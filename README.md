@@ -1,4 +1,4 @@
-# Network Toolkit (netkit)
+# Network Toolkit (net-worker)
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
@@ -61,7 +61,7 @@ uv sync
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Verify installation
-netkit --help
+nw --help
 ```
 
 
@@ -119,7 +119,7 @@ uv pip install --python .venv-buildtest/bin/python dist/*.whl
 
 # Smoke tests: import, version, and CLI help
 .venv-buildtest/bin/python -c "import network_toolkit as nt; import network_toolkit.__about__ as a; print(a.__version__)"
-.venv-buildtest/bin/netkit --help | head -n 20
+.venv-buildtest/bin/nw --help | head -n 20
 ```
 
 Publishing:
@@ -293,7 +293,7 @@ device_groups:
     match_tags: ["switch"]
 ```
 
-When you run `netkit run all_switches system_info`, each device automatically gets the correct vendor-specific commands!
+When you run `nw run all_switches system_info`, each device automatically gets the correct vendor-specific commands!
 
 **Important**: All device credentials are now stored in environment variables for security!
   store_results: true
@@ -362,50 +362,50 @@ The toolkit uses Pydantic for strict configuration validation:
 
 ```bash
 # Test connectivity to a device
-netkit connect my-router
+nw connect my-router
 
 # Run a single command
-netkit run my-router "/system/resource/print"
+nw run my-router "/system/resource/print"
 # Open tmux with SSH panes (requires tmux, libtmux; sshpass for password auth)
-netkit ssh my-router --no-attach
+nw ssh my-router --no-attach
 
 See docs/tmux-ssh.md for details on layouts, sync, and authentication modes.
 
 # Run a command sequence (via `run`)
-netkit run my-router health_check
+nw run my-router health_check
 
 # Run commands on a device group
-netkit group-run critical_devices "/system/resource/print"
+nw group-run critical_devices "/system/resource/print"
 ```
 
 ### Advanced Operations
 
 ```bash
 # Upload firmware
-netkit upload my-router firmware.npk
+nw upload my-router firmware.npk
 
 # Download configuration backup
-netkit download my-router config.backup
+nw download my-router config.backup
 
 # Execute multiple commands with results storage
-netkit run my-router "/system/resource/print" "/interface/print" \
+nw run my-router "/system/resource/print" "/interface/print" \
   --store-results --results-format json
 
 # Run commands with custom timeout
-netkit run my-router "/system/backup/save" --timeout 120
+nw run my-router "/system/backup/save" --timeout 120
 ```
 
 ### Working with Groups
 
 ```bash
 # List all configured groups
-netkit groups
+nw groups
 
 # Show group members
-netkit group-members critical_devices
+nw group-members critical_devices
 
 # Run sequence on entire group (use `run` with sequence name)
-netkit run all_routers basic_info
+nw run all_routers basic_info
 ```
 
 ## 📁 Project Structure
@@ -472,21 +472,21 @@ uv run ruff check && uv run ruff format && uv run mypy src/ && uv run pytest
 ## 📚 Command Reference
 
 ### Device Operations
-- `netkit connect <device>` - Test device connectivity
-- `netkit run <device> <command|sequence>` - Execute a raw command or a predefined sequence
-- `netkit upload <device> <file>` - Upload file to device
-- `netkit download <device> <file>` - Download file from device
+- `nw connect <device>` - Test device connectivity
+- `nw run <device> <command|sequence>` - Execute a raw command or a predefined sequence
+- `nw upload <device> <file>` - Upload file to device
+- `nw download <device> <file>` - Download file from device
 
 ### Group Operations
-- `netkit groups` - List all device groups
-- `netkit group-members <group>` - Show group membership
-- `netkit group-run <group> <command>` - Run command on group
-- `netkit run <group> <sequence>` - Run sequence on group
+- `nw groups` - List all device groups
+- `nw group-members <group>` - Show group membership
+- `nw group-run <group> <command>` - Run command on group
+- `nw run <group> <sequence>` - Run sequence on group
 
 ### Utility Commands
-- `netkit config validate` - Validate configuration file
-- `netkit config show` - Display current configuration
-- `netkit devices` - List all configured devices
+- `nw config validate` - Validate configuration file
+- `nw config show` - Display current configuration
+- `nw devices` - List all configured devices
 
 ## 🤝 Contributing
 
@@ -524,7 +524,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Support
 
-- **Documentation**: See inline help with `netkit --help`
+- **Documentation**: See inline help with `nw --help`
 - **Issues**: Report bugs and request features on GitHub
 - **Discussions**: Join community discussions for help and ideas
 
@@ -550,12 +550,12 @@ config/
 ### Unified Command Interface
 ```bash
 # One simple command pattern for everything:
-netkit run [device|group] [command|sequence] [options]
+nw run [device|group] [command|sequence] [options]
 
 # Examples (auto-detects device vs group, command vs sequence):
-netkit run sw-acc1 health_check                    # Device + Sequence
-netkit run access_switches "/system/resource/print" # Group + Command
-netkit run critical_infrastructure security_audit   # Group + Sequence
+nw run sw-acc1 health_check                    # Device + Sequence
+nw run access_switches "/system/resource/print" # Group + Command
+nw run critical_infrastructure security_audit   # Group + Sequence
 ```
 
 ### Key Benefits
@@ -576,8 +576,8 @@ export NT_DEFAULT_USER="admin"
 export NT_DEFAULT_PASSWORD="your_secure_password"
 
 # 3. Use simplified commands
-netkit run sw-acc1 health_check
-netkit run access_switches security_audit --store-results
+nw run sw-acc1 health_check
+nw run access_switches security_audit --store-results
 ```
 
 ### Migration Path
@@ -641,22 +641,22 @@ device_groups:
 ### 2. Multi-Vendor Usage Examples
 ```bash
 # List all configured devices (shows vendor types)
-netkit list-devices
+nw list-devices
 
 # Execute vendor-specific commands automatically
-netkit run mikrotik-sw1 system_info  # Uses: /system/identity/print, etc.
-netkit run cisco-sw1 system_info     # Uses: show version, show inventory, etc.
+nw run mikrotik-sw1 system_info  # Uses: /system/identity/print, etc.
+nw run cisco-sw1 system_info     # Uses: show version, show inventory, etc.
 
 # Run sequences on mixed-vendor groups (auto-selects correct commands)
-netkit run office_switches health_check
+nw run office_switches health_check
 
 # List available sequences by vendor
-netkit list-sequences --vendor mikrotik_routeros
-netkit list-sequences --vendor cisco_iosxe
-netkit run office_switches health_check
+nw list-sequences --vendor mikrotik_routeros
+nw list-sequences --vendor cisco_iosxe
+nw run office_switches health_check
 
 # Store results automatically
-netkit run office_switches health_check --store-results
+nw run office_switches health_check --store-results
 ```
 
 ## Usage Guide
@@ -666,25 +666,25 @@ netkit run office_switches health_check --store-results
 #### Single Device Commands
 ```bash
 # Basic command execution
-netkit run DEVICE_NAME "COMMAND"
+nw run DEVICE_NAME "COMMAND"
 
 # Examples
-netkit run sw-office1 "/system/resource/print"
-netkit run sw-office1 "/interface/print" --verbose
-netkit run sw-office1 "/export compact" --store-results
+nw run sw-office1 "/system/resource/print"
+nw run sw-office1 "/interface/print" --verbose
+nw run sw-office1 "/export compact" --store-results
 ```
 
 #### Command Sequences
 ```bash
 # Run predefined sequence
-netkit run DEVICE_NAME SEQUENCE_NAME
+nw run DEVICE_NAME SEQUENCE_NAME
 
 # Or use run with a sequence name
-netkit run DEVICE_NAME SEQUENCE_NAME
+nw run DEVICE_NAME SEQUENCE_NAME
 
 # Examples
-netkit run sw-office1 health_check
-netkit run office_switches health_check  # Run sequence on a group
+nw run sw-office1 health_check
+nw run office_switches health_check  # Run sequence on a group
 ```
 
 ### Group Operations
@@ -692,38 +692,38 @@ netkit run office_switches health_check  # Run sequence on a group
 #### Group Commands
 ```bash
 # Run command on all devices in group
-netkit group-run GROUP_NAME "COMMAND"
+nw group-run GROUP_NAME "COMMAND"
 
 # Examples
-netkit group-run office_switches "/system/clock/print"
-netkit group-run critical_devices "/system/resource/print"
+nw group-run office_switches "/system/clock/print"
+nw group-run critical_devices "/system/resource/print"
 ```
 
 #### Group Sequences
 ```bash
 # Run sequence on all devices in group
-netkit run GROUP_NAME SEQUENCE_NAME
+nw run GROUP_NAME SEQUENCE_NAME
 
 # Examples
-netkit run office_switches health_check
-netkit run all_switches security_audit --store-results
+nw run office_switches health_check
+nw run all_switches security_audit --store-results
 ```
 
 ### Information Commands
 
 ```bash
 # List devices and groups
-netkit list-devices
-netkit list-groups
-netkit list-global-sequences
+nw list-devices
+nw list-groups
+nw list-global-sequences
 
 # Device information
-netkit info DEVICE_NAME
-netkit list-sequences DEVICE_NAME
+nw info DEVICE_NAME
+nw list-sequences DEVICE_NAME
 
 # Configuration validation
-netkit config-validate
-netkit config-validate --verbose
+nw config-validate
+nw config-validate --verbose
 ```
 
 ## Results Storage
@@ -748,16 +748,16 @@ When `--store-results` is used, results are organized as follows:
 
 ## Layered Sequences (Built-in, Repo, User)
 
-Netkit discovers sequences from multiple layers with simple overrides:
+Net-Worker discovers sequences from multiple layers with simple overrides:
 
-- Built-in defaults shipped with netkit (no setup)
+- Built-in defaults shipped with net-worker (no setup)
 - Repo-provided vendor files in `config/sequences/<vendor>/*.yml`
 - User-defined files in `~/.config/netkit/sequences/<vendor>/*.yml` (highest priority)
 
 You can list merged sequences by vendor:
 
 ```bash
-netkit list-sequences --vendor mikrotik_routeros
+nw list-sequences --vendor mikrotik_routeros
 ```
 
 Add a user sequence quickly:
@@ -770,7 +770,7 @@ printf "sequences:\n  my_quick_diag:\n    description: Quick diagnostics\n    ca
 Then run it:
 
 ```bash
-netkit run DEVICE_NAME my_quick_diag
+nw run DEVICE_NAME my_quick_diag
 ```
 
 See more examples in `docs/examples/user_sequences/`.
@@ -782,7 +782,7 @@ See more examples in `docs/examples/user_sequences/`.
 # Network Toolkit Results
 # Generated: 2025-01-15T14:30:22+00:00
 # Device: sw-office1
-# NetKit Command: run sw-office1 health_check
+# NetWorker Command: run sw-office1 health_check
 
 Command: /system/resource/print
 ================================================================================
@@ -799,7 +799,7 @@ version: 7.8 (stable)
   "device_name": "sw-office1",
   "command": "/system/resource/print",
   "output": "uptime: 2w3d6h15m40s...",
-  "netkit_command": "run sw-office1 health_check"
+  "nw_command": "run sw-office1 health_check"
 }
 ```
 
@@ -812,7 +812,7 @@ version: 7.8 (stable)
 --results-dir /path/to/custom/results
 
 # Combine with any command
-netkit run sw-office1 "/system/clock/print" --store-results --results-dir ./audit-results
+nw run sw-office1 "/system/clock/print" --store-results --results-dir ./audit-results
 ```
 
 ## Configuration
@@ -993,37 +993,37 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 #### Daily Health Checks
 ```bash
 # Check all critical devices
-netkit run critical_devices health_check --store-results
+nw run critical_devices health_check --store-results
 
 # Comprehensive system audit
-netkit run all_switches security_audit --store-results --results-dir ./audit-$(date +%Y%m%d)
+nw run all_switches security_audit --store-results --results-dir ./audit-$(date +%Y%m%d)
 ```
 
 #### Configuration Management
 ```bash
 # Export configurations
-netkit group-run all_switches "/export compact" --store-results
+nw group-run all_switches "/export compact" --store-results
 
 # Check system resources
-netkit group-run all_switches "/system/resource/print" --store-results
+nw group-run all_switches "/system/resource/print" --store-results
 ```
 
 #### Troubleshooting
 ```bash
 # Check interface status
-netkit run problematic-switch interface_status --verbose
+nw run problematic-switch interface_status --verbose
 
 # Get detailed logs
-netkit run problematic-switch "/log/print last=100 where topics~\"error\"" --store-results
+nw run problematic-switch "/log/print last=100 where topics~\"error\"" --store-results
 ```
 
 #### Bulk Operations
 ```bash
 # Update system time on all devices
-netkit group-run all_switches "/system/ntp/client/set enabled=yes server-dns-names=pool.ntp.org"
+nw group-run all_switches "/system/ntp/client/set enabled=yes server-dns-names=pool.ntp.org"
 
 # Check firmware versions
-netkit group-run all_switches "/system/routerboard/print" --store-results
+nw group-run all_switches "/system/routerboard/print" --store-results
 ```
 
 ## Troubleshooting
@@ -1039,19 +1039,19 @@ ping DEVICE_IP
 ssh admin@DEVICE_IP
 
 # Verify credentials in config
-netkit info DEVICE_NAME
+nw info DEVICE_NAME
 ```
 
 #### Configuration Issues
 ```bash
 # Validate configuration
-netkit config-validate --verbose
+nw config-validate --verbose
 
 # Check device groups
-netkit list-groups
+nw list-groups
 
 # Verify sequences
-netkit list-global-sequences
+nw list-global-sequences
 ```
 
 #### Results Storage Issues
@@ -1060,17 +1060,17 @@ netkit list-global-sequences
 ls -la /path/to/results/
 
 # Test with custom directory
-netkit run DEVICE "/system/clock/print" --store-results --results-dir ./test-results
+nw run DEVICE "/system/clock/print" --store-results --results-dir ./test-results
 ```
 
 ### Debug Mode
 ```bash
 # Enable verbose logging
-netkit --verbose COMMAND
+nw --verbose COMMAND
 
 # Enable debug logging
 export NETKIT_LOG_LEVEL=DEBUG
-netkit COMMAND
+nw COMMAND
 ```
 
 ## 📚 Documentation

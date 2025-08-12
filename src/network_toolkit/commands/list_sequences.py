@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""`netkit list-sequences` command implementation."""
+"""`nw list-sequences` command implementation."""
 
 from __future__ import annotations
 

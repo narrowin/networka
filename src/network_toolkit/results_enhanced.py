@@ -51,7 +51,7 @@ class ResultsManager:
         self.results_format = config.general.results_format
         self.include_timestamp = config.general.results_include_timestamp
         self.include_command = config.general.results_include_command
-        self.command_context = command_context  # Store the netkit command used
+        self.command_context = command_context  # Store the nw command used
         # Cached session directory for this run
         self.session_dir: Path | None = None
 
@@ -117,7 +117,7 @@ class ResultsManager:
             "device_name": device_name,
             "command": command,
             "output": output,
-            "netkit_command": self.command_context,
+            "nw_command": self.command_context,
             "metadata": metadata or {},
         }
 
@@ -159,7 +159,7 @@ class ResultsManager:
                 "total_commands": len(results),
                 "command": command,
                 "output": output,
-                "netkit_command": self.command_context,
+                "nw_command": self.command_context,
                 "metadata": metadata or {},
             }
 
@@ -180,7 +180,7 @@ class ResultsManager:
             "device_name": device_name,
             "sequence_name": sequence_name,
             "commands_executed": len(results),
-            "netkit_command": self.command_context,
+            "nw_command": self.command_context,
             "results_summary": {
                 cmd: f"Command {i + 1}: {cmd}" for i, cmd in enumerate(results.keys())
             },
@@ -232,7 +232,7 @@ class ResultsManager:
                     "type": "sequence" if is_sequence else "command",
                     "status": "failed",
                     "error": error,
-                    "netkit_command": self.command_context,
+                    "nw_command": self.command_context,
                 }
 
                 try:
@@ -271,7 +271,7 @@ class ResultsManager:
             "group_name": group_name,
             "command_or_sequence": command_or_sequence,
             "type": "sequence" if is_sequence else "command",
-            "netkit_command": self.command_context,
+            "nw_command": self.command_context,
             "total_devices": len(group_results),
             "succeeded_devices": len(succeeded_devices),
             "failed_devices": len(failed_devices),
@@ -309,8 +309,8 @@ class ResultsManager:
                 f.write("# Network Toolkit Results\n")
                 f.write(f"# Generated: {data['timestamp']}\n")
                 f.write(f"# Device: {data['device_name']}\n")
-                if data.get("netkit_command"):
-                    f.write(f"# NetKit Command: {data['netkit_command']}\n")
+                if data.get("nw_command"):
+                    f.write(f"# NW Command: {data['nw_command']}\n")
                 f.write("\n")
 
                 if is_single_command:

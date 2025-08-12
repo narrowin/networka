@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""`netkit firmware-upgrade` command implementation (device or group).
+"""`nw firmware-upgrade` command implementation (device or group).
 
 Uploads a RouterOS .npk package and triggers reboot to apply it.
 """

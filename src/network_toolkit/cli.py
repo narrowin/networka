@@ -100,17 +100,17 @@ class CategorizedHelpGroup(TyperGroup):
 
 # Typer application instance
 help_text = (
-    "\n    🌐 Network Automation Toolkit (netkit)\n\n"
+    "\n    🌐 Network Worker (nw)\n\n"
     "    A powerful CLI tool for automating MikroTik RouterOS devices and beyond.\n"
     "    Built with async/await support and type safety in mind.\n\n"
     "    📋 QUICK START:\n"
-    "      netkit run sw-acc1 '/system/clock/print'  # Execute command\n"
-    "      netkit run office_switches system_info    # Run sequence on group\n\n"
-    "    📖 For detailed help on any command: netkit <command> --help\n"
+    "      nw run sw-acc1 '/system/clock/print'  # Execute command\n"
+    "      nw run office_switches system_info    # Run sequence on group\n\n"
+    "    📖 For detailed help on any command: nw <command> --help\n"
     "    📁 Default config directory: config/ (use --config to override)\n    "
 )
 app = typer.Typer(
-    name="netkit",
+    name="nw",
     help=help_text,
     no_args_is_help=True,
     rich_markup_mode="rich",

@@ -10,16 +10,16 @@ Add the `--interactive-auth` or `-i` flag to any command that connects to device
 
 ```bash
 # Device information with interactive auth
-netkit info sw-acc1 --interactive-auth
+nw info sw-acc1 --interactive-auth
 
 # Execute commands with interactive auth
-netkit run sw-acc1 '/system/identity/print' --interactive-auth
+nw run sw-acc1 '/system/identity/print' --interactive-auth
 
 # Multiple devices with interactive auth (short flag)
-netkit run sw-acc1,sw-acc2 '/system/clock/print' -i
+nw run sw-acc1,sw-acc2 '/system/clock/print' -i
 
 # Group operations with interactive auth
-netkit run access_switches system_info --interactive-auth
+nw run access_switches system_info --interactive-auth
 ```
 
 ## Security Benefits
@@ -84,7 +84,7 @@ netkit run access_switches system_info --interactive-auth
 
 ```bash
 # Info command with interactive auth
-$ netkit info sw-acc1 --interactive-auth
+$ nw info sw-acc1 --interactive-auth
 Interactive authentication mode enabled
 Username [admin]: admin
 Password: ********
@@ -102,7 +102,7 @@ Device: sw-acc1
 
 ```bash
 # Execute command with interactive auth
-$ netkit run sw-acc1 '/system/identity/print' -i
+$ nw run sw-acc1 '/system/identity/print' -i
 Interactive authentication mode enabled
 Username [admin]: myuser
 Password: ********
@@ -117,7 +117,7 @@ name="MikroTik"
 
 ```bash
 # Run on multiple devices
-$ netkit run sw-acc1,sw-acc2 '/system/clock/print' --interactive-auth
+$ nw run sw-acc1,sw-acc2 '/system/clock/print' --interactive-auth
 Interactive authentication mode enabled
 Username [admin]: admin
 Password: ********

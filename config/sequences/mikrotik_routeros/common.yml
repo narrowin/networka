@@ -94,8 +94,8 @@ sequences:
     category: "maintenance"
     timeout: 180
     commands:
-      - "/system/backup/save name=netkit-backup"
-      - "/export compact file=netkit-export"
+      - "/system/backup/save name=nw-backup"
+      - "/export compact file=nw-export"
       - "/system/resource/print"
 
   pre_maintenance:

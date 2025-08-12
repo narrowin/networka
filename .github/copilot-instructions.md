@@ -1,9 +1,9 @@
 ````instructions
-# GitHub Copilot Instructions for Network Toolkit (netkit)
+# GitHub Copilot Instructions for Network Worker (nw)
 
 ## Project Overview & Mission
 
-The **Network Toolkit (netkit)** is a production-ready, async Python CLI tool for automating MikroTik RouterOS devices and other network equipment. This is **NOT a prototype** - it's a mature, fully-featured tool with 3000+ lines of well-architected code.
+The **Network Worker (nw)** is a production-ready, async Python CLI tool for automating MikroTik RouterOS devices and other network equipment. This is **NOT a prototype** - it's a mature, fully-featured tool with 3000+ lines of well-architected code.
 
 THE BOTH MOST IMPORTANT PRADIGMS ARE: CLARITY AND SIMPLICITY!
 FOLLOW FOREMOST THE KISS PRINCIPLE: Keep It Simple, Stupid!
@@ -52,24 +52,24 @@ DONT USE EMOJIS OR ANY OTHER STUPID SYMBOLS in help, or markdown or even the Cod
 ### 🚀 Primary Commands (ALL IMPLEMENTED)
 ```bash
 # Device Information & Management
-netkit info <device>                    # Show device details and connection status
-netkit list-devices                     # List all configured devices
-netkit list-device-groups              # Show device groups
+nw info <device>                    # Show device details and connection status
+nw list-devices                     # List all configured devices
+nw list-device-groups              # Show device groups
 
 # Command Execution
-netkit run <device> <command>           # Execute single command
+nw run <device> <command>           # Execute single command
 
 # Advanced Tag-Based Operations
-netkit list-sequences                   # List available command sequences
+nw list-sequences                   # List available command sequences
 
 # File Operations
-netkit upload <device> <local> <remote>    # Upload file to device
-netkit download <device> <remote> <local>    # Download file from device
+nw upload <device> <local> <remote>    # Upload file to device
+nw download <device> <remote> <local>    # Download file from device
 
 # System Operations
-netkit backup <device>                  # Create device backup
-netkit reboot <device>                  # Reboot device with confirmation
-netkit upload-firmware <device> <file> # Upload and install firmware
+nw backup <device>                  # Create device backup
+nw reboot <device>                  # Reboot device with confirmation
+nw upload-firmware <device> <file> # Upload and install firmware
 ```
 
 ### 📊 Results Management (Comprehensive System)
@@ -291,13 +291,13 @@ def get_device_credentials(device_name: str) -> tuple[str, str]:
 ### 🔍 Debug Modes
 ```bash
 # Enable verbose logging
-netkit --verbose run sw-acc1 "/system/clock/print"
+nw --verbose run sw-acc1 "/system/clock/print"
 
 # Check device configuration
-netkit info sw-acc1
+nw info sw-acc1
 
 # Test connectivity
-netkit run sw-acc1 "/system/identity/print"
+nw run sw-acc1 "/system/identity/print"
 
 # Validate configuration file
 python -c "from network_toolkit.config import load_config; load_config('devices.yml')"

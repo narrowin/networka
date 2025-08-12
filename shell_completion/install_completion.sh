@@ -1,5 +1,5 @@
 #!/bin/bash
-# Installation script for netkit completions (bash, zsh, fish)
+# Installation script for nw completions (bash, zsh, fish)
 
 set -euo pipefail
 
@@ -29,11 +29,11 @@ print_error() {
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-COMPLETION_BASH="${SCRIPT_DIR}/bash_completion_netkit.sh"
-COMPLETION_ZSH="${SCRIPT_DIR}/zsh_completion_netkit.zsh"
-COMPLETION_FISH="${SCRIPT_DIR}/fish_completion_netkit.fish"
+COMPLETION_BASH="${SCRIPT_DIR}/bash_completion_nw.sh"
+COMPLETION_ZSH="${SCRIPT_DIR}/zsh_completion_nw.zsh"
+COMPLETION_FISH="${SCRIPT_DIR}/fish_completion_nw.fish"
 
-print_status "Installing netkit shell completions..."
+print_status "Installing nw shell completions..."
 
 # Check if we have bash-completion installed
 if ! command -v bash >/dev/null 2>&1; then
@@ -87,17 +87,17 @@ install_system_wide() {
 
     local ok=0
     if [[ $DO_BASH -eq 1 ]] && [[ -n "$bash_dir" ]] && [[ -f "$COMPLETION_BASH" ]]; then
-        if sudo cp "$COMPLETION_BASH" "$bash_dir/netkit" 2>/dev/null; then
-            ok=1; print_success "Bash: $bash_dir/netkit"; fi
+        if sudo cp "$COMPLETION_BASH" "$bash_dir/nw" 2>/dev/null; then
+            ok=1; print_success "Bash: $bash_dir/nw"; fi
     fi
     if [[ $DO_ZSH -eq 1 ]] && [[ -n "$zsh_dir" ]] && [[ -f "$COMPLETION_ZSH" ]]; then
         # zsh requires leading underscore for function name files
-        if sudo cp "$COMPLETION_ZSH" "$zsh_dir/_netkit" 2>/dev/null; then
-            ok=1; print_success "Zsh: $zsh_dir/_netkit"; fi
+        if sudo cp "$COMPLETION_ZSH" "$zsh_dir/_nw" 2>/dev/null; then
+            ok=1; print_success "Zsh: $zsh_dir/_nw"; fi
     fi
     if [[ $DO_FISH -eq 1 ]] && [[ -n "$fish_dir" ]] && [[ -f "$COMPLETION_FISH" ]]; then
-        if sudo cp "$COMPLETION_FISH" "$fish_dir/netkit.fish" 2>/dev/null; then
-            ok=1; print_success "fish: $fish_dir/netkit.fish"; fi
+        if sudo cp "$COMPLETION_FISH" "$fish_dir/nw.fish" 2>/dev/null; then
+            ok=1; print_success "fish: $fish_dir/nw.fish"; fi
     fi
 
     if [[ $ok -eq 1 ]]; then
@@ -120,10 +120,10 @@ install_user_specific() {
         local profile="$HOME/.profile"
         local target_file=""
         if [[ -f "$bashrc" ]]; then target_file="$bashrc"; elif [[ -f "$bash_profile" ]]; then target_file="$bash_profile"; elif [[ -f "$profile" ]]; then target_file="$profile"; else target_file="$bashrc"; touch "$target_file"; fi
-        if ! grep -q "bash_completion_netkit.sh" "$target_file" 2>/dev/null; then
+        if ! grep -q "bash_completion_nw.sh" "$target_file" 2>/dev/null; then
             {
                 echo "";
-                echo "# netkit bash completion";
+                echo "# nw bash completion";
                 echo "source \"$COMPLETION_BASH\"";
             } >> "$target_file"
             print_success "Bash: added source to $target_file"
@@ -136,20 +136,20 @@ install_user_specific() {
     if [[ $DO_ZSH -eq 1 ]] && [[ -f "$COMPLETION_ZSH" ]]; then
         local zfunc_dir="$HOME/.zsh/completions"
         mkdir -p "$zfunc_dir"
-        cp "$COMPLETION_ZSH" "$zfunc_dir/_netkit"
+        cp "$COMPLETION_ZSH" "$zfunc_dir/_nw"
         if ! grep -q "fpath+=\$HOME/.zsh/completions" "$HOME/.zshrc" 2>/dev/null; then
             echo 'fpath+=$HOME/.zsh/completions' >> "$HOME/.zshrc"
             echo 'autoload -Uz compinit && compinit' >> "$HOME/.zshrc"
         fi
-        print_success "Zsh: installed to $zfunc_dir/_netkit"
+        print_success "Zsh: installed to $zfunc_dir/_nw"
     fi
 
     # fish
     if [[ $DO_FISH -eq 1 ]] && [[ -f "$COMPLETION_FISH" ]]; then
         local fish_dir="$HOME/.config/fish/completions"
         mkdir -p "$fish_dir"
-        cp "$COMPLETION_FISH" "$fish_dir/netkit.fish"
-        print_success "fish: installed to $fish_dir/netkit.fish"
+        cp "$COMPLETION_FISH" "$fish_dir/nw.fish"
+        print_success "fish: installed to $fish_dir/nw.fish"
     fi
 
     print_status "User-specific installation complete. Restart your shell."
@@ -164,25 +164,25 @@ show_manual_instructions() {
     echo "  - Source directly in your shell profile:"
     echo "      source \"$COMPLETION_BASH\""
     echo "  - Or copy to a completion directory (one of):"
-    echo "      sudo cp \"$COMPLETION_BASH\" /etc/bash_completion.d/netkit"
-    echo "      sudo cp \"$COMPLETION_BASH\" /usr/share/bash-completion/completions/netkit"
-    echo "      sudo cp \"$COMPLETION_BASH\" /usr/local/etc/bash_completion.d/netkit"
+    echo "      sudo cp \"$COMPLETION_BASH\" /etc/bash_completion.d/nw"
+    echo "      sudo cp \"$COMPLETION_BASH\" /usr/share/bash-completion/completions/nw"
+    echo "      sudo cp \"$COMPLETION_BASH\" /usr/local/etc/bash_completion.d/nw"
     echo ""
     echo "Zsh:"
     echo "  - Copy to a directory in your fpath and run compinit:"
-    echo "      mkdir -p ~/.zsh/completions && cp \"$COMPLETION_ZSH\" ~/.zsh/completions/_netkit"
+    echo "      mkdir -p ~/.zsh/completions && cp \"$COMPLETION_ZSH\" ~/.zsh/completions/_nw"
     echo "      echo 'fpath+=\$HOME/.zsh/completions' >> ~/.zshrc"
     echo "      echo 'autoload -Uz compinit && compinit' >> ~/.zshrc"
     echo ""
     echo "fish:"
     echo "  - Copy to your fish completions directory:"
-    echo "      mkdir -p ~/.config/fish/completions && cp \"$COMPLETION_FISH\" ~/.config/fish/completions/netkit.fish"
+    echo "      mkdir -p ~/.config/fish/completions && cp \"$COMPLETION_FISH\" ~/.config/fish/completions/nw.fish"
     echo ""
 }
 
 # Main installation logic
 main() {
-    print_status "netkit completion installer"
+    print_status "nw completion installer"
     echo ""
     # Parse optional per-shell flags
     while [[ $# -gt 0 ]]; do
@@ -222,7 +222,7 @@ main() {
     if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
     echo "Usage: $0 [OPTIONS] [--bash|--zsh|--fish|--all]"
         echo ""
-    echo "Install shell completions for netkit (bash/zsh/fish)"
+    echo "Install shell completions for nw (bash/zsh/fish)"
         echo ""
         echo "Options:"
         echo "  -s, --system     Install system-wide (requires sudo)"
@@ -247,7 +247,7 @@ main() {
     echo ""
     print_success "Installation complete!"
     print_status "To test the completion, try:"
-    echo "    netkit <TAB><TAB>"
+    echo "    nw <TAB><TAB>"
     echo ""
     print_status "If completion doesn't work immediately, try:"
     echo "    # bash only:"

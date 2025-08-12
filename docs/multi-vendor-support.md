@@ -143,41 +143,41 @@ groups:
 
 ```bash
 # Run system_info on a MikroTik device (uses MikroTik commands)
-netkit run sw-mikrotik system_info
+nw run sw-mikrotik system_info
 
 # Run system_info on a Cisco device (uses Cisco commands)
-netkit run sw-cisco system_info
+nw run sw-cisco system_info
 
 # Run on a group with mixed vendors (automatically uses correct commands)
-netkit run all_switches health_check
+nw run all_switches health_check
 ```
 
 ### Listing Sequences by Vendor
 
 ```bash
 # List all sequences for all vendors
-netkit list-sequences
+nw list-sequences
 
 # List sequences for a specific vendor
-netkit list-sequences --vendor mikrotik_routeros
+nw list-sequences --vendor mikrotik_routeros
 
 # List sequences by category
-netkit list-sequences --category monitoring
+nw list-sequences --category monitoring
 
 # Verbose output with command details
-netkit list-sequences --vendor cisco_iosxe --verbose
+nw list-sequences --vendor cisco_iosxe --verbose
 ```
 
 ### Managing Multi-Vendor Groups
 
 ```bash
 # List devices by vendor
-netkit list-devices | grep cisco
-netkit list-devices | grep mikrotik
+nw list-devices | grep cisco
+nw list-devices | grep mikrotik
 
 # Run operations on vendor-specific groups
-netkit run cisco_devices health_check
-netkit run mikrotik_devices system_info
+nw run cisco_devices health_check
+nw run mikrotik_devices system_info
 ```
 
 ## Adding New Vendors
@@ -253,10 +253,10 @@ Different vendors may have different:
 Always test new vendor sequences:
 ```bash
 # Test individual commands first
-netkit run new-device "show version"
+nw run new-device "show version"
 
 # Then test sequences
-netkit run new-device system_info
+nw run new-device system_info
 ```
 
 ## Migration from Single-Vendor
@@ -293,13 +293,13 @@ Error: Sequence 'system_info' not found for device type
 ### Debug Commands
 ```bash
 # Check device configuration
-netkit info device-name
+nw info device-name
 
 # List available sequences for device's vendor
-netkit list-sequences --vendor cisco_iosxe
+nw list-sequences --vendor cisco_iosxe
 
 # Test with verbose logging
-netkit --verbose sequence device-name system_info
+nw --verbose sequence device-name system_info
 ```
 
 ## Future Enhancements

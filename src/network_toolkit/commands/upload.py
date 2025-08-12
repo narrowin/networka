@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""`netkit upload` command implementation."""
+"""`nw upload` command implementation."""
 
 from __future__ import annotations
 

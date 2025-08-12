@@ -1,6 +1,6 @@
-# Shell Completions for netkit
+# Shell Completions for nw
 
-This directory contains dynamic shell completions for the `netkit` (Network Automation Toolkit) command.
+This directory contains dynamic shell completions for the `nw` (Network Worker) command.
 Supported shells:
 - Bash (Linux/macOS)
 - Zsh (Linux/macOS)
@@ -10,7 +10,7 @@ Supported shells:
 
 The completions provide intelligent suggestions powered by the CLI itself:
 
-- **Commands**: All netkit subcommands (info, run, list-*, etc.)
+- **Commands**: All nw subcommands (info, run, list-*, etc.)
 - **Device names**: Read from your active configuration
 - **Device groups**: From the `device_groups` section
 - **Command sequences**: Global, vendor, and device-specific sequences
@@ -46,23 +46,23 @@ Use the provided installation script (supports bash/zsh/fish):
 Add this line to your `~/.bashrc`, `~/.bash_profile`, or `~/.profile`:
 
 ```bash
-source "/path/to/bash_completion_netkit.sh"
+source "/path/to/bash_completion_nw.sh"
 ```
 
-For zsh, copy `zsh_completion_netkit.zsh` to one of your `$fpath` directories as `_netkit`, e.g.:
+For zsh, copy `zsh_completion_nw.zsh` to one of your `$fpath` directories as `_nw`, e.g.:
 
 ```bash
 mkdir -p ~/.zsh/completions
-cp zsh_completion_netkit.zsh ~/.zsh/completions/_netkit
+cp zsh_completion_nw.zsh ~/.zsh/completions/_nw
 echo 'fpath+=$HOME/.zsh/completions' >> ~/.zshrc
 echo 'autoload -Uz compinit && compinit' >> ~/.zshrc
 ```
 
-For fish, copy `fish_completion_netkit.fish`:
+For fish, copy `fish_completion_nw.fish`:
 
 ```bash
 mkdir -p ~/.config/fish/completions
-cp fish_completion_netkit.fish ~/.config/fish/completions/netkit.fish
+cp fish_completion_nw.fish ~/.config/fish/completions/nw.fish
 ```
 
 #### Option 2: System-wide installation (bash)
@@ -71,10 +71,10 @@ Copy the completion file to the bash completion directory:
 
 ```bash
 # Most Linux distributions
-sudo cp bash_completion_netkit.sh /etc/bash_completion.d/netkit
+sudo cp bash_completion_nw.sh /etc/bash_completion.d/nw
 
 # Some distributions use this path
-sudo cp bash_completion_netkit.sh /usr/share/bash-completion/completions/netkit
+sudo cp bash_completion_nw.sh /usr/share/bash-completion/completions/nw
 ```
 
 #### Option 3: User-specific bash-completion
@@ -83,72 +83,72 @@ If you use bash-completion locally:
 
 ```bash
 mkdir -p ~/.local/share/bash-completion/completions
-cp bash_completion_netkit.sh ~/.local/share/bash-completion/completions/netkit
+cp bash_completion_nw.sh ~/.local/share/bash-completion/completions/nw
 ```
 
 ## Usage Examples
 
-Once installed, you can use TAB completion with the `netkit` command:
+Once installed, you can use TAB completion with the `nw` command:
 
 ### Basic Command Completion
 
 ```bash
-netkit <TAB><TAB>
+nw <TAB><TAB>
 # Shows: info run list-devices ...
 
-netkit list-<TAB><TAB>
+nw list-<TAB><TAB>
 # Shows: list-devices list-sequences list-groups ...
 ```
 
 ### Device Name Completion
 
 ```bash
-netkit info <TAB><TAB>
+nw info <TAB><TAB>
 # Shows: core1br core2br vpn1br sw-acc1 sw-dist1 ...
 
-netkit run sw-<TAB><TAB>
+nw run sw-<TAB><TAB>
 # Shows: sw-acc1 sw-acc2 sw-dist1
 ```
 
 ### Group Name Completion (as run target)
 
 ```bash
-netkit run <TAB><TAB>
+nw run <TAB><TAB>
 # Shows device and group names
 ```
 
 ### Sequence Completion (via run)
 
 ```bash
-netkit run sw-acc1 <TAB><TAB>
+nw run sw-acc1 <TAB><TAB>
 # Shows: health_check system_info interface_monitoring security_audit ...
 # Plus device-specific sequences: interface_status
 
 # Or use run with sequences (device or group)
-netkit run sw-acc1 <TAB><TAB>
+nw run sw-acc1 <TAB><TAB>
 # Shows: commands or known sequences
 
-netkit run core <TAB><TAB>
+nw run core <TAB><TAB>
 # Shows global sequences for groups
 ```
 
 ### Vendor/user-defined sequence completion
 
 ```bash
-netkit run sw-acc1 <TAB><TAB>
+nw run sw-acc1 <TAB><TAB>
 # Includes vendor/user sequences resolved via device type
 ```
 
 ### File and Option Completion
 
 ```bash
-netkit upload sw-acc1 <TAB>
+nw upload sw-acc1 <TAB>
 # Shows file completion for local files
 
-netkit info --<TAB><TAB>
+nw info --<TAB><TAB>
 # Shows: --config --verbose --help
 
-netkit run --config <TAB><TAB>
+nw run --config <TAB><TAB>
 # Shows *.yml and *.yaml files
 ```
 
@@ -193,13 +193,13 @@ The completion gracefully handles:
 
 1. **Check if completion is loaded:**
    ```bash
-   complete -p netkit
-   # Should show: complete -F _netkit netkit
+   complete -p nw
+   # Should show: complete -F _nw nw
    ```
 
 2. **Manually load completion:**
    ```bash
-   source /path/to/bash_completion_netkit.sh
+   source /path/to/bash_completion_nw.sh
    ```
 
 3. **Check bash-completion is installed:**
@@ -217,7 +217,7 @@ The completion gracefully handles:
 
 1. **Verify YAML syntax:**
    ```bash
-   netkit config-validate
+   nw config-validate
    ```
 
 2. **Check file permissions:**
@@ -227,7 +227,7 @@ The completion gracefully handles:
 
 3. **Test with explicit config:**
    ```bash
-   netkit --config /path/to/devices.yml info <TAB>
+   nw --config /path/to/devices.yml info <TAB>
    ```
 
 ### Performance Issues
@@ -240,7 +240,7 @@ If completion is slow with large configuration files:
 
 ## Files
 
-- `bash_completion_netkit.sh` - Main completion script
+- `bash_completion_nw.sh` - Main completion script
 - `install_completion.sh` - Automated installation script
 - `README.md` - This documentation
 
@@ -249,7 +249,7 @@ If completion is slow with large configuration files:
 To improve the completion:
 
 1. Test with various YAML configurations
-2. Add support for new netkit commands
+2. Add support for new nw commands
 3. Improve performance for large config files
 4. Add support for additional file types
 5. Enhance error handling
@@ -257,8 +257,8 @@ To improve the completion:
 ## Related Commands
 
 The completion also works with these command variations:
-- `network-toolkit` (alternative name)
-- `nt` (short alias)
+- `net-worker` (alternative name)
+- `network-toolkit` (legacy name)
 
 ---
 

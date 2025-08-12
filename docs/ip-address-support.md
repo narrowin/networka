@@ -1,4 +1,12 @@
-# IP Address Support for Network Toolkit
+# IP Address Support```bash
+# Multiple IPs separated by commas (no spaces)
+nw run "192.168.1.1,192.168.1.2,192.168.1.3" "/system/clock/print" --platform mikrotik_routeros
+
+# SSH to multiple devices by IP
+nw ssh "192.168.1.1,192.168.1.2" --platform mikrotik_routeros
+
+# Mix configured devices and IPs
+nw run "192.168.1.1,sw-acc1,192.168.1.2" "/system/clock/print" --platform mikrotik_routeroswork Toolkit
 
 The network toolkit now supports using IP addresses directly in commands instead of requiring predefined device configurations.
 
@@ -6,38 +14,38 @@ The network toolkit now supports using IP addresses directly in commands instead
 
 ### Single IP Address
 ```bash
-# Execute a command on a single IP
-netkit run 192.168.1.1 "/system/clock/print" --platform mikrotik_routeros
+```bash
+nw run 192.168.1.1 "/system/clock/print" --platform mikrotik_routeros
 
-# SSH to a single IP
-netkit ssh 192.168.1.1 --platform mikrotik_routeros
+# SSH to device by IP
+nw ssh 192.168.1.1 --platform mikrotik_routeros
 
-# Get device info from a single IP
-netkit info 192.168.1.1 --platform mikrotik_routeros
+# Check device info by IP
+nw info 192.168.1.1 --platform mikrotik_routeros
 ```
 
 ### Multiple IP Addresses
 ```bash
 # Execute command on multiple IPs
-netkit run "192.168.1.1,192.168.1.2,192.168.1.3" "/system/clock/print" --platform mikrotik_routeros
+nw run "192.168.1.1,192.168.1.2,192.168.1.3" "/system/clock/print" --platform mikrotik_routeros
 
 # SSH to multiple IPs (opens tmux with multiple panes)
-netkit ssh "192.168.1.1,192.168.1.2" --platform mikrotik_routeros
+nw ssh "192.168.1.1,192.168.1.2" --platform mikrotik_routeros
 
 # Mixed: IPs and predefined devices
-netkit run "192.168.1.1,sw-acc1,192.168.1.2" "/system/clock/print" --platform mikrotik_routeros
+nw run "192.168.1.1,sw-acc1,192.168.1.2" "/system/clock/print" --platform mikrotik_routeros
 ```
 
 ### With Custom Port
 ```bash
 # Use custom SSH port
-netkit run 192.168.1.1 "/system/clock/print" --platform mikrotik_routeros --port 2222
+nw run 192.168.1.1 "/system/clock/print" --platform mikrotik_routeros --port 2222
 ```
 
 ### Interactive Authentication
 ```bash
 # Prompt for credentials interactively
-netkit run 192.168.1.1 "/system/clock/print" --platform mikrotik_routeros --interactive-auth
+nw run 192.168.1.1 "/system/clock/print" --platform mikrotik_routeros --interactive-auth
 ```
 
 ## Required Parameters
@@ -73,7 +81,7 @@ IP-based connections use the same authentication mechanisms as predefined device
 If you forget to specify the platform when using IP addresses:
 
 ```bash
-$ netkit run 192.168.1.1 "/system/clock/print"
+$ nw run 192.168.1.1 "/system/clock/print"
 Error: When using IP addresses, --platform is required
 Supported platforms:
   mikrotik_routeros: MikroTik RouterOS

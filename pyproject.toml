@@ -3,25 +3,29 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "network-toolkit"
+name = "net-worker"
 dynamic = ["version"]
-description = "Network automation toolkit for MikroTik RouterOS and beyond"
+description = "Modern async Python toolkit for network device automation"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
-keywords = ["network", "automation", "mikrotik", "routeros", "scrapli"]
+keywords = ["network", "automation", "mikrotik", "routeros", "cli", "async", "narrowin"]
 authors = [
-    { name = "Network Team", email = "network@company.com" },
+    { name = "narrowin", email = "contact@narrowin.com" },
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
     "Intended Audience :: System Administrators",
+    "Intended Audience :: Telecommunications Industry",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: System :: Networking",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Utilities",
 ]
 dependencies = [
     "scrapli[paramiko]>=2023.7.30",
@@ -48,12 +52,14 @@ tmux = [
 ]
 
 [project.urls]
-Documentation = "https://github.com/your-org/network-toolkit#readme"
-Issues = "https://github.com/your-org/network-toolkit/issues"
-Source = "https://github.com/your-org/network-toolkit"
+Documentation = "https://github.com/narrowin/net-worker#readme"
+Issues = "https://github.com/narrowin/net-worker/issues"
+Source = "https://github.com/narrowin/net-worker"
+Homepage = "https://github.com/narrowin/net-worker"
+Repository = "https://github.com/narrowin/net-worker"
 
 [project.scripts]
-netkit = "network_toolkit.cli:app"
+nw = "network_toolkit.cli:app"
 
 [tool.hatch.version]
 path = "src/network_toolkit/__about__.py"
@@ -95,8 +101,8 @@ omit = [
 ]
 
 [tool.coverage.paths]
-network_toolkit = ["src/network_toolkit", "*/network-toolkit/src/network_toolkit"]
-tests = ["tests", "*/network-toolkit/tests"]
+network_toolkit = ["src/network_toolkit", "*/net-worker/src/network_toolkit"]
+tests = ["tests", "*/net-worker/tests"]
 
 [tool.coverage.report]
 exclude_lines = [
@@ -124,9 +130,9 @@ include = [
     "LICENSE*",
     "docs/**",
     # Shell completion helpers and example defaults (useful for users)
-    "bash_completion_*",
-    "fish_completion_*",
-    "zsh_completion_*",
+    "bash_completion_nw.sh",
+    "fish_completion_nw.fish",
+    "zsh_completion_nw.zsh",
     "default_configs/**",
 ]
 

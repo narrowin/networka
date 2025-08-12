@@ -59,27 +59,27 @@ def demonstrate_ip_functionality():
     print("\n4. Command Examples:")
     print("   # Single IP address:")
     print(
-        "   netkit run 192.168.1.1 '/system/clock/print' --platform mikrotik_routeros"
+        "   nw run 192.168.1.1 '/system/clock/print' --platform mikrotik_routeros"
     )
     print()
     print("   # Multiple IP addresses:")
     print(
-        "   netkit run '192.168.1.1,192.168.1.2' '/system/identity/print' --platform mikrotik_routeros"
+        "   nw run '192.168.1.1,192.168.1.2' '/system/identity/print' --platform mikrotik_routeros"
     )
     print()
     print("   # Mixed IPs and device names:")
     print(
-        "   netkit run '192.168.1.1,sw-acc1' '/system/clock/print' --platform mikrotik_routeros"
+        "   nw run '192.168.1.1,sw-acc1' '/system/clock/print' --platform mikrotik_routeros"
     )
     print()
-    print("   # With custom port:")
+    print("   # Custom port:")
     print(
-        "   netkit run 192.168.1.1 '/system/clock/print' --platform mikrotik_routeros --port 2222"
+        "   nw run 192.168.1.1 '/system/clock/print' --platform mikrotik_routeros --port 2222"
     )
     print()
     print("   # Interactive authentication:")
     print(
-        "   netkit run 192.168.1.1 '/system/clock/print' --platform mikrotik_routeros --interactive-auth"
+        "   nw run 192.168.1.1 '/system/clock/print' --platform mikrotik_routeros --interactive-auth"
     )
 
     print("\n✅ IP address functionality ready to use!")

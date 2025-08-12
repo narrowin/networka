@@ -22,7 +22,7 @@ A clear description of what actually happened.
 ## Environment
 - OS: [e.g. Ubuntu 22.04]
 - Python version: [e.g. 3.11.5]
-- netkit version: [e.g. 1.0.0]
+- net-worker version: [e.g. 1.0.0]
 
 ## Additional Context
 Add any other context about the problem here.

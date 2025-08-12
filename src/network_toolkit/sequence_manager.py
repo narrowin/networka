@@ -3,7 +3,7 @@
 This module provides a single place to discover and resolve sequences:
 - Built-in sequences shipped inside the package (src/network_toolkit/builtin_sequences)
 - Repo-provided vendor sequences under config/sequences/<vendor>/*.yml
-- User-defined sequences under ~/.config/netkit/sequences/<vendor>/*.yml
+- User-defined sequences under ~/.config/nw/sequences/<vendor>/*.yml
 
 Resolution order (highest wins):
 1. User-defined vendor sequences (override/extend)
@@ -172,8 +172,8 @@ class SequenceManager:
         return None
 
     def _user_sequences_root(self) -> Path | None:
-        # XDG-style config: ~/.config/netkit/sequences
-        root = Path.home() / ".config" / "netkit" / "sequences"
+        # XDG-style config: ~/.config/nw/sequences
+        root = Path.home() / ".config" / "nw" / "sequences"
         return root if root.exists() else None
 
     def _load_from_root(

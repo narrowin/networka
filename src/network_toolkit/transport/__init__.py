@@ -1,4 +1,4 @@
-"""Transport layer abstractions for netkit.
+"""Transport layer abstractions for nw.
 
 Option B: sync transport interface with Scrapli adapter.
 """

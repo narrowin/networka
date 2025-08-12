@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Dynamic Bash completion for netkit powered by `netkit __complete`.
+# Dynamic Bash completion for nw powered by `nw __complete`.
 
 # Guard for old bash without completion helpers
 if ! declare -F _init_completion >/dev/null 2>&1; then
     _init_completion() { return 0; }
 fi
 
-_netkit() {
+_nw() {
     local cur prev words cword
     _init_completion || {
         cur=${COMP_WORDS[COMP_CWORD]}
@@ -39,24 +39,24 @@ _netkit() {
         fi
     fi
 
-    # Try to find netkit command - check if available, otherwise try python module
-    local netkit_cmd=""
-    if command -v netkit >/dev/null 2>&1; then
-        netkit_cmd="netkit"
+    # Try to find nw command - check if available, otherwise try python module
+    local nw_cmd=""
+    if command -v nw >/dev/null 2>&1; then
+        nw_cmd="nw"
     elif command -v python >/dev/null 2>&1; then
-        netkit_cmd="python -m network_toolkit.cli"
+        nw_cmd="python -m network_toolkit.cli"
     else
         return 0  # No way to run completion
     fi
 
     # Dynamic lists via hidden command with fallback
-    _nk_list() {
+    _nw_list() {
         local what="$1"; shift
         case "$what" in
             commands)
                 # Try the completion command first, then fallback to static list
                 local result
-                result=$($netkit_cmd __complete --for commands 2>/dev/null)
+                result=$($nw_cmd __complete --for commands 2>/dev/null)
                 if [[ -n "$result" ]]; then
                     echo "$result"
                 else
@@ -66,7 +66,7 @@ _netkit() {
             devices)
                 # Try the completion command first, then fallback to parsing config
                 local result
-                result=$($netkit_cmd __complete --for devices --config "$cfg" 2>/dev/null)
+                result=$($nw_cmd __complete --for devices --config "$cfg" 2>/dev/null)
                 if [[ -n "$result" ]]; then
                     echo "$result"
                 else
@@ -81,7 +81,7 @@ _netkit() {
             groups)
                 # Try the completion command first, then fallback to parsing config
                 local result
-                result=$($netkit_cmd __complete --for groups --config "$cfg" 2>/dev/null)
+                result=$($nw_cmd __complete --for groups --config "$cfg" 2>/dev/null)
                 if [[ -n "$result" ]]; then
                     echo "$result"
                 else
@@ -95,9 +95,9 @@ _netkit() {
                 local dev="$1"; shift || true
                 local result
                 if [[ -n "$dev" ]]; then
-                    result=$($netkit_cmd __complete --for sequences --device "$dev" --config "$cfg" 2>/dev/null)
+                    result=$($nw_cmd __complete --for sequences --device "$dev" --config "$cfg" 2>/dev/null)
                 else
-                    result=$($netkit_cmd __complete --for sequences --config "$cfg" 2>/dev/null)
+                    result=$($nw_cmd __complete --for sequences --config "$cfg" 2>/dev/null)
                 fi
                 if [[ -n "$result" ]]; then
                     echo "$result"
@@ -107,9 +107,9 @@ _netkit() {
                 fi
                 return ;;
             sequence-groups)
-                $netkit_cmd __complete --for sequence-groups --config "$cfg" 2>/dev/null; return ;;
+                $nw_cmd __complete --for sequence-groups --config "$cfg" 2>/dev/null; return ;;
             tags)
-                $netkit_cmd __complete --for tags --config "$cfg" 2>/dev/null; return ;;
+                $nw_cmd __complete --for tags --config "$cfg" 2>/dev/null; return ;;
         esac
     }
 
@@ -118,7 +118,7 @@ _netkit() {
 
     # First arg: suggest commands
     if [[ ${COMP_CWORD} -eq 1 ]]; then
-        COMPREPLY=( $(compgen -W "$(_nk_list commands)" -- "$cur") )
+        COMPREPLY=( $(compgen -W "$(_nw_list commands)" -- "$cur") )
         return 0
     fi
 
@@ -168,7 +168,7 @@ _netkit() {
     case "$cmd" in
         info)
             if [[ ${COMP_CWORD} -eq 2 ]]; then
-                _opts "$(_nk_list devices)"
+                _opts "$(_nw_list devices)"
             else
                 _opts "$info_opts"
             fi
@@ -177,13 +177,13 @@ _netkit() {
             if [[ ${COMP_CWORD} -eq 2 ]]; then
                 # Show groups first, then devices for friendlier targeting
                 local groups devices
-                groups=$(_nk_list groups)
-                devices=$(_nk_list devices)
+                groups=$(_nw_list groups)
+                devices=$(_nw_list devices)
                 _opts "$groups $devices"
             elif [[ ${COMP_CWORD} -eq 3 ]]; then
                 local target="${COMP_WORDS[2]}"
                 # If target is a device, include vendor/device sequences
-                _opts "$(_nk_list sequences "$target")"
+                _opts "$(_nw_list sequences "$target")"
             else
                 _opts "$run_opts"
             fi
@@ -191,8 +191,8 @@ _netkit() {
         ssh)
             if [[ ${COMP_CWORD} -eq 2 ]]; then
                 local groups devices
-                groups=$(_nk_list groups)
-                devices=$(_nk_list devices)
+                groups=$(_nw_list groups)
+                devices=$(_nw_list devices)
                 _opts "$groups $devices"
             else
                 if [[ $cur == -* ]]; then _opts "$ssh_opts"; fi
@@ -201,8 +201,8 @@ _netkit() {
         upload)
             if [[ ${COMP_CWORD} -eq 2 ]]; then
                 local groups devices
-                groups=$(_nk_list groups)
-                devices=$(_nk_list devices)
+                groups=$(_nw_list groups)
+                devices=$(_nw_list devices)
                 _opts "$devices $groups"
             elif [[ ${COMP_CWORD} -eq 3 ]]; then
                 compopt -o filenames 2>/dev/null || true
@@ -214,8 +214,8 @@ _netkit() {
         download)
             if [[ ${COMP_CWORD} -eq 2 ]]; then
                 local groups devices
-                groups=$(_nk_list groups)
-                devices=$(_nk_list devices)
+                groups=$(_nw_list groups)
+                devices=$(_nw_list devices)
                 _opts "$devices $groups"
             elif [[ ${COMP_CWORD} -eq 4 ]]; then
                 # local path argument
@@ -228,8 +228,8 @@ _netkit() {
         config-backup|backup)
             if [[ ${COMP_CWORD} -eq 2 ]]; then
                 local groups devices
-                groups=$(_nk_list groups)
-                devices=$(_nk_list devices)
+                groups=$(_nw_list groups)
+                devices=$(_nw_list devices)
                 _opts "$devices $groups"
             else
                 _opts "$config_backup_opts"
@@ -238,8 +238,8 @@ _netkit() {
         firmware-upgrade)
             if [[ ${COMP_CWORD} -eq 2 ]]; then
                 local groups devices
-                groups=$(_nk_list groups)
-                devices=$(_nk_list devices)
+                groups=$(_nw_list groups)
+                devices=$(_nw_list devices)
                 _opts "$devices $groups"
             else
                 _opts "$firmware_upgrade_opts"
@@ -248,8 +248,8 @@ _netkit() {
         firmware-downgrade)
             if [[ ${COMP_CWORD} -eq 2 ]]; then
                 local groups devices
-                groups=$(_nk_list groups)
-                devices=$(_nk_list devices)
+                groups=$(_nw_list groups)
+                devices=$(_nw_list devices)
                 _opts "$devices $groups"
             else
                 _opts "$firmware_downgrade_opts"
@@ -258,8 +258,8 @@ _netkit() {
         bios-upgrade)
             if [[ ${COMP_CWORD} -eq 2 ]]; then
                 local groups devices
-                groups=$(_nk_list groups)
-                devices=$(_nk_list devices)
+                groups=$(_nw_list groups)
+                devices=$(_nw_list devices)
                 _opts "$devices $groups"
             else
                 _opts "$bios_upgrade_opts"
@@ -268,8 +268,8 @@ _netkit() {
         diff)
             if [[ ${COMP_CWORD} -eq 2 ]]; then
                 local groups devices
-                groups=$(_nk_list groups)
-                devices=$(_nk_list devices)
+                groups=$(_nw_list groups)
+                devices=$(_nw_list devices)
                 _opts "$devices $groups"
             else
                 _opts "$diff_opts"
@@ -291,7 +291,7 @@ _netkit() {
     return 0
 }
 
-# Register the completion function for netkit and common aliases
-complete -F _netkit netkit 2>/dev/null || true
-complete -F _netkit network-toolkit 2>/dev/null || true
-complete -F _netkit nt 2>/dev/null || true
+# Register the completion function for nw and common aliases
+complete -F _nw nw 2>/dev/null || true
+complete -F _nw net-worker 2>/dev/null || true
+complete -F _nw network-toolkit 2>/dev/null || true

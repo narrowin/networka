@@ -1,6 +1,6 @@
 # User-defined Sequences
 
-Netkit supports user-defined sequences layered on top of built-in and repo sequences.
+Net-Worker supports user-defined sequences layered on top of built-in and repo sequences.
 
 - Built-in: packaged defaults (no setup needed)
 - Repo: your project's `config/sequences/<vendor>/*.yml`
@@ -24,10 +24,10 @@ sequences:
 ```
 
 3. List sequences:
-- `netkit list-sequences --vendor mikrotik_routeros`
+- `nw list-sequences --vendor mikrotik_routeros`
 
 4. Run the sequence:
-- `netkit run <device> my_quick_diag`
+- `nw run <device> my_quick_diag`
 
 ## Example files in this folder
 

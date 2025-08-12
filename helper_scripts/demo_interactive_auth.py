@@ -30,7 +30,7 @@ def demo_interactive_credentials():
     # Simulate what happens when --interactive-auth is used
     print("1. When you use --interactive-auth, the tool will prompt for credentials:")
     print(
-        "   Example: netkit run sw-acc1 '/system/identity/print' --interactive-auth\n"
+        "   Example: nw run sw-acc1 '/system/identity/print' --interactive-auth\n"
     )
 
     try:
@@ -71,15 +71,15 @@ def show_usage_examples():
     examples = [
         {
             "description": "Get device info with interactive auth",
-            "command": "netkit info sw-acc1 --interactive-auth",
+            "command": "nw info sw-acc1 --interactive-auth",
         },
         {
             "description": "Run command with interactive auth",
-            "command": "netkit run sw-acc1 '/system/identity/print' --interactive-auth",
+            "command": "nw run sw-acc1 '/system/identity/print' --interactive-auth",
         },
         {
             "description": "Run on multiple devices with interactive auth",
-            "command": "netkit run sw-acc1,sw-acc2 '/system/clock/print' -i",
+            "command": "nw run sw-acc1,sw-acc2 '/system/clock/print' -i",
         },
         {
             "description": "Run sequence with interactive auth",
@@ -123,4 +123,4 @@ if __name__ == "__main__":
 
     print("\n=== Next Steps ===")
     print("Try the feature with a real device using:")
-    print("netkit info <device-name> --interactive-auth")
+    print("nw info <device-name> --interactive-auth")

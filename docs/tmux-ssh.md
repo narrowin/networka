@@ -1,6 +1,6 @@
 # tmux-based SSH fanout (prototype)
 
-This adds a lean `netkit ssh` command that opens a tmux session and starts SSH in one pane per device. It relies on your local SSH config/keys and tmux.
+This adds a lean `nw ssh` command that opens a tmux session and starts SSH in one pane per device. It relies on your local SSH config/keys and tmux.
 
 ## Requirements
 - Linux/macOS with tmux installed
@@ -9,11 +9,11 @@ This adds a lean `netkit ssh` command that opens a tmux session and starts SSH i
 - sshpass is required when using password authentication (either `--auth password` or when `--auth auto` detects a password). Install with your package manager, e.g. `apt install sshpass` or `brew install hudochenkov/sshpass/sshpass`.
 
 ## Usage
-- Single device: `netkit ssh sw-acc1`
-- Group: `netkit ssh office_switches`
-- Custom layout: `netkit ssh lab_devices --layout even-vertical`
-- Name session/window: `netkit ssh core --session-name ops --window-name core-routers`
-- Disable synchronized typing: `netkit ssh lab_devices --no-sync`
+- Single device: `nw ssh sw-acc1`
+- Group: `nw ssh office_switches`
+- Custom layout: `nw ssh lab_devices --layout even-vertical`
+- Name session/window: `nw ssh core --session-name ops --window-name core-routers`
+- Disable synchronized typing: `nw ssh lab_devices --no-sync`
 
 By default, panes are synchronized so your keystrokes go to all panes. Toggle with `--sync/--no-sync`.
 
