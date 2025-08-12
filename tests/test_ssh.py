@@ -23,7 +23,7 @@ class FakePane:
 class FakeWindow:
     def __init__(self) -> None:
         self._panes: list[FakePane] = [FakePane()]
-        self.name = "netkit"
+        self.name = "nw"
 
     @property
     def panes(self) -> list[FakePane]:

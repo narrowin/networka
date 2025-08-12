@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""`netkit download` command implementation."""
+"""`nw download` command implementation."""
 
 from __future__ import annotations
 

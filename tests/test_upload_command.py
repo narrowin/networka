@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""Tests for the `netkit upload` command."""
+"""Tests for the `nw upload` command."""
 
 from __future__ import annotations
 

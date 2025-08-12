@@ -2,7 +2,7 @@
 
 This module remains only as a stub placeholder to avoid import errors in older
 environments. It doesn't register any commands. All sequence functionality is
-handled by `netkit run <device|group> <sequence>`.
+handled by `nw run <device|group> <sequence>`.
 """
 
 from __future__ import annotations

@@ -262,7 +262,7 @@ class TestResultsManager:
             "device_name": "device1",
             "command": "test command",
             "output": "test output",
-            "netkit_command": "run",
+            "nw_command": "run",
         }
         manager._write_result_file(Path("/tmp/test.txt"), data, is_single_command=True)
 
@@ -292,7 +292,7 @@ class TestResultsManager:
             "device_name": "device1",
             "command": "test command",
             "output": "test output",
-            "netkit_command": "run",
+            "nw_command": "run",
         }
         manager._write_result_file(
             Path("/tmp/test.yaml"), data, is_single_command=False
@@ -320,7 +320,7 @@ class TestResultsManager:
             "device_name": "device1",
             "command": "test command",
             "output": "test output",
-            "netkit_command": "run",
+            "nw_command": "run",
         }
         manager._write_result_file(
             Path("/tmp/test.json"), data, is_single_command=False
@@ -345,7 +345,7 @@ class TestResultsManager:
                 "device_name": "device1",
                 "command": "test command",
                 "output": "test output",
-                "netkit_command": "run",
+                "nw_command": "run",
             }
             manager._write_result_file(
                 Path("/tmp/test.txt"), data, is_single_command=True

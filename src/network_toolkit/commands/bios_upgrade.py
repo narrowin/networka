@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""`netkit bios-upgrade` command implementation (device or group).
+"""`nw bios-upgrade` command implementation (device or group).
 
 Runs '/system routerboard upgrade' and reboots the device to apply RouterBOOT/BIOS.
 """

@@ -1,4 +1,4 @@
-"""`netkit diff` command implementation.
+"""`nw diff` command implementation.
 
 Provides smart diffing of device configuration and operational state:
  - Config diff: compares current RouterOS export (compact) with a baseline file
@@ -6,7 +6,7 @@ Provides smart diffing of device configuration and operational state:
  - Sequence diff: compares a sequence's per-command outputs with files in a baseline directory
 
 Subject-based UX:
-    netkit diff <targets> <subject>
+    nw diff <targets> <subject>
 Where subject is one of:
     - "config" (special keyword for /export compact)
     - "/..." (a RouterOS command)
@@ -170,11 +170,11 @@ def register(app: typer.Typer) -> None:
         """Diff config, a command, or a sequence.
 
         Examples:
-          - netkit diff sw-acc1 config -b baseline/export_compact.txt
-          - netkit diff sw-acc1 "/system/resource/print" -b baseline/resource.txt
-          - netkit diff lab_devices system_info -b baseline_dir/
-          - netkit diff sw-acc1,sw-acc2 "/system/resource/print"   # device-to-device
-          - netkit diff sw-acc1,sw-acc2 config                      # device-to-device
+          - nw diff sw-acc1 config -b baseline/export_compact.txt
+          - nw diff sw-acc1 "/system/resource/print" -b baseline/resource.txt
+          - nw diff lab_devices system_info -b baseline_dir/
+          - nw diff sw-acc1,sw-acc2 "/system/resource/print"   # device-to-device
+          - nw diff sw-acc1,sw-acc2 config                      # device-to-device
         """
         setup_logging("DEBUG" if verbose else "INFO")
 

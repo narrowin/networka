@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""`netkit info` command implementation."""
+"""`nw info` command implementation."""
 
 from __future__ import annotations
 
@@ -50,10 +50,10 @@ def register(app: typer.Typer) -> None:
         Supports comma-separated device and group names.
 
         Examples:
-        - netkit info sw-acc1
-        - netkit info sw-acc1,sw-acc2
-        - netkit info access_switches
-        - netkit info sw-acc1,access_switches
+        - nw info sw-acc1
+        - nw info sw-acc1,sw-acc2
+        - nw info access_switches
+        - nw info sw-acc1,access_switches
         """
         setup_logging("DEBUG" if verbose else "INFO")
 

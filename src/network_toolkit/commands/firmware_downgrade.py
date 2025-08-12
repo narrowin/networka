@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""`netkit firmware-downgrade` command implementation (device or group).
+"""`nw firmware-downgrade` command implementation (device or group).
 
 Uploads a RouterOS .npk package to the device root and reboots to apply it.
 Intended for downgrading to an older firmware image, but functionally identical

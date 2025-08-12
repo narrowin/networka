@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""`netkit config-validate` command implementation."""
+"""`nw config-validate` command implementation."""
 
 from __future__ import annotations
 

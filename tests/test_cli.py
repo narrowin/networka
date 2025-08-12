@@ -26,8 +26,8 @@ class TestCLI:
         runner = CliRunner()
         result = runner.invoke(app, ["--help"])
         assert result.exit_code == 0
-        assert "Network Automation Toolkit" in result.output
-        assert "netkit" in result.output
+        assert "Network Worker" in result.output
+        assert "nw" in result.output
 
     def test_info_command_success(self, config_file: Path) -> None:
         """Test info command with valid device."""

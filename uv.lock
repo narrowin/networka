@@ -445,7 +445,7 @@ wheels = [
 ]
 
 [[package]]
-name = "network-toolkit"
+name = "net-worker"
 source = { editable = "." }
 dependencies = [
     { name = "asyncssh" },

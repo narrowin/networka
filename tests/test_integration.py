@@ -32,9 +32,9 @@ class TestCLIIntegration:
         # Should contain help text
         assert (
             "Network" in result.stdout
-            or "netkit" in result.stdout
+            or "nw" in result.stdout
             or "Network" in result.stderr
-            or "netkit" in result.stderr
+            or "nw" in result.stderr
         )
 
     def test_list_devices_with_config(self, config_file: Path) -> None:

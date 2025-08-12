@@ -1,4 +1,4 @@
-# Network Toolkit (net-worker)
+# Net-Worker
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
@@ -748,11 +748,11 @@ When `--store-results` is used, results are organized as follows:
 
 ## Layered Sequences (Built-in, Repo, User)
 
-Net-Worker discovers sequences from multiple layers with simple overrides:
+net-worker discovers sequences from multiple layers with simple overrides:
 
 - Built-in defaults shipped with net-worker (no setup)
 - Repo-provided vendor files in `config/sequences/<vendor>/*.yml`
-- User-defined files in `~/.config/netkit/sequences/<vendor>/*.yml` (highest priority)
+- User-defined files in `~/.config/nw/sequences/<vendor>/*.yml` (highest priority)
 
 You can list merged sequences by vendor:
 
@@ -763,8 +763,8 @@ nw list-sequences --vendor mikrotik_routeros
 Add a user sequence quickly:
 
 ```bash
-mkdir -p ~/.config/netkit/sequences/mikrotik_routeros
-printf "sequences:\n  my_quick_diag:\n    description: Quick diagnostics\n    category: troubleshooting\n    timeout: 30\n    commands:\n      - /system/resource/print\n      - /interface/print brief\n" > ~/.config/netkit/sequences/mikrotik_routeros/custom.yml
+mkdir -p ~/.config/nw/sequences/mikrotik_routeros
+printf "sequences:\n  my_quick_diag:\n    description: Quick diagnostics\n    category: troubleshooting\n    timeout: 30\n    commands:\n      - /system/resource/print\n      - /interface/print brief\n" > ~/.config/nw/sequences/mikrotik_routeros/custom.yml
 ```
 
 Then run it:

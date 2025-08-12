@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""`netkit list-groups` command implementation."""
+"""`nw list-groups` command implementation."""
 
 from __future__ import annotations
 
@@ -67,7 +67,7 @@ def register(app: typer.Typer) -> None:
             if verbose:
                 console.print("\n[bold green]Usage Examples:[/bold green]")
                 for group_name in config.device_groups.keys():
-                    console.print(f"  netkit group-run {group_name} health_check")
+                    console.print(f"  nw group-run {group_name} health_check")
 
         except NetworkToolkitError as e:
             console.print(f"[red]Error: {e.message}[/red]")

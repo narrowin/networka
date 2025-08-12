@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""Tests for the `netkit diff` command."""
+"""Tests for the `nw diff` command."""
 
 from __future__ import annotations
 

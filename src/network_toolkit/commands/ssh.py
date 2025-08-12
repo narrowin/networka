@@ -44,7 +44,7 @@ app_help = (
     "- Cycle layouts: Prefix + Space\n"
     "- Synchronize panes: Prefix + : then 'set synchronize-panes on|off'\n"
     "- Detach: Ctrl-b then d\n\n"
-    "Tip: Use --sync/--no-sync to control synchronized typing from netkit."
+    "Tip: Use --sync/--no-sync to control synchronized typing from nw."
 )
 
 
@@ -153,7 +153,7 @@ def _build_ssh_cmd(
 def _session_name(default_base: str) -> str:
     ts = datetime.datetime.now(tz=datetime.UTC).strftime("%Y%m%d_%H%M%S")
     base = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in default_base)
-    return f"netkit_{base}_{ts}"
+    return f"nw_{base}_{ts}"
 
 
 def _sanitize_session_name(name: str) -> str:
@@ -245,10 +245,10 @@ def register(app: typer.Typer) -> None:
         Supports comma-separated device and group names.
 
         Examples:
-        - netkit ssh sw-acc1
-        - netkit ssh sw-acc1,sw-acc2
-        - netkit ssh access_switches
-        - netkit ssh sw-acc1,access_switches
+        - nw ssh sw-acc1
+        - nw ssh sw-acc1,sw-acc2
+        - nw ssh access_switches
+        - nw ssh sw-acc1,access_switches
         """
 
         setup_logging("DEBUG" if verbose else "INFO")

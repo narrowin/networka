@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""`netkit run` command implementation."""
+"""`nw run` command implementation."""
 
 from __future__ import annotations
 

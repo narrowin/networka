@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""`netkit config-backup` command implementation (device or group).
+"""`nw config-backup` command implementation (device or group).
 
 Runs the configured backup command sequence and optionally downloads artifacts.
 """
@@ -138,16 +138,16 @@ def register(app: typer.Typer) -> None:
                         if download:
                             downloads: list[dict[str, Any]] = [
                                 {
-                                    "remote_file": "netkit-backup.backup",
+                                    "remote_file": "nw-backup.backup",
                                     "local_path": str(config.general.backup_dir),
-                                    "local_filename": ("{device}_{date}_netkit.backup"),
+                                    "local_filename": ("{device}_{date}_nw.backup"),
                                     "delete_remote": delete_remote,
                                 },
                                 {
-                                    "remote_file": "netkit-export.rsc",
+                                    "remote_file": "nw-export.rsc",
                                     "local_path": str(config.general.backup_dir),
                                     "local_filename": (
-                                        "{device}_{date}_netkit-export.rsc"
+                                        "{device}_{date}_nw-export.rsc"
                                     ),
                                     "delete_remote": delete_remote,
                                 },

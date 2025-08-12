@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""`netkit list-devices` command implementation."""
+"""`nw list-devices` command implementation."""
 
 from __future__ import annotations
 

@@ -164,7 +164,7 @@ class TestCommandsCoverage:
         # Test main help
         result = runner.invoke(app, ["--help"])
         assert result.exit_code == 0
-        assert "netkit" in result.output.lower()
+        assert "nw" in result.output.lower()
 
         # Test subcommand help - use actual command names that exist
         for cmd in ["run", "info", "upload", "diff", "config-backup"]:
@@ -237,7 +237,7 @@ class TestCommandLineInterfaceEdgeCases:
         result = runner.invoke(app, [])
         # CLI with no args shows help (exit code 0) or returns error (exit code 2)
         assert result.exit_code in [0, 2]
-        assert "netkit" in result.output.lower()
+        assert "nw" in result.output.lower()
 
     def test_cli_with_unknown_command(self) -> None:
         """Test CLI with unknown command."""

@@ -83,7 +83,7 @@ def show_usage_examples():
         },
         {
             "description": "Run sequence with interactive auth",
-            "command": "netkit run access_switches system_info --interactive-auth",
+            "command": "nw run access_switches system_info --interactive-auth",
         },
     ]
 
