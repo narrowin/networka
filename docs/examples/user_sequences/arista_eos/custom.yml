@@ -1,0 +1,9 @@
+# Example user-defined sequences for Arista EOS
+sequences:
+  my_quick_diag:
+    description: "Quick diagnostics"
+    category: "troubleshooting"
+    timeout: 30
+    commands:
+      - "show processes top once"
+      - "show interfaces status"

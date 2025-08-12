@@ -1,0 +1,297 @@
+#!/usr/bin/env bash
+# Dynamic Bash completion for netkit powered by `netkit __complete`.
+
+# Guard for old bash without completion helpers
+if ! declare -F _init_completion >/dev/null 2>&1; then
+    _init_completion() { return 0; }
+fi
+
+_netkit() {
+    local cur prev words cword
+    _init_completion || {
+        cur=${COMP_WORDS[COMP_CWORD]}
+        prev=${COMP_WORDS[COMP_CWORD-1]}
+    }
+
+    cur=${cur:-${COMP_WORDS[COMP_CWORD]}}
+    prev=${prev:-${COMP_WORDS[COMP_CWORD-1]}}
+
+    # Helper: find value after an option (e.g. --config)
+    _after_opt() {
+        local opt="$1"; local i
+        for (( i=1; i<${#COMP_WORDS[@]}-1; i++ )); do
+            if [[ "${COMP_WORDS[i]}" == "$opt" ]]; then
+                echo "${COMP_WORDS[i+1]}"; return 0
+            fi
+        done
+        return 1
+    }
+
+    # Resolve config option if provided
+    local cfg
+    cfg=$(_after_opt --config)
+    [[ -z "$cfg" ]] && cfg=$(_after_opt -c)
+    if [[ -z "$cfg" ]]; then
+        if [[ -d config || -f config/config.yml ]]; then
+            cfg="config"
+        else
+            cfg="devices.yml"
+        fi
+    fi
+
+    # Try to find netkit command - check if available, otherwise try python module
+    local netkit_cmd=""
+    if command -v netkit >/dev/null 2>&1; then
+        netkit_cmd="netkit"
+    elif command -v python >/dev/null 2>&1; then
+        netkit_cmd="python -m network_toolkit.cli"
+    else
+        return 0  # No way to run completion
+    fi
+
+    # Dynamic lists via hidden command with fallback
+    _nk_list() {
+        local what="$1"; shift
+        case "$what" in
+            commands)
+                # Try the completion command first, then fallback to static list
+                local result
+                result=$($netkit_cmd __complete --for commands 2>/dev/null)
+                if [[ -n "$result" ]]; then
+                    echo "$result"
+                else
+                    echo "info run upload download config-backup backup firmware-upgrade firmware-downgrade bios-upgrade ssh diff list-devices list-groups list-sequences config-validate"
+                fi
+                return ;;
+            devices)
+                # Try the completion command first, then fallback to parsing config
+                local result
+                result=$($netkit_cmd __complete --for devices --config "$cfg" 2>/dev/null)
+                if [[ -n "$result" ]]; then
+                    echo "$result"
+                else
+                    # Fallback: parse devices.yml directly
+                    if [[ -f "$cfg/devices.yml" ]]; then
+                        grep -E "^  [a-zA-Z0-9_-]+:" "$cfg/devices.yml" 2>/dev/null | sed 's/^  \([^:]*\):.*/\1/' | tr '\n' ' '
+                    elif [[ -f "$cfg" && "$cfg" =~ \.ya?ml$ ]]; then
+                        grep -E "^  [a-zA-Z0-9_-]+:" "$cfg" 2>/dev/null | sed 's/^  \([^:]*\):.*/\1/' | tr '\n' ' '
+                    fi
+                fi
+                return ;;
+            groups)
+                # Try the completion command first, then fallback to parsing config
+                local result
+                result=$($netkit_cmd __complete --for groups --config "$cfg" 2>/dev/null)
+                if [[ -n "$result" ]]; then
+                    echo "$result"
+                else
+                    # Fallback: parse groups.yml directly
+                    if [[ -f "$cfg/groups.yml" ]]; then
+                        grep -E "^  [a-zA-Z0-9_-]+:" "$cfg/groups.yml" 2>/dev/null | sed 's/^  \([^:]*\):.*/\1/' | tr '\n' ' '
+                    fi
+                fi
+                return ;;
+            sequences)
+                local dev="$1"; shift || true
+                local result
+                if [[ -n "$dev" ]]; then
+                    result=$($netkit_cmd __complete --for sequences --device "$dev" --config "$cfg" 2>/dev/null)
+                else
+                    result=$($netkit_cmd __complete --for sequences --config "$cfg" 2>/dev/null)
+                fi
+                if [[ -n "$result" ]]; then
+                    echo "$result"
+                else
+                    # Fallback: basic sequences
+                    echo "system_info interface_status backup_config"
+                fi
+                return ;;
+            sequence-groups)
+                $netkit_cmd __complete --for sequence-groups --config "$cfg" 2>/dev/null; return ;;
+            tags)
+                $netkit_cmd __complete --for tags --config "$cfg" 2>/dev/null; return ;;
+        esac
+    }
+
+    local cmd
+    cmd=${COMP_WORDS[1]}
+
+    # First arg: suggest commands
+    if [[ ${COMP_CWORD} -eq 1 ]]; then
+        COMPREPLY=( $(compgen -W "$(_nk_list commands)" -- "$cur") )
+        return 0
+    fi
+
+    # File/directory/value options
+    case "$prev" in
+        --config|-c)
+            # complete YAML files and directories
+            local files dirs
+            files=$(compgen -f -X '!*.yml !*.yaml' -- "$cur")
+            dirs=$(compgen -d -- "$cur")
+            COMPREPLY=( $files $dirs )
+            return 0 ;;
+        --layout)
+            COMPREPLY=( $(compgen -W "tiled even-horizontal even-vertical main-horizontal main-vertical" -- "$cur") ); return 0 ;;
+        --results-dir)
+            COMPREPLY=( $(compgen -d -- "$cur") ); return 0 ;;
+        --raw)
+            COMPREPLY=( $(compgen -W "txt json" -- "$cur") ); return 0 ;;
+        --platform|-p)
+            COMPREPLY=( $(compgen -W "mikrotik_routeros" -- "$cur") ); return 0 ;;
+        --port)
+            COMPREPLY=( $(compgen -W "22 2222 8022" -- "$cur") ); return 0 ;;
+        --auth)
+            COMPREPLY=( $(compgen -W "key-first key password interactive" -- "$cur") ); return 0 ;;
+    esac
+
+    # Common options per command
+    local common_opts="--config -c --verbose -v --help -h"
+    local run_opts="--store-results -s --results-dir --raw --interactive-auth -i --platform -p --port $common_opts"
+    local upload_opts="--remote-name -r --verify --no-verify --checksum-verify --no-checksum-verify --max-concurrent -j $common_opts"
+    local download_opts="--delete-remote --keep-remote --verify --no-verify $common_opts"
+    local config_backup_opts="$common_opts"
+    local firmware_upgrade_opts="$common_opts"
+    local firmware_downgrade_opts="$common_opts"
+    local bios_upgrade_opts="$common_opts"
+    local list_devices_opts="$common_opts"
+    local list_groups_opts="$common_opts"
+    local list_sequences_opts="--vendor --category $common_opts"
+    local ssh_opts="--config -c --auth --user --password --layout --session-name --window-name --reuse --sync --no-sync --use-sshpass --attach --no-attach --platform -p --port $common_opts"
+    local info_opts="--interactive-auth -i $common_opts"
+    local config_validate_opts="$common_opts"
+    local diff_opts="$common_opts"
+
+    # Helper: complete from a list or options
+    _opts() { COMPREPLY=( $(compgen -W "$1" -- "$cur") ); }
+
+    case "$cmd" in
+        info)
+            if [[ ${COMP_CWORD} -eq 2 ]]; then
+                _opts "$(_nk_list devices)"
+            else
+                _opts "$info_opts"
+            fi
+            ;;
+        run)
+            if [[ ${COMP_CWORD} -eq 2 ]]; then
+                # Show groups first, then devices for friendlier targeting
+                local groups devices
+                groups=$(_nk_list groups)
+                devices=$(_nk_list devices)
+                _opts "$groups $devices"
+            elif [[ ${COMP_CWORD} -eq 3 ]]; then
+                local target="${COMP_WORDS[2]}"
+                # If target is a device, include vendor/device sequences
+                _opts "$(_nk_list sequences "$target")"
+            else
+                _opts "$run_opts"
+            fi
+            ;;
+        ssh)
+            if [[ ${COMP_CWORD} -eq 2 ]]; then
+                local groups devices
+                groups=$(_nk_list groups)
+                devices=$(_nk_list devices)
+                _opts "$groups $devices"
+            else
+                if [[ $cur == -* ]]; then _opts "$ssh_opts"; fi
+            fi
+            ;;
+        upload)
+            if [[ ${COMP_CWORD} -eq 2 ]]; then
+                local groups devices
+                groups=$(_nk_list groups)
+                devices=$(_nk_list devices)
+                _opts "$devices $groups"
+            elif [[ ${COMP_CWORD} -eq 3 ]]; then
+                compopt -o filenames 2>/dev/null || true
+                COMPREPLY=( $(compgen -f -- "$cur") )
+            else
+                _opts "$upload_opts"
+            fi
+            ;;
+        download)
+            if [[ ${COMP_CWORD} -eq 2 ]]; then
+                local groups devices
+                groups=$(_nk_list groups)
+                devices=$(_nk_list devices)
+                _opts "$devices $groups"
+            elif [[ ${COMP_CWORD} -eq 4 ]]; then
+                # local path argument
+                compopt -o filenames 2>/dev/null || true
+                COMPREPLY=( $(compgen -d -- "$cur") )
+            else
+                _opts "$download_opts"
+            fi
+            ;;
+        config-backup|backup)
+            if [[ ${COMP_CWORD} -eq 2 ]]; then
+                local groups devices
+                groups=$(_nk_list groups)
+                devices=$(_nk_list devices)
+                _opts "$devices $groups"
+            else
+                _opts "$config_backup_opts"
+            fi
+            ;;
+        firmware-upgrade)
+            if [[ ${COMP_CWORD} -eq 2 ]]; then
+                local groups devices
+                groups=$(_nk_list groups)
+                devices=$(_nk_list devices)
+                _opts "$devices $groups"
+            else
+                _opts "$firmware_upgrade_opts"
+            fi
+            ;;
+        firmware-downgrade)
+            if [[ ${COMP_CWORD} -eq 2 ]]; then
+                local groups devices
+                groups=$(_nk_list groups)
+                devices=$(_nk_list devices)
+                _opts "$devices $groups"
+            else
+                _opts "$firmware_downgrade_opts"
+            fi
+            ;;
+        bios-upgrade)
+            if [[ ${COMP_CWORD} -eq 2 ]]; then
+                local groups devices
+                groups=$(_nk_list groups)
+                devices=$(_nk_list devices)
+                _opts "$devices $groups"
+            else
+                _opts "$bios_upgrade_opts"
+            fi
+            ;;
+        diff)
+            if [[ ${COMP_CWORD} -eq 2 ]]; then
+                local groups devices
+                groups=$(_nk_list groups)
+                devices=$(_nk_list devices)
+                _opts "$devices $groups"
+            else
+                _opts "$diff_opts"
+            fi
+            ;;
+        list-devices)
+            _opts "$list_devices_opts" ;;
+        list-groups)
+            _opts "$list_groups_opts" ;;
+        list-sequences)
+            _opts "$list_sequences_opts" ;;
+        config-validate)
+            _opts "$config_validate_opts" ;;
+        *)
+            # Fallback: suggest common opts
+            if [[ $cur == -* ]]; then _opts "$common_opts"; fi ;;
+    esac
+
+    return 0
+}
+
+# Register the completion function for netkit and common aliases
+complete -F _netkit netkit 2>/dev/null || true
+complete -F _netkit network-toolkit 2>/dev/null || true
+complete -F _netkit nt 2>/dev/null || true

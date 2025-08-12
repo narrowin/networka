@@ -1,0 +1,100 @@
+# Juniper JunOS Command Sequences
+# Vendor-specific sequences for Juniper JunOS devices
+
+sequences:
+  # System Information Sequences
+  system_info:
+    description: "Complete system information gathering"
+    category: "information"
+    timeout: 60
+    commands:
+      - "show version"
+      - "show chassis hardware"
+      - "show system uptime"
+      - "show system environment"
+      - "show system processes extensive"
+
+  health_check:
+    description: "Basic health check for device monitoring"
+    category: "monitoring"
+    timeout: 45
+    commands:
+      - "show system processes"
+      - "show system memory"
+      - "show system uptime"
+      - "show interfaces terse"
+      - "show log messages | last 10"
+
+  quick_status:
+    description: "Quick device status overview"
+    category: "monitoring"
+    timeout: 30
+    commands:
+      - "show system processes"
+      - "show interfaces status"
+      - "show interfaces terse"
+
+  # Network Configuration Sequences
+  interface_status:
+    description: "Detailed interface status and statistics"
+    category: "network"
+    timeout: 60
+    commands:
+      - "show interfaces detail"
+      - "show interfaces extensive"
+      - "show interfaces statistics"
+      - "show interfaces descriptions"
+
+  network_overview:
+    description: "Complete network configuration overview"
+    category: "network"
+    timeout: 90
+    commands:
+      - "show interfaces terse"
+      - "show route summary"
+      - "show arp"
+      - "show lldp neighbors"
+      - "show spanning-tree bridge"
+
+  routing_info:
+    description: "Routing table and protocol information"
+    category: "network"
+    timeout: 60
+    commands:
+      - "show route"
+      - "show ospf neighbor"
+      - "show bgp summary"
+      - "show bfd session"
+
+  # Security and Access Sequences
+  security_audit:
+    description: "Security configuration audit"
+    category: "security"
+    timeout: 120
+    commands:
+      - "show configuration system login"
+      - "show firewall"
+      - "show security"
+      - "show log messages | match security"
+
+  access_control:
+    description: "Access control and user management review"
+    category: "security"
+    timeout: 60
+    commands:
+      - "show system users"
+      - "show system login"
+      - "show snmp"
+
+  # Switch-specific Sequences
+  switch_specifics:
+    description: "Switch-specific information and status"
+    category: "device-specific"
+    timeout: 60
+    device_types: ["switch"]
+    commands:
+      - "show ethernet-switching table"
+      - "show spanning-tree bridge"
+      - "show vlans"
+      - "show virtual-chassis"
+      - "show lacp interfaces"

@@ -1,0 +1,175 @@
+# Cisco IOS-XE Command Sequences
+# Vendor-specific sequences for Cisco IOS-XE devices
+
+sequences:
+  # System Information Sequences
+  system_info:
+    description: "Complete system information gathering"
+    category: "information"
+    timeout: 60
+    commands:
+      - "show version"
+      - "show inventory"
+      - "show clock"
+      - "show environment all"
+      - "show processes cpu"
+
+  health_check:
+    description: "Basic health check for device monitoring"
+    category: "monitoring"
+    timeout: 45
+    commands:
+      - "show processes cpu"
+      - "show memory"
+      - "show clock"
+      - "show interfaces summary"
+      - "show logging | include %"
+
+  quick_status:
+    description: "Quick device status overview"
+    category: "monitoring"
+    timeout: 30
+    commands:
+      - "show processes cpu"
+      - "show interfaces status"
+      - "show ip interface brief"
+
+  # Network Configuration Sequences
+  interface_status:
+    description: "Detailed interface status and statistics"
+    category: "network"
+    timeout: 60
+    commands:
+      - "show interfaces"
+      - "show interfaces status"
+      - "show interfaces counters"
+      - "show interfaces description"
+
+  network_overview:
+    description: "Complete network configuration overview"
+    category: "network"
+    timeout: 90
+    commands:
+      - "show ip interface brief"
+      - "show ip route summary"
+      - "show arp"
+      - "show cdp neighbors detail"
+      - "show spanning-tree summary"
+
+  routing_info:
+    description: "Routing table and protocol information"
+    category: "network"
+    timeout: 60
+    commands:
+      - "show ip route"
+      - "show ip ospf neighbor"
+      - "show ip bgp summary"
+      - "show ip eigrp neighbors"
+
+  # Security and Access Sequences
+  security_audit:
+    description: "Security configuration audit"
+    category: "security"
+    timeout: 120
+    commands:
+      - "show running-config | section username"
+      - "show privilege"
+      - "show access-lists"
+      - "show ip access-lists"
+      - "show logging"
+
+  access_control:
+    description: "Access control and user management review"
+    category: "security"
+    timeout: 60
+    commands:
+      - "show users"
+      - "show sessions"
+      - "show line"
+      - "show snmp"
+
+  # Maintenance Sequences
+  backup_config:
+    description: "Create comprehensive device backup"
+    category: "maintenance"
+    timeout: 180
+    commands:
+      - "show running-config"
+      - "show startup-config"
+      - "show version"
+
+  pre_maintenance:
+    description: "Pre-maintenance checks and documentation"
+    category: "maintenance"
+    timeout: 120
+    commands:
+      - "show processes cpu"
+      - "show memory"
+      - "show clock"
+      - "show interfaces summary"
+      - "show logging | tail 20"
+
+  post_maintenance:
+    description: "Post-maintenance verification"
+    category: "maintenance"
+    timeout: 120
+    commands:
+      - "show processes cpu"
+      - "show interfaces summary"
+      - "ping 8.8.8.8 repeat 5"
+      - "show ip route summary"
+      - "show logging | tail 10"
+
+  # Troubleshooting Sequences
+  connectivity_test:
+    description: "Network connectivity testing"
+    category: "troubleshooting"
+    timeout: 120
+    commands:
+      - "ping 8.8.8.8 repeat 5"
+      - "ping 1.1.1.1 repeat 5"
+      - "traceroute 8.8.8.8"
+      - "show ip route 0.0.0.0"
+
+  interface_troubleshoot:
+    description: "Interface troubleshooting and diagnostics"
+    category: "troubleshooting"
+    timeout: 90
+    commands:
+      - "show interfaces"
+      - "show interfaces counters errors"
+      - "show controllers"
+      - "show interfaces transceiver"
+
+  performance_check:
+    description: "System performance analysis"
+    category: "troubleshooting"
+    timeout: 60
+    commands:
+      - "show processes cpu sorted"
+      - "show processes memory sorted"
+      - "show interfaces"
+      - "show policy-map interface"
+
+  # Switch-specific Sequences
+  switch_specifics:
+    description: "Switch-specific information and status"
+    category: "device-specific"
+    timeout: 60
+    device_types: ["switch"]
+    commands:
+      - "show mac address-table"
+      - "show spanning-tree"
+      - "show vlan brief"
+      - "show port-security"
+
+  router_specifics:
+    description: "Router-specific information and status"
+    category: "device-specific"
+    timeout: 90
+    device_types: ["router"]
+    commands:
+      - "show ip route"
+      - "show ip protocols"
+      - "show access-lists"
+      - "show nat translations"

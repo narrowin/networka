@@ -21,6 +21,7 @@ A powerful, modern CLI tool for **multi-vendor network automation**. Built with 
 - **Vendor-Aware Sequences**: Automatically uses correct commands for each vendor
 - **Group Operations**: Execute commands across multiple devices concurrently
 - **Results Storage**: Comprehensive, organized storage of command outputs
+- **Security-First Design**: Environment variable credentials, secret detection, comprehensive protection
 - **Type Safety**: Full type annotations and validation using Pydantic
 - **Async Support**: Built with modern async/await patterns for performance
 
@@ -153,7 +154,7 @@ The toolkit is configured via a single YAML file (`devices.yml`) and environment
    # Default credentials
    NT_DEFAULT_USER=admin
    NT_DEFAULT_PASSWORD=your_secure_password
-   
+
    # Device-specific overrides (optional)
    NT_SW_ACC1_PASSWORD=switch1_password
    NT_SW_DIST1_PASSWORD=distribution_password
@@ -167,6 +168,36 @@ The toolkit is configured via a single YAML file (`devices.yml`) and environment
 
 📖 **See [Environment Variables Guide](docs/environment-variables.md) for complete setup instructions.**
 
+### 🔒 Security Features & Best Practices
+
+**Enterprise-Grade Security**: This repository implements comprehensive security measures to protect your network credentials and infrastructure.
+
+#### ✅ Built-in Security Features
+- **Environment Variable Credentials**: All secrets stored in environment variables, never in code
+- **Automatic Secret Detection**: CI/CD pipelines scan for accidentally committed secrets
+- **Pre-commit Security Hooks**: Local validation before commits reach the repository
+- **Comprehensive `.gitignore`**: Protects SSH keys, config backups, and sensitive files
+- **Security Baseline**: Tracks known safe test data to reduce false positives
+
+#### 🔍 Automated Secret Detection
+```bash
+# Test secret detection locally
+pre-commit run detect-secrets --all-files
+
+# Update baseline when adding legitimate test data
+./scripts/update-secrets-baseline.sh
+```
+
+#### 📋 Security Checklist
+- ✅ Never commit real passwords, API keys, or SSH keys
+- ✅ Use environment variables for all credentials
+- ✅ Rotate credentials regularly
+- ✅ Use device-specific credentials when possible
+- ✅ Keep firmware images and backups in protected directories
+- ✅ Review security alerts in GitHub (Dependabot, CodeQL)
+
+**Learn More**: See [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
+
 ### Configuration File Example
 
 Here's a minimal `devices.yml` configuration:
@@ -178,12 +209,12 @@ general:
   backup_dir: "./backups"
   logs_dir: "./logs"
   results_dir: "./results"
-  
+
   # Connection settings (credentials come from environment)
   transport: "ssh"
   port: 22
   timeout: 30
-  
+
   # Results storage
   store_results: false
   results_format: "txt"
@@ -196,7 +227,7 @@ devices:
     device_type: "mikrotik_routeros"
     platform: "mipbsbe"
     tags: ["access", "floor1", "critical"]
-    
+
   sw-dist1:
     host: "10.10.1.13"
     description: "Distribution Switch 1"
@@ -211,7 +242,7 @@ device_groups:
   all_switches:
     description: "All network switches"
     members: ["sw-acc1", "sw-dist1"]
-  
+
   critical_devices:
     description: "Critical infrastructure devices"
     match_tags: ["critical"]
@@ -236,14 +267,14 @@ devices:
     device_type: "mikrotik_routeros"
     description: "MikroTik Access Switch"
     tags: ["switch", "access", "mikrotik"]
-    
-  # Cisco devices use IOS-XE commands  
+
+  # Cisco devices use IOS-XE commands
   cisco-switch:
     host: "10.0.1.20"
     device_type: "cisco_iosxe"
     description: "Cisco Catalyst Switch"
     tags: ["switch", "core", "cisco"]
-    
+
   # Arista devices use EOS commands
   arista-spine:
     host: "10.0.1.30"
@@ -256,7 +287,7 @@ device_groups:
   cisco_devices:
     description: "All Cisco devices"
     match_tags: ["cisco"]
-    
+
   all_switches:
     description: "All switches (multi-vendor)"
     match_tags: ["switch"]
@@ -277,16 +308,16 @@ devices:
     platform: "mipbsbe"
     model: "RB5009UG+S+"
     location: "Server Room"
-    
+
     # Connection settings (inherits from general if not specified)
     user: "admin"
     password: "mypassword"
-    
+
     # Device-specific tags for grouping
     tags:
       - "core"
       - "critical"
-    
+
     # Pre-defined command sequences
     command_sequences:
       health_check:
@@ -300,7 +331,7 @@ device_groups:
     description: "All critical infrastructure devices"
     match_tags:
       - "critical"
-  
+
   all_routers:
     description: "All routers"
     members:
@@ -505,13 +536,13 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🏗️ New Modular Architecture (Recommended)
 
-The Network Toolkit now supports a **new modular configuration architecture** that provides better organization, enhanced security, and simplified usage. 
+The Network Toolkit now supports a **new modular configuration architecture** that provides better organization, enhanced security, and simplified usage.
 
 ### New Configuration Structure
 ```
 config/
 ├── config.yml      # General settings and defaults
-├── devices.yml     # Device definitions  
+├── devices.yml     # Device definitions
 ├── groups.yml      # Device group definitions
 └── sequences.yml   # All command sequences
 ```
@@ -523,7 +554,7 @@ netkit run [device|group] [command|sequence] [options]
 
 # Examples (auto-detects device vs group, command vs sequence):
 netkit run sw-acc1 health_check                    # Device + Sequence
-netkit run access_switches "/system/resource/print" # Group + Command  
+netkit run access_switches "/system/resource/print" # Group + Command
 netkit run critical_infrastructure security_audit   # Group + Sequence
 ```
 
@@ -551,7 +582,7 @@ netkit run access_switches security_audit --store-results
 
 ### Migration Path
 - ✅ **Current users**: Your `devices.yml` continues to work unchanged
-- ✅ **New features**: Available only with new `config/` structure  
+- ✅ **New features**: Available only with new `config/` structure
 - ✅ **Gradual migration**: Move at your own pace with full backward compatibility
 
 ---
@@ -593,8 +624,8 @@ devices:
     device_type: "mikrotik_routeros"
     description: "MikroTik Switch"
     tags: ["switch", "office", "mikrotik"]
-    
-  # Cisco device  
+
+  # Cisco device
   cisco-sw1:
     host: "192.168.1.20"
     device_type: "cisco_iosxe"
@@ -794,14 +825,14 @@ general:
   firmware_dir: "/path/to/firmware"
   backup_dir: "./backups"
   results_dir: "/path/to/results"
-  
+
   # Connection settings
   default_user: "admin"
   default_password: "password"
   transport: "ssh"  # ssh or telnet
   port: 22
   timeout: 30
-  
+
   # Results storage
   store_results: false
   results_format: "txt"  # txt, json, yaml
@@ -814,11 +845,11 @@ devices:
     description: "Device description"
     device_type: "mikrotik_routeros"
     tags: ["tag1", "tag2"]
-    
+
     # Device-specific credentials (optional)
     user: "device_admin"
     password: "device_password"
-    
+
     # Connection overrides (optional)
     overrides:
       timeout: 60
