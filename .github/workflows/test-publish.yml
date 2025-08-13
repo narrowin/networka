@@ -65,7 +65,9 @@ jobs:
     - name: Test wheel installation
       run: |
         python -m pip install --upgrade pip
-        python -m pip install dist/*.whl
+        # Find and install the wheel file
+        wheel_file=$(find dist/ -name "*.whl" | head -1)
+        python -m pip install "$wheel_file"
 
     - name: Test installed package
       run: |
@@ -75,7 +77,9 @@ jobs:
     - name: Test source distribution installation
       run: |
         python -m pip uninstall -y net-worker
-        python -m pip install dist/*.tar.gz
+        # Find and install the source distribution
+        tar_file=$(find dist/ -name "*.tar.gz" | head -1)
+        python -m pip install "$tar_file"
 
     - name: Test source installation
       run: |

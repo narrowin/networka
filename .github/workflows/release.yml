@@ -70,9 +70,18 @@ jobs:
         path: dist/
 
     - name: Install built package
+      shell: bash
       run: |
         python -m pip install --upgrade pip
-        python -m pip install dist/*.whl
+        # Find and install the wheel file
+        wheel_file=$(find dist/ -name "*.whl" | head -1)
+        if [ -n "$wheel_file" ]; then
+          python -m pip install "$wheel_file"
+        else
+          echo "No wheel file found!"
+          ls -la dist/
+          exit 1
+        fi
 
     - name: Test package installation
       run: |
