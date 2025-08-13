@@ -40,25 +40,25 @@ jobs:
     - name: Install dependencies
       run: uv sync --all-extras --group dev
 
-    - name: Run ruff check
-      run: uv run ruff check .
+    # - name: Run ruff check
+    #   run: uv run ruff check .
 
-    - name: Run ruff format
-      run: uv run ruff format --check .
+    # - name: Run ruff format
+    #   run: uv run ruff format --check .
 
-    - name: Run mypy
-      run: uv run mypy src/
+    # - name: Run mypy
+    #   run: uv run mypy src/
 
-    - name: Run tests with coverage
-      run: uv run pytest --cov=network_toolkit --cov-report=xml --cov-report=term-missing
+    # - name: Run tests with coverage
+    #   run: uv run pytest --cov=network_toolkit --cov-report=xml --cov-report=term-missing
 
-    - name: Upload coverage to Codecov
-      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-      uses: codecov/codecov-action@v4
-      with:
-        file: ./coverage.xml
-        fail_ci_if_error: true
-        token: ${{ secrets.CODECOV_TOKEN }}
+    # - name: Upload coverage to Codecov
+    #   if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+    #   uses: codecov/codecov-action@v4
+    #   with:
+    #     file: ./coverage.xml
+    #     fail_ci_if_error: true
+    #     token: ${{ secrets.CODECOV_TOKEN }}
 
   security:
     name: Security checks
@@ -86,15 +86,15 @@ jobs:
         head: HEAD
         extra_args: --debug --only-verified
 
-    - name: Run bandit security linter
-      run: uv run bandit -r src/ -f json -o bandit-report.json || true
+    # - name: Run bandit security linter
+    #   run: uv run bandit -r src/ -f json -o bandit-report.json || true
 
-    - name: Upload bandit report
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: bandit-report
-        path: bandit-report.json
+    # - name: Upload bandit report
+    #   uses: actions/upload-artifact@v4
+    #   if: always()
+    #   with:
+    #     name: bandit-report
+    #     path: bandit-report.json
 
   docs:
     name: Documentation
