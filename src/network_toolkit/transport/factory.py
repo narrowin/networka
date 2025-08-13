@@ -41,18 +41,7 @@ class ScrapliTransportFactory:
         # Create Scrapli driver with existing logic
         driver = Scrapli(**connection_params)
 
-        # Get device info for transport
-        device_config = config.devices[device_name] if config.devices else None
-        host = (
-            device_config.host
-            if device_config
-            else connection_params.get("host", "unknown")
-        )
-        port = (
-            device_config.port if device_config else connection_params.get("port", 22)
-        )
-
-        return ScrapliSyncTransport(driver, device_name, host, port)
+        return ScrapliSyncTransport(driver)
 
 
 class NornirNetmikoTransportFactory:
@@ -87,14 +76,10 @@ class NornirNetmikoTransportFactory:
 
         # Get device info
         device_config = config.devices[device_name] if config.devices else None
-        host = (
-            device_config.host
-            if device_config
-            else connection_params.get("host", "unknown")
-        )
-        port = (
-            device_config.port if device_config else connection_params.get("port", 22)
-        )
+        host = device_config.host if device_config else connection_params.get("host", "unknown")
+        port = device_config.port if device_config else connection_params.get("port", 22)
+        # Ensure port is an int
+        port = int(port) if port is not None else 22
 
         return NornirNetmikoTransport(self._nornir_runner, device_name, host, port)
 

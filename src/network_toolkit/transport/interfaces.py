@@ -17,6 +17,18 @@ class CommandResult:
     failed: bool = False
 
 
+@dataclass(frozen=True)
+class ConnectionState:
+    """Connection state information."""
+
+    connected: bool
+    transport_type: str
+    device_name: str
+    host: str
+    port: int
+    last_activity: float | None = None
+
+
 class Transport(Protocol):
     """Minimal sync transport contract."""
 
@@ -28,6 +40,4 @@ class Transport(Protocol):
 
     def send_command(self, command: str) -> CommandResult: ...
 
-    def send_interactive(
-        self, interact_events: list[tuple[str, str, bool]], timeout_ops: float
-    ) -> str: ...
+    def send_interactive(self, interact_events: list[tuple[str, str, bool]], timeout_ops: float) -> str: ...

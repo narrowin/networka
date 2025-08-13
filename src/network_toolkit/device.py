@@ -16,10 +16,7 @@ import paramiko
 from scrapli import Scrapli
 from scrapli.exceptions import ScrapliException
 
-from network_toolkit.device_transfers import (
-    calculate_file_checksum,
-    verify_file_upload,
-)
+from network_toolkit.device_transfers import calculate_file_checksum, verify_file_upload
 from network_toolkit.exceptions import (
     DeviceConnectionError,
     DeviceExecutionError,
@@ -85,9 +82,7 @@ class DeviceSession:
         self._connected = False
 
         # Get device connection parameters with optional credential overrides
-        self._connection_params = config.get_device_connection_params(
-            device_name, username_override, password_override
-        )
+        self._connection_params = config.get_device_connection_params(device_name, username_override, password_override)
 
         # Add SSH host key acceptance settings for first-time connections
         # https://scrapli.dev/user_guide/basic_usage/#ssh-key-verification
@@ -158,10 +153,7 @@ class DeviceSession:
                 return
 
             except ScrapliException as e:
-                logger.warning(
-                    f"Connection attempt {attempt + 1}/{retries} failed for "
-                    f"{self.device_name}: {e}"
-                )
+                logger.warning(f"Connection attempt {attempt + 1}/{retries} failed for {self.device_name}: {e}")
                 if attempt < retries - 1:
                     time.sleep(retry_delay)
 
@@ -309,9 +301,7 @@ class DeviceSession:
         if verify_checksum is None:
             verify_checksum = getattr(self.config.general, "verify_checksums", False)
 
-        logger.info(
-            f"Uploading file '{local_path}' to {self.device_name} as '{remote_filename}'"
-        )
+        logger.info(f"Uploading file '{local_path}' to {self.device_name} as '{remote_filename}'")
 
         # Calculate local file checksum if verification is enabled
         local_checksum = None
@@ -346,9 +336,7 @@ class DeviceSession:
             # Upload the file
             sftp.put(str(local_path), remote_path)
 
-            logger.info(
-                f"File '{local_path.name}' uploaded successfully as '{remote_filename}'"
-            )
+            logger.info(f"File '{local_path.name}' uploaded successfully as '{remote_filename}'")
 
             # CRITICAL: Wait for device to finish processing the uploaded file
             # SFTP upload completes immediately but MikroTik may still be copying/processing
@@ -383,9 +371,7 @@ class DeviceSession:
             return True
 
         except paramiko.AuthenticationException as e:
-            logger.error(
-                f"Authentication failed during file upload to {self.device_name}: {e}"
-            )
+            logger.error(f"Authentication failed during file upload to {self.device_name}: {e}")
             msg = f"Authentication failed during file upload to {self.device_name}"
             raise DeviceExecutionError(
                 msg,
@@ -493,10 +479,7 @@ class DeviceSession:
                         verify_checksum=verify_checksum,
                     )
                     with upload_lock:
-                        logger.info(
-                            f"Upload to {device_name}: "
-                            f"{'SUCCESS' if success else 'FAILED'}"
-                        )
+                        logger.info(f"Upload to {device_name}: {'SUCCESS' if success else 'FAILED'}")
                     return device_name, success
 
             except Exception as e:
@@ -509,8 +492,7 @@ class DeviceSession:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Submit all upload tasks
             future_to_device = {
-                executor.submit(upload_to_device, device_name): device_name
-                for device_name in device_names
+                executor.submit(upload_to_device, device_name): device_name for device_name in device_names
             }
 
             # Collect results as they complete
@@ -659,9 +641,7 @@ class DeviceSession:
             logger.info(f"Step 2/3: Preparing reset command: {reset_command}")
 
             # Step 3: Execute the nuclear reset with auto-confirmation
-            logger.warning(
-                f"Step 3/3: Executing NUCLEAR RESET in {pre_reset_delay}s..."
-            )
+            logger.warning(f"Step 3/3: Executing NUCLEAR RESET in {pre_reset_delay}s...")
             logger.warning("🚨 DEVICE WILL LOSE CONNECTION AND REBOOT! 🚨")
 
             # Give operator a moment to panic and Ctrl+C if needed
@@ -693,9 +673,7 @@ class DeviceSession:
                         timeout_ops=confirmation_timeout,
                     )
 
-                    logger.info(
-                        f"Interactive command completed. Response: {response!r}"
-                    )
+                    logger.info(f"Interactive command completed. Response: {response!r}")
 
                     logger.warning("🚨 NUCLEAR RESET EXECUTED! Device is rebooting...")
                     logger.warning("🔄 Device will apply new configuration on startup")
@@ -719,12 +697,8 @@ class DeviceSession:
                         ]
                     ):
                         logger.info(f"Device disconnected during reset (expected): {e}")
-                        logger.warning(
-                            "🚨 NUCLEAR RESET EXECUTED! Device is rebooting..."
-                        )
-                        logger.warning(
-                            "🔄 Device will apply new configuration on startup"
-                        )
+                        logger.warning("🚨 NUCLEAR RESET EXECUTED! Device is rebooting...")
+                        logger.warning("🔄 Device will apply new configuration on startup")
 
                         # Mark as disconnected
                         self._connected = False
@@ -736,14 +710,9 @@ class DeviceSession:
 
             except Exception as e:
                 # The device might disconnect immediately, which is expected
-                if any(
-                    phrase in str(e).lower()
-                    for phrase in ["connection", "disconnect", "timeout", "closed"]
-                ):
+                if any(phrase in str(e).lower() for phrase in ["connection", "disconnect", "timeout", "closed"]):
                     logger.info(f"Device disconnected during reset (expected): {e}")
-                    logger.warning(
-                        "🚨 NUCLEAR RESET LIKELY EXECUTED! Device is rebooting..."
-                    )
+                    logger.warning("🚨 NUCLEAR RESET LIKELY EXECUTED! Device is rebooting...")
                     logger.warning("🔄 Device will apply new configuration on startup")
 
                     # Mark as disconnected
@@ -756,18 +725,13 @@ class DeviceSession:
 
             else:
                 # Unexpected response - something went wrong
-                logger.error(f"Unexpected response to reset command: {prompt_response}")
+                logger.error("Unexpected flow in reset command - no response captured")
                 msg = "Reset command failed - no confirmation prompt received"
-                raise DeviceExecutionError(
-                    msg,
-                    details=f"Response: {prompt_response}",
-                )
+                raise DeviceExecutionError(msg)
 
         except Exception as e:
             logger.error(f"Nuclear config deployment failed: {e}")
-            if isinstance(
-                e, DeviceConnectionError | DeviceExecutionError | FileNotFoundError
-            ):
+            if isinstance(e, DeviceConnectionError | DeviceExecutionError | FileNotFoundError):
                 raise
             else:
                 msg = f"Nuclear config deployment failed on {self.device_name}"
@@ -867,9 +831,7 @@ class DeviceSession:
         # Determine remote filename
         remote_name = remote_filename or local_firmware_path.name
 
-        logger.warning(
-            f"🚨 NUCLEAR FIRMWARE DEPLOYMENT INITIATED on {self.device_name}!"
-        )
+        logger.warning(f"🚨 NUCLEAR FIRMWARE DEPLOYMENT INITIATED on {self.device_name}!")
         logger.warning(f"   Firmware file: {local_firmware_path}")
         logger.warning(f"   Remote name: {remote_name}")
         logger.warning(f"   File size: {local_firmware_path.stat().st_size:,} bytes")
@@ -910,9 +872,7 @@ class DeviceSession:
                 # Continue anyway - package verification is not critical
 
             # Step 3: Execute the reboot command with auto-confirmation
-            logger.warning(
-                f"Step 3/3: Executing NUCLEAR REBOOT in {pre_reboot_delay}s..."
-            )
+            logger.warning(f"Step 3/3: Executing NUCLEAR REBOOT in {pre_reboot_delay}s...")
             logger.warning("🚨 DEVICE WILL LOSE CONNECTION AND REBOOT! 🚨")
             logger.warning("🔄 FIRMWARE WILL BE APPLIED DURING BOOT PROCESS! 🔄")
 
@@ -943,15 +903,11 @@ class DeviceSession:
                         timeout_ops=confirmation_timeout,
                     )
 
-                    logger.info(
-                        f"Interactive reboot command completed. Response: {response!r}"
-                    )
+                    logger.info(f"Interactive reboot command completed. Response: {response!r}")
 
                     logger.warning("🚨 NUCLEAR REBOOT EXECUTED! Device is rebooting...")
                     logger.warning("🔄 Firmware will be applied during boot process...")
-                    logger.warning(
-                        "⏰ Boot process may take 2-5 minutes with firmware update"
-                    )
+                    logger.warning("⏰ Boot process may take 2-5 minutes with firmware update")
                     logger.info("✅ Firmware deployment command executed successfully")
 
                     # Mark as disconnected since device is rebooting
@@ -971,18 +927,10 @@ class DeviceSession:
                             "eof",
                         ]
                     ):
-                        logger.info(
-                            f"Device disconnected during reboot (expected): {e}"
-                        )
-                        logger.warning(
-                            "🚨 NUCLEAR REBOOT EXECUTED! Device is rebooting..."
-                        )
-                        logger.warning(
-                            "🔄 Firmware will be applied during boot process..."
-                        )
-                        logger.warning(
-                            "⏰ Boot process may take 2-5 minutes with firmware update"
-                        )
+                        logger.info(f"Device disconnected during reboot (expected): {e}")
+                        logger.warning("🚨 NUCLEAR REBOOT EXECUTED! Device is rebooting...")
+                        logger.warning("🔄 Firmware will be applied during boot process...")
+                        logger.warning("⏰ Boot process may take 2-5 minutes with firmware update")
 
                         # Mark as disconnected
                         self._connected = False
@@ -994,18 +942,11 @@ class DeviceSession:
 
             except Exception as e:
                 # The device might disconnect immediately, which is expected for reboot
-                if any(
-                    phrase in str(e).lower()
-                    for phrase in ["connection", "disconnect", "timeout", "closed"]
-                ):
+                if any(phrase in str(e).lower() for phrase in ["connection", "disconnect", "timeout", "closed"]):
                     logger.info(f"Device disconnected during reboot (expected): {e}")
-                    logger.warning(
-                        "🚨 NUCLEAR REBOOT LIKELY EXECUTED! Device is rebooting..."
-                    )
+                    logger.warning("🚨 NUCLEAR REBOOT LIKELY EXECUTED! Device is rebooting...")
                     logger.warning("🔄 Firmware will be applied during boot process...")
-                    logger.warning(
-                        "⏰ Boot process may take 2-5 minutes with firmware update"
-                    )
+                    logger.warning("⏰ Boot process may take 2-5 minutes with firmware update")
 
                     # Mark as disconnected
                     self._connected = False
@@ -1019,10 +960,7 @@ class DeviceSession:
             logger.error(f"Nuclear firmware deployment failed: {e}")
             if isinstance(
                 e,
-                DeviceConnectionError
-                | DeviceExecutionError
-                | FileNotFoundError
-                | ValueError,
+                DeviceConnectionError | DeviceExecutionError | FileNotFoundError | ValueError,
             ):
                 raise
             else:
@@ -1119,13 +1057,9 @@ class DeviceSession:
                 logger.warning(f"Could not verify packages (non-critical): {e}")
 
             # Step 3: Schedule downgrade with interactive confirmation
-            logger.info(
-                "Step 3/4: Scheduling downgrade via '/system package downgrade'"
-            )
+            logger.info("Step 3/4: Scheduling downgrade via '/system package downgrade'")
             try:
-                logger.info(
-                    "Executing downgrade command with automatic confirmation..."
-                )
+                logger.info("Executing downgrade command with automatic confirmation...")
                 try:
                     logger.debug("Sending downgrade command: /system/package/downgrade")
                     response = self._transport.send_interactive(  # type: ignore[union-attr]
@@ -1139,13 +1073,9 @@ class DeviceSession:
                         ],
                         timeout_ops=confirmation_timeout,
                     )
-                    logger.info(
-                        f"Interactive downgrade command completed. Response: {response!r}"
-                    )
+                    logger.info(f"Interactive downgrade command completed. Response: {response!r}")
                     logger.warning("🔁 DOWNGRADE INITIATED! Device is rebooting...")
-                    logger.warning(
-                        "⏰ Boot process may take 2-5 minutes with firmware change"
-                    )
+                    logger.warning("⏰ Boot process may take 2-5 minutes with firmware change")
                     self._connected = False
                     return True
                 except Exception as e:
@@ -1160,13 +1090,9 @@ class DeviceSession:
                             "eof",
                         ]
                     ):
-                        logger.info(
-                            f"Device disconnected during downgrade (expected): {e}"
-                        )
+                        logger.info(f"Device disconnected during downgrade (expected): {e}")
                         logger.warning("🔁 DOWNGRADE INITIATED! Device is rebooting...")
-                        logger.warning(
-                            "⏰ Boot process may take 2-5 minutes with firmware change"
-                        )
+                        logger.warning("⏰ Boot process may take 2-5 minutes with firmware change")
                         self._connected = False
                         return True
                     else:
@@ -1174,17 +1100,10 @@ class DeviceSession:
                         msg = f"Downgrade command failed: {e}"
                         raise DeviceConnectionError(msg) from e
             except Exception as e:
-                if any(
-                    phrase in str(e).lower()
-                    for phrase in ["connection", "disconnect", "timeout", "closed"]
-                ):
+                if any(phrase in str(e).lower() for phrase in ["connection", "disconnect", "timeout", "closed"]):
                     logger.info(f"Device disconnected during downgrade (expected): {e}")
-                    logger.warning(
-                        "🔁 DOWNGRADE LIKELY EXECUTED! Device is rebooting..."
-                    )
-                    logger.warning(
-                        "⏰ Boot process may take 2-5 minutes with firmware change"
-                    )
+                    logger.warning("🔁 DOWNGRADE LIKELY EXECUTED! Device is rebooting...")
+                    logger.warning("⏰ Boot process may take 2-5 minutes with firmware change")
                     self._connected = False
                     return True
                 else:
@@ -1195,10 +1114,7 @@ class DeviceSession:
             logger.error(f"Firmware downgrade deployment failed: {e}")
             if isinstance(
                 e,
-                DeviceConnectionError
-                | DeviceExecutionError
-                | FileNotFoundError
-                | ValueError,
+                DeviceConnectionError | DeviceExecutionError | FileNotFoundError | ValueError,
             ):
                 raise
             else:
@@ -1246,9 +1162,7 @@ class DeviceSession:
                     info = self.execute_command("/system/routerboard/print")
                     logger.debug(f"RouterBOARD status before upgrade: {info}")
                 except DeviceExecutionError as e:
-                    logger.warning(
-                        f"Could not fetch RouterBOARD status (non-critical): {e}"
-                    )
+                    logger.warning(f"Could not fetch RouterBOARD status (non-critical): {e}")
 
             logger.info("Issuing RouterBOARD upgrade command...")
             # RouterOS accepts both '/system routerboard upgrade' and with slashes
@@ -1273,9 +1187,7 @@ class DeviceSession:
                 error_msg = f"RouterBOARD upgrade failed: {e}"
                 raise DeviceExecutionError(error_msg) from e
 
-            logger.warning(
-                f"Rebooting in {pre_reboot_delay}s to apply RouterBOARD upgrade..."
-            )
+            logger.warning(f"Rebooting in {pre_reboot_delay}s to apply RouterBOARD upgrade...")
             logger.warning("🚨 DEVICE WILL LOSE CONNECTION AND REBOOT! 🚨")
             time.sleep(pre_reboot_delay)
 
@@ -1291,9 +1203,7 @@ class DeviceSession:
                         ],
                         timeout_ops=confirmation_timeout,
                     )
-                    logger.info(
-                        f"Interactive reboot command completed. Response: {response!r}"
-                    )
+                    logger.info(f"Interactive reboot command completed. Response: {response!r}")
                     logger.warning("🔁 REBOOT EXECUTED! Device is rebooting...")
                     self._connected = False
                     return True
@@ -1309,9 +1219,7 @@ class DeviceSession:
                             "eof",
                         ]
                     ):
-                        logger.info(
-                            f"Device disconnected during reboot (expected): {e}"
-                        )
+                        logger.info(f"Device disconnected during reboot (expected): {e}")
                         logger.warning("🔁 REBOOT EXECUTED! Device is rebooting...")
                         self._connected = False
                         return True
@@ -1320,10 +1228,7 @@ class DeviceSession:
                         msg = f"Reboot command failed: {e}"
                         raise DeviceConnectionError(msg) from e
             except Exception as e:
-                if any(
-                    phrase in str(e).lower()
-                    for phrase in ["connection", "disconnect", "timeout", "closed"]
-                ):
+                if any(phrase in str(e).lower() for phrase in ["connection", "disconnect", "timeout", "closed"]):
                     logger.info(f"Device disconnected during reboot (expected): {e}")
                     logger.warning("🔁 REBOOT LIKELY EXECUTED! Device is rebooting...")
                     self._connected = False
@@ -1386,9 +1291,7 @@ class DeviceSession:
         # Create parent directories if they don't exist
         local_path.parent.mkdir(parents=True, exist_ok=True)
 
-        logger.info(
-            f"Downloading file '{remote_filename}' from {self.device_name} to '{local_path}'"
-        )
+        logger.info(f"Downloading file '{remote_filename}' from {self.device_name} to '{local_path}'")
 
         # Get connection parameters for SFTP
         host = self._connection_params["host"]
@@ -1422,9 +1325,7 @@ class DeviceSession:
             # Download the file
             sftp.get(remote_path, str(local_path))
 
-            logger.info(
-                f"File '{remote_filename}' downloaded successfully to '{local_path}'"
-            )
+            logger.info(f"File '{remote_filename}' downloaded successfully to '{local_path}'")
 
             # Verify download if requested
             if verify_download:
@@ -1433,8 +1334,7 @@ class DeviceSession:
                     logger.info("Download verified: file sizes match")
                 else:
                     logger.error(
-                        f"Download verification failed: size mismatch "
-                        f"(remote: {remote_size}, local: {local_size})"
+                        f"Download verification failed: size mismatch (remote: {remote_size}, local: {local_size})"
                     )
                     return False
 
@@ -1442,21 +1342,15 @@ class DeviceSession:
             if delete_remote:
                 try:
                     # Use the device command to remove the file
-                    self.execute_command(
-                        f'/file/remove numbers=[find name="{remote_filename}"]'
-                    )
+                    self.execute_command(f'/file/remove numbers=[find name="{remote_filename}"]')
                     logger.info(f"Remote file '{remote_filename}' deleted")
                 except Exception as e:
-                    logger.warning(
-                        f"Failed to delete remote file '{remote_filename}': {e}"
-                    )
+                    logger.warning(f"Failed to delete remote file '{remote_filename}': {e}")
 
             return True
 
         except paramiko.AuthenticationException as e:
-            logger.error(
-                f"Authentication failed during file download from {self.device_name}: {e}"
-            )
+            logger.error(f"Authentication failed during file download from {self.device_name}: {e}")
             msg = f"Authentication failed during file download from {self.device_name}"
             raise DeviceExecutionError(
                 msg,

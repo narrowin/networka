@@ -109,7 +109,6 @@ class NornirNetmikoTransport:
             return CommandResult(
                 result=str(output),  # Ensure it's a string
                 failed=False,
-                execution_time=execution_time,
             )
 
         except Exception as e:
@@ -119,17 +118,12 @@ class NornirNetmikoTransport:
             return CommandResult(
                 result="",
                 failed=True,
-                execution_time=execution_time,
-                error_context={"error": error_msg},
             )
         """Send a single command and return the result."""
         try:
             from nornir_netmiko.tasks import netmiko_send_command
         except ImportError as e:
-            error_msg = (
-                "nornir-netmiko package required. "
-                "Install with: pip install nornir-netmiko"
-            )
+            error_msg = "nornir-netmiko package required. Install with: pip install nornir-netmiko"
             raise ImportError(error_msg) from e
 
         start_time = time.time()
@@ -151,14 +145,14 @@ class NornirNetmikoTransport:
             result=str(device_result.result) if device_result.result else "",
             failed=device_result.failed,
             execution_time=execution_time,
-            error_context={
-                "exception": str(device_result.exception)
-                if device_result.exception
-                else None,
-                "host": device_result.host.name if device_result.host else None,
-            }
-            if device_result.failed
-            else None,
+            error_context=(
+                {
+                    "exception": str(device_result.exception) if device_result.exception else None,
+                    "host": device_result.host.name if device_result.host else None,
+                }
+                if device_result.failed
+                else None
+            ),
         )
 
     def send_commands(self, commands: list[str]) -> list[CommandResult]:
@@ -169,15 +163,12 @@ class NornirNetmikoTransport:
             # Fallback to individual commands
             return [self.send_command(cmd) for cmd in commands]
 
-        start_time = time.time()
-
         filtered_nr = self.nr.filter(name=self.device_name)
         result = filtered_nr.run(
             task=netmiko_send_commands,
             command_string=commands,
         )
 
-        execution_time = time.time() - start_time
         self._last_activity = time.time()
 
         device_result = result[self.device_name]
@@ -187,12 +178,6 @@ class NornirNetmikoTransport:
             failed_result = CommandResult(
                 result="",
                 failed=True,
-                execution_time=execution_time,
-                error_context={
-                    "exception": str(device_result.exception)
-                    if device_result.exception
-                    else None,
-                },
             )
             return [failed_result for _ in commands]
 
@@ -204,8 +189,6 @@ class NornirNetmikoTransport:
                     CommandResult(
                         result=str(cmd_result),
                         failed=False,
-                        execution_time=execution_time
-                        / len(commands),  # Approximate per command
                     )
                 )
         else:
@@ -216,15 +199,12 @@ class NornirNetmikoTransport:
                     CommandResult(
                         result=result_text,
                         failed=False,
-                        execution_time=execution_time / len(commands),
                     )
                 )
 
         return results
 
-    def send_interactive(
-        self, interact_events: list[tuple[str, str, bool]], timeout_ops: float
-    ) -> str:
+    def send_interactive(self, interact_events: list[tuple[str, str, bool]], timeout_ops: float) -> str:
         """Send interactive command with prompts and responses."""
         # This is more complex with Netmiko, would need custom implementation
         # For now, raise NotImplementedError
@@ -249,20 +229,13 @@ class NornirNetmikoTransport:
         """Check if the connection is still active."""
         return self._connected
 
-    def execute_on_group(
-        self, device_names: list[str], command: str
-    ) -> dict[str, CommandResult]:
+    def execute_on_group(self, device_names: list[str], command: str) -> dict[str, CommandResult]:
         """Execute command on multiple devices efficiently using Nornir's parallel execution."""
         try:
             from nornir_netmiko.tasks import netmiko_send_command
         except ImportError as e:
-            error_msg = (
-                "nornir-netmiko package required. "
-                "Install with: pip install nornir-netmiko"
-            )
+            error_msg = "nornir-netmiko package required. Install with: pip install nornir-netmiko"
             raise ImportError(error_msg) from e
-
-        start_time = time.time()
 
         # Filter to target devices and run command in parallel
         filtered_nr = self.nr.filter(name__in=device_names)
@@ -270,8 +243,6 @@ class NornirNetmikoTransport:
             task=netmiko_send_command,
             command_string=command,
         )
-
-        execution_time = time.time() - start_time
 
         # Convert Nornir results to CommandResult dict
         command_results = {}
@@ -281,25 +252,12 @@ class NornirNetmikoTransport:
                 command_results[device_name] = CommandResult(
                     result=str(device_result.result) if device_result.result else "",
                     failed=device_result.failed,
-                    execution_time=execution_time,  # Total time for parallel execution
-                    error_context={
-                        "exception": str(device_result.exception)
-                        if device_result.exception
-                        else None,
-                        "host": device_result.host.name if device_result.host else None,
-                    }
-                    if device_result.failed
-                    else None,
                 )
             else:
                 # Device not found in results
                 command_results[device_name] = CommandResult(
                     result="",
                     failed=True,
-                    execution_time=0.0,
-                    error_context={
-                        "error": f"Device {device_name} not found in inventory"
-                    },
                 )
 
         return command_results
