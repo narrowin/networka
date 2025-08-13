@@ -102,7 +102,7 @@ class NornirNetmikoTransportFactory:
         """Setup Nornir runner with inventory from config."""
         try:
             # Import nornir-netmiko to register its plugins
-            import nornir_netmiko  # noqa: F401
+            import nornir_netmiko
             from nornir.core import Nornir
         except ImportError as e:
             error_msg = "Nornir package required. Install with: pip install nornir"

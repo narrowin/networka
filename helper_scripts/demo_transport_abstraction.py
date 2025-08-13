@@ -37,21 +37,16 @@ devices:
 
 def test_transport_factory():
     """Test basic transport factory functionality."""
-    print("Testing transport factory...")
 
     # Test factory creation for both transport types
     try:
-        scrapli_factory = get_transport_factory("scrapli")
-        print(f"✓ Scrapli factory created: {type(scrapli_factory).__name__}")
-    except Exception as e:
-        print(f"✗ Failed to create Scrapli factory: {e}")
+        get_transport_factory("scrapli")
+    except Exception:
         return False
 
     try:
-        nornir_factory = get_transport_factory("nornir_netmiko")
-        print(f"✓ Nornir factory created: {type(nornir_factory).__name__}")
-    except Exception as e:
-        print(f"✗ Failed to create Nornir factory: {e}")
+        get_transport_factory("nornir_netmiko")
+    except Exception:
         return False
 
     return True
@@ -59,33 +54,25 @@ def test_transport_factory():
 
 def test_configuration():
     """Test configuration with transport settings."""
-    print("\nTesting configuration system...")
 
     config_file = create_test_config()
 
     try:
         # Test config loading
         config = load_config(config_file)
-        print("✓ Configuration loaded successfully")
 
         # Test transport type resolution
-        transport_type = config.get_transport_type("test_device")
-        print(f"✓ Transport type resolved: {transport_type}")
+        config.get_transport_type("test_device")
 
         # Set mock environment variables for testing
         os.environ["NT_DEFAULT_PASSWORD"] = "test_password"
 
         # Test connection parameters
-        params = config.get_device_connection_params("test_device")
-        print(f"✓ Connection parameters generated: {len(params)} parameters")
-        print(f"  - transport_type: {params.get('transport_type')}")
-        print(f"  - host: {params.get('host')}")
-        print(f"  - username: {params.get('username')}")
+        config.get_device_connection_params("test_device")
 
         return True
 
-    except Exception as e:
-        print(f"✗ Configuration test failed: {e}")
+    except Exception:
         return False
     finally:
         # Cleanup
@@ -95,7 +82,6 @@ def test_configuration():
 
 def test_transport_creation():
     """Test transport creation without actual connection."""
-    print("\nTesting transport creation...")
 
     config_file = create_test_config()
     os.environ["NT_DEFAULT_PASSWORD"] = "test_password"
@@ -110,16 +96,13 @@ def test_transport_creation():
             config=config,
             connection_params=config.get_device_connection_params("test_device"),
         )
-        print(f"✓ Scrapli transport created: {type(scrapli_transport).__name__}")
 
         # Test connection state interface
-        state = scrapli_transport.get_connection_state()
-        print(f"✓ Connection state accessible: {state.is_connected}")
+        scrapli_transport.get_connection_state()
 
         return True
 
-    except Exception as e:
-        print(f"✗ Transport creation failed: {e}")
+    except Exception:
         return False
     finally:
         # Cleanup
@@ -129,8 +112,6 @@ def test_transport_creation():
 
 def main():
     """Run all transport abstraction tests."""
-    print("Transport Abstraction Test Suite")
-    print("=" * 40)
 
     tests = [
         test_transport_factory,
@@ -142,15 +123,10 @@ def main():
     for test in tests:
         if test():
             passed += 1
-        print()
-
-    print(f"Results: {passed}/{len(tests)} tests passed")
 
     if passed == len(tests):
-        print("🎉 All transport abstraction tests passed!")
         return True
     else:
-        print("❌ Some tests failed")
         return False
 
 

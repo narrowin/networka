@@ -125,10 +125,13 @@ tasks:
       - echo "✅ All checks passed!"
 
   build:
-    desc: Build package
+    desc: Build package for GitHub release
     cmds:
-      - echo "📦 Building package..."
-      - ./scripts/build.sh
+      - echo "📦 Building package for GitHub distribution..."
+      - rm -rf dist/
+      - uv build
+      - echo "✅ Built files:"
+      - ls -la dist/
     sources:
       - src/**/*.py
       - pyproject.toml
@@ -138,11 +141,13 @@ tasks:
       - dist/**
 
   build:check:
-    desc: Build and check package
+    desc: Build and validate package structure
     cmds:
-      - echo "🔍 Building and checking package..."
+      - echo "🔍 Building and validating package..."
       - uv build
-      - uv run twine check dist/*
+      - echo "📋 Package structure check:"
+      - tar -tzf dist/*.tar.gz | head -20
+      - unzip -l dist/*.whl | head -20
     sources:
       - src/**/*.py
       - pyproject.toml
@@ -174,25 +179,37 @@ tasks:
       - echo "⚠️ Documentation generation not yet implemented"
 
   release:dry:
-    desc: Dry run release process
+    desc: Dry run GitHub release process
     interactive: true
     cmds:
-      - echo "🚀 Running release dry run..."
+      - echo "🚀 Running GitHub release dry run..."
       - |
         read -p "Enter version (e.g., 1.0.0): " version
-        ./scripts/release.sh -v $version --dry-run
+        echo "Would create GitHub release v$version with built assets"
+        echo "Assets that would be attached:"
+        task build
+        ls -la dist/
 
   release:
-    desc: Create a release (interactive)
+    desc: Create a GitHub release (interactive)
     interactive: true
     cmds:
-      - echo "🚀 Creating release..."
-      - echo "⚠️ This will create a new release. Make sure you're on main branch with clean working directory."
+      - echo "🚀 Creating GitHub release..."
+      - echo "⚠️ This will create a new GitHub release with built assets."
+      - echo "   Make sure you're on main branch with clean working directory."
       - |
         read -p "Enter version (e.g., 1.0.0): " version
-        read -p "Are you sure you want to release v$version? (y/N): " confirm
+        read -p "Are you sure you want to release v$version to GitHub? (y/N): " confirm
         if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
-          ./scripts/release.sh -v $version
+          echo "Building release assets..."
+          task build
+          echo "✅ Assets built. Create GitHub release manually and attach:"
+          ls -la dist/
+          echo "📌 Instructions:"
+          echo "1. Go to https://github.com/narrowin/net-worker/releases/new"
+          echo "2. Tag: v$version"
+          echo "3. Attach files from dist/ directory"
+          echo "4. Write release notes"
         else
           echo "❌ Release cancelled"
         fi

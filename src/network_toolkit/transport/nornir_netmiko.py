@@ -199,7 +199,7 @@ class NornirNetmikoTransport:
         # Convert results to CommandResult list
         results = []
         if isinstance(device_result.result, list):
-            for i, cmd_result in enumerate(device_result.result):
+            for _i, cmd_result in enumerate(device_result.result):
                 results.append(
                     CommandResult(
                         result=str(cmd_result),

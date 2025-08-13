@@ -48,15 +48,24 @@ uv build
 
 # Check the build
 echo "🔍 Checking build artifacts..."
-uv run twine check dist/*
-
-echo "✅ Build completed successfully!"
-echo ""
 echo "📦 Build artifacts:"
 ls -la dist/
 echo ""
-echo "🚀 To publish to PyPI:"
-echo "   uv run twine upload dist/*"
+
+# Validate package structure
+echo "📋 Package validation:"
+echo "Source distribution contents:"
+tar -tzf dist/*.tar.gz | head -10
 echo ""
-echo "🧪 To publish to Test PyPI:"
-echo "   uv run twine upload --repository testpypi dist/*"
+echo "Wheel contents:"
+unzip -l dist/*.whl | head -10
+echo ""
+
+echo "✅ Build completed successfully!"
+echo ""
+echo "� Ready for GitHub release!"
+echo "   1. Create a new release at: https://github.com/narrowin/net-worker/releases/new"
+echo "   2. Attach the files from dist/ directory"
+echo "   3. Users can install with:"
+echo "      pip install git+https://github.com/narrowin/net-worker.git"
+echo "   4. Or download and install the wheel file"

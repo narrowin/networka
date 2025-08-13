@@ -123,7 +123,8 @@ class TestDeviceSessionAdditional:
 
         def side_effect(command: str) -> str:
             if "invalid" in command:
-                raise DeviceExecutionError("Command failed")
+                msg = "Command failed"
+                raise DeviceExecutionError(msg)
             return "success output"
 
         session = DeviceSession("test_device1", sample_config)

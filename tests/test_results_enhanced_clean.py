@@ -208,7 +208,7 @@ class TestResultsManager:
             "/system/clock/print": "time: 14:30:00",
         }
 
-        with patch.object(manager, "_write_result_file") as mock_write:
+        with patch.object(manager, "_write_result_file"):
             stored_files = manager.store_sequence_results(
                 "sw-acc1",
                 "system_info",

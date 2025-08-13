@@ -90,7 +90,6 @@ devices: {}
         """Test exception hierarchy and creation."""
         from network_toolkit.exceptions import (
             DeviceConnectionError,
-            DeviceExecutionError,
             NetworkToolkitError,
         )
 
@@ -223,7 +222,7 @@ class TestErrorConditions:
     def test_network_timeout_simulation(self) -> None:
         """Test network timeout simulation."""
         with patch("asyncio.wait_for") as mock_wait:
-            mock_wait.side_effect = asyncio.TimeoutError("Timeout")
+            mock_wait.side_effect = TimeoutError("Timeout")
 
             async def timeout_test() -> None:
                 await asyncio.wait_for(asyncio.sleep(1), timeout=0.1)

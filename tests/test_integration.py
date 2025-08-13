@@ -21,6 +21,7 @@ class TestCLIIntegration:
         # Test the CLI as it would be run by a user
         result = subprocess.run(
             [sys.executable, "-m", "network_toolkit", "--help"],
+            check=False,
             capture_output=True,
             text=True,
             cwd=Path(__file__).parent.parent,
@@ -48,6 +49,7 @@ class TestCLIIntegration:
                 str(config_file),
                 "list-devices",
             ],
+            check=False,
             capture_output=True,
             text=True,
             cwd=Path(__file__).parent.parent,
@@ -69,6 +71,7 @@ class TestCLIIntegration:
                 "info",
                 "test_device1",
             ],
+            check=False,
             capture_output=True,
             text=True,
             cwd=Path(__file__).parent.parent,
@@ -82,6 +85,7 @@ class TestCLIIntegration:
         """Test CLI with invalid command."""
         result = subprocess.run(
             [sys.executable, "-m", "network_toolkit", "invalid-command"],
+            check=False,
             capture_output=True,
             text=True,
             cwd=Path(__file__).parent.parent,
@@ -102,6 +106,7 @@ class TestCLIIntegration:
                 "/nonexistent/config.yml",
                 "list-devices",
             ],
+            check=False,
             capture_output=True,
             text=True,
             cwd=Path(__file__).parent.parent,

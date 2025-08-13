@@ -16,7 +16,7 @@ class FakePane:
     def __init__(self) -> None:
         self.sent: list[str] = []
 
-    def send_keys(self, cmd: str, *, enter: bool = False) -> None:  # noqa: ARG002
+    def send_keys(self, cmd: str, *, enter: bool = False) -> None:
         self.sent.append(cmd)
 
 
@@ -41,10 +41,10 @@ class FakeWindow:
         self._panes.append(p)
         return p
 
-    def select_layout(self, layout: str) -> None:  # noqa: ARG002
+    def select_layout(self, layout: str) -> None:
         return None
 
-    def set_option(self, name: str, value: Any) -> None:  # noqa: ARG002
+    def set_option(self, name: str, value: Any) -> None:
         return None
 
     def rename_window(self, name: str) -> None:

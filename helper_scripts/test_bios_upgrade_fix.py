@@ -30,7 +30,7 @@ def test_routerboard_upgrade_interactive():
 
     # Test that upgrade_routerboard uses send_interactive
     try:
-        result = device.upgrade_routerboard(
+        device.upgrade_routerboard(
             verify_before=False, pre_reboot_delay=0, confirmation_timeout=30
         )
 
@@ -44,24 +44,16 @@ def test_routerboard_upgrade_interactive():
         # Verify the upgrade command and prompt
         assert interact_events[0][0] == "/system/routerboard/upgrade"
         assert "Do you really want to upgrade firmware? [y/n]" in interact_events[0][1]
-        assert interact_events[0][2] == True  # hidden=True
+        assert interact_events[0][2]  # hidden=True
 
         # Verify the confirmation response
         assert interact_events[1][0] == "y"
         assert interact_events[1][1] == ""
-        assert interact_events[1][2] == False  # hidden=False
-
-        print("✅ BIOS upgrade fix verified!")
-        print("✅ RouterBOARD upgrade now uses interactive command handling")
-        print(
-            "✅ Correct prompt pattern is expected: 'Do you really want to upgrade firmware? [y/n]'"
-        )
-        print("✅ Automatic 'y' confirmation is sent")
+        assert not interact_events[1][2]  # hidden=False
 
         return True
 
-    except Exception as e:
-        print(f"❌ Test failed: {e}")
+    except Exception:
         return False
 
 

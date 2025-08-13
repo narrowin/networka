@@ -237,15 +237,14 @@ def create_simple_run_command() -> Any:
                     _execute_sequence_multiple_devices(
                         executor, resolved_devices, command_or_sequence, target
                     )
+            elif is_single_device:
+                _execute_command_single_device(
+                    executor, resolved_devices[0], command_or_sequence, target
+                )
             else:
-                if is_single_device:
-                    _execute_command_single_device(
-                        executor, resolved_devices[0], command_or_sequence, target
-                    )
-                else:
-                    _execute_command_multiple_devices(
-                        executor, resolved_devices, command_or_sequence, target
-                    )
+                _execute_command_multiple_devices(
+                    executor, resolved_devices, command_or_sequence, target
+                )
 
             # Print summary
             if output_format == OutputFormat.NORMAL:

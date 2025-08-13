@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: write
-  id-token: write  # For trusted publishing to PyPI
 
 env:
   FORCE_COLOR: "1"
@@ -38,14 +37,15 @@ jobs:
     - name: Check build artifacts
       run: |
         ls -la dist/
-        uv run twine check dist/*
+        echo "✅ Built packages:"
+        file dist/*
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
         name: dist
         path: dist/
-        retention-days: 30
+        retention-days: 90
 
   test-built-package:
     name: Test built package
@@ -79,31 +79,10 @@ jobs:
         nw --help
         python -c "import network_toolkit; print('Import successful')"
 
-  publish-pypi:
-    name: Publish to PyPI
-    runs-on: ubuntu-latest
-    needs: [build, test-built-package]
-    environment:
-      name: pypi
-      url: https://pypi.org/p/net-worker
-
-    steps:
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: dist
-        path: dist/
-
-    - name: Publish to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        verbose: true
-        print-hash: true
-
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [publish-pypi]
+    needs: [build, test-built-package]
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -138,14 +117,23 @@ jobs:
         echo "" >> release_notes.txt
         echo "## Installation" >> release_notes.txt
         echo "" >> release_notes.txt
+        echo '### Option 1: Install from GitHub' >> release_notes.txt
         echo '```bash' >> release_notes.txt
-        echo "pip install net-worker==${VERSION}" >> release_notes.txt
+        echo "pip install git+https://github.com/narrowin/net-worker.git@v${VERSION}" >> release_notes.txt
         echo '```' >> release_notes.txt
         echo "" >> release_notes.txt
-        echo "Or using uv:" >> release_notes.txt
-        echo "" >> release_notes.txt
+        echo '### Option 2: Download and install wheel' >> release_notes.txt
         echo '```bash' >> release_notes.txt
-        echo "uv add net-worker==${VERSION}" >> release_notes.txt
+        echo "# Download the .whl file from this release, then:" >> release_notes.txt
+        echo "pip install net_worker-${VERSION}-py3-none-any.whl" >> release_notes.txt
+        echo '```' >> release_notes.txt
+        echo "" >> release_notes.txt
+        echo '### Option 3: Clone and install' >> release_notes.txt
+        echo '```bash' >> release_notes.txt
+        echo "git clone https://github.com/narrowin/net-worker.git" >> release_notes.txt
+        echo "cd net-worker" >> release_notes.txt
+        echo "git checkout v${VERSION}" >> release_notes.txt
+        echo "uv sync  # or pip install -e ." >> release_notes.txt
         echo '```' >> release_notes.txt
 
     - name: Create GitHub Release

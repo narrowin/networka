@@ -280,7 +280,7 @@ class TestHandleFileDownloads(unittest.TestCase):
         ]
 
         with patch("network_toolkit.cli.console"):
-            result = _handle_file_downloads(
+            _handle_file_downloads(
                 session=self.mock_session,
                 device_name=self.device_name,
                 download_files=download_files,
@@ -345,7 +345,7 @@ class TestHandleFileDownloads(unittest.TestCase):
         ]
 
         with patch("network_toolkit.cli.console"):
-            result = _handle_file_downloads(
+            _handle_file_downloads(
                 session=self.mock_session,
                 device_name=self.device_name,
                 download_files=download_files,
@@ -368,7 +368,7 @@ class TestHandleFileDownloads(unittest.TestCase):
         download_files: list[dict[str, str | bool]] = [{"remote_file": "minimal.rsc"}]
 
         with patch("network_toolkit.cli.console"):
-            result = _handle_file_downloads(
+            _handle_file_downloads(
                 session=self.mock_session,
                 device_name=self.device_name,
                 download_files=download_files,
@@ -399,7 +399,7 @@ class TestHandleFileDownloads(unittest.TestCase):
         ]
 
         with patch("network_toolkit.cli.console"):
-            result = _handle_file_downloads(
+            _handle_file_downloads(
                 session=self.mock_session,
                 device_name=self.device_name,
                 download_files=download_files,
@@ -562,9 +562,11 @@ class TestHandleFileDownloadsIntegration(unittest.TestCase):
             elif remote_filename == "missing.rsc":
                 return False
             elif remote_filename == "corrupted.rsc":
-                raise DeviceExecutionError("File corrupted during transfer")
+                msg = "File corrupted during transfer"
+                raise DeviceExecutionError(msg)
             else:
-                raise Exception("Unexpected file")
+                msg = "Unexpected file"
+                raise Exception(msg)
 
         self.mock_session.download_file.side_effect = download_side_effect
 

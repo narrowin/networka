@@ -131,7 +131,8 @@ class TestDeviceResolver:
 
         try:
             resolver.get_group_members("nonexistent")
-            assert False, "Should have raised ValueError"
+            msg = "Should have raised ValueError"
+            raise AssertionError(msg)
         except ValueError as e:
             assert "Group 'nonexistent' does not exist" in str(e)
 
@@ -144,7 +145,8 @@ class TestDeviceResolver:
 
         try:
             resolver.get_group_members("group1")
-            assert False, "Should have raised ValueError"
+            msg = "Should have raised ValueError"
+            raise AssertionError(msg)
         except ValueError as e:
             assert "Failed to get members for group 'group1'" in str(e)
 

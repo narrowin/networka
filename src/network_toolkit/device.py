@@ -131,14 +131,16 @@ class DeviceSession:
             )
         except (TypeError, ValueError, KeyError) as e:
             logger.error(f"Invalid configuration for {self.device_name}: {e}")
+            msg = f"Invalid configuration for {self.device_name}"
             raise DeviceConnectionError(
-                f"Invalid configuration for {self.device_name}",
+                msg,
                 details={"original_error": str(e)},
             ) from e
         except Exception as e:
             logger.error(f"Failed to create driver for {self.device_name}: {e}")
+            msg = f"Driver creation failed for {self.device_name}"
             raise DeviceConnectionError(
-                f"Driver creation failed for {self.device_name}",
+                msg,
                 details={"original_error": str(e)},
             ) from e
 
@@ -164,9 +166,8 @@ class DeviceSession:
                     time.sleep(retry_delay)
 
         # If all retries fail, raise an exception
-        raise DeviceConnectionError(
-            f"Failed to connect to {self.device_name} after {retries} attempts"
-        )
+        msg = f"Failed to connect to {self.device_name} after {retries} attempts"
+        raise DeviceConnectionError(msg)
 
     def disconnect(self) -> None:
         """Close connection to the device."""
@@ -202,7 +203,8 @@ class DeviceSession:
             If command execution fails
         """
         if not self._connected or not self._transport:
-            raise DeviceExecutionError(f"Device {self.device_name} not connected")
+            msg = f"Device {self.device_name} not connected"
+            raise DeviceExecutionError(msg)
 
         logger.debug(f"Executing command on {self.device_name}: {command}")
 
@@ -210,8 +212,9 @@ class DeviceSession:
             response = self._transport.send_command(command)
 
             if response.failed:
+                msg = f"Command failed on {self.device_name}: {command}"
                 raise DeviceExecutionError(
-                    f"Command failed on {self.device_name}: {command}",
+                    msg,
                     details={"error": response.result},
                 )
 
@@ -220,8 +223,9 @@ class DeviceSession:
 
         except ScrapliException as e:
             logger.error(f"Command execution failed on {self.device_name}: {e}")
+            msg = f"Command execution failed on {self.device_name}"
             raise DeviceExecutionError(
-                f"Command execution failed on {self.device_name}",
+                msg,
                 details={"command": command, "original_error": str(e)},
             ) from e
 
@@ -591,14 +595,17 @@ class DeviceSession:
         ...     print(f"Config deployment: {'SUCCESS' if success else 'FAILED'}")
         """
         if not self._connected:
-            raise DeviceConnectionError("Device not connected")
+            msg = "Device not connected"
+            raise DeviceConnectionError(msg)
 
         # Validate local config file
         if not local_config_path.exists():
-            raise FileNotFoundError(f"Config file not found: {local_config_path}")
+            msg = f"Config file not found: {local_config_path}"
+            raise FileNotFoundError(msg)
 
         if not local_config_path.is_file():
-            raise FileNotFoundError(f"Path is not a file: {local_config_path}")
+            msg = f"Path is not a file: {local_config_path}"
+            raise FileNotFoundError(msg)
 
         # Determine remote filename
         remote_name = remote_filename or local_config_path.name
@@ -619,8 +626,9 @@ class DeviceSession:
             )
 
             if not upload_success:
+                msg = f"Config file upload failed to {self.device_name}"
                 raise DeviceExecutionError(
-                    f"Config file upload failed to {self.device_name}",
+                    msg,
                     details={"reason": "Upload verification failed"},
                 )
 
@@ -723,7 +731,8 @@ class DeviceSession:
                         return True
                     else:
                         logger.error(f"Unexpected error during reset: {e}")
-                        raise DeviceConnectionError(f"Reset command failed: {e}") from e
+                        msg = f"Reset command failed: {e}"
+                        raise DeviceConnectionError(msg) from e
 
             except Exception as e:
                 # The device might disconnect immediately, which is expected
@@ -742,25 +751,28 @@ class DeviceSession:
                     return True
                 else:
                     logger.error(f"Unexpected error during reset: {e}")
-                    raise DeviceConnectionError(f"Reset command failed: {e}") from e
+                    msg = f"Reset command failed: {e}"
+                    raise DeviceConnectionError(msg) from e
 
             else:
                 # Unexpected response - something went wrong
                 logger.error(f"Unexpected response to reset command: {prompt_response}")
+                msg = "Reset command failed - no confirmation prompt received"
                 raise DeviceExecutionError(
-                    "Reset command failed - no confirmation prompt received",
+                    msg,
                     details=f"Response: {prompt_response}",
                 )
 
         except Exception as e:
             logger.error(f"Nuclear config deployment failed: {e}")
             if isinstance(
-                e, (DeviceConnectionError, DeviceExecutionError, FileNotFoundError)
+                e, DeviceConnectionError | DeviceExecutionError | FileNotFoundError
             ):
                 raise
             else:
+                msg = f"Nuclear config deployment failed on {self.device_name}"
                 raise DeviceExecutionError(
-                    f"Nuclear config deployment failed on {self.device_name}",
+                    msg,
                     details={"error": str(e)},
                 ) from e
 
@@ -835,20 +847,22 @@ class DeviceSession:
         • Device may have different IP/credentials after firmware update
         """
         if not self._connected:
-            raise DeviceConnectionError("Device not connected")
+            msg = "Device not connected"
+            raise DeviceConnectionError(msg)
 
         # Validate local firmware file
         if not local_firmware_path.exists():
-            raise FileNotFoundError(f"Firmware file not found: {local_firmware_path}")
+            msg = f"Firmware file not found: {local_firmware_path}"
+            raise FileNotFoundError(msg)
 
         if not local_firmware_path.is_file():
-            raise FileNotFoundError(f"Path is not a file: {local_firmware_path}")
+            msg = f"Path is not a file: {local_firmware_path}"
+            raise FileNotFoundError(msg)
 
         # Validate firmware file extension
         if not local_firmware_path.suffix.lower() == ".npk":
-            raise ValueError(
-                f"Invalid firmware file type. Expected .npk file, got: {local_firmware_path.suffix}"
-            )
+            msg = f"Invalid firmware file type. Expected .npk file, got: {local_firmware_path.suffix}"
+            raise ValueError(msg)
 
         # Determine remote filename
         remote_name = remote_filename or local_firmware_path.name
@@ -872,8 +886,9 @@ class DeviceSession:
             )
 
             if not upload_success:
+                msg = f"Firmware file upload failed to {self.device_name}"
                 raise DeviceExecutionError(
-                    f"Firmware file upload failed to {self.device_name}",
+                    msg,
                     details={"reason": "Upload verification failed"},
                 )
 
@@ -974,9 +989,8 @@ class DeviceSession:
                         return True
                     else:
                         logger.error(f"Unexpected error during reboot: {e}")
-                        raise DeviceConnectionError(
-                            f"Reboot command failed: {e}"
-                        ) from e
+                        msg = f"Reboot command failed: {e}"
+                        raise DeviceConnectionError(msg) from e
 
             except Exception as e:
                 # The device might disconnect immediately, which is expected for reboot
@@ -998,23 +1012,23 @@ class DeviceSession:
                     return True
                 else:
                     logger.error(f"Unexpected error during reboot: {e}")
-                    raise DeviceConnectionError(f"Reboot command failed: {e}") from e
+                    msg = f"Reboot command failed: {e}"
+                    raise DeviceConnectionError(msg) from e
 
         except Exception as e:
             logger.error(f"Nuclear firmware deployment failed: {e}")
             if isinstance(
                 e,
-                (
-                    DeviceConnectionError,
-                    DeviceExecutionError,
-                    FileNotFoundError,
-                    ValueError,
-                ),
+                DeviceConnectionError
+                | DeviceExecutionError
+                | FileNotFoundError
+                | ValueError,
             ):
                 raise
             else:
+                msg = f"Nuclear firmware deployment failed on {self.device_name}"
                 raise DeviceExecutionError(
-                    f"Nuclear firmware deployment failed on {self.device_name}",
+                    msg,
                     details={"error": str(e)},
                 ) from e
 
@@ -1057,17 +1071,19 @@ class DeviceSession:
             On validation or execution failures
         """
         if not self._connected:
-            raise DeviceConnectionError("Device not connected")
+            msg = "Device not connected"
+            raise DeviceConnectionError(msg)
 
         # Validate local firmware file
         if not local_firmware_path.exists():
-            raise FileNotFoundError(f"Firmware file not found: {local_firmware_path}")
+            msg = f"Firmware file not found: {local_firmware_path}"
+            raise FileNotFoundError(msg)
         if not local_firmware_path.is_file():
-            raise FileNotFoundError(f"Path is not a file: {local_firmware_path}")
+            msg = f"Path is not a file: {local_firmware_path}"
+            raise FileNotFoundError(msg)
         if not local_firmware_path.suffix.lower() == ".npk":
-            raise ValueError(
-                f"Invalid firmware file type. Expected .npk file, got: {local_firmware_path.suffix}"
-            )
+            msg = f"Invalid firmware file type. Expected .npk file, got: {local_firmware_path.suffix}"
+            raise ValueError(msg)
 
         remote_name = remote_filename or local_firmware_path.name
 
@@ -1087,8 +1103,9 @@ class DeviceSession:
                 verify_checksum=verify_checksum,
             )
             if not upload_success:
+                msg = f"Firmware file upload failed to {self.device_name}"
                 raise DeviceExecutionError(
-                    f"Firmware file upload failed to {self.device_name}",
+                    msg,
                     details={"reason": "Upload verification failed"},
                 )
             logger.info("✅ Firmware file uploaded successfully")
@@ -1154,9 +1171,8 @@ class DeviceSession:
                         return True
                     else:
                         logger.error(f"Unexpected error during downgrade: {e}")
-                        raise DeviceConnectionError(
-                            f"Downgrade command failed: {e}"
-                        ) from e
+                        msg = f"Downgrade command failed: {e}"
+                        raise DeviceConnectionError(msg) from e
             except Exception as e:
                 if any(
                     phrase in str(e).lower()
@@ -1179,17 +1195,16 @@ class DeviceSession:
             logger.error(f"Firmware downgrade deployment failed: {e}")
             if isinstance(
                 e,
-                (
-                    DeviceConnectionError,
-                    DeviceExecutionError,
-                    FileNotFoundError,
-                    ValueError,
-                ),
+                DeviceConnectionError
+                | DeviceExecutionError
+                | FileNotFoundError
+                | ValueError,
             ):
                 raise
             else:
+                msg = f"Firmware downgrade deployment failed on {self.device_name}"
                 raise DeviceExecutionError(
-                    f"Firmware downgrade deployment failed on {self.device_name}",
+                    msg,
                     details={"error": str(e)},
                 ) from e
 
@@ -1222,7 +1237,8 @@ class DeviceSession:
             True if upgrade command was issued and reboot initiated
         """
         if not self._connected:
-            raise DeviceConnectionError("Device not connected")
+            msg = "Device not connected"
+            raise DeviceConnectionError(msg)
 
         try:
             if verify_before:
@@ -1301,9 +1317,8 @@ class DeviceSession:
                         return True
                     else:
                         logger.error(f"Unexpected error during reboot: {e}")
-                        raise DeviceConnectionError(
-                            f"Reboot command failed: {e}"
-                        ) from e
+                        msg = f"Reboot command failed: {e}"
+                        raise DeviceConnectionError(msg) from e
             except Exception as e:
                 if any(
                     phrase in str(e).lower()
@@ -1315,15 +1330,17 @@ class DeviceSession:
                     return True
                 else:
                     logger.error(f"Unexpected error during reboot: {e}")
-                    raise DeviceConnectionError(f"Reboot command failed: {e}") from e
+                    msg = f"Reboot command failed: {e}"
+                    raise DeviceConnectionError(msg) from e
 
         except Exception as e:
             logger.error(f"RouterBOARD upgrade failed: {e}")
-            if isinstance(e, (DeviceConnectionError, DeviceExecutionError)):
+            if isinstance(e, DeviceConnectionError | DeviceExecutionError):
                 raise
             else:
+                msg = f"RouterBOARD upgrade failed on {self.device_name}"
                 raise DeviceExecutionError(
-                    f"RouterBOARD upgrade failed on {self.device_name}",
+                    msg,
                     details={"error": str(e)},
                 ) from e
 
@@ -1361,7 +1378,8 @@ class DeviceSession:
             If download fails
         """
         if not self._connected:
-            raise DeviceConnectionError(f"Device {self.device_name} not connected")
+            msg = f"Device {self.device_name} not connected"
+            raise DeviceConnectionError(msg)
 
         local_path = Path(local_path)
 
@@ -1497,7 +1515,8 @@ class DeviceSession:
     def _calculate_file_checksum(self, file_path: Path) -> str:
         """Back-compat wrapper delegating to helper implementation."""
         if not file_path.exists():
-            raise FileNotFoundError(f"File not found: {file_path}")
+            msg = f"File not found: {file_path}"
+            raise FileNotFoundError(msg)
         return calculate_file_checksum(file_path)
 
     def _verify_file_upload(
