@@ -146,9 +146,7 @@ def register(app: typer.Typer) -> None:
                                 {
                                     "remote_file": "nw-export.rsc",
                                     "local_path": str(config.general.backup_dir),
-                                    "local_filename": (
-                                        "{device}_{date}_nw-export.rsc"
-                                    ),
+                                    "local_filename": ("{device}_{date}_nw-export.rsc"),
                                     "delete_remote": delete_remote,
                                 },
                             ]

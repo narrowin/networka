@@ -29,9 +29,7 @@ def demo_interactive_credentials():
 
     # Simulate what happens when --interactive-auth is used
     print("1. When you use --interactive-auth, the tool will prompt for credentials:")
-    print(
-        "   Example: nw run sw-acc1 '/system/identity/print' --interactive-auth\n"
-    )
+    print("   Example: nw run sw-acc1 '/system/identity/print' --interactive-auth\n")
 
     try:
         # Demo the credential prompting

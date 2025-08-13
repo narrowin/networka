@@ -58,9 +58,7 @@ def demonstrate_ip_functionality():
     # Usage examples
     print("\n4. Command Examples:")
     print("   # Single IP address:")
-    print(
-        "   nw run 192.168.1.1 '/system/clock/print' --platform mikrotik_routeros"
-    )
+    print("   nw run 192.168.1.1 '/system/clock/print' --platform mikrotik_routeros")
     print()
     print("   # Multiple IP addresses:")
     print(

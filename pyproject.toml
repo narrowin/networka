@@ -9,30 +9,41 @@ description = "Modern async Python toolkit for network device automation"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
-keywords = ["network", "automation", "mikrotik", "routeros", "cli", "async", "narrowin"]
+keywords = ["network", "automation", "mikrotik", "routeros", "cli", "async", "narrowin", "networking", "infrastructure"]
 authors = [
     { name = "narrowin", email = "contact@narrowin.com" },
 ]
+maintainers = [
+    { name = "narrowin", email = "contact@narrowin.com" },
+]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 4 - Beta",
     "Environment :: Console",
+    "Intended Audience :: Developers",
     "Intended Audience :: System Administrators",
     "Intended Audience :: Telecommunications Industry",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3 :: Only",
     "Topic :: System :: Networking",
     "Topic :: System :: Systems Administration",
+    "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Utilities",
+    "Typing :: Typed",
 ]
 dependencies = [
     "scrapli[paramiko]>=2023.7.30",
     "scrapli[community]>=2023.7.30",
     "pydantic>=2.5.0",
     "pyyaml>=6.0",
-    "typer[all]",
+    "typer>=0.12.0",
     "rich>=13.0.0",
     "asyncssh>=2.21.0",
     "scrapli-community>=2025.1.30",
@@ -45,18 +56,32 @@ dev = [
     "mypy>=1.7.0",
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.14.0",
+    "pytest-xdist>=3.8.0",
     "detect-secrets>=1.4.0",
+    "bandit>=1.7.0",
+    "twine>=4.0.0",
+    "build>=0.10.0",
+]
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.0.0",
+    "mkdocstrings[python]>=0.24.0",
 ]
 tmux = [
     "libtmux>=0.21.0",
 ]
 
 [project.urls]
-Documentation = "https://github.com/narrowin/net-worker#readme"
-Issues = "https://github.com/narrowin/net-worker/issues"
-Source = "https://github.com/narrowin/net-worker"
 Homepage = "https://github.com/narrowin/net-worker"
-Repository = "https://github.com/narrowin/net-worker"
+Documentation = "https://github.com/narrowin/net-worker#readme"
+Repository = "https://github.com/narrowin/net-worker.git"
+"Bug Tracker" = "https://github.com/narrowin/net-worker/issues"
+Changelog = "https://github.com/narrowin/net-worker/blob/main/CHANGELOG.md"
+"Source Code" = "https://github.com/narrowin/net-worker"
+"CI/CD" = "https://github.com/narrowin/net-worker/actions"
+"PyPI" = "https://pypi.org/project/net-worker/"
 
 [project.scripts]
 nw = "network_toolkit.cli:app"

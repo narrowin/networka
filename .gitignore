@@ -267,5 +267,9 @@ config_local.py
 # Pre-commit
 .pre-commit-config.yaml.bak
 
+# Task runner cache and binaries
+.task/
+bin/task
+
 # config dirs with sensitive data
 config/devices/

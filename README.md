@@ -1,9 +1,12 @@
 # Net-Worker
 
+[![PyPI](https://img.shields.io/pypi/v/net-worker.svg)](https://pypi.org/project/net-worker/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+[![CI](https://github.com/narrowin/net-worker/workflows/CI/badge.svg)](https://github.com/narrowin/net-worker/actions)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Type checked with mypy](https://img.shields.io/badge/mypy-checked-blue.svg)](http://mypy-lang.org/)
+[![Downloads](https://pepy.tech/badge/net-worker/month)](https://pepy.tech/project/net-worker)
 
 A powerful, modern CLI tool for **multi-vendor network automation**. Built with async/await support, type safety, and comprehensive results storage. Supports MikroTik RouterOS, Cisco IOS-XE/NX-OS, Arista EOS, Juniper JunOS, and more.
 
@@ -42,12 +45,56 @@ A powerful, modern CLI tool for **multi-vendor network automation**. Built with 
 
 ## 🚀 Installation
 
+### Option 1: Install from PyPI (Recommended)
+
+**Using pip:**
+```bash
+pip install net-worker
+```
+
+**Using uv (faster):**
+```bash
+uv add net-worker
+```
+
+**Using pipx (isolated install):**
+```bash
+pipx install net-worker
+```
+
+### Option 2: Install from GitHub
+
+**Latest stable release:**
+```bash
+pip install git+https://github.com/narrowin/net-worker.git@main
+```
+
+**Development version:**
+```bash
+pip install git+https://github.com/narrowin/net-worker.git@develop
+```
+
+### Option 3: Development Installation
+
+**Clone and install in development mode:**
+```bash
+git clone https://github.com/narrowin/net-worker.git
+cd net-worker
+uv sync --all-extras --group dev
+```
+
+### Verify Installation
+```bash
+nw --help
+```
+
 ### Prerequisites
 - **Python 3.11+** - Required for modern type annotations and async features
 - **SSH access** to target network devices
 - **uv** (recommended) or pip for package management
 
 ### Quick Install with uv (Recommended)
+```
 
 ```bash
 # Clone the repository
@@ -1090,11 +1137,127 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Pydantic](https://github.com/pydantic/pydantic) - Data validation
 - [Rich](https://github.com/Textualize/rich) - Terminal formatting
 
+## 🛠️ Development & Building
+
+### Development Setup
+
+**Prerequisites:**
+- Python 3.11+
+- [uv](https://docs.astral.sh/uv/) (recommended) or pip
+- Git
+
+**Clone and setup development environment:**
+```bash
+git clone https://github.com/narrowin/net-worker.git
+cd net-worker
+uv sync --all-extras --group dev
+```
+
+**Run tests:**
+```bash
+uv run pytest
+```
+
+**Run with coverage:**
+```bash
+uv run pytest --cov=network_toolkit --cov-report=html
+```
+
+**Quality checks:**
+```bash
+# Linting
+uv run ruff check .
+
+# Formatting
+uv run ruff format .
+
+# Type checking
+uv run mypy src/
+```
+
+### Building from Source
+
+**Using the build script (recommended):**
+```bash
+./scripts/build.sh
+```
+
+**Manual build:**
+```bash
+# Install build dependencies
+uv sync --group dev
+
+# Build package
+uv build
+
+# Check build artifacts
+uv run twine check dist/*
+```
+
+### Release Process
+
+**Automated release (maintainers only):**
+```bash
+# Create a new release
+./scripts/release.sh -v 1.0.0
+
+# Dry run to see what would happen
+./scripts/release.sh -v 1.0.0 --dry-run
+```
+
+**Manual release steps:**
+1. Update version in `src/network_toolkit/__about__.py`
+2. Update `CHANGELOG.md` with release notes
+3. Commit changes: `git commit -m "chore: bump version to v1.0.0"`
+4. Create tag: `git tag -a v1.0.0 -m "Release v1.0.0"`
+5. Push: `git push origin main && git push origin v1.0.0`
+
+GitHub Actions will automatically:
+- Run comprehensive tests on Linux, Windows, and macOS
+- Build packages for all supported Python versions
+- Publish to PyPI using trusted publishing
+- Create GitHub release with artifacts
+
+### Distribution
+
+**Multi-platform support:**
+- ✅ Linux (x86_64, ARM64)
+- ✅ Windows (x86_64)
+- ✅ macOS (x86_64, ARM64/Apple Silicon)
+
+**Python versions:**
+- ✅ Python 3.11
+- ✅ Python 3.12
+- ✅ Python 3.13
+
+**Package formats:**
+- 📦 PyPI wheel (universal)
+- 📦 Source distribution (sdist)
+- 🐙 GitHub releases with artifacts
+
+### Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Make your changes and add tests
+4. Run quality checks: `./scripts/build.sh`
+5. Commit changes: `git commit -m "feat: add amazing feature"`
+6. Push to branch: `git push origin feature/amazing-feature`
+7. Open a Pull Request
+
+**Coding standards:**
+- Follow PEP 8 (enforced by ruff)
+- Add type hints (checked by mypy)
+- Write tests for new features
+- Update documentation as needed
+
 ## Support
 
-- **Documentation**: [https://network-toolkit.readthedocs.io](https://network-toolkit.readthedocs.io)
-- **Issues**: [GitHub Issues](https://github.com/your-org/network-toolkit/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-org/network-toolkit/discussions)
+- **Documentation**: [GitHub README](https://github.com/narrowin/net-worker#readme)
+- **Issues**: [GitHub Issues](https://github.com/narrowin/net-worker/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/narrowin/net-worker/discussions)
+- **PyPI**: [https://pypi.org/project/net-worker/](https://pypi.org/project/net-worker/)
+- **Changelog**: [CHANGELOG.md](https://github.com/narrowin/net-worker/blob/main/CHANGELOG.md)
 
 ---
 

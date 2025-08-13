@@ -1,0 +1,158 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  id-token: write  # For trusted publishing to PyPI
+
+env:
+  FORCE_COLOR: "1"
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  build:
+    name: Build distribution
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: "latest"
+
+    - name: Set up Python
+      run: uv python install 3.12
+
+    - name: Install dependencies
+      run: uv sync
+
+    - name: Build package
+      run: uv build
+
+    - name: Check build artifacts
+      run: |
+        ls -la dist/
+        uv run twine check dist/*
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: dist
+        path: dist/
+        retention-days: 30
+
+  test-built-package:
+    name: Test built package
+    runs-on: ${{ matrix.os }}
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: dist
+        path: dist/
+
+    - name: Install built package
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install dist/*.whl
+
+    - name: Test package installation
+      run: |
+        nw --help
+        python -c "import network_toolkit; print('Import successful')"
+
+  publish-pypi:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs: [build, test-built-package]
+    environment:
+      name: pypi
+      url: https://pypi.org/p/net-worker
+
+    steps:
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: dist
+        path: dist/
+
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        verbose: true
+        print-hash: true
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [publish-pypi]
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: dist
+        path: dist/
+
+    - name: Get version from tag
+      id: version
+      run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+    - name: Generate release notes
+      id: release_notes
+      run: |
+        # Extract changelog section for this version
+        VERSION="${{ steps.version.outputs.version }}"
+        if [ -f CHANGELOG.md ]; then
+          # Extract section between version headers
+          awk "/^## \[?v?${VERSION}\]?/,/^## \[?v?[0-9]/" CHANGELOG.md | head -n -1 | tail -n +2 > release_notes.txt
+        else
+          echo "Release v${VERSION}" > release_notes.txt
+          echo "" >> release_notes.txt
+          echo "See [CHANGELOG.md](CHANGELOG.md) for details." >> release_notes.txt
+        fi
+
+        # Add installation instructions
+        echo "" >> release_notes.txt
+        echo "## Installation" >> release_notes.txt
+        echo "" >> release_notes.txt
+        echo '```bash' >> release_notes.txt
+        echo "pip install net-worker==${VERSION}" >> release_notes.txt
+        echo '```' >> release_notes.txt
+        echo "" >> release_notes.txt
+        echo "Or using uv:" >> release_notes.txt
+        echo "" >> release_notes.txt
+        echo '```bash' >> release_notes.txt
+        echo "uv add net-worker==${VERSION}" >> release_notes.txt
+        echo '```' >> release_notes.txt
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/*
+        body_path: release_notes.txt
+        draft: false
+        prerelease: ${{ contains(steps.version.outputs.version, 'a') || contains(steps.version.outputs.version, 'b') || contains(steps.version.outputs.version, 'rc') }}
+        generate_release_notes: true

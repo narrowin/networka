@@ -211,9 +211,9 @@ class TestModuleStructure:
                 config_dir / "devices.yml",
             ]
             for config_file in config_files:
-                assert (
-                    config_file.exists()
-                ), f"Required config file not found: {config_file}"
+                assert config_file.exists(), (
+                    f"Required config file not found: {config_file}"
+                )
             return
 
         # Fall back to legacy config files
@@ -228,7 +228,9 @@ class TestModuleStructure:
                 found_config = True
                 break
 
-        assert found_config, "No example config file found (neither modular config/ nor legacy devices.yml)"
+        assert found_config, (
+            "No example config file found (neither modular config/ nor legacy devices.yml)"
+        )
 
 
 class TestEndToEndWorkflow:

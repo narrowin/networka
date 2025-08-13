@@ -1,0 +1,287 @@
+version: '3'
+
+vars:
+  PROJECT_NAME: net-worker
+  PACKAGE_NAME: network_toolkit
+  PYTHON_VERSION: "3.11"
+
+env:
+  FORCE_COLOR: "1"
+  PYTHONPATH: "./src"
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  install:
+    desc: Install development dependencies
+    cmds:
+      - echo "🔧 Installing development dependencies..."
+      - uv sync --all-extras --group dev
+    sources:
+      - pyproject.toml
+      - uv.lock
+    generates:
+      - .venv/**
+
+  format:
+    desc: Format code with ruff
+    cmds:
+      - echo "🎨 Formatting code..."
+      - uv run ruff format .
+    sources:
+      - src/**/*.py
+      - tests/**/*.py
+
+  lint:
+    desc: Lint code with ruff
+    cmds:
+      - echo "🔍 Linting code..."
+      - uv run ruff check .
+    sources:
+      - src/**/*.py
+      - tests/**/*.py
+
+  lint:fix:
+    desc: Lint and fix code with ruff
+    cmds:
+      - echo "🔧 Linting and fixing code..."
+      - uv run ruff check --fix .
+    sources:
+      - src/**/*.py
+      - tests/**/*.py
+
+  typecheck:
+    desc: Type check with mypy
+    cmds:
+      - echo "🔬 Type checking..."
+      - uv run mypy src/
+    sources:
+      - src/**/*.py
+      - pyproject.toml
+
+  test:
+    desc: Run tests
+    cmds:
+      - echo "🧪 Running tests..."
+      - uv run pytest
+    sources:
+      - src/**/*.py
+      - tests/**/*.py
+      - pyproject.toml
+
+  test:cov:
+    desc: Run tests with coverage
+    cmds:
+      - echo "📊 Running tests with coverage..."
+      - uv run pytest --cov={{.PACKAGE_NAME}} --cov-report=term-missing --cov-report=html
+    sources:
+      - src/**/*.py
+      - tests/**/*.py
+    generates:
+      - htmlcov/**
+      - .coverage
+
+  test:fast:
+    desc: Run tests in parallel
+    cmds:
+      - echo "⚡ Running tests in parallel..."
+      - uv run pytest -n auto
+    sources:
+      - src/**/*.py
+      - tests/**/*.py
+
+  security:
+    desc: Run security checks
+    cmds:
+      - echo "🔒 Running security checks..."
+      - uv run bandit -r src/ -f json -o bandit-report.json || true
+      - echo "✅ Security report saved to bandit-report.json"
+    sources:
+      - src/**/*.py
+    generates:
+      - bandit-report.json
+
+  secrets:
+    desc: Scan for secrets
+    cmds:
+      - echo "🕵️ Scanning for secrets..."
+      - uv run detect-secrets scan --all-files --baseline .secrets.baseline
+    sources:
+      - "**/*.py"
+      - "**/*.yml"
+      - "**/*.yaml"
+      - "**/*.json"
+
+  check:
+    desc: Run all quality checks
+    deps:
+      - lint
+      - typecheck
+      - test
+    cmds:
+      - echo "✅ All checks passed!"
+
+  build:
+    desc: Build package
+    cmds:
+      - echo "📦 Building package..."
+      - ./scripts/build.sh
+    sources:
+      - src/**/*.py
+      - pyproject.toml
+      - README.md
+      - CHANGELOG.md
+    generates:
+      - dist/**
+
+  build:check:
+    desc: Build and check package
+    cmds:
+      - echo "🔍 Building and checking package..."
+      - uv build
+      - uv run twine check dist/*
+    sources:
+      - src/**/*.py
+      - pyproject.toml
+      - README.md
+      - CHANGELOG.md
+    generates:
+      - dist/**
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - echo "🧹 Cleaning build artifacts..."
+      - rm -rf build/
+      - rm -rf dist/
+      - rm -rf *.egg-info/
+      - rm -rf .pytest_cache/
+      - rm -rf .coverage
+      - rm -rf htmlcov/
+      - rm -rf .mypy_cache/
+      - rm -rf .ruff_cache/
+      - find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+      - find . -type f -name "*.pyc" -delete 2>/dev/null || true
+      - echo "✅ Clean complete!"
+
+  docs:
+    desc: Generate documentation
+    cmds:
+      - echo "📚 Generating documentation..."
+      - echo "⚠️ Documentation generation not yet implemented"
+
+  release:dry:
+    desc: Dry run release process
+    interactive: true
+    cmds:
+      - echo "🚀 Running release dry run..."
+      - |
+        read -p "Enter version (e.g., 1.0.0): " version
+        ./scripts/release.sh -v $version --dry-run
+
+  release:
+    desc: Create a release (interactive)
+    interactive: true
+    cmds:
+      - echo "🚀 Creating release..."
+      - echo "⚠️ This will create a new release. Make sure you're on main branch with clean working directory."
+      - |
+        read -p "Enter version (e.g., 1.0.0): " version
+        read -p "Are you sure you want to release v$version? (y/N): " confirm
+        if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
+          ./scripts/release.sh -v $version
+        else
+          echo "❌ Release cancelled"
+        fi
+
+  dev:
+    desc: Set up development environment and run checks
+    deps:
+      - install
+      - lint:fix
+      - typecheck
+      - test
+    cmds:
+      - echo "🎉 Development environment ready!"
+
+  ci:
+    desc: Run CI checks locally
+    deps:
+      - lint
+      - typecheck
+      - test:cov
+      - security
+    cmds:
+      - echo "✅ CI checks completed!"
+
+  update:
+    desc: Update dependencies
+    cmds:
+      - echo "⬆️ Updating dependencies..."
+      - uv sync --upgrade
+    generates:
+      - uv.lock
+
+  shell:
+    desc: Open a shell in the virtual environment
+    cmds:
+      - echo "🐚 Opening shell in virtual environment..."
+      - uv shell
+
+  run:
+    desc: Run the CLI tool (nw --help)
+    cmds:
+      - echo "🚀 Running net-worker CLI..."
+      - uv run nw --help
+
+  run:info:
+    desc: Show CLI info command
+    cmds:
+      - echo "ℹ️ Running nw info..."
+      - uv run nw info || echo "No devices configured yet"
+
+  run:version:
+    desc: Show CLI version
+    cmds:
+      - echo "📋 Showing version..."
+      - uv run nw version
+
+  install:task:
+    desc: Install go-task if not present
+    cmds:
+      - |
+        if ! command -v task &> /dev/null; then
+          echo "📥 Installing go-task..."
+          if command -v brew &> /dev/null; then
+            brew install go-task
+          elif command -v apt-get &> /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y wget
+            wget -O task.deb https://github.com/go-task/task/releases/latest/download/task_linux_amd64.deb
+            sudo dpkg -i task.deb
+            rm task.deb
+          elif command -v yum &> /dev/null; then
+            sudo yum install -y wget
+            wget -O task.rpm https://github.com/go-task/task/releases/latest/download/task_linux_amd64.rpm
+            sudo rpm -i task.rpm
+            rm task.rpm
+          else
+            echo "Please install go-task manually: https://taskfile.dev/installation/"
+            exit 1
+          fi
+        else
+          echo "✅ go-task is already installed"
+        fi
+    status:
+      - command -v task
+
+  bootstrap:
+    desc: Bootstrap the entire development environment
+    deps:
+      - install:task
+      - install
+    cmds:
+      - echo "🎯 Bootstrap complete! Run 'task dev' to set up development environment."
