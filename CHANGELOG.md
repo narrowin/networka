@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Professional CI/CD pipeline with multi-platform testing (Linux, Windows, macOS)
 - Automated PyPI publishing with trusted publishing
 - Comprehensive security scanning and quality checks
+- **Automatic .env file loading**: Added support for loading credentials from `.env` files automatically
+  - Supports multiple .env file locations with proper precedence (environment variables > config dir .env > cwd .env)
+  - No need to manually source .env files - they're loaded automatically when running commands
+  - Updated documentation and examples to showcase new .env workflow
+  - Maintains full backward compatibility with existing environment variable usage
 - Shell completion for bash, fish, and zsh with new "nw" command
 - Modern packaging standards with uv build system
 - Automated release workflows with GitHub Actions

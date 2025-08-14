@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Network Toolkit now supports interactive credential input through the `--interactive-auth` (or `-i`) flag, providing a secure way to enter credentials at runtime without storing them in environment variables or configuration files.
+The Network Toolkit now supports interactive credential input through the `--interactive-auth` (or `-i`) flag, providing a secure way to enter credentials at runtime without storing them in environment variables, .env files, or configuration files.
 
 ## Usage
 
@@ -53,8 +53,10 @@ nw run access_switches system_info --interactive-auth
 ### Credential Resolution Priority
 
 1. **Interactive credentials** (highest priority) - When `--interactive-auth` is used
-2. **Environment variables** - `NT_DEFAULT_USER`, `NT_DEFAULT_PASSWORD`, device-specific overrides
-3. **Configuration file** - Default credentials in `devices.yml`
+2. **Environment variables** - Variables already set in shell environment
+3. **Config directory .env** - `.env` file in config directory (automatically loaded)
+4. **Current directory .env** - `.env` file in working directory (automatically loaded) 
+5. **Configuration file** - Default credentials in `devices.yml` (deprecated)
 
 ### Error Handling
 

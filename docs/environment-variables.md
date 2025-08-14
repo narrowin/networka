@@ -42,7 +42,9 @@ export NT_SW_DIST1_PASSWORD=distribution_password
 
 ## Setup Methods
 
-### Option 1: Environment File (.env)
+### Option 1: Environment File (.env) - Recommended
+
+The Network Toolkit automatically loads environment variables from `.env` files, making credential management simple and secure.
 
 1. Copy the example environment file:
    ```bash
@@ -54,11 +56,23 @@ export NT_SW_DIST1_PASSWORD=distribution_password
    nano .env
    ```
 
-3. Source the environment file before running the tool:
+3. Run the tool directly - the `.env` file is loaded automatically:
    ```bash
-   source .env
-   python -m network_toolkit.cli --help
+   nw run system_info sw-acc1
    ```
+
+#### .env File Locations
+
+The toolkit automatically looks for `.env` files in the following order (highest to lowest precedence):
+
+1. **Environment Variables** (Highest priority) - Variables already set in your shell
+2. **Config Directory** - `.env` file in the same directory as your config files
+3. **Current Working Directory** (Lowest priority) - `.env` file in your current directory
+
+This allows for flexible credential management:
+- Place `.env` in your project/config directory for project-specific credentials
+- Place `.env` in your working directory for global defaults
+- Use shell environment variables for runtime overrides
 
 ### Option 2: Export in Shell
 
@@ -100,20 +114,26 @@ python -m network_toolkit.cli run system_info sw-acc1
 
 The toolkit resolves credentials in this priority order:
 
-1. Device-specific environment variables (`NT_{DEVICE}_USER`, `NT_{DEVICE}_PASSWORD`)
-2. Explicitly set credentials in device configuration (deprecated, not recommended)
-3. Default environment variables (`NT_DEFAULT_USER`, `NT_DEFAULT_PASSWORD`)
-4. If none are found, an error will be raised
+1. **Environment Variables** (Highest) - Variables already set in your shell environment
+2. **Config Directory .env** - `.env` file in the same directory as config files  
+3. **Current Working Directory .env** - `.env` file in your current directory
+4. **Device Configuration** (Deprecated) - Explicitly set credentials in device YAML files
+5. If none are found, an error will be raised
+
+This precedence allows you to:
+- Set global defaults in your home directory `.env`
+- Override with project-specific credentials in config directory `.env`  
+- Override again with runtime environment variables for testing
 
 ## Troubleshooting
 
-### "Default username not found in environment"
+### "Default username not found in environment or .env file"
 
-This error means `NT_DEFAULT_USER` is not set. Set it using one of the methods above.
+This error means `NT_DEFAULT_USER` is not set in any of the credential sources. Set it using one of the methods above.
 
-### "Default password not found in environment"
+### "Default password not found in environment or .env file"
 
-This error means `NT_DEFAULT_PASSWORD` is not set. Set it using one of the methods above.
+This error means `NT_DEFAULT_PASSWORD` is not set in any of the credential sources. Set it using one of the methods above.
 
 ### Device-specific credentials not working
 

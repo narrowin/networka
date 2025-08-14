@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from dotenv import load_dotenv
 from pydantic import BaseModel, field_validator
 
 from network_toolkit.exceptions import NetworkToolkitError
@@ -19,11 +20,16 @@ from network_toolkit.exceptions import NetworkToolkitError
 
 def get_env_credential(device_name: str | None = None, credential_type: str = "user") -> str | None:
     """
-    Get credentials from environment variables.
+    Get credentials from environment variables or .env files.
 
     Supports both device-specific and default credentials:
     - Device-specific: NT_{DEVICE_NAME}_{USER|PASSWORD}
     - Default: NT_DEFAULT_{USER|PASSWORD}
+
+    The function looks for credentials in the following order:
+    1. Environment variables (runtime environment)
+    2. .env file in current working directory
+    3. .env file in the same directory as the config file
 
     Parameters
     ----------
@@ -49,6 +55,45 @@ def get_env_credential(device_name: str | None = None, credential_type: str = "u
     # Fall back to default credential
     default_env_var = f"NT_DEFAULT_{credential_type}"
     return os.getenv(default_env_var)
+
+
+def load_dotenv_files(config_path: Path | None = None) -> None:
+    """
+    Load environment variables from .env files.
+
+    Precedence order (highest to lowest):
+    1. Environment variables already set (highest priority)
+    2. .env in config directory (if config_path provided)
+    3. .env in current working directory (lowest priority)
+
+    Parameters
+    ----------
+    config_path : Path | None
+        Path to the configuration file (used to locate adjacent .env file)
+    """
+    # Store any existing NT_* environment variables to preserve their precedence
+    # These are the "real" environment variables that should have highest priority
+    original_nt_vars = {k: v for k, v in os.environ.items() if k.startswith("NT_")}
+    
+    # Load .env from current working directory first (lowest priority)
+    cwd_env = Path.cwd() / ".env"
+    if cwd_env.exists():
+        logging.debug(f"Loading .env from current directory: {cwd_env}")
+        load_dotenv(cwd_env, override=False)
+
+    # Load .env from config directory (higher priority than cwd)
+    if config_path:
+        config_dir = config_path.parent if config_path.is_file() else config_path
+        config_env = config_dir / ".env"
+        if config_env.exists():
+            logging.debug(f"Loading .env from config directory: {config_env}")
+            # This will override any values loaded from cwd .env
+            load_dotenv(config_env, override=True)
+    
+    # Finally, restore any environment variables that existed BEFORE we started loading .env files
+    # This ensures that environment variables set by the user have the highest precedence
+    for key, value in original_nt_vars.items():
+        os.environ[key] = value
 
 
 class GeneralConfig(BaseModel):
@@ -94,19 +139,19 @@ class GeneralConfig(BaseModel):
 
     @property
     def default_user(self) -> str:
-        """Get default username from environment variable."""
+        """Get default username from environment variable or .env file."""
         user = get_env_credential(credential_type="user")
         if not user:
-            msg = "Default username not found in environment. " "Please set NT_DEFAULT_USER environment variable."
+            msg = "Default username not found in environment or .env file. Please set NT_DEFAULT_USER environment variable or add it to a .env file."
             raise ValueError(msg)
         return user
 
     @property
     def default_password(self) -> str:
-        """Get default password from environment variable."""
+        """Get default password from environment variable or .env file."""
         password = get_env_credential(credential_type="password")
         if not password:
-            msg = "Default password not found in environment. " "Please set NT_DEFAULT_PASSWORD environment variable."
+            msg = "Default password not found in environment or .env file. Please set NT_DEFAULT_PASSWORD environment variable or add it to a .env file."
             raise ValueError(msg)
         return password
 
@@ -735,9 +780,14 @@ def load_config(config_path: str | Path) -> NetworkConfig:
     1. New modular config: config_path as directory containing config/, devices.yml,
        groups.yml, sequences.yml
     2. Legacy monolithic: config_path as single devices.yml file
+
+    Additionally loads environment variables from .env files before loading config.
     """
     config_path = Path(config_path)
     original_path = config_path  # Keep track of original user input
+
+    # Load .env files first to make environment variables available for credential resolution
+    load_dotenv_files(config_path)
 
     # Check for new modular configuration structure
     if config_path.name in ["config", "config/"]:

@@ -29,7 +29,7 @@ Net-Worker is a CLI tool for automating network devices across multiple vendors.
 - **Group operations**: Execute commands across device groups concurrently  
 - **Command sequences**: Vendor-aware predefined command sets
 - **Results management**: Organized storage with multiple output formats
-- **Security-first**: Environment variable credentials and comprehensive protection
+- **Security-first**: Automatic .env file loading, environment variable credentials, and comprehensive protection
 
 ## Installation
 
@@ -62,6 +62,23 @@ uv sync
 # Activate environment and verify
 source .venv/bin/activate
 nw --help
+```
+
+## Quick Start
+
+Get up and running in 3 steps:
+
+```bash
+# 1. Set up credentials (automatically loaded)
+cp .env.example .env
+nano .env  # Add your actual device credentials
+
+# 2. Configure your devices
+nano config/devices/devices.yml
+
+# 3. Start managing your network
+nw run sw-acc1 "/system/identity/print"
+nw run office_switches system_info
 ```
 
 ## CLI overview
@@ -119,6 +136,14 @@ Built with async/await support and type safety in mind.
 
 ### 1. Set up credentials
 
+**Option A: Use .env file (Recommended)**
+```bash
+# Copy and edit the example file
+cp .env.example .env
+nano .env  # Add your actual credentials
+```
+
+**Option B: Export environment variables**
 ```bash
 # Set environment variables for security
 export NT_DEFAULT_USER="admin"
@@ -189,6 +214,18 @@ Net-Worker uses a flexible configuration system supporting both YAML and CSV for
 - **Mixed format support**: Use both YAML and CSV in the same project
 
 ### Environment variables
+
+**Automatic .env Loading** - The toolkit automatically loads credentials from `.env` files:
+
+```bash
+# Copy the example and edit with your credentials
+cp .env.example .env
+
+# Credentials are loaded automatically when you run commands
+nw run system_info sw-acc1
+```
+
+**Manual Environment Variables** - You can also set them manually:
 
 ```bash
 # Default credentials (required)
