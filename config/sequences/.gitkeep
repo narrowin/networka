@@ -1,0 +1,10 @@
+# This file ensures the config/sequences/ directory is tracked in git
+# while ignoring the actual configuration files for security.
+# 
+# Place your sequence configurations here:
+# - sequences.yml (main sequence definitions)
+# - *.yml (additional sequence files)
+# - *.csv (CSV format sequence lists)
+#
+# Vendor-specific sequences in subdirectories are preserved.
+# See config/examples/ for templates and examples.

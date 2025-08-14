@@ -1121,16 +1121,19 @@ class TestModularConfigLoading:
         config_dir = tmp_path / "config"
         config_dir.mkdir()
 
-        # Missing config.yml - should raise ValueError (wrapped FileNotFoundError)
-        with pytest.raises(ValueError, match="Failed to load modular configuration"):
+        # Missing config.yml - should raise FileNotFoundError
+        with pytest.raises(FileNotFoundError, match="Main config file not found"):
             load_config(config_dir)
 
-        # Create config.yml but missing devices.yml
+        # Create config.yml - should work even without other files (they're optional now)
         config_file = config_dir / "config.yml"
         config_file.write_text(yaml.safe_dump({"general": {"timeout": 30}}))
 
-        with pytest.raises(ValueError, match="Failed to load modular configuration"):
-            load_config(config_dir)
+        # This should work now - devices, groups, sequences are optional
+        config = load_config(config_dir)
+        assert config.general.timeout == 30
+        assert config.devices == {}  # Empty devices is okay
+        assert config.device_groups == {}  # Empty groups is okay
 
     def test_legacy_config_error_handling(self, tmp_path: Path) -> None:
         """Test error handling in legacy config loading."""

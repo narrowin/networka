@@ -40,6 +40,7 @@ general:
   output_mode: "default"  # default, light, dark, no-color, raw
 
 # Note:
-# - Devices are defined in config/devices.yml
-# - Groups are defined in config/groups.yml
-# - Global command sequences are in config/sequences.yml
+# - Devices are defined in config/devices/
+# - Groups are defined in config/groups/
+# - Global command sequences are in config/sequences/
+# - See config/examples/ for usage examples and templates
