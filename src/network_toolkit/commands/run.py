@@ -79,7 +79,7 @@ def register(app: typer.Typer) -> None:
             typer.Option(
                 "--output-mode",
                 "-o",
-                help="Output decoration mode: normal, light, dark, no-color, raw",
+                help="Output decoration mode: default, light, dark, no-color, raw",
                 show_default=False,
             ),
         ] = None,

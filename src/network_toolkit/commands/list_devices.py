@@ -30,22 +30,25 @@ def register(app: typer.Typer) -> None:
             typer.Option(
                 "--output-mode",
                 "-o",
-                help="Output decoration mode: normal, light, dark, no-color, raw",
+                help="Output decoration mode: default, light, dark, no-color, raw",
                 show_default=False,
             ),
         ] = None,
         verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose logging")] = False,
     ) -> None:
         """List all configured network devices."""
-        # Handle output mode configuration
-        if output_mode is None:
-            output_mode = OutputMode.DEFAULT
-        set_output_mode(output_mode)
-
         setup_logging("DEBUG" if verbose else "INFO")
         try:
             config = load_config(config_file)
-            output_manager = get_output_manager()
+            
+            # Handle output mode configuration
+            if output_mode is not None:
+                set_output_mode(output_mode)
+                output_manager = get_output_manager()
+            else:
+                # Use config-based output mode
+                from network_toolkit.common.output import get_output_manager_with_config
+                output_manager = get_output_manager_with_config(config.general.output_mode)
 
             if output_manager.mode == OutputMode.RAW:
                 # Raw mode output
@@ -70,7 +73,7 @@ def register(app: typer.Typer) -> None:
 
             table = Table()
             table.add_column("Name", style="device")  # Use theme color
-            table.add_column("Host", style="output")   # Use theme color  
+            table.add_column("Host", style="output")  # Use theme color
             table.add_column("Type", style="command")  # Use theme color
             table.add_column("Description", style="output")  # Use theme color
             table.add_column("Tags", style="success")  # Use theme color
