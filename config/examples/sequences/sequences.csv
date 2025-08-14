@@ -1,0 +1,6 @@
+name,description,commands,tags
+system_info,Get basic system information,/system/identity/print;/system/clock/print;/system/resource/print,system;info;basic
+interface_status,Check interface status and statistics,/interface/print;/interface/ethernet/print stats,interface;network;status
+routing_table,Display routing information,/ip/route/print;/routing/ospf/neighbor/print,routing;network;ospf
+backup_config,Create configuration backup,/export file=backup-$(date +%Y%m%d),backup;config;maintenance
+check_logs,Review system logs,/log/print where topics~error;/log/print where topics~warning,logs;troubleshooting;error

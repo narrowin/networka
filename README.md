@@ -128,15 +128,19 @@ export NT_DEFAULT_PASSWORD="your_secure_password"
 export NT_SW_ACC1_PASSWORD="switch1_password"
 ```
 
-### 2. Create configuration file
+### 2. Create configuration files
 
-Create `devices.yml`:
+Create `config/config.yml` for general settings:
 
 ```yaml
 general:
   results_dir: "./results"
   timeout: 30
+```
 
+Create `config/devices/devices.yml` for your devices:
+
+```yaml
 devices:
   sw-acc1:
     host: "10.10.1.11"
@@ -149,8 +153,12 @@ devices:
     device_type: "cisco_iosxe"
     description: "Cisco Switch"
     tags: ["core", "cisco"]
+```
 
-device_groups:
+Create `config/groups/groups.yml` for device groups:
+
+```yaml
+groups:
   all_switches:
     description: "All network switches"
     members: ["sw-acc1", "cisco-sw1"]
@@ -171,7 +179,14 @@ nw run sw-acc1 health_check --store-results
 
 ## Configuration
 
-Net-Worker uses YAML configuration files and environment variables for secure credential management.
+Net-Worker uses a flexible configuration system supporting both YAML and CSV formats, with hierarchical loading from directories and subdirectories.
+
+### Enhanced Configuration Features
+
+- **Multiple formats**: YAML and CSV files supported
+- **Subdirectory organization**: Split configurations across directories
+- **Hierarchical loading**: More specific configs override general ones
+- **Mixed format support**: Use both YAML and CSV in the same project
 
 ### Environment variables
 
@@ -184,27 +199,114 @@ export NT_DEFAULT_PASSWORD="your_secure_password"
 export NT_SW_ACC1_PASSWORD="switch1_password"
 ```
 
+### Configuration Structure
+
+#### Modular Directory Structure
+```
+config/
+├── config.yml              # Main configuration (required)
+├── devices/                # Device definitions (all files here)
+│   ├── devices.yml         # Main devices file
+│   ├── devices.csv         # CSV format devices
+│   ├── production.yml      # YAML format devices
+│   └── customer-a.yml      # Customer-specific devices
+├── groups/                 # Group definitions (all files here)
+│   ├── groups.yml          # Main groups file
+│   ├── groups.csv          # CSV format groups
+│   └── production.yml      # YAML format groups
+├── sequences/              # Sequence definitions (all files here)
+│   ├── sequences.yml       # Main sequences file
+│   ├── sequences.csv       # CSV format sequences
+│   ├── advanced.yml        # YAML format sequences
+│   └── vendor_sequences/   # Vendor-specific sequences
+└── examples/               # Templates and examples
+    ├── devices/
+    ├── groups/
+    └── sequences/
+```
+
+#### CSV Format Reference
+
+**Devices CSV Headers:**
+```csv
+name,host,device_type,description,platform,model,location,tags
+sw-01,192.168.1.1,mikrotik_routeros,Lab Switch,mipsbe,CRS326,Lab,switch;access;lab
+```
+
+**Groups CSV Headers:**
+```csv
+name,description,members,match_tags
+lab_devices,Lab environment,sw-01;sw-02,lab;test
+```
+
+**Sequences CSV Headers:**
+```csv
+name,description,commands,tags
+system_info,Get system info,/system/identity/print;/system/clock/print,system;info
+```
+
 ### Configuration file structure
 
+**Main Configuration (`config/config.yml`):**
 ```yaml
 general:
   results_dir: "./results"
   timeout: 30
+  output_mode: "dark"  # default, light, dark, no-color, raw
+```
 
+**Device Configuration (`config/devices/*.yml`):**
+```yaml
 devices:
   device_name:
     host: "IP_ADDRESS"
     device_type: "mikrotik_routeros"  # or cisco_iosxe, arista_eos, juniper_junos
     description: "Device description"
     tags: ["tag1", "tag2"]
+```
 
-device_groups:
+**Group Configuration (`config/groups/*.yml`):**
+```yaml
+groups:
   group_name:
     description: "Group description"
     match_tags: ["tag1"]  # Include devices with these tags
     # OR
     members: ["device1", "device2"]  # Explicit device list
 ```
+
+**Sequence Configuration (`config/sequences/*.yml`):**
+```yaml
+sequences:
+  sequence_name:
+    description: "Sequence description"
+    commands:
+      - "/system/identity/print"
+      - "/system/clock/print"
+    tags: ["system", "info"]
+```
+
+### Loading Priority
+
+Configuration files are loaded from their respective subdirectories. All files in each subdirectory are combined (later files override earlier ones):
+
+1. **Device files**: All files in `config/devices/` (*.yml, *.yaml, *.csv)
+2. **Group files**: All files in `config/groups/` (*.yml, *.yaml, *.csv)  
+3. **Sequence files**: All files in `config/sequences/` (*.yml, *.yaml, *.csv)
+
+Within each directory, files are loaded alphabetically, so later files can override earlier ones.
+
+### Getting Started
+
+1. **Copy examples**: Start with the templates in `config/examples/`
+2. **Create your configs**: Place your configurations in the appropriate subdirectories:
+   - `config/devices/` for device definitions
+   - `config/groups/` for group definitions  
+   - `config/sequences/` for sequence definitions
+3. **Mix formats**: Use YAML for complex configs and CSV for bulk data
+4. **Organize by purpose**: Create multiple files organized by site, customer, or environment
+
+See `config/examples/` for detailed examples and migration guides.
 
 ### Output modes
 
