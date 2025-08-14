@@ -32,35 +32,42 @@ class TestTransportAbstraction:
 
     @patch.dict(os.environ, {"NT_DEFAULT_USER": "admin", "NT_DEFAULT_PASSWORD": "test_password"})
     def test_scrapli_transport_creation(self):
-        """Test creating Scrapli transport without actual connection."""
-        # Create minimal config
-        config = NetworkConfig(
-            general=GeneralConfig(default_transport_type="scrapli"),
-            devices={
-                "test_device": DeviceConfig(
-                    host="192.168.1.1", transport_type="scrapli"
-                )
-            },
-        )
+        """Test creating a Scrapli transport instance."""
+        # Set up environment variables for credential resolution
+        os.environ["NW_USER_DEFAULT"] = "test_user"
+        os.environ["NW_PASSWORD_DEFAULT"] = "test_pass"
 
-        factory = get_transport_factory("scrapli")
-        connection_params = config.get_device_connection_params("test_device")
-
-        # Mock Scrapli to avoid actual connection
-        with patch("scrapli.Scrapli") as mock_scrapli:
-            mock_driver = MagicMock()
-            mock_scrapli.return_value = mock_driver
-
-            transport = factory.create_transport(
-                device_name="test_device",
-                config=config,
-                connection_params=connection_params,
+        try:
+            config = NetworkConfig(
+                general=GeneralConfig(),
+                devices={
+                    "test_device": DeviceConfig(
+                        host="192.168.1.1", transport_type="scrapli"
+                    )
+                },
             )
 
-            assert transport is not None
-            assert hasattr(transport, "send_command")
-            assert hasattr(transport, "open")
-            assert hasattr(transport, "close")
+            factory = get_transport_factory("scrapli")
+            connection_params = config.get_device_connection_params("test_device")
+
+            # Mock Scrapli to avoid actual connection
+            with patch("scrapli.Scrapli") as mock_scrapli:
+                mock_driver = MagicMock()
+                mock_scrapli.return_value = mock_driver
+
+                transport = factory.create_transport(
+                    device_name="test_device",
+                    config=config,
+                    connection_params=connection_params,
+                )
+
+                assert transport is not None
+                assert isinstance(transport, Transport)
+        finally:
+            # Clean up environment variables
+            for key in ["NW_USER_DEFAULT", "NW_PASSWORD_DEFAULT"]:
+                if key in os.environ:
+                    del os.environ[key]
 
     def test_config_transport_type_resolution(self):
         """Test transport type resolution from config."""
@@ -83,26 +90,36 @@ class TestTransportAbstraction:
     @patch.dict(os.environ, {"NT_DEFAULT_USER": "admin", "NT_DEFAULT_PASSWORD": "test_password"})
     def test_config_connection_params(self):
         """Test connection parameter generation."""
-        config = NetworkConfig(
-            general=GeneralConfig(
-                default_transport_type="scrapli",
-                transport_defaults={
-                    "scrapli": {"timeout_socket": 30, "auth_strict_key": False}
+        # Set up environment variables for credential resolution
+        os.environ["NW_USER_DEFAULT"] = "test_user"
+        os.environ["NW_PASSWORD_DEFAULT"] = "test_pass"
+
+        try:
+            config = NetworkConfig(
+                general=GeneralConfig(
+                    default_transport_type="scrapli",
+                    transport_defaults={
+                        "scrapli": {"timeout_socket": 30, "auth_strict_key": False}
+                    },
+                ),
+                devices={
+                    "test_device": DeviceConfig(
+                        host="192.168.1.1",
+                        port=2222,
+                        transport_options={"custom_param": "value"},
+                    )
                 },
-            ),
-            devices={
-                "test_device": DeviceConfig(
-                    host="192.168.1.1",
-                    port=2222,
-                    transport_options={"custom_param": "value"},
-                )
-            },
-        )
+            )
 
-        params = config.get_device_connection_params("test_device")
+            params = config.get_device_connection_params("test_device")
 
-        assert params["host"] == "192.168.1.1"
-        assert params["port"] == 2222
-        # Note: transport_type is not included in connection params
-        assert params["timeout_socket"] == 30  # From transport defaults
-        # Note: custom transport options may not be included in connection params
+            assert params["host"] == "192.168.1.1"
+            assert params["port"] == 2222
+            # Note: transport_type is not included in connection params
+            assert params["timeout_socket"] == 30  # From transport defaults
+            # Note: custom transport options may not be included in connection params
+        finally:
+            # Clean up environment variables
+            for key in ["NW_USER_DEFAULT", "NW_PASSWORD_DEFAULT"]:
+                if key in os.environ:
+                    del os.environ[key]

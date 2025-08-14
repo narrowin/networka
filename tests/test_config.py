@@ -20,12 +20,13 @@ from network_toolkit.config import (
     DeviceOverrides,
     FileOperationConfig,
     GeneralConfig,
+    GroupCredentials,
     NetworkConfig,
     VendorPlatformConfig,
     VendorSequence,
-    get_env_credential,
     load_config,
 )
+from network_toolkit.credentials import EnvironmentCredentialManager
 from network_toolkit.exceptions import NetworkToolkitError
 
 
@@ -35,30 +36,37 @@ class TestGeneralConfig:
     def test_default_values(self) -> None:
         """Test default configuration values."""
         # Set up environment variables for testing
-        os.environ["NT_DEFAULT_USER"] = "admin"
-        os.environ["NT_DEFAULT_PASSWORD"] = "admin"
+        os.environ["NW_USER_DEFAULT"] = "admin"
+        os.environ["NW_PASSWORD_DEFAULT"] = "admin"
 
-        config = GeneralConfig()
-        assert config.firmware_dir == "/tmp/firmware"
-        assert config.backup_dir == "/tmp/backups"
-        assert config.default_user == "admin"
-        assert config.default_password == "admin"
-        assert config.transport == "ssh"
-        assert config.port == 22
-        assert config.timeout == 30
-        assert config.connection_retries == 3
-        assert config.retry_delay == 5
-        assert config.transfer_timeout == 300
-        assert config.verify_checksums is True
-        assert config.command_timeout == 60
-        assert config.enable_logging is True
-        assert config.log_level == "INFO"
-        assert config.backup_retention_days == 30
-        assert config.max_backups_per_device == 10
-        assert config.store_results is False
-        assert config.results_format == "txt"
-        assert config.results_include_timestamp is True
-        assert config.results_include_command is True
+        try:
+            config = GeneralConfig()
+            assert config.firmware_dir == "/tmp/firmware"
+            assert config.backup_dir == "/tmp/backups"
+            assert config.default_user == "admin"
+            assert config.default_password == "admin"
+            assert config.transport == "ssh"
+            assert config.port == 22
+            assert config.timeout == 30
+            assert config.connection_retries == 3
+            assert config.retry_delay == 5
+            assert config.transfer_timeout == 300
+            assert config.verify_checksums is True
+            assert config.command_timeout == 60
+            assert config.enable_logging is True
+            assert config.log_level == "INFO"
+            assert config.backup_retention_days == 30
+            assert config.max_backups_per_device == 10
+            assert config.store_results is False
+            assert config.results_format == "txt"
+            assert config.results_include_timestamp is True
+            assert config.results_include_command is True
+        finally:
+            # Clean up environment variables
+            if "NW_USER_DEFAULT" in os.environ:
+                del os.environ["NW_USER_DEFAULT"]
+            if "NW_PASSWORD_DEFAULT" in os.environ:
+                del os.environ["NW_PASSWORD_DEFAULT"]
 
     def test_results_format_validation(self) -> None:
         """Test results format validation."""
@@ -684,13 +692,13 @@ class TestNetworkConfigValidation:
         config_file.write_text(yaml.safe_dump(config_data))
 
         # Clear environment variables to ensure no fallback
-        old_user = os.environ.get("NT_DEFAULT_USER")
-        old_pass = os.environ.get("NT_DEFAULT_PASSWORD")
+        old_user = os.environ.get("NW_USER_DEFAULT")
+        old_pass = os.environ.get("NW_PASSWORD_DEFAULT")
 
-        if "NT_DEFAULT_USER" in os.environ:
-            del os.environ["NT_DEFAULT_USER"]
-        if "NT_DEFAULT_PASSWORD" in os.environ:
-            del os.environ["NT_DEFAULT_PASSWORD"]
+        if "NW_USER_DEFAULT" in os.environ:
+            del os.environ["NW_USER_DEFAULT"]
+        if "NW_PASSWORD_DEFAULT" in os.environ:
+            del os.environ["NW_PASSWORD_DEFAULT"]
 
         try:
             # Config should load successfully - credential validation happens at runtime
@@ -708,9 +716,9 @@ class TestNetworkConfigValidation:
         finally:
             # Restore environment variables
             if old_user is not None:
-                os.environ["NT_DEFAULT_USER"] = old_user
+                os.environ["NW_USER_DEFAULT"] = old_user
             if old_pass is not None:
-                os.environ["NT_DEFAULT_PASSWORD"] = old_pass
+                os.environ["NW_PASSWORD_DEFAULT"] = old_pass
 
     def test_network_config_device_group_references(self, tmp_path: Path) -> None:
         """Test network config with device group references."""
@@ -1328,3 +1336,428 @@ class TestNetworkConfigAdvancedMethods:
         # Should fall back to device sequence when vendor not found
         commands = config.resolve_sequence_commands("fallback_seq", "test_device")
         assert commands == ["device_fallback_cmd"]
+
+
+class TestGroupCredentials:
+    """Test group credential functionality."""
+
+    def test_group_credentials_creation(self) -> None:
+        """Test GroupCredentials model creation."""
+        # Empty credentials
+        creds = GroupCredentials()
+        assert creds.user is None
+        assert creds.password is None
+
+        # With user only
+        creds = GroupCredentials(user="admin")
+        assert creds.user == "admin"
+        assert creds.password is None
+
+        # With password only
+        creds = GroupCredentials(password="secret")
+        assert creds.user is None
+        assert creds.password == "secret"
+
+        # With both
+        creds = GroupCredentials(user="admin", password="secret")
+        assert creds.user == "admin"
+        assert creds.password == "secret"
+
+    def test_device_group_with_credentials(self) -> None:
+        """Test DeviceGroup with credentials."""
+        # Group without credentials
+        group = DeviceGroup(description="Test group", members=["device1"])
+        assert group.credentials is None
+
+        # Group with credentials
+        creds = GroupCredentials(user="group_admin", password="group_pass")
+        group = DeviceGroup(
+            description="Test group with creds",
+            members=["device1"],
+            credentials=creds
+        )
+        assert group.credentials is not None
+        assert group.credentials.user == "group_admin"
+        assert group.credentials.password == "group_pass"
+
+    def test_get_device_groups(self) -> None:
+        """Test getting groups that a device belongs to."""
+        config_data = {
+            "general": {},
+            "devices": {
+                "device1": {
+                    "host": "192.168.1.1",
+                    "tags": ["switch", "production"]
+                },
+                "device2": {
+                    "host": "192.168.1.2",
+                    "tags": ["router"]
+                }
+            },
+            "device_groups": {
+                "switches": {
+                    "description": "All switches",
+                    "members": ["device1"]
+                },
+                "production": {
+                    "description": "Production devices",
+                    "match_tags": ["production"]
+                },
+                "routers": {
+                    "description": "All routers",
+                    "match_tags": ["router"]
+                }
+            }
+        }
+
+        config = NetworkConfig(**config_data)
+
+        # Device1 should be in both 'switches' (explicit) and 'production' (tag-based)
+        groups = config.get_device_groups("device1")
+        assert set(groups) == {"switches", "production"}
+
+        # Device2 should only be in 'routers' (tag-based)
+        groups = config.get_device_groups("device2")
+        assert groups == ["routers"]
+
+        # Non-existent device should return empty list
+        groups = config.get_device_groups("nonexistent")
+        assert groups == []
+
+    def test_get_group_credentials_config_only(self) -> None:
+        """Test getting group credentials from config only."""
+        config_data = {
+            "general": {},
+            "devices": {
+                "device1": {
+                    "host": "192.168.1.1",
+                    "tags": ["production"]
+                }
+            },
+            "device_groups": {
+                "production": {
+                    "description": "Production devices",
+                    "match_tags": ["production"],
+                    "credentials": {
+                        "user": "prod_admin",
+                        "password": "prod_pass"
+                    }
+                },
+                "staging": {
+                    "description": "Staging devices",
+                    "match_tags": ["staging"],
+                    "credentials": {
+                        "user": "stage_admin"
+                        # No password in config
+                    }
+                }
+            }
+        }
+
+        config = NetworkConfig(**config_data)
+
+        # Should get credentials from production group
+        user, password = config.get_group_credentials("device1")
+        assert user == "prod_admin"
+        assert password == "prod_pass"
+
+    def test_get_group_credentials_env_vars(self) -> None:
+        """Test getting group credentials from environment variables."""
+        # Set up test environment variables
+        os.environ["NW_USER_PRODUCTION"] = "env_prod_user"
+        os.environ["NW_PASSWORD_PRODUCTION"] = "env_prod_pass"
+
+        try:
+            config_data = {
+                "general": {},
+                "devices": {
+                    "device1": {
+                        "host": "192.168.1.1",
+                        "tags": ["production"]
+                    }
+                },
+                "device_groups": {
+                    "production": {
+                        "description": "Production devices",
+                        "match_tags": ["production"],
+                        "credentials": {}  # Empty credentials in config
+                    }
+                }
+            }
+
+            config = NetworkConfig(**config_data)
+
+            # Should get credentials from environment variables
+            user, password = config.get_group_credentials("device1")
+            assert user == "env_prod_user"
+            assert password == "env_prod_pass"
+
+        finally:
+            # Clean up environment variables
+            if "NW_USER_PRODUCTION" in os.environ:
+                del os.environ["NW_USER_PRODUCTION"]
+            if "NW_PASSWORD_PRODUCTION" in os.environ:
+                del os.environ["NW_PASSWORD_PRODUCTION"]
+
+    def test_get_group_credentials_no_groups(self) -> None:
+        """Test getting group credentials when device has no groups."""
+        config_data = {
+            "general": {},
+            "devices": {
+                "device1": {
+                    "host": "192.168.1.1"
+                    # No tags, won't match any groups
+                }
+            },
+            "device_groups": {
+                "production": {
+                    "description": "Production devices",
+                    "match_tags": ["production"],
+                    "credentials": {
+                        "user": "prod_admin",
+                        "password": "prod_pass"
+                    }
+                }
+            }
+        }
+
+        config = NetworkConfig(**config_data)
+
+        # Should return None for both since device doesn't belong to any groups
+        user, password = config.get_group_credentials("device1")
+        assert user is None
+        assert password is None
+
+    def test_get_device_connection_params_with_group_credentials(self) -> None:
+        """Test connection params resolution with group credentials."""
+        # Set up environment for defaults
+        os.environ["NW_USER_DEFAULT"] = "default_user"
+        os.environ["NW_PASSWORD_DEFAULT"] = "default_pass"
+
+        try:
+            config_data = {
+                "general": {},
+                "devices": {
+                    "device1": {
+                        "host": "192.168.1.1",
+                        "tags": ["production"]
+                        # No explicit credentials
+                    },
+                    "device2": {
+                        "host": "192.168.1.2",
+                        "user": "device_user",
+                        "password": "device_pass",
+                        "tags": ["production"]
+                        # Has explicit credentials - should take precedence
+                    },
+                    "device3": {
+                        "host": "192.168.1.3"
+                        # No tags, no explicit credentials - should use defaults
+                    }
+                },
+                "device_groups": {
+                    "production": {
+                        "description": "Production devices",
+                        "match_tags": ["production"],
+                        "credentials": {
+                            "user": "prod_user",
+                            "password": "prod_pass"
+                        }
+                    }
+                }
+            }
+
+            config = NetworkConfig(**config_data)
+
+            # Debug: check if device1 is in production group
+            groups = config.get_device_groups("device1")
+            assert "production" in groups, f"device1 should be in production group, got: {groups}"
+
+            # Debug: check if group credentials are retrieved correctly
+            group_user, group_password = config.get_group_credentials("device1")
+            assert group_user == "prod_user", f"Expected prod_user, got: {group_user}"
+            assert group_password == "prod_pass", f"Expected prod_pass, got: {group_password}"
+
+            # Debug: check the entire credential resolution chain
+            device = config.devices["device1"] if config.devices else None
+            print(f"Device config: {device}")
+            print(f"Device user: {device.user if device else None}")
+            print(f"Device password: {device.password if device else None}")
+            print(f"Group credentials: {group_user}, {group_password}")
+            
+            # Device1: Should use group credentials
+            params = config.get_device_connection_params("device1")
+            print(f"Final params: {params}")
+            assert params["auth_username"] == "prod_user"
+            assert params["auth_password"] == "prod_pass"
+
+            # Device2: Device credentials should take precedence over group
+            params = config.get_device_connection_params("device2")
+            assert params["auth_username"] == "device_user"
+            assert params["auth_password"] == "device_pass"
+
+            # Device3: Should fall back to defaults
+            params = config.get_device_connection_params("device3")
+            assert params["auth_username"] == "default_user"
+            assert params["auth_password"] == "default_pass"
+
+        finally:
+            # Clean up environment variables
+            if "NW_USER_DEFAULT" in os.environ:
+                del os.environ["NW_USER_DEFAULT"]
+            if "NW_PASSWORD_DEFAULT" in os.environ:
+                del os.environ["NW_PASSWORD_DEFAULT"]
+
+    def test_credential_precedence_order(self) -> None:
+        """Test the complete credential precedence order."""
+        # Set up all credential sources
+        os.environ["NW_USER_DEFAULT"] = "default_user"
+        os.environ["NW_PASSWORD_DEFAULT"] = "default_pass"
+        os.environ["NW_USER_DEVICE1"] = "env_device_user"
+        os.environ["NW_PASSWORD_DEVICE1"] = "env_device_pass"
+
+        try:
+            config_data = {
+                "general": {},
+                "devices": {
+                    "device1": {
+                        "host": "192.168.1.1",
+                        "user": "config_device_user",
+                        "password": "config_device_pass",
+                        "tags": ["production"]
+                    }
+                },
+                "device_groups": {
+                    "production": {
+                        "description": "Production devices",
+                        "match_tags": ["production"],
+                        "credentials": {
+                            "user": "group_user",
+                            "password": "group_pass"
+                        }
+                    }
+                }
+            }
+
+            config = NetworkConfig(**config_data)
+
+            # Test precedence: device config > device env vars > group > defaults
+            params = config.get_device_connection_params("device1")
+            # Device config should win
+            assert params["auth_username"] == "config_device_user"
+            assert params["auth_password"] == "config_device_pass"
+
+            # Test with interactive override (highest precedence)
+            params = config.get_device_connection_params(
+                "device1",
+                username_override="interactive_user",
+                password_override="interactive_pass"
+            )
+            assert params["auth_username"] == "interactive_user"
+            assert params["auth_password"] == "interactive_pass"
+
+        finally:
+            # Clean up environment variables
+            for key in ["NW_USER_DEFAULT", "NW_PASSWORD_DEFAULT",
+                       "NW_USER_DEVICE1", "NW_PASSWORD_DEVICE1"]:
+                if key in os.environ:
+                    del os.environ[key]
+
+
+class TestEnvironmentCredentialManager:
+    """Test the EnvironmentCredentialManager class with new NW_ prefix."""
+
+    def test_get_device_specific(self) -> None:
+        """Test getting device-specific credentials."""
+        os.environ["NW_USER_TESTDEV"] = "device_user"
+        os.environ["NW_PASSWORD_TESTDEV"] = "device_pass"
+
+        try:
+            # Test device-specific user
+            result = EnvironmentCredentialManager.get_device_specific("testdev", "user")
+            assert result == "device_user"
+
+            # Test device-specific password
+            result = EnvironmentCredentialManager.get_device_specific("testdev", "password")
+            assert result == "device_pass"
+
+            # Test case insensitive device name (should convert to uppercase)
+            result = EnvironmentCredentialManager.get_device_specific("TestDev", "user")
+            assert result == "device_user"
+
+        finally:
+            if "NW_USER_TESTDEV" in os.environ:
+                del os.environ["NW_USER_TESTDEV"]
+            if "NW_PASSWORD_TESTDEV" in os.environ:
+                del os.environ["NW_PASSWORD_TESTDEV"]
+
+    def test_get_group_specific(self) -> None:
+        """Test getting group-specific credentials."""
+        os.environ["NW_USER_PRODUCTION"] = "group_user"
+        os.environ["NW_PASSWORD_PRODUCTION"] = "group_pass"
+
+        try:
+            # Test group-specific user
+            result = EnvironmentCredentialManager.get_group_specific("production", "user")
+            assert result == "group_user"
+
+            # Test group-specific password
+            result = EnvironmentCredentialManager.get_group_specific("production", "password")
+            assert result == "group_pass"
+
+        finally:
+            if "NW_USER_PRODUCTION" in os.environ:
+                del os.environ["NW_USER_PRODUCTION"]
+            if "NW_PASSWORD_PRODUCTION" in os.environ:
+                del os.environ["NW_PASSWORD_PRODUCTION"]
+
+    def test_get_env_credential_defaults(self) -> None:
+        """Test getting default credentials."""
+        os.environ["NW_USER_DEFAULT"] = "default_user"
+        os.environ["NW_PASSWORD_DEFAULT"] = "default_pass"
+
+        try:
+            # Test default user
+            result = EnvironmentCredentialManager.get_default("user")
+            assert result == "default_user"
+
+            # Test default password
+            result = EnvironmentCredentialManager.get_default("password")
+            assert result == "default_pass"
+
+        finally:
+            if "NW_USER_DEFAULT" in os.environ:
+                del os.environ["NW_USER_DEFAULT"]
+            if "NW_PASSWORD_DEFAULT" in os.environ:
+                del os.environ["NW_PASSWORD_DEFAULT"]
+
+    def test_get_env_credential_fallback(self) -> None:
+        """Test fallback from specific to default credentials."""
+        os.environ["NW_USER_DEFAULT"] = "default_user"
+        # No device-specific credential set
+
+        try:
+            # Should fall back to default when device-specific not found
+            result = EnvironmentCredentialManager.get_credential("nonexistent", "user")
+            assert result == "default_user"
+
+            # Should return None when nothing is found
+            result = EnvironmentCredentialManager.get_credential("nonexistent", "password")
+            assert result is None
+
+        finally:
+            if "NW_USER_DEFAULT" in os.environ:
+                del os.environ["NW_USER_DEFAULT"]
+
+    def test_get_env_credential_hyphen_conversion(self) -> None:
+        """Test that hyphens in device names are converted to underscores."""
+        os.environ["NW_USER_TEST_DEVICE"] = "test_user"
+
+        try:
+            # Device name with hyphens should be converted to underscores
+            result = EnvironmentCredentialManager.get_credential("test-device", "user")
+            assert result == "test_user"
+
+        finally:
+            if "NW_USER_TEST_DEVICE" in os.environ:
+                del os.environ["NW_USER_TEST_DEVICE"]

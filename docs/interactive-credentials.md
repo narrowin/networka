@@ -53,7 +53,7 @@ nw run access_switches system_info --interactive-auth
 ### Credential Resolution Priority
 
 1. **Interactive credentials** (highest priority) - When `--interactive-auth` is used
-2. **Environment variables** - `NT_DEFAULT_USER`, `NT_DEFAULT_PASSWORD`, device-specific overrides
+2. **Environment variables** - `NW_USER_DEFAULT`, `NW_PASSWORD_DEFAULT`, device-specific overrides
 3. **Configuration file** - Default credentials in `devices.yml`
 
 ### Error Handling

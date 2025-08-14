@@ -17,7 +17,7 @@ Your repository follows good security practices overall. No hardcoded secrets we
 - **Email Addresses**: Generic company emails in headers (safe)
 
 ### 📋 Security Best Practices Already Implemented
-1. **Environment Variables**: All real credentials via `NT_*` environment variables
+1. **Environment Variables**: All real credentials via `NW_*` environment variables
 2. **No Hardcoded Secrets**: No real API keys, passwords, or tokens in code
 3. **Gitignore Protection**: Comprehensive `.gitignore` protects:
    - `.env` files

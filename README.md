@@ -121,11 +121,11 @@ Built with async/await support and type safety in mind.
 
 ```bash
 # Set environment variables for security
-export NT_DEFAULT_USER="admin"
-export NT_DEFAULT_PASSWORD="your_secure_password"
+export NW_USER_DEFAULT="admin"
+export NW_PASSWORD_DEFAULT="your_secure_password"
 
 # Device-specific overrides (optional)
-export NT_SW_ACC1_PASSWORD="switch1_password"
+export NW_PASSWORD_SW_ACC1="switch1_password"
 ```
 
 ### 2. Create configuration files
@@ -192,11 +192,11 @@ Net-Worker uses a flexible configuration system supporting both YAML and CSV for
 
 ```bash
 # Default credentials (required)
-export NT_DEFAULT_USER="admin"
-export NT_DEFAULT_PASSWORD="your_secure_password"
+export NW_USER_DEFAULT="admin"
+export NW_PASSWORD_DEFAULT="your_secure_password"
 
 # Device-specific overrides (optional)
-export NT_SW_ACC1_PASSWORD="switch1_password"
+export NW_PASSWORD_SW_ACC1="switch1_password"
 ```
 
 ### Configuration Structure
@@ -326,7 +326,7 @@ general:
 
 **Override precedence:**
 1. CLI flag: `nw info device1 --output-mode raw`
-2. Environment: `export NT_OUTPUT_MODE=light`
+2. Environment: `export NW_OUTPUT_MODE=light`
 3. Config file: `general.output_mode`
 
 ## Examples

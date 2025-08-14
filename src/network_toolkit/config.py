@@ -15,40 +15,7 @@ import yaml
 from pydantic import BaseModel, field_validator
 
 from network_toolkit.exceptions import NetworkToolkitError
-
-
-def get_env_credential(device_name: str | None = None, credential_type: str = "user") -> str | None:
-    """
-    Get credentials from environment variables.
-
-    Supports both device-specific and default credentials:
-    - Device-specific: NT_{DEVICE_NAME}_{USER|PASSWORD}
-    - Default: NT_DEFAULT_{USER|PASSWORD}
-
-    Parameters
-    ----------
-    device_name : str | None
-        Name of the device (will be converted to uppercase for env var lookup)
-    credential_type : str
-        Type of credential: "user" or "password"
-
-    Returns
-    -------
-    str | None
-        The credential value or None if not found
-    """
-    credential_type = credential_type.upper()
-
-    # Try device-specific credential first
-    if device_name:
-        device_env_var = f"NT_{device_name.upper().replace('-', '_')}_{credential_type}"
-        value = os.getenv(device_env_var)
-        if value:
-            return value
-
-    # Fall back to default credential
-    default_env_var = f"NT_DEFAULT_{credential_type}"
-    return os.getenv(default_env_var)
+from network_toolkit.credentials import ConnectionParameterBuilder, EnvironmentCredentialManager
 
 
 class GeneralConfig(BaseModel):
@@ -95,18 +62,18 @@ class GeneralConfig(BaseModel):
     @property
     def default_user(self) -> str:
         """Get default username from environment variable."""
-        user = get_env_credential(credential_type="user")
+        user = EnvironmentCredentialManager.get_default("user")
         if not user:
-            msg = "Default username not found in environment. " "Please set NT_DEFAULT_USER environment variable."
+            msg = "Default username not found in environment. Please set NW_USER_DEFAULT environment variable."
             raise ValueError(msg)
         return user
 
     @property
     def default_password(self) -> str:
         """Get default password from environment variable."""
-        password = get_env_credential(credential_type="password")
+        password = EnvironmentCredentialManager.get_default("password")
         if not password:
-            msg = "Default password not found in environment. " "Please set NT_DEFAULT_PASSWORD environment variable."
+            msg = "Default password not found in environment. Please set NW_PASSWORD_DEFAULT environment variable."
             raise ValueError(msg)
         return password
 
@@ -177,12 +144,20 @@ class DeviceConfig(BaseModel):
     command_sequences: dict[str, list[str]] | None = None
 
 
+class GroupCredentials(BaseModel):
+    """Group-level credential configuration."""
+
+    user: str | None = None
+    password: str | None = None
+
+
 class DeviceGroup(BaseModel):
     """Configuration for a device group."""
 
     description: str
     members: list[str] | None = None
     match_tags: list[str] | None = None
+    credentials: GroupCredentials | None = None
 
 
 class VendorPlatformConfig(BaseModel):
@@ -252,7 +227,7 @@ class NetworkConfig(BaseModel):
         password_override: str | None = None,
     ) -> dict[str, Any]:
         """
-        Get connection parameters for a device.
+        Get connection parameters for a device using the builder pattern.
 
         Parameters
         ----------
@@ -273,54 +248,8 @@ class NetworkConfig(BaseModel):
         ValueError
             If device is not found in configuration
         """
-        if not self.devices or device_name not in self.devices:
-            msg = f"Device '{device_name}' not found in configuration"
-            raise ValueError(msg)
-
-        device = self.devices[device_name]
-
-        # Get credentials with override priority:
-        # 1. Function parameters (interactive override)
-        # 2. Device configuration
-        # 3. Environment variables (device-specific)
-        # 4. Default environment variables
-        username = (
-            username_override or device.user or get_env_credential(device_name, "user") or self.general.default_user
-        )
-        password = (
-            password_override
-            or device.password
-            or get_env_credential(device_name, "password")
-            or self.general.default_password
-        )
-
-        # Start with general config defaults
-        params = {
-            "host": device.host,
-            "auth_username": username,
-            "auth_password": password,
-            "port": device.port or self.general.port,
-            "timeout_socket": self.general.timeout,
-            "timeout_transport": self.general.timeout,
-            "transport": self.general.transport,
-            "platform": device.platform or "mikrotik_routeros",
-        }
-
-        # Apply device-specific overrides
-        if device.overrides:
-            if device.overrides.user:
-                params["auth_username"] = device.overrides.user
-            if device.overrides.password:
-                params["auth_password"] = device.overrides.password
-            if device.overrides.port:
-                params["port"] = device.overrides.port
-            if device.overrides.timeout:
-                params["timeout_socket"] = device.overrides.timeout
-                params["timeout_transport"] = device.overrides.timeout
-            if device.overrides.transport:
-                params["transport"] = device.overrides.transport
-
-        return params
+        builder = ConnectionParameterBuilder(self)
+        return builder.build_parameters(device_name, username_override, password_override)
 
     def get_group_members(self, group_name: str) -> list[str]:
         """Get list of device names in a group."""
@@ -532,6 +461,76 @@ class NetworkConfig(BaseModel):
 
         vendor_sequence = self.vendor_sequences[device_type][sequence_name]
         return list(vendor_sequence.commands)
+
+    def get_device_groups(self, device_name: str) -> list[str]:
+        """
+        Get all groups that a device belongs to.
+
+        Parameters
+        ----------
+        device_name : str
+            Name of the device
+
+        Returns
+        -------
+        list[str]
+            List of group names the device belongs to
+        """
+        device_groups: list[str] = []
+        if not self.device_groups or not self.devices:
+            return device_groups
+
+        device = self.devices.get(device_name)
+        if not device:
+            return device_groups
+
+        for group_name, group_config in self.device_groups.items():
+            # Check explicit membership
+            if group_config.members and device_name in group_config.members:
+                device_groups.append(group_name)
+                continue
+
+            # Check tag-based membership
+            if (group_config.match_tags and
+                device.tags and
+                any(tag in device.tags for tag in group_config.match_tags)):
+                device_groups.append(group_name)
+
+        return device_groups
+
+    def get_group_credentials(self, device_name: str) -> tuple[str | None, str | None]:
+        """
+        Get group-level credentials for a device using the environment manager.
+
+        Checks all groups the device belongs to and returns the first
+        group credentials found, prioritizing by group order.
+
+        Parameters
+        ----------
+        device_name : str
+            Name of the device
+
+        Returns
+        -------
+        tuple[str | None, str | None]
+            Tuple of (username, password) from group credentials, or (None, None)
+        """
+        device_groups = self.get_device_groups(device_name)
+
+        for group_name in device_groups:
+            group = self.device_groups.get(group_name) if self.device_groups else None
+            if group and group.credentials:
+                # Check for explicit credentials in group config
+                if group.credentials.user or group.credentials.password:
+                    return (group.credentials.user, group.credentials.password)
+
+                # Check for environment variables for this group
+                group_user = EnvironmentCredentialManager.get_group_specific(group_name, "user")
+                group_password = EnvironmentCredentialManager.get_group_specific(group_name, "password")
+                if group_user or group_password:
+                    return (group_user, group_password)
+
+        return (None, None)
 
 
 def _load_csv_devices(csv_path: Path) -> dict[str, DeviceConfig]:
