@@ -10,7 +10,8 @@ import typer
 from rich.table import Table
 
 from network_toolkit.common.credentials import prompt_for_credentials
-from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.logging import setup_logging
+from network_toolkit.common.output import get_output_manager
 from network_toolkit.common.resolver import DeviceResolver
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
@@ -56,6 +57,9 @@ def register(app: typer.Typer) -> None:
         - nw info sw-acc1,access_switches
         """
         setup_logging("DEBUG" if verbose else "INFO")
+
+        # Get the output manager console
+        console = get_output_manager().console
 
         try:
             config = load_config(config_file)

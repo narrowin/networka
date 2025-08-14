@@ -15,7 +15,8 @@ import typer
 from rich.table import Table
 
 from network_toolkit.common.credentials import prompt_for_credentials
-from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.logging import setup_logging
+from network_toolkit.common.output import OutputMode, get_output_manager, set_output_mode
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.ip_device import (
@@ -73,12 +74,22 @@ def register(app: typer.Typer) -> None:
         results_dir: Annotated[
             str | None, typer.Option("--results-dir", help="Override results directory")
         ] = None,
+        output_mode: Annotated[
+            OutputMode | None,
+            typer.Option(
+                "--output-mode",
+                "-o",
+                help="Output decoration mode: normal, light, dark, no-color, raw",
+                show_default=False,
+            ),
+        ] = None,
         raw: Annotated[
             RawFormat | None,
             typer.Option(
                 "--raw",
-                help="Raw output mode with format: txt or json",
+                help="Legacy raw output mode - use --output-mode raw instead",
                 show_default=False,
+                hidden=True,
             ),
         ] = None,
         interactive_auth: Annotated[
@@ -106,7 +117,22 @@ def register(app: typer.Typer) -> None:
         ] = None,
     ) -> None:
         """Execute a single command or a sequence on a device or a group."""
-        if raw is None:
+        # Handle output mode configuration
+        if raw is not None:
+            # Legacy raw mode support - map to new output mode
+            output_mode = OutputMode.RAW
+        elif output_mode is None:
+            # Default to normal mode if nothing specified
+            output_mode = OutputMode.NORMAL
+
+        # Set the global output mode for this command
+        set_output_mode(output_mode)
+
+        # Get the console from the output manager
+        console = get_output_manager().console
+
+        # Raw mode suppresses all logging setup
+        if output_mode != OutputMode.RAW:
             setup_logging("DEBUG" if verbose else "INFO")
 
         # Handle interactive authentication if requested
@@ -129,6 +155,7 @@ def register(app: typer.Typer) -> None:
         # Track run timing & reporting state
         started_at = perf_counter()
         printed_results_dir = False
+        output_mgr = get_output_manager()
 
         def _print_results_dir_once(results_mgr: ResultsManager) -> None:
             """Print the results directory once if storing is enabled."""
@@ -138,9 +165,7 @@ def register(app: typer.Typer) -> None:
                 and results_mgr.session_dir
                 and not printed_results_dir
             ):
-                console.print(
-                    f"\n[dim]Results directory: {results_mgr.session_dir}[/dim]"
-                )
+                output_mgr.print_results_directory(str(results_mgr.session_dir))
                 printed_results_dir = True
 
         def _print_run_summary(
@@ -159,41 +184,17 @@ def register(app: typer.Typer) -> None:
 
             Skips printing for device command in raw output mode.
             """
-            # In raw mode, never print summaries
-            if raw_mode:
-                return
-
-            console.print("\n[bold cyan]Run Summary[/bold cyan]")
-            kind_label = "Sequence" if op_type == "Sequence" else "Command"
-            if is_group:
-                total, succ, fail = totals or (0, 0, 0)
-                console.print(
-                    f"  [bold]Target:[/bold] {target_label} (group)\n"
-                    f"  [bold]Type:[/bold] {op_type}\n"
-                    f"  [bold]{kind_label}:[/bold] {name}\n"
-                    f"  [bold]Devices:[/bold] {total} total | "
-                    f"[green]{succ} succeeded[/green], "
-                    f"[red]{fail} failed[/red]\n"
-                    + (
-                        f"  [bold]Results dir:[/bold] {results_mgr.session_dir}\n"
-                        if results_mgr.store_results and results_mgr.session_dir
-                        else ""
-                    )
-                    + f"  [bold]Duration:[/bold] {duration:.2f}s"
-                )
-            else:
-                console.print(
-                    f"  [bold]Target:[/bold] {target_label}\n"
-                    f"  [bold]Type:[/bold] {op_type}\n"
-                    f"  [bold]{kind_label}:[/bold] {name}\n"
-                    f"  [bold]Status:[/bold] Success\n"
-                    + (
-                        f"  [bold]Results dir:[/bold] {results_mgr.session_dir}\n"
-                        if results_mgr.store_results and results_mgr.session_dir
-                        else ""
-                    )
-                    + f"  [bold]Duration:[/bold] {duration:.2f}s"
-                )
+            results_dir = str(results_mgr.session_dir) if results_mgr.store_results and results_mgr.session_dir else None
+            
+            output_mgr.print_summary(
+                target=target_label,
+                operation_type=op_type,
+                name=name,
+                duration=duration,
+                is_group=is_group,
+                totals=totals,
+                results_dir=results_dir
+            )
 
         def _run_command_on_device(
             device_name: str,
@@ -215,13 +216,13 @@ def register(app: typer.Typer) -> None:
                 error_msg = f"Error on {device_name}: {e.message}"
                 if verbose and e.details:
                     error_msg += f" | Details: {e.details}"
-                if raw is None:
-                    console.print(f"[red]{error_msg}[/red]")
+                if output_mode != OutputMode.RAW:
+                    output_mgr.print_error(error_msg, device_name)
                 return (device_name, None, e.message)
             except Exception as e:  # pragma: no cover - unexpected
                 error_msg = f"Unexpected error on {device_name}: {e}"
-                if raw is None:
-                    console.print(f"[red]{error_msg}[/red]")
+                if output_mode != OutputMode.RAW:
+                    output_mgr.print_error(error_msg, device_name)
                 return (device_name, None, str(e))
 
         def _run_sequence_on_device(
@@ -666,13 +667,9 @@ def register(app: typer.Typer) -> None:
                             }
                         )
                     else:
-                        sys.stdout.write(
-                            f"device={device_target} cmd={command_or_sequence}\n"
-                        )
-                        sys.stdout.write(f"{result}\n")
+                        output_mgr.print_command_output(device_target, command_or_sequence, result)
                 else:
-                    console.print("[bold green]Command Output:[/bold green]")
-                    console.print(f"[white]{result}[/white]")
+                    output_mgr.print_command_output(device_target, command_or_sequence, result)
 
                 if results_mgr.store_results and raw is None and result:
                     stored_path = results_mgr.store_command_result(
