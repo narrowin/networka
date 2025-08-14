@@ -49,7 +49,7 @@ Net-Worker is a modern async CLI tool for automating network devices across mult
 
 ```bash
 # Install from GitHub (latest)
-uv pip install git+https://github.com/narrowin/net-worker.git
+pip install git+https://github.com/narrowin/net-worker.git
 
 # Verify installation works
 nw --help
@@ -82,7 +82,7 @@ nw --help
 
 ```bash
 # Install specific version
-uv pip install git+https://github.com/narrowin/net-worker.git@v0.1.0
+pip install git+https://github.com/narrowin/net-worker.git@v0.1.0
 
 # Install from local clone
 git clone https://github.com/narrowin/net-worker.git
