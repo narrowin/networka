@@ -294,8 +294,8 @@ class OutputManager:
 def get_output_mode_from_env() -> OutputMode:
     """Determine output mode from environment variables.
 
-    Respects standard environment variables like NO_COLOR and FORCE_COLOR,
-    as well as custom NT_OUTPUT_MODE.
+    Respects standard environment variables like NO_COLOR and the custom
+    NW_OUTPUT_MODE environment variable.
 
     Returns
     -------
@@ -308,13 +308,10 @@ def get_output_mode_from_env() -> OutputMode:
     if os.getenv("NO_COLOR"):
         return OutputMode.NO_COLOR
 
-    # Check for custom output mode environment variable
-    output_mode = os.getenv("NT_OUTPUT_MODE", "").lower()
-    if output_mode and output_mode in OutputMode.__members__.values():
-        return OutputMode(output_mode)
-
-    # Check for theme preference (legacy support)
-    if output_mode in ["light", "dark"]:
+    # Check for custom output mode environment variable (new scheme)
+    output_mode = os.getenv("NW_OUTPUT_MODE", "").lower()
+    valid_values = {m.value for m in OutputMode}
+    if output_mode and output_mode in valid_values:
         return OutputMode(output_mode)
 
     # Default to default mode
@@ -341,13 +338,14 @@ def get_output_mode_from_config(config_output_mode: str | None = None) -> Output
     if os.getenv("NO_COLOR"):
         return OutputMode.NO_COLOR
 
-    # Check for custom output mode environment variable
-    env_output_mode = os.getenv("NT_OUTPUT_MODE", "").lower()
-    if env_output_mode and env_output_mode in OutputMode.__members__.values():
+    # Check for custom output mode environment variable (new scheme)
+    env_output_mode = os.getenv("NW_OUTPUT_MODE", "").lower()
+    valid_values = {m.value for m in OutputMode}
+    if env_output_mode and env_output_mode in valid_values:
         return OutputMode(env_output_mode)
 
     # Use config setting if available
-    if config_output_mode and config_output_mode.lower() in OutputMode.__members__.values():
+    if config_output_mode and config_output_mode.lower() in valid_values:
         return OutputMode(config_output_mode.lower())
 
     # Default to default mode

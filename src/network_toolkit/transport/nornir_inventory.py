@@ -59,10 +59,10 @@ def build_nornir_inventory(config: NetworkConfig) -> Inventory:
 
         # Get credentials for this device
         username = get_env_credential(device_name, "user") or os.getenv(
-            "NT_DEFAULT_USER", "admin"
+            "NW_USER_DEFAULT", "admin"
         )
         password = get_env_credential(device_name, "password") or os.getenv(
-            "NT_DEFAULT_PASSWORD", ""
+            "NW_PASSWORD_DEFAULT", ""
         )
 
         if not password:

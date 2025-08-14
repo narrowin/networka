@@ -29,7 +29,7 @@ Net-Worker is a CLI tool for automating network devices across multiple vendors.
 - **Group operations**: Execute commands across device groups concurrently  
 - **Command sequences**: Vendor-aware predefined command sets
 - **Results management**: Organized storage with multiple output formats
-- **Security-first**: Environment variable credentials and comprehensive protection
+- **Security-first**: Automatic .env file loading, environment variable credentials, and comprehensive protection
 
 ## Installation
 
@@ -62,6 +62,23 @@ uv sync
 # Activate environment and verify
 source .venv/bin/activate
 nw --help
+```
+
+## Quick Start
+
+Get up and running in 3 steps:
+
+```bash
+# 1. Set up credentials (automatically loaded)
+cp .env.example .env
+nano .env  # Add your actual device credentials
+
+# 2. Configure your devices
+nano config/devices/devices.yml
+
+# 3. Start managing your network
+nw run sw-acc1 "/system/identity/print"
+nw run office_switches system_info
 ```
 
 ## CLI overview
@@ -119,6 +136,14 @@ Built with async/await support and type safety in mind.
 
 ### 1. Set up credentials
 
+**Option A: Use .env file (Recommended)**
+```bash
+# Copy and edit the example file
+cp .env.example .env
+nano .env  # Add your actual credentials
+```
+
+**Option B: Export environment variables**
 ```bash
 # Set environment variables for security
 export NW_USER_DEFAULT="admin"
@@ -190,6 +215,18 @@ Net-Worker uses a flexible configuration system supporting both YAML and CSV for
 
 ### Environment variables
 
+**Automatic .env Loading** - The toolkit automatically loads credentials from `.env` files:
+
+```bash
+# Copy the example and edit with your credentials
+cp .env.example .env
+
+# Credentials are loaded automatically when you run commands
+nw run system_info sw-acc1
+```
+
+**Manual Environment Variables** - You can also set them manually:
+
 ```bash
 # Default credentials (required)
 export NW_USER_DEFAULT="admin"
@@ -197,6 +234,52 @@ export NW_PASSWORD_DEFAULT="your_secure_password"
 
 # Device-specific overrides (optional)
 export NW_PASSWORD_SW_ACC1="switch1_password"
+```
+
+### Configuration Structure
+
+#### Modular Directory Structure
+```
+config/
+├── config.yml              # Main configuration (required)
+├── devices/                # Device definitions (all files here)
+│   ├── devices.yml         # Main devices file
+│   ├── devices.csv         # CSV format devices
+│   ├── production.yml      # YAML format devices
+│   └── customer-a.yml      # Customer-specific devices
+├── groups/                 # Group definitions (all files here)
+│   ├── groups.yml          # Main groups file
+│   ├── groups.csv          # CSV format groups
+│   └── production.yml      # YAML format groups
+├── sequences/              # Sequence definitions (all files here)
+│   ├── sequences.yml       # Main sequences file
+│   ├── sequences.csv       # CSV format sequences
+│   ├── advanced.yml        # YAML format sequences
+│   └── vendor_sequences/   # Vendor-specific sequences
+└── examples/               # Templates and examples
+    ├── devices/
+    ├── groups/
+    └── sequences/
+```
+
+#### CSV Format Reference
+
+**Devices CSV Headers:**
+```csv
+name,host,device_type,description,platform,model,location,tags
+sw-01,192.168.1.1,mikrotik_routeros,Lab Switch,mipsbe,CRS326,Lab,switch;access;lab
+```
+
+**Groups CSV Headers:**
+```csv
+name,description,members,match_tags
+lab_devices,Lab environment,sw-01;sw-02,lab;test
+```
+
+**Sequences CSV Headers:**
+```csv
+name,description,commands,tags
+system_info,Get system info,/system/identity/print;/system/clock/print,system;info
 ```
 
 ### Configuration Structure

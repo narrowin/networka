@@ -48,6 +48,7 @@ dependencies = [
     "asyncssh>=2.21.0",
     "scrapli-community>=2025.1.30",
     "libtmux>=0.46.2",
+    "python-dotenv>=1.0.0",
 ]
 
 [project.optional-dependencies]

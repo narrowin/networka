@@ -65,7 +65,9 @@ export NW_PASSWORD_CRITICAL_INFRASTRUCTURE=critical_systems_password
 
 ## Setup Methods
 
-### Option 1: Environment File (.env)
+### Option 1: Environment File (.env) - Recommended
+
+The Network Toolkit automatically loads environment variables from `.env` files, making credential management simple and secure.
 
 1. Copy the example environment file:
    ```bash
@@ -77,11 +79,23 @@ export NW_PASSWORD_CRITICAL_INFRASTRUCTURE=critical_systems_password
    nano .env
    ```
 
-3. Source the environment file before running the tool:
+3. Run the tool directly - the `.env` file is loaded automatically:
    ```bash
-   source .env
-   python -m network_toolkit.cli --help
+   nw run system_info sw-acc1
    ```
+
+#### .env File Locations
+
+The toolkit automatically looks for `.env` files in the following order (highest to lowest precedence):
+
+1. **Environment Variables** (Highest priority) - Variables already set in your shell
+2. **Config Directory** - `.env` file in the same directory as your config files
+3. **Current Working Directory** (Lowest priority) - `.env` file in your current directory
+
+This allows for flexible credential management:
+- Place `.env` in your project/config directory for project-specific credentials
+- Place `.env` in your working directory for global defaults
+- Use shell environment variables for runtime overrides
 
 ### Option 2: Export in Shell
 
@@ -124,12 +138,10 @@ python -m network_toolkit.cli run system_info sw-acc1
 The toolkit resolves credentials in this priority order:
 
 1. **Interactive credentials** (Highest) - When `--interactive-auth` is used
-2. **Device configuration** - Explicitly set credentials in device YAML files (deprecated)
+2. **Device configuration** - Explicitly set credentials in device YAML files (supported but discouraged)
 3. **Device-specific environment variables** - `NW_USER_DEVICENAME` and `NW_PASSWORD_DEVICENAME`
 4. **Group-level credentials** - From group configuration or `NW_USER_GROUPNAME` and `NW_PASSWORD_GROUPNAME`
-5. **Config Directory .env** - `.env` file in the same directory as config files  
-6. **Current Working Directory .env** - `.env` file in your current directory
-7. **Default environment variables** (Lowest) - `NW_USER_DEFAULT` and `NW_PASSWORD_DEFAULT`
+5. **Default environment variables** (Lowest) - `NW_USER_DEFAULT` and `NW_PASSWORD_DEFAULT`
 
 This precedence allows you to:
 - Set global defaults with `NW_USER_DEFAULT` and `NW_PASSWORD_DEFAULT`
@@ -139,11 +151,11 @@ This precedence allows you to:
 
 ## Troubleshooting
 
-### "Default username not found in environment or .env file"
+### "Default username not found in environment"
 
 This error means `NW_USER_DEFAULT` is not set in any of the credential sources. Set it using one of the methods above.
 
-### "Default password not found in environment or .env file"
+### "Default password not found in environment"
 
 This error means `NW_PASSWORD_DEFAULT` is not set in any of the credential sources. Set it using one of the methods above.
 

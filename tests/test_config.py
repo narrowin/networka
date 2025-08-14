@@ -25,6 +25,7 @@ from network_toolkit.config import (
     VendorPlatformConfig,
     VendorSequence,
     load_config,
+    load_dotenv_files,
 )
 from network_toolkit.credentials import EnvironmentCredentialManager
 from network_toolkit.exceptions import NetworkToolkitError
@@ -208,9 +209,7 @@ class TestDeviceGroup:
 
     def test_device_group_both(self) -> None:
         """Test device group with both members and tags."""
-        group = DeviceGroup(
-            description="Test group", members=["device1"], match_tags=["switch"]
-        )
+        group = DeviceGroup(description="Test group", members=["device1"], match_tags=["switch"])
         assert group.description == "Test group"
         assert group.members == ["device1"]
         assert group.match_tags == ["switch"]
@@ -221,9 +220,7 @@ class TestCommandSequence:
 
     def test_command_sequence(self) -> None:
         """Test command sequence creation."""
-        sequence = CommandSequence(
-            description="Test sequence", commands=["command1", "command2", "command3"]
-        )
+        sequence = CommandSequence(description="Test sequence", commands=["command1", "command2", "command3"])
         assert sequence.description == "Test sequence"
         assert sequence.commands == ["command1", "command2", "command3"]
 
@@ -280,9 +277,7 @@ class TestNetworkConfig:
         with pytest.raises(ValueError, match="Device 'nonexistent' not found"):
             config.get_device_connection_params("nonexistent")
 
-    def test_get_device_connection_params_basic(
-        self, sample_config: NetworkConfig
-    ) -> None:
+    def test_get_device_connection_params_basic(self, sample_config: NetworkConfig) -> None:
         """Test getting basic device connection parameters."""
         params = sample_config.get_device_connection_params("test_device1")
 
@@ -299,9 +294,7 @@ class TestNetworkConfig:
 
         assert params == expected
 
-    def test_get_device_connection_params_with_overrides(
-        self, sample_config: NetworkConfig
-    ) -> None:
+    def test_get_device_connection_params_with_overrides(self, sample_config: NetworkConfig) -> None:
         """Test getting device connection parameters with overrides."""
         params = sample_config.get_device_connection_params("test_device2")
 
@@ -318,16 +311,12 @@ class TestNetworkConfig:
 
         assert params == expected
 
-    def test_get_group_members_nonexistent_group(
-        self, sample_config: NetworkConfig
-    ) -> None:
+    def test_get_group_members_nonexistent_group(self, sample_config: NetworkConfig) -> None:
         """Test getting members of nonexistent group."""
         with pytest.raises(NetworkToolkitError, match="Device group 'nonexistent'"):
             sample_config.get_group_members("nonexistent")
 
-    def test_get_group_members_direct_members(
-        self, sample_config: NetworkConfig
-    ) -> None:
+    def test_get_group_members_direct_members(self, sample_config: NetworkConfig) -> None:
         """Test getting group members from direct member list."""
         members = sample_config.get_group_members("lab_devices")
         assert set(members) == {"test_device1", "test_device2"}
@@ -496,9 +485,7 @@ class TestGeneralConfigValidation:
 
     def test_general_config_invalid_transport(self) -> None:
         """Test general config with invalid transport."""
-        with pytest.raises(
-            ValueError, match="transport must be either 'ssh' or 'telnet'"
-        ):
+        with pytest.raises(ValueError, match="transport must be either 'ssh' or 'telnet'"):
             GeneralConfig(transport="invalid")
 
     def test_general_config_invalid_log_level(self) -> None:
@@ -791,9 +778,7 @@ class TestNetworkConfigValidation:
         assert sequence.description == "Get system information"
         assert len(sequence.commands) == 2
 
-    def test_network_config_environment_variable_substitution(
-        self, tmp_path: Path
-    ) -> None:
+    def test_network_config_environment_variable_substitution(self, tmp_path: Path) -> None:
         """Test environment variable substitution in config."""
         # Set test environment variables
         os.environ["TEST_USER"] = "env_user"
@@ -983,9 +968,7 @@ class TestModularConfigLoading:
 
         # Invalid YAML in device fragment
         fragment_file = devices_dir / "invalid.yml"
-        fragment_file.write_text(
-            "devices:\n  test:\n    host: 192.168.1.1\n    invalid: ["
-        )
+        fragment_file.write_text("devices:\n  test:\n    host: 192.168.1.1\n    invalid: [")
 
         # Should load successfully but skip invalid files
         config = load_config(config_dir)
@@ -1025,11 +1008,7 @@ class TestModularConfigLoading:
 
         # Create devices
         devices_file = config_dir / "devices.yml"
-        devices_data = {
-            "devices": {
-                "device1": {"host": "192.168.1.1", "device_type": "mikrotik_routeros"}
-            }
-        }
+        devices_data = {"devices": {"device1": {"host": "192.168.1.1", "device_type": "mikrotik_routeros"}}}
         devices_file.write_text(yaml.safe_dump(devices_data))
 
         # Create groups file
@@ -1374,7 +1353,7 @@ class TestGroupCredentials:
         group = DeviceGroup(
             description="Test group with creds",
             members=["device1"],
-            credentials=creds
+            credentials=creds,
         )
         assert group.credentials is not None
         assert group.credentials.user == "group_admin"
@@ -1385,29 +1364,14 @@ class TestGroupCredentials:
         config_data = {
             "general": {},
             "devices": {
-                "device1": {
-                    "host": "192.168.1.1",
-                    "tags": ["switch", "production"]
-                },
-                "device2": {
-                    "host": "192.168.1.2",
-                    "tags": ["router"]
-                }
+                "device1": {"host": "192.168.1.1", "tags": ["switch", "production"]},
+                "device2": {"host": "192.168.1.2", "tags": ["router"]},
             },
             "device_groups": {
-                "switches": {
-                    "description": "All switches",
-                    "members": ["device1"]
-                },
-                "production": {
-                    "description": "Production devices",
-                    "match_tags": ["production"]
-                },
-                "routers": {
-                    "description": "All routers",
-                    "match_tags": ["router"]
-                }
-            }
+                "switches": {"description": "All switches", "members": ["device1"]},
+                "production": {"description": "Production devices", "match_tags": ["production"]},
+                "routers": {"description": "All routers", "match_tags": ["router"]},
+            },
         }
 
         config = NetworkConfig(**config_data)
@@ -1428,30 +1392,19 @@ class TestGroupCredentials:
         """Test getting group credentials from config only."""
         config_data = {
             "general": {},
-            "devices": {
-                "device1": {
-                    "host": "192.168.1.1",
-                    "tags": ["production"]
-                }
-            },
+            "devices": {"device1": {"host": "192.168.1.1", "tags": ["production"]}},
             "device_groups": {
                 "production": {
                     "description": "Production devices",
                     "match_tags": ["production"],
-                    "credentials": {
-                        "user": "prod_admin",
-                        "password": "prod_pass"
-                    }
+                    "credentials": {"user": "prod_admin", "password": "prod_pass"},
                 },
                 "staging": {
                     "description": "Staging devices",
                     "match_tags": ["staging"],
-                    "credentials": {
-                        "user": "stage_admin"
-                        # No password in config
-                    }
-                }
-            }
+                    "credentials": {"user": "stage_admin"},  # No password in config
+                },
+            },
         }
 
         config = NetworkConfig(**config_data)
@@ -1470,19 +1423,14 @@ class TestGroupCredentials:
         try:
             config_data = {
                 "general": {},
-                "devices": {
-                    "device1": {
-                        "host": "192.168.1.1",
-                        "tags": ["production"]
-                    }
-                },
+                "devices": {"device1": {"host": "192.168.1.1", "tags": ["production"]}},
                 "device_groups": {
                     "production": {
                         "description": "Production devices",
                         "match_tags": ["production"],
-                        "credentials": {}  # Empty credentials in config
+                        "credentials": {},  # Empty credentials in config
                     }
-                }
+                },
             }
 
             config = NetworkConfig(**config_data)
@@ -1503,22 +1451,14 @@ class TestGroupCredentials:
         """Test getting group credentials when device has no groups."""
         config_data = {
             "general": {},
-            "devices": {
-                "device1": {
-                    "host": "192.168.1.1"
-                    # No tags, won't match any groups
-                }
-            },
+            "devices": {"device1": {"host": "192.168.1.1"}},  # No tags
             "device_groups": {
                 "production": {
                     "description": "Production devices",
                     "match_tags": ["production"],
-                    "credentials": {
-                        "user": "prod_admin",
-                        "password": "prod_pass"
-                    }
+                    "credentials": {"user": "prod_admin", "password": "prod_pass"},
                 }
-            }
+            },
         }
 
         config = NetworkConfig(**config_data)
@@ -1538,56 +1478,30 @@ class TestGroupCredentials:
             config_data = {
                 "general": {},
                 "devices": {
-                    "device1": {
-                        "host": "192.168.1.1",
-                        "tags": ["production"]
-                        # No explicit credentials
-                    },
+                    "device1": {"host": "192.168.1.1", "tags": ["production"]},
+                    # No explicit credentials
                     "device2": {
                         "host": "192.168.1.2",
                         "user": "device_user",
                         "password": "device_pass",
-                        "tags": ["production"]
-                        # Has explicit credentials - should take precedence
+                        "tags": ["production"],
                     },
-                    "device3": {
-                        "host": "192.168.1.3"
-                        # No tags, no explicit credentials - should use defaults
-                    }
+                    # Has explicit credentials - should take precedence
+                    "device3": {"host": "192.168.1.3"},  # No tags, use defaults
                 },
                 "device_groups": {
                     "production": {
                         "description": "Production devices",
                         "match_tags": ["production"],
-                        "credentials": {
-                            "user": "prod_user",
-                            "password": "prod_pass"
-                        }
+                        "credentials": {"user": "prod_user", "password": "prod_pass"},
                     }
-                }
+                },
             }
 
             config = NetworkConfig(**config_data)
 
-            # Debug: check if device1 is in production group
-            groups = config.get_device_groups("device1")
-            assert "production" in groups, f"device1 should be in production group, got: {groups}"
-
-            # Debug: check if group credentials are retrieved correctly
-            group_user, group_password = config.get_group_credentials("device1")
-            assert group_user == "prod_user", f"Expected prod_user, got: {group_user}"
-            assert group_password == "prod_pass", f"Expected prod_pass, got: {group_password}"
-
-            # Debug: check the entire credential resolution chain
-            device = config.devices["device1"] if config.devices else None
-            print(f"Device config: {device}")
-            print(f"Device user: {device.user if device else None}")
-            print(f"Device password: {device.password if device else None}")
-            print(f"Group credentials: {group_user}, {group_password}")
-            
             # Device1: Should use group credentials
             params = config.get_device_connection_params("device1")
-            print(f"Final params: {params}")
             assert params["auth_username"] == "prod_user"
             assert params["auth_password"] == "prod_pass"
 
@@ -1624,19 +1538,16 @@ class TestGroupCredentials:
                         "host": "192.168.1.1",
                         "user": "config_device_user",
                         "password": "config_device_pass",
-                        "tags": ["production"]
+                        "tags": ["production"],
                     }
                 },
                 "device_groups": {
                     "production": {
                         "description": "Production devices",
                         "match_tags": ["production"],
-                        "credentials": {
-                            "user": "group_user",
-                            "password": "group_pass"
-                        }
+                        "credentials": {"user": "group_user", "password": "group_pass"},
                     }
-                }
+                },
             }
 
             config = NetworkConfig(**config_data)
@@ -1651,15 +1562,19 @@ class TestGroupCredentials:
             params = config.get_device_connection_params(
                 "device1",
                 username_override="interactive_user",
-                password_override="interactive_pass"
+                password_override="interactive_pass",
             )
             assert params["auth_username"] == "interactive_user"
             assert params["auth_password"] == "interactive_pass"
 
         finally:
             # Clean up environment variables
-            for key in ["NW_USER_DEFAULT", "NW_PASSWORD_DEFAULT",
-                       "NW_USER_DEVICE1", "NW_PASSWORD_DEVICE1"]:
+            for key in [
+                "NW_USER_DEFAULT",
+                "NW_PASSWORD_DEFAULT",
+                "NW_USER_DEVICE1",
+                "NW_PASSWORD_DEVICE1",
+            ]:
                 if key in os.environ:
                     del os.environ[key]
 
@@ -1761,3 +1676,140 @@ class TestEnvironmentCredentialManager:
         finally:
             if "NW_USER_TEST_DEVICE" in os.environ:
                 del os.environ["NW_USER_TEST_DEVICE"]
+
+
+class TestDotenvSupportNW:
+    """Tests for .env support using NW_* variables and EnvironmentCredentialManager."""
+
+    def test_dotenv_from_cwd(self, tmp_path: Path) -> None:
+        """Credentials from .env in current working directory are loaded."""
+        original_cwd = Path.cwd()
+        os.chdir(tmp_path)
+        try:
+            env_file = tmp_path / ".env"
+            env_file.write_text(
+                "\n".join(
+                    [
+                        "NW_USER_DEFAULT=dotenv_user",
+                        "NW_PASSWORD_DEFAULT=dotenv_pass",
+                        "NW_USER_TESTDEVICE=device_user",
+                        "NW_PASSWORD_TESTDEVICE=device_pass",
+                    ]
+                )
+            )
+
+            # Clear any pre-existing values to assert .env load
+            for var in [
+                "NW_USER_DEFAULT",
+                "NW_PASSWORD_DEFAULT",
+                "NW_USER_TESTDEVICE",
+                "NW_PASSWORD_TESTDEVICE",
+            ]:
+                if var in os.environ:
+                    del os.environ[var]
+
+            load_dotenv_files()
+
+            assert EnvironmentCredentialManager.get_default("user") == "dotenv_user"
+            assert EnvironmentCredentialManager.get_default("password") == "dotenv_pass"
+            assert (
+                EnvironmentCredentialManager.get_device_specific("testdevice", "user")
+                == "device_user"
+            )
+            assert (
+                EnvironmentCredentialManager.get_device_specific("testdevice", "password")
+                == "device_pass"
+            )
+        finally:
+            os.chdir(original_cwd)
+
+    def test_config_dir_dotenv_precedence_over_cwd(self, tmp_path: Path) -> None:
+        """.env in config dir takes precedence over cwd .env."""
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+
+        original_cwd = Path.cwd()
+        os.chdir(tmp_path)
+        try:
+            (tmp_path / ".env").write_text(
+                "NW_USER_DEFAULT=cwd_user\nNW_PASSWORD_DEFAULT=cwd_pass"
+            )
+            (config_dir / ".env").write_text(
+                "NW_USER_DEFAULT=config_user\nNW_PASSWORD_DEFAULT=config_pass"
+            )
+
+            # Clear env
+            for var in ["NW_USER_DEFAULT", "NW_PASSWORD_DEFAULT"]:
+                if var in os.environ:
+                    del os.environ[var]
+
+            load_dotenv_files(config_dir)
+
+            assert EnvironmentCredentialManager.get_default("user") == "config_user"
+            assert EnvironmentCredentialManager.get_default("password") == "config_pass"
+        finally:
+            os.chdir(original_cwd)
+
+    def test_environment_variables_override_dotenv(self, tmp_path: Path) -> None:
+        """Explicit environment variables override values from .env files."""
+        (tmp_path / ".env").write_text(
+            "NW_USER_DEFAULT=dotenv_user\nNW_PASSWORD_DEFAULT=dotenv_pass"
+        )
+
+        os.environ["NW_USER_DEFAULT"] = "env_user"
+        os.environ["NW_PASSWORD_DEFAULT"] = "env_pass"
+        try:
+            load_dotenv_files(tmp_path)
+            assert EnvironmentCredentialManager.get_default("user") == "env_user"
+            assert EnvironmentCredentialManager.get_default("password") == "env_pass"
+        finally:
+            if "NW_USER_DEFAULT" in os.environ:
+                del os.environ["NW_USER_DEFAULT"]
+            if "NW_PASSWORD_DEFAULT" in os.environ:
+                del os.environ["NW_PASSWORD_DEFAULT"]
+
+    def test_device_specific_hyphen_conversion_in_dotenv(self, tmp_path: Path) -> None:
+        """Device names with hyphens map to underscores in NW_* variables."""
+        (tmp_path / ".env").write_text(
+            "NW_USER_ROUTER_MAIN=router_user\nNW_PASSWORD_ROUTER_MAIN=router_pass"
+        )
+        # Clear env
+        for var in ["NW_USER_ROUTER_MAIN", "NW_PASSWORD_ROUTER_MAIN"]:
+            if var in os.environ:
+                del os.environ[var]
+        load_dotenv_files(tmp_path)
+        assert (
+            EnvironmentCredentialManager.get_device_specific("router-main", "user")
+            == "router_user"
+        )
+        assert (
+            EnvironmentCredentialManager.get_device_specific("router-main", "password")
+            == "router_pass"
+        )
+
+
+class TestGeneralConfigDotenvIntegrationNW:
+    """GeneralConfig integration tests with NW_* dotenv support."""
+
+    def test_default_user_and_password_from_dotenv(self, tmp_path: Path) -> None:
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+
+        (config_dir / ".env").write_text(
+            "NW_USER_DEFAULT=conf_user\nNW_PASSWORD_DEFAULT=conf_pass"
+        )
+
+        # Minimal valid config files
+        (config_dir / "config.yml").write_text(yaml.safe_dump({"general": {"timeout": 30}}))
+        (config_dir / "devices.yml").write_text(
+            yaml.safe_dump({"devices": {"dev": {"host": "192.168.1.1"}}})
+        )
+
+        # Clear env to ensure .env is the source
+        for var in ["NW_USER_DEFAULT", "NW_PASSWORD_DEFAULT"]:
+            if var in os.environ:
+                del os.environ[var]
+
+        config = load_config(config_dir)
+        assert config.general.default_user == "conf_user"
+        assert config.general.default_password == "conf_pass"

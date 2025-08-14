@@ -12,10 +12,53 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from dotenv import load_dotenv
 from pydantic import BaseModel, field_validator
 
 from network_toolkit.exceptions import NetworkToolkitError
-from network_toolkit.credentials import ConnectionParameterBuilder, EnvironmentCredentialManager
+from network_toolkit.credentials import (
+    ConnectionParameterBuilder,
+    EnvironmentCredentialManager,
+)
+
+
+def load_dotenv_files(config_path: Path | None = None) -> None:
+    """
+    Load environment variables from .env files.
+
+    Precedence order (highest to lowest):
+    1. Environment variables already set (highest priority)
+    2. .env in config directory (if config_path provided)
+    3. .env in current working directory (lowest priority)
+
+    Parameters
+    ----------
+    config_path : Path | None
+        Path to the configuration file (used to locate adjacent .env file)
+    """
+    # Store any existing NW_* environment variables to preserve their precedence
+    # These are the "real" environment variables that should have highest priority
+    original_nw_vars = {k: v for k, v in os.environ.items() if k.startswith("NW_")}
+
+    # Load .env from current working directory first (lowest priority)
+    cwd_env = Path.cwd() / ".env"
+    if cwd_env.exists():
+        logging.debug(f"Loading .env from current directory: {cwd_env}")
+        load_dotenv(cwd_env, override=False)
+
+    # Load .env from config directory (higher priority than cwd)
+    if config_path:
+        config_dir = config_path.parent if config_path.is_file() else config_path
+        config_env = config_dir / ".env"
+        if config_env.exists():
+            logging.debug(f"Loading .env from config directory: {config_env}")
+            # This will override any values loaded from cwd .env
+            load_dotenv(config_env, override=True)
+
+    # Finally, restore any environment variables that existed BEFORE we started loading .env files
+    # This ensures that environment variables set by the user have the highest precedence
+    for key, value in original_nw_vars.items():
+        os.environ[key] = value
 
 
 class GeneralConfig(BaseModel):
@@ -64,7 +107,9 @@ class GeneralConfig(BaseModel):
         """Get default username from environment variable."""
         user = EnvironmentCredentialManager.get_default("user")
         if not user:
-            msg = "Default username not found in environment. Please set NW_USER_DEFAULT environment variable."
+            msg = (
+                "Default username not found in environment. Please set NW_USER_DEFAULT environment variable."
+            )
             raise ValueError(msg)
         return user
 
@@ -73,7 +118,9 @@ class GeneralConfig(BaseModel):
         """Get default password from environment variable."""
         password = EnvironmentCredentialManager.get_default("password")
         if not password:
-            msg = "Default password not found in environment. Please set NW_PASSWORD_DEFAULT environment variable."
+            msg = (
+                "Default password not found in environment. Please set NW_PASSWORD_DEFAULT environment variable."
+            )
             raise ValueError(msg)
         return password
 
@@ -258,7 +305,7 @@ class NetworkConfig(BaseModel):
             raise NetworkToolkitError(msg, details={"group": group_name})
 
         group = self.device_groups[group_name]
-        members = []
+        members: list[str] = []
 
         # Direct members
         if group.members:
@@ -310,7 +357,7 @@ class NetworkConfig(BaseModel):
         if not self.global_command_sequences:
             return {}
 
-        matching_sequences = {}
+        matching_sequences: dict[str, CommandSequence] = {}
         for sequence_name, sequence in self.global_command_sequences.items():
             if sequence.tags and any(tag in sequence.tags for tag in tags):
                 matching_sequences[sequence_name] = sequence
@@ -399,7 +446,9 @@ class NetworkConfig(BaseModel):
                             sources.append(dev_name)
         return sequences
 
-    def resolve_sequence_commands(self, sequence_name: str, device_name: str | None = None) -> list[str] | None:
+    def resolve_sequence_commands(
+        self, sequence_name: str, device_name: str | None = None
+    ) -> list[str] | None:
         """Resolve commands for a sequence name from any origin.
 
         Parameters
@@ -480,20 +529,22 @@ class NetworkConfig(BaseModel):
         if not self.device_groups or not self.devices:
             return device_groups
 
-        device = self.devices.get(device_name)
+        device = self.devices.get(device_name) if self.devices else None
         if not device:
             return device_groups
 
-        for group_name, group_config in self.device_groups.items():
+        for group_name, group_config in (self.device_groups or {}).items():
             # Check explicit membership
             if group_config.members and device_name in group_config.members:
                 device_groups.append(group_name)
                 continue
 
             # Check tag-based membership
-            if (group_config.match_tags and
-                device.tags and
-                any(tag in device.tags for tag in group_config.match_tags)):
+            if (
+                group_config.match_tags
+                and device.tags
+                and any(tag in device.tags for tag in group_config.match_tags)
+            ):
                 device_groups.append(group_name)
 
         return device_groups
@@ -533,28 +584,30 @@ class NetworkConfig(BaseModel):
         return (None, None)
 
 
+# CSV/Discovery/Merge helpers
+
 def _load_csv_devices(csv_path: Path) -> dict[str, DeviceConfig]:
     """
     Load device configurations from CSV file.
-    
+
     Expected CSV headers: name,host,device_type,description,platform,model,location,tags
     Tags should be semicolon-separated in a single column.
     """
-    devices = {}
-    
+    devices: dict[str, DeviceConfig] = {}
+
     try:
         with csv_path.open("r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
-            
+
             for row in reader:
                 name = row.get("name", "").strip()
                 if not name:
                     continue
-                    
+
                 # Parse tags from semicolon-separated string
                 tags_str = row.get("tags", "").strip()
                 tags = [tag.strip() for tag in tags_str.split(";") if tag.strip()] if tags_str else None
-                
+
                 device_config = DeviceConfig(
                     host=row.get("host", "").strip(),
                     device_type=row.get("device_type", "mikrotik_routeros").strip(),
@@ -562,15 +615,15 @@ def _load_csv_devices(csv_path: Path) -> dict[str, DeviceConfig]:
                     platform=row.get("platform", "").strip() or None,
                     model=row.get("model", "").strip() or None,
                     location=row.get("location", "").strip() or None,
-                    tags=tags
+                    tags=tags,
                 )
-                
+
                 devices[name] = device_config
-                
+
         logging.debug(f"Loaded {len(devices)} devices from CSV: {csv_path}")
         return devices
-        
-    except Exception as e:
+
+    except Exception as e:  # pragma: no cover - robustness
         logging.warning(f"Failed to load devices from CSV {csv_path}: {e}")
         return {}
 
@@ -578,41 +631,41 @@ def _load_csv_devices(csv_path: Path) -> dict[str, DeviceConfig]:
 def _load_csv_groups(csv_path: Path) -> dict[str, DeviceGroup]:
     """
     Load device group configurations from CSV file.
-    
+
     Expected CSV headers: name,description,members,match_tags
     Members and match_tags should be semicolon-separated.
     """
-    groups = {}
-    
+    groups: dict[str, DeviceGroup] = {}
+
     try:
         with csv_path.open("r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
-            
+
             for row in reader:
                 name = row.get("name", "").strip()
                 if not name:
                     continue
-                    
+
                 # Parse members from semicolon-separated string
                 members_str = row.get("members", "").strip()
                 members = [m.strip() for m in members_str.split(";") if m.strip()] if members_str else None
-                
-                # Parse match_tags from semicolon-separated string  
+
+                # Parse match_tags from semicolon-separated string
                 tags_str = row.get("match_tags", "").strip()
                 match_tags = [tag.strip() for tag in tags_str.split(";") if tag.strip()] if tags_str else None
-                
+
                 group_config = DeviceGroup(
                     description=row.get("description", "").strip(),
                     members=members,
-                    match_tags=match_tags
+                    match_tags=match_tags,
                 )
-                
+
                 groups[name] = group_config
-                
+
         logging.debug(f"Loaded {len(groups)} groups from CSV: {csv_path}")
         return groups
-        
-    except Exception as e:
+
+    except Exception as e:  # pragma: no cover - robustness
         logging.warning(f"Failed to load groups from CSV {csv_path}: {e}")
         return {}
 
@@ -620,45 +673,45 @@ def _load_csv_groups(csv_path: Path) -> dict[str, DeviceGroup]:
 def _load_csv_sequences(csv_path: Path) -> dict[str, CommandSequence]:
     """
     Load command sequence configurations from CSV file.
-    
+
     Expected CSV headers: name,description,commands,tags
     Commands and tags should be semicolon-separated.
     """
-    sequences = {}
-    
+    sequences: dict[str, CommandSequence] = {}
+
     try:
         with csv_path.open("r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
-            
+
             for row in reader:
                 name = row.get("name", "").strip()
                 if not name:
                     continue
-                    
+
                 # Parse commands from semicolon-separated string
                 commands_str = row.get("commands", "").strip()
                 commands = [cmd.strip() for cmd in commands_str.split(";") if cmd.strip()]
-                
+
                 if not commands:
                     logging.warning(f"Sequence '{name}' has no commands, skipping")
                     continue
-                
+
                 # Parse tags from semicolon-separated string
                 tags_str = row.get("tags", "").strip()
                 tags = [tag.strip() for tag in tags_str.split(";") if tag.strip()] if tags_str else None
-                
+
                 sequence_config = CommandSequence(
                     description=row.get("description", "").strip(),
                     commands=commands,
-                    tags=tags
+                    tags=tags,
                 )
-                
+
                 sequences[name] = sequence_config
-                
+
         logging.debug(f"Loaded {len(sequences)} sequences from CSV: {csv_path}")
         return sequences
-        
-    except Exception as e:
+
+    except Exception as e:  # pragma: no cover - robustness
         logging.warning(f"Failed to load sequences from CSV {csv_path}: {e}")
         return {}
 
@@ -666,23 +719,23 @@ def _load_csv_sequences(csv_path: Path) -> dict[str, CommandSequence]:
 def _discover_config_files(config_dir: Path, config_type: str) -> list[Path]:
     """
     Discover configuration files of a specific type in config directory and subdirectories.
-    
+
     Looks for both YAML and CSV files in:
     - config_dir/{config_type}.yml
-    - config_dir/{config_type}.csv  
+    - config_dir/{config_type}.csv
     - config_dir/{config_type}/{config_type}.yml
     - config_dir/{config_type}/{config_type}.csv
     - config_dir/{config_type}/*.yml
     - config_dir/{config_type}/*.csv
     """
-    files = []
-    
+    files: list[Path] = []
+
     # Main config file in root
     for ext in [".yml", ".yaml", ".csv"]:
         main_file = config_dir / f"{config_type}{ext}"
         if main_file.exists():
             files.append(main_file)
-    
+
     # Subdirectory files
     subdir = config_dir / config_type
     if subdir.exists() and subdir.is_dir():
@@ -691,30 +744,30 @@ def _discover_config_files(config_dir: Path, config_type: str) -> list[Path]:
             sub_main_file = subdir / f"{config_type}{ext}"
             if sub_main_file.exists():
                 files.append(sub_main_file)
-        
+
         # All yaml/csv files in subdirectory
         for pattern in ["*.yml", "*.yaml", "*.csv"]:
             files.extend(subdir.glob(pattern))
-    
+
     # Remove duplicates while preserving order
-    seen = set()
-    unique_files = []
+    seen: set[Path] = set()
+    unique_files: list[Path] = []
     for f in files:
         if f not in seen:
             seen.add(f)
             unique_files.append(f)
-    
+
     return unique_files
 
 
 def _merge_configs(base_config: dict[str, Any], override_config: dict[str, Any]) -> dict[str, Any]:
     """
     Merge two configuration dictionaries with override precedence.
-    
+
     More specific configs (from subdirectories or later files) override general ones.
     """
     merged = base_config.copy()
-    
+
     for key, value in override_config.items():
         if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
             # Recursively merge nested dictionaries
@@ -722,7 +775,7 @@ def _merge_configs(base_config: dict[str, Any], override_config: dict[str, Any])
         else:
             # Override with new value
             merged[key] = value
-    
+
     return merged
 
 
@@ -734,9 +787,14 @@ def load_config(config_path: str | Path) -> NetworkConfig:
     1. New modular config: config_path as directory containing config/, devices.yml,
        groups.yml, sequences.yml
     2. Legacy monolithic: config_path as single devices.yml file
+
+    Additionally loads environment variables from .env files before loading config.
     """
     config_path = Path(config_path)
     original_path = config_path  # Keep track of original user input
+
+    # Load .env files first to make environment variables available for credential resolution
+    load_dotenv_files(config_path)
 
     # Check for new modular configuration structure
     if config_path.name in ["config", "config/"]:
@@ -805,10 +863,10 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
             main_config: dict[str, Any] = yaml.safe_load(f) or {}
 
         # Enhanced device loading with CSV support and subdirectory discovery
-        all_devices = {}
-        device_defaults = {}
+        all_devices: dict[str, Any] = {}
+        device_defaults: dict[str, Any] = {}
         device_files = _discover_config_files(config_dir, "devices")
-        
+
         # Load defaults first
         devices_dir = config_dir / "devices"
         if devices_dir.exists():
@@ -820,20 +878,20 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
                         device_defaults = defaults_config.get("defaults", {})
                 except yaml.YAMLError as e:
                     logging.warning(f"Invalid YAML in defaults file {defaults_file}: {e}")
-        
+
         # Load device files
         for device_file in device_files:
             # Skip defaults file as it's handled separately
             if device_file.name == "_defaults.yml":
                 continue
-                
+
             if device_file.suffix.lower() == ".csv":
                 file_devices = _load_csv_devices(device_file)
                 # Apply defaults to CSV devices
                 for _device_name, device_config in file_devices.items():
                     for key, default_value in device_defaults.items():
-                        if key not in device_config:
-                            device_config[key] = default_value
+                        if getattr(device_config, key, None) is None:
+                            setattr(device_config, key, default_value)
                 all_devices.update(file_devices)
             else:
                 try:
@@ -848,14 +906,16 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
                                         device_config[key] = default_value
                             all_devices.update(file_devices)
                         else:
-                            logging.warning(f"Invalid devices structure in {device_file}, skipping")
+                            logging.warning(
+                                f"Invalid devices structure in {device_file}, skipping"
+                            )
                 except yaml.YAMLError as e:
                     logging.warning(f"Invalid YAML in {device_file}: {e}")
 
         # Enhanced group loading with CSV support and subdirectory discovery
-        all_groups = {}
+        all_groups: dict[str, Any] = {}
         group_files = _discover_config_files(config_dir, "groups")
-        
+
         for group_file in group_files:
             if group_file.suffix.lower() == ".csv":
                 file_groups = _load_csv_groups(group_file)
@@ -868,15 +928,17 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
                         if isinstance(file_groups, dict):
                             all_groups.update(file_groups)
                         else:
-                            logging.warning(f"Invalid groups structure in {group_file}, skipping")
+                            logging.warning(
+                                f"Invalid groups structure in {group_file}, skipping"
+                            )
                 except yaml.YAMLError as e:
                     logging.warning(f"Invalid YAML in {group_file}: {e}")
 
         # Enhanced sequence loading with CSV support and subdirectory discovery
-        all_sequences = {}
+        all_sequences: dict[str, Any] = {}
         sequence_files = _discover_config_files(config_dir, "sequences")
         sequences_config: dict[str, Any] = {}
-        
+
         for seq_file in sequence_files:
             if seq_file.suffix.lower() == ".csv":
                 file_sequences = _load_csv_sequences(seq_file)
@@ -885,18 +947,18 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
                 try:
                     with seq_file.open("r", encoding="utf-8") as f:
                         seq_yaml_config: dict[str, Any] = yaml.safe_load(f) or {}
-                        
                         # Extract sequences
                         file_sequences = seq_yaml_config.get("sequences", {})
                         if isinstance(file_sequences, dict):
                             all_sequences.update(file_sequences)
-                        
+
                         # Keep track of other sequence config for vendor sequences
                         if not sequences_config:
                             sequences_config = seq_yaml_config
                         else:
-                            sequences_config = _merge_configs(sequences_config, seq_yaml_config)
-                            
+                            sequences_config = _merge_configs(
+                                sequences_config, seq_yaml_config
+                            )
                 except yaml.YAMLError as e:
                     logging.warning(f"Invalid YAML in {seq_file}: {e}")
 
@@ -917,7 +979,7 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
         logging.debug(f"  - Devices: {len(all_devices)}")
         logging.debug(f"  - Groups: {len(all_groups)}")
         logging.debug(f"  - Sequences: {len(all_sequences)}")
-        
+
         return NetworkConfig(**merged_config)
 
     except yaml.YAMLError as e:
@@ -926,12 +988,14 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
     except FileNotFoundError:
         # Re-raise FileNotFoundError as-is for missing config files
         raise
-    except Exception as e:
+    except Exception as e:  # pragma: no cover - safety
         msg = f"Failed to load modular configuration from {config_dir}: {e}"
         raise ValueError(msg) from e
 
 
-def _load_vendor_sequences(config_dir: Path, sequences_config: dict[str, Any]) -> dict[str, dict[str, VendorSequence]]:
+def _load_vendor_sequences(
+    config_dir: Path, sequences_config: dict[str, Any]
+) -> dict[str, dict[str, VendorSequence]]:
     """Load vendor-specific sequences from sequences directory."""
     vendor_sequences: dict[str, dict[str, VendorSequence]] = {}
 
@@ -955,7 +1019,9 @@ def _load_vendor_sequences(config_dir: Path, sequences_config: dict[str, Any]) -
             vendor_file_path = sequence_path / sequence_file
 
             if not vendor_file_path.exists():
-                logging.debug(f"Vendor sequence file not found: {vendor_file_path}")
+                logging.debug(
+                    f"Vendor sequence file not found: {vendor_file_path}"
+                )
                 continue
 
             try:
@@ -967,13 +1033,19 @@ def _load_vendor_sequences(config_dir: Path, sequences_config: dict[str, Any]) -
                 for seq_name, seq_data in sequences.items():
                     platform_sequences[seq_name] = VendorSequence(**seq_data)
 
-                logging.debug(f"Loaded {len(sequences)} sequences for {platform_name} " f"from {vendor_file_path}")
+                logging.debug(
+                    f"Loaded {len(sequences)} sequences for {platform_name} from {vendor_file_path}"
+                )
 
             except yaml.YAMLError as e:
-                logging.warning(f"Invalid YAML in vendor sequence file {vendor_file_path}: {e}")
+                logging.warning(
+                    f"Invalid YAML in vendor sequence file {vendor_file_path}: {e}"
+                )
                 continue
-            except Exception as e:
-                logging.warning(f"Failed to load vendor sequence file {vendor_file_path}: {e}")
+            except Exception as e:  # pragma: no cover - robustness
+                logging.warning(
+                    f"Failed to load vendor sequence file {vendor_file_path}: {e}"
+                )
                 continue
 
         if platform_sequences:
@@ -996,6 +1068,6 @@ def load_legacy_config(config_path: Path) -> NetworkConfig:
     except yaml.YAMLError as e:
         msg = f"Invalid YAML in configuration file: {config_path}"
         raise ValueError(msg) from e
-    except Exception as e:
+    except Exception as e:  # pragma: no cover - safety
         msg = f"Failed to load configuration from {config_path}: {e}"
         raise ValueError(msg) from e

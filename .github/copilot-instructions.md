@@ -1,3 +1,4 @@
+``````instructions
 ````instructions
 # GitHub Copilot Instructions for Network Worker (nw)
 
@@ -155,8 +156,8 @@ def test_command_execution(mock_scrapli, test_config):
 ### 🔒 Security Best Practices
 - **No Hardcoded Credentials**: All credentials via environment variables
 - **Environment Variable Pattern**:
-  - `NT_DEFAULT_USER`/`NT_DEFAULT_PASSWORD` for defaults
-  - `NT_{DEVICE_NAME}_USER`/`NT_{DEVICE_NAME}_PASSWORD` for overrides
+  - `NW_USER_DEFAULT`/`NW_PASSWORD_DEFAULT` for defaults
+  - `NW_{DEVICE_NAME}_USER`/`NW_{DEVICE_NAME}_PASSWORD` for overrides
 - **SSH Security**: Automatic host key management, secure transports only
 - **Validation**: Pydantic models for all configuration validation
 
@@ -265,10 +266,10 @@ class DeviceManager:
 ### 🔒 Credential Management
 ```python
 # ✅ Environment variable patterns
-NT_DEFAULT_USER=admin                    # Default username
-NT_DEFAULT_PASSWORD=secure_password      # Default password
-NT_SW_ACC1_USER=switch_admin            # Device-specific username
-NT_SW_ACC1_PASSWORD=switch_password     # Device-specific password
+NW_USER_DEFAULT=admin                    # Default username
+NW_PASSWORD_DEFAULT=secure_password      # Default password
+NW_SW_ACC1_USER=switch_admin            # Device-specific username
+NW_SW_ACC1_PASSWORD=switch_password     # Device-specific password
 
 # ✅ Credential retrieval
 def get_device_credentials(device_name: str) -> tuple[str, str]:
@@ -311,8 +312,8 @@ python -c "from network_toolkit.config import load_config; load_config('devices.
    - Review firewall rules: SSH port 22 accessible
 
 2. **Authentication errors**:
-   - Verify environment variables: `echo $NT_DEFAULT_USER`
-   - Check device-specific overrides: `NT_{DEVICE}_USER`
+   - Verify environment variables: `echo $NW_USER_DEFAULT`
+   - Check device-specific overrides: `NW_{DEVICE}_USER`
    - Test manual SSH login: Confirm credentials work
 
 3. **Command execution failures**:
