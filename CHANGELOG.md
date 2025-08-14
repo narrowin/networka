@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.2] - 2025-08-15
 
 ### Changed
 - Renamed project from "netkit" to "net-worker"
@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Shell completion for bash, fish, and zsh with new "nw" command
 - Modern packaging standards with uv build system
 - Automated release workflows with GitHub Actions
+- Global `--version` flag to display version information
+- CLI now properly handles top-level flags without requiring a subcommand
+
 
 ### Technical
 - Enhanced pyproject.toml with modern Python packaging standards
@@ -33,3 +36,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Security scanning with TruffleHog and Bandit
 - Test coverage reporting with Codecov
 - Proper artifact management and retention policies
+
+### Fixed
+- GitHub Actions CI test failure for version command support
