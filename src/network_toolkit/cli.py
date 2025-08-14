@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import datetime
 from pathlib import Path
-from typing import Any, Annotated
+from typing import Annotated, Any
 
 import typer
 from typer.core import TyperGroup
@@ -116,21 +116,10 @@ app = typer.Typer(
 
 
 @app.callback()
-def main(
-    *,
-    output_mode: Annotated[
-        OutputMode | None,
-        typer.Option(
-            "--output-mode",
-            "-o",
-            help="Output decoration mode: normal, light, dark, no-color, raw",
-            show_default=False,
-        ),
-    ] = None,
-) -> None:
+def main() -> None:
     """Configure global settings for the network toolkit."""
-    if output_mode is not None:
-        set_output_mode(output_mode)
+    pass
+
 
 # Expose DeviceSession symbol for tests to patch (`network_toolkit.cli.DeviceSession`)
 DeviceSession = _DeviceSession

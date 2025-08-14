@@ -12,7 +12,11 @@ from typing import Annotated, Any, TypeVar
 import typer
 
 from network_toolkit.common.logging import setup_logging
-from network_toolkit.common.output import OutputMode, get_output_manager, set_output_mode
+from network_toolkit.common.output import (
+    OutputMode,
+    get_output_manager,
+    set_output_mode,
+)
 from network_toolkit.config import load_config
 
 T = TypeVar("T")
@@ -125,6 +129,10 @@ def handle_toolkit_errors(func: Callable[..., T]) -> Callable[..., T]:
 def create_command_context(**options: Any) -> CommandContext:
     """Create a command context from common options."""
     return CommandContext(
+        config_file=options.get("config_file", Path("devices.yml")),
+        verbose=options.get("verbose", False),
+        output_mode=options.get("output_mode"),
+    )
         config_file=options.get("config_file", Path("devices.yml")),
         verbose=options.get("verbose", False),
         output_mode=options.get("output_mode"),

@@ -48,60 +48,45 @@ class OutputManager:
         if self.mode == OutputMode.RAW:
             # Raw mode uses no styling at all
             return Console(
-                color_system=None,
-                force_terminal=False,
-                stderr=False,
-                file=sys.stdout,
-                width=None,
-                height=None
+                color_system=None, force_terminal=False, stderr=False, file=sys.stdout, width=None, height=None
             )
         elif self.mode == OutputMode.NO_COLOR:
             # No color mode disables colors but keeps other formatting
-            return Console(
-                color_system=None,
-                force_terminal=True,
-                stderr=False
-            )
+            return Console(color_system=None, force_terminal=True, stderr=False)
         elif self.mode == OutputMode.LIGHT:
-            # Light theme with appropriate colors
-            light_theme = Theme({
-                "info": "blue",
-                "warning": "dark_orange",
-                "error": "red",
-                "success": "green",
-                "device": "cyan",
-                "command": "magenta",
-                "output": "default",
-                "summary": "blue",
-                "dim": "dim",
-                "bold": "bold"
-            })
-            return Console(
-                theme=light_theme,
-                stderr=False,
-                force_terminal=True,
-                color_system="standard"
+            # Light theme with more dramatic differences for testing
+            light_theme = Theme(
+                {
+                    "info": "blue",
+                    "warning": "dark_orange", 
+                    "error": "red",
+                    "success": "green",
+                    "device": "cyan",
+                    "command": "magenta",
+                    "output": "black",  # Dark text for light background
+                    "summary": "blue",
+                    "dim": "dim",
+                    "bold": "bold blue",  # Make bold blue for light theme
+                }
             )
+            return Console(theme=light_theme, stderr=False, force_terminal=True, color_system="standard")
         elif self.mode == OutputMode.DARK:
-            # Dark theme with appropriate colors
-            dark_theme = Theme({
-                "info": "bright_blue",
-                "warning": "yellow",
-                "error": "bright_red",
-                "success": "bright_green",
-                "device": "bright_cyan",
-                "command": "bright_magenta",
-                "output": "white",
-                "summary": "bright_blue",
-                "dim": "dim",
-                "bold": "bold"
-            })
-            return Console(
-                theme=dark_theme,
-                stderr=False,
-                force_terminal=True,
-                color_system="standard"
+            # Dark theme with more dramatic differences for testing
+            dark_theme = Theme(
+                {
+                    "info": "bright_blue",
+                    "warning": "yellow",
+                    "error": "bright_red",
+                    "success": "bright_green",
+                    "device": "bright_cyan",
+                    "command": "bright_magenta",
+                    "output": "white",  # Light text for dark background
+                    "summary": "bright_blue",
+                    "dim": "dim",
+                    "bold": "bold bright_white",  # Make bold bright white for dark theme
+                }
             )
+            return Console(theme=dark_theme, stderr=False, force_terminal=True, color_system="standard")
         else:
             # Normal mode uses default Rich styling
             return Console(stderr=False)
@@ -186,7 +171,7 @@ class OutputManager:
         status: str = "Success",
         is_group: bool = False,
         totals: tuple[int, int, int] | None = None,
-        results_dir: str | None = None
+        results_dir: str | None = None,
     ) -> None:
         """Print a run summary."""
         if self.mode == OutputMode.RAW:

@@ -106,12 +106,7 @@ class TestOutputManagerRawMode:
         manager = OutputManager(OutputMode.RAW)
 
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            manager.print_summary(
-                target="sw-acc1",
-                operation_type="Command",
-                name="test_command",
-                duration=1.5
-            )
+            manager.print_summary(target="sw-acc1", operation_type="Command", name="test_command", duration=1.5)
             output = mock_stdout.getvalue()
 
         # Raw mode should not print summaries
@@ -148,7 +143,7 @@ class TestOutputManagerNormalModes:
     def test_normal_mode_console_output(self) -> None:
         """Test that normal mode uses console output."""
         manager = OutputManager(OutputMode.NORMAL)
-        
+
         # These should not raise exceptions and should use console
         manager.print_success("Test success")
         manager.print_error("Test error")
@@ -158,10 +153,10 @@ class TestOutputManagerNormalModes:
     def test_no_color_mode_console_output(self) -> None:
         """Test that no-color mode uses console without colors."""
         manager = OutputManager(OutputMode.NO_COLOR)
-        
+
         # Should have no color system but still use console
         assert manager.console.color_system is None
-        
+
         # These should not raise exceptions
         manager.print_success("Test success")
         manager.print_error("Test error")
@@ -169,19 +164,14 @@ class TestOutputManagerNormalModes:
     def test_summary_printed_in_normal_mode(self) -> None:
         """Test that summaries are printed in normal modes."""
         manager = OutputManager(OutputMode.NORMAL)
-        
+
         # Should not raise exceptions - testing that it's called
-        manager.print_summary(
-            target="sw-acc1",
-            operation_type="Command", 
-            name="test_command",
-            duration=1.5
-        )
+        manager.print_summary(target="sw-acc1", operation_type="Command", name="test_command", duration=1.5)
 
     def test_results_directory_printed_in_normal_mode(self) -> None:
         """Test that results directory is printed in normal modes."""
         manager = OutputManager(OutputMode.NORMAL)
-        
+
         # Should not raise exceptions - testing that it's called
         manager.print_results_directory("/path/to/results")
 
@@ -261,11 +251,11 @@ class TestGlobalOutputManager:
         # Set to raw mode
         manager = set_output_mode(OutputMode.RAW)
         assert manager.mode == OutputMode.RAW
-        
+
         # Get the global manager
         global_manager = get_output_manager()
         assert global_manager.mode == OutputMode.RAW
-        
+
         # Reset to normal for other tests
         set_output_mode(OutputMode.NORMAL)
 
@@ -278,7 +268,7 @@ class TestGlobalOutputManager:
             print_success,
             print_warning,
         )
-        
+
         # These should not raise exceptions
         print_success("Test success")
         print_error("Test error")

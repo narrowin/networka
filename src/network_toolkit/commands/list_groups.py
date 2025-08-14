@@ -10,6 +10,11 @@ import typer
 from rich.table import Table
 
 from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.output import (
+    OutputMode,
+    get_output_manager,
+    set_output_mode,
+)
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 
@@ -17,31 +22,68 @@ from network_toolkit.exceptions import NetworkToolkitError
 def register(app: typer.Typer) -> None:
     @app.command("list-groups", rich_help_panel="Info & Configuration")
     def list_groups(
-        config_file: Annotated[
-            Path, typer.Option("--config", "-c", help="Configuration file path")
-        ] = Path("devices.yml"),
-        verbose: Annotated[
-            bool, typer.Option("--verbose", "-v", help="Show detailed information")
-        ] = False,
+        config_file: Annotated[Path, typer.Option("--config", "-c", help="Configuration file path")] = Path(
+            "devices.yml"
+        ),
+        output_mode: Annotated[
+            OutputMode | None,
+            typer.Option(
+                "--output-mode",
+                "-o",
+                help="Output decoration mode: normal, light, dark, no-color, raw",
+                show_default=False,
+            ),
+        ] = None,
+        verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Show detailed information")] = False,
     ) -> None:
         """List all configured device groups and their members."""
+        # Handle output mode configuration
+        if output_mode is None:
+            output_mode = OutputMode.NORMAL
+        set_output_mode(output_mode)
+
         setup_logging("DEBUG" if verbose else "INFO")
 
         try:
             config = load_config(config_file)
+            output_manager = get_output_manager()
 
-            console.print("[bold blue]Device Groups[/bold blue]")
-            console.print()
+            if output_manager.mode == OutputMode.RAW:
+                # Raw mode output
+                if not config.device_groups:
+                    return
+
+                for name, group in config.device_groups.items():
+                    group_members: list[str] = []
+                    if group.members:
+                        group_members = group.members
+                    elif group.match_tags and config.devices:
+                        # Find devices matching tags
+                        for device_name, device_config in config.devices.items():
+                            if device_config.tags and any(tag in group.match_tags for tag in device_config.tags):
+                                group_members.append(device_name)
+
+                    members_str = ",".join(group_members) if group_members else "none"
+                    tags_str = ",".join(group.match_tags or []) if group.match_tags else "none"
+                    description = group.description or ""
+                    print(f"group={name} description={description} tags={tags_str} members={members_str}")
+                return
+
+            # Get the themed console from output manager
+            themed_console = output_manager.console
+
+            themed_console.print("[bold]Device Groups[/bold]")
+            themed_console.print()
 
             if not config.device_groups:
-                console.print("[yellow]No device groups configured[/yellow]")
+                themed_console.print("[warning]No device groups configured[/warning]")
                 return
 
             table = Table()
-            table.add_column("Group Name", style="cyan")
-            table.add_column("Description", style="white")
-            table.add_column("Match Tags", style="yellow")
-            table.add_column("Members", style="green")
+            table.add_column("Group Name", style="device")  # Use theme color
+            table.add_column("Description", style="output")  # Use theme color
+            table.add_column("Match Tags", style="command")  # Use theme color
+            table.add_column("Members", style="success")  # Use theme color
 
             for name, group in config.device_groups.items():
                 members: list[str] = []
@@ -49,9 +91,7 @@ def register(app: typer.Typer) -> None:
                     members = group.members
                 elif group.match_tags and config.devices:
                     for device_name, device_config in config.devices.items():
-                        if device_config.tags and any(
-                            tag in device_config.tags for tag in group.match_tags
-                        ):
+                        if device_config.tags and any(tag in device_config.tags for tag in group.match_tags):
                             members.append(device_name)
 
                 table.add_row(
@@ -61,19 +101,19 @@ def register(app: typer.Typer) -> None:
                     ", ".join(members) if members else "None",
                 )
 
-            console.print(table)
-            console.print(f"\n[bold]Total groups: {len(config.device_groups)}[/bold]")
+            themed_console.print(table)
+            themed_console.print(f"\n[bold]Total groups: {len(config.device_groups)}[/bold]")
 
             if verbose:
-                console.print("\n[bold green]Usage Examples:[/bold green]")
+                themed_console.print("\n[bold success]Usage Examples:[/bold success]")
                 for group_name in config.device_groups.keys():
-                    console.print(f"  nw group-run {group_name} health_check")
+                    themed_console.print(f"  nw group-run {group_name} health_check")
 
         except NetworkToolkitError as e:
-            console.print(f"[red]Error: {e.message}[/red]")
+            output_manager.print_error(f"Error: {e.message}")
             if verbose and e.details:
-                console.print(f"[red]Details: {e.details}[/red]")
+                output_manager.print_error(f"Details: {e.details}")
             raise typer.Exit(1) from None
         except Exception as e:  # pragma: no cover - unexpected
-            console.print(f"[red]Unexpected error: {e}[/red]")
+            output_manager.print_error(f"Unexpected error: {e}")
             raise typer.Exit(1) from None

@@ -11,7 +11,11 @@ from rich.table import Table
 
 from network_toolkit.common.credentials import prompt_for_credentials
 from network_toolkit.common.logging import setup_logging
-from network_toolkit.common.output import get_output_manager
+from network_toolkit.common.output import (
+    OutputMode,
+    get_output_manager,
+    set_output_mode,
+)
 from network_toolkit.common.resolver import DeviceResolver
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
@@ -25,17 +29,22 @@ def register(app: typer.Typer) -> None:
     def info(
         targets: Annotated[
             str,
-            typer.Argument(
-                help="Comma-separated device/group names from configuration"
-            ),
+            typer.Argument(help="Comma-separated device/group names from configuration"),
         ],
         config_file: Annotated[
             Path,
             typer.Option("--config", "-c", help="Configuration directory or file path"),
         ] = Path("config"),
-        verbose: Annotated[
-            bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
-        ] = False,
+        output_mode: Annotated[
+            OutputMode | None,
+            typer.Option(
+                "--output-mode",
+                "-o",
+                help="Output decoration mode: normal, light, dark, no-color, raw",
+                show_default=False,
+            ),
+        ] = None,
+        verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose logging")] = False,
         interactive_auth: Annotated[
             bool,
             typer.Option(
@@ -58,6 +67,11 @@ def register(app: typer.Typer) -> None:
         """
         setup_logging("DEBUG" if verbose else "INFO")
 
+        # Handle output mode configuration
+        if output_mode is None:
+            output_mode = OutputMode.NORMAL
+        set_output_mode(output_mode)
+
         # Get the output manager console
         console = get_output_manager().console
 
@@ -68,33 +82,25 @@ def register(app: typer.Typer) -> None:
             # Handle interactive authentication if requested
             interactive_creds = None
             if interactive_auth:
-                console.print(
-                    "[yellow]Interactive authentication mode enabled[/yellow]"
-                )
+                console.print("[yellow]Interactive authentication mode enabled[/yellow]")
                 interactive_creds = prompt_for_credentials(
                     "Enter username for devices",
                     "Enter password for devices",
                     "admin",  # Default username suggestion
                 )
-                console.print(
-                    f"[green]Will use username: {interactive_creds.username}[/green]"
-                )
+                console.print(f"[green]Will use username: {interactive_creds.username}[/green]")
 
             # Resolve targets to device names
             devices, unknowns = resolver.resolve_targets(targets)
 
             if unknowns:
-                console.print(
-                    f"[yellow]Warning: Unknown targets: {', '.join(unknowns)}[/yellow]"
-                )
+                console.print(f"[yellow]Warning: Unknown targets: {', '.join(unknowns)}[/yellow]")
 
             if not devices:
                 console.print("[red]Error: No valid devices found in targets[/red]")
                 raise typer.Exit(1) from None
 
-            console.print(
-                f"[bold blue]Device Information ({len(devices)} devices)[/bold blue]"
-            )
+            console.print(f"[bold blue]Device Information ({len(devices)} devices)[/bold blue]")
 
             # Show info for each resolved device
             for i, device in enumerate(devices):
@@ -102,10 +108,7 @@ def register(app: typer.Typer) -> None:
                     console.print()  # Blank line between devices
 
                 if not config.devices or device not in config.devices:
-                    console.print(
-                        f"[red]Error: Device '{device}' not found in "
-                        "configuration[/red]"
-                    )
+                    console.print(f"[red]Error: Device '{device}' not found in " "configuration[/red]")
                     continue
 
                 device_config = config.devices[device]
@@ -126,16 +129,10 @@ def register(app: typer.Typer) -> None:
                 )
 
                 # Get connection params with optional credential overrides
-                username_override = (
-                    interactive_creds.username if interactive_creds else None
-                )
-                password_override = (
-                    interactive_creds.password if interactive_creds else None
-                )
+                username_override = interactive_creds.username if interactive_creds else None
+                password_override = interactive_creds.password if interactive_creds else None
 
-                conn_params = config.get_device_connection_params(
-                    device, username_override, password_override
-                )
+                conn_params = config.get_device_connection_params(device, username_override, password_override)
                 table.add_row("SSH Port", str(conn_params["port"]))
                 table.add_row("Username", conn_params["auth_username"])
                 table.add_row("Timeout", f"{conn_params['timeout_socket']}s")
@@ -166,6 +163,10 @@ def register(app: typer.Typer) -> None:
             console.print(f"[red]Error: {e.message}[/red]")
             if verbose and e.details:
                 console.print(f"[red]Details: {e.details}[/red]")
+            raise typer.Exit(1) from None
+        except Exception as e:  # pragma: no cover - unexpected
+            console.print(f"[red]Unexpected error: {e}[/red]")
+            raise typer.Exit(1) from None
             raise typer.Exit(1) from None
         except Exception as e:  # pragma: no cover - unexpected
             console.print(f"[red]Unexpected error: {e}[/red]")
