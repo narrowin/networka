@@ -7,60 +7,87 @@
 <div align="center">
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](https://github.com/narrowin/net-worker)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Type checked with mypy](https://img.shields.io/badge/mypy-checked-blue.svg)](http://mypy-lang.org/)
 
 </div>
 
-Net-Worker is a CLI tool for automating network devices across multiple vendors. Built with modern async/await patterns. Designed for network engineers who want fast, reliable, scalable automation. Stands on the shoulders for mutlivendor-support of scrapli and netmiko.
+Net-Worker is a modern async CLI tool for automating network devices across multiple vendors. Built with async/await patterns for high performance and reliability. Designed for network engineers who want fast, scalable automation with full cross-platform support.
+
+**Cross-Platform Support**: Runs on Linux, macOS, and Windows with Python
 
 ## Getting started
 
 - [Installation instructions →](#installation)
-- [CLI overview →](#cli-overview)  
+- [Platform compatibility →](docs/platform-compatibility.md)
+- [CLI overview →](#cli-overview)
 - [Quick start guide →](#quick-start)
 - [Configuration →](#configuration)
 - [Examples →](#examples)
 
 ## Features
 
-- **Multi-vendor support**: MikroTik RouterOS, Cisco IOS-XE/NX-OS, Arista EOS, Juniper JunOS (... many more: all platforms supported by scrapli and netmiko!)
-- **Device/Group operations**: Execute commands across devices or groups of devices concurrently  
+- **Cross-platform**: Full support for Linux, macOS, and Windows
+- **Multi-vendor support**: MikroTik RouterOS, Cisco IOS-XE/NX-OS, Arista EOS, Juniper JunOS, and more
+- **Modern async architecture**: Built with async/await for high performance
+- **Device/Group operations**: Execute commands across devices or groups concurrently
 - **Command sequences**: Vendor-aware predefined command sets
 - **Results management**: Organized storage with multiple output formats
+- **Type safety**: Full type checking with mypy for reliability
 
 ## Installation
 
-### Prerequisites
-- Python 3.11+
-- SSH access to target network devices
-- uv (recommended) or pip for package management
+### System Requirements
+- **Operating System**: Linux, macOS, or Windows
+- **Python**: 3.11, 3.12, or 3.13
+- **Network Access**: SSH connectivity to target devices
+- **Package Manager**: uv (recommended) or pip
 
-### Install from GitHub
+### Quick Install
 
 ```bash
-# Install latest version
+# Install from GitHub (latest)
 uv pip install git+https://github.com/narrowin/net-worker.git
 
-# Install specific version
-uv pip install git+https://github.com/narrowin/net-worker.git@v0.1.0
+# Verify installation works
+nw --help
+```
+
+### Platform-Specific Notes
+
+**Linux/macOS**: No additional dependencies required
+
+**Windows**: All dependencies include pre-built wheels for seamless installation
+
+### Development Installation
+
+```bash
+# Clone repository
+git clone https://github.com/narrowin/net-worker.git
+cd net-worker
+
+# Install with uv (recommended)
+uv sync --all-extras
+
+# Or with pip
+pip install -e ".[dev]"
 
 # Verify installation
 nw --help
 ```
 
-### Development installation
+### Alternative Installation Methods
 
 ```bash
-# Clone and install in development mode
+# Install specific version
+uv pip install git+https://github.com/narrowin/net-worker.git@v0.1.0
+
+# Install from local clone
 git clone https://github.com/narrowin/net-worker.git
 cd net-worker
-uv sync
-
-# Activate environment and verify
-source .venv/bin/activate
-nw --help
+uv pip install .
 ```
 
 ## Quick Start
@@ -146,10 +173,10 @@ nano .env  # Add your actual credentials
 ```bash
 # Set environment variables for security
 export NW_USER_DEFAULT="admin"
-export NW_PASSWORD_DEFAULT="your_secure_password"
+export NW_PASSWORD_DEFAULT="your_secure_password"  # pragma: allowlist secret
 
 # Device-specific overrides (optional)
-export NW_PASSWORD_SW_ACC1="switch1_password"
+export NW_PASSWORD_SW_ACC1="switch1_password"  # pragma: allowlist secret
 ```
 
 ### 2. Create configuration files
@@ -229,10 +256,10 @@ nw run system_info sw-acc1
 ```bash
 # Default credentials (required)
 export NW_USER_DEFAULT="admin"
-export NW_PASSWORD_DEFAULT="your_secure_password"
+export NW_PASSWORD_DEFAULT="your_secure_password"  # pragma: allowlist secret
 
 # Device-specific overrides (optional)
-export NW_PASSWORD_SW_ACC1="switch1_password"
+export NW_PASSWORD_SW_ACC1="switch1_password"  # pragma: allowlist secret
 ```
 
 ### Configuration Structure
@@ -373,7 +400,7 @@ sequences:
 Configuration files are loaded from their respective subdirectories. All files in each subdirectory are combined (later files override earlier ones):
 
 1. **Device files**: All files in `config/devices/` (*.yml, *.yaml, *.csv)
-2. **Group files**: All files in `config/groups/` (*.yml, *.yaml, *.csv)  
+2. **Group files**: All files in `config/groups/` (*.yml, *.yaml, *.csv)
 3. **Sequence files**: All files in `config/sequences/` (*.yml, *.yaml, *.csv)
 
 Within each directory, files are loaded alphabetically, so later files can override earlier ones.
@@ -383,7 +410,7 @@ Within each directory, files are loaded alphabetically, so later files can overr
 1. **Copy examples**: Start with the templates in `config/examples/`
 2. **Create your configs**: Place your configurations in the appropriate subdirectories:
    - `config/devices/` for device definitions
-   - `config/groups/` for group definitions  
+   - `config/groups/` for group definitions
    - `config/sequences/` for sequence definitions
 3. **Mix formats**: Use YAML for complex configs and CSV for bulk data
 4. **Organize by purpose**: Create multiple files organized by site, customer, or environment
@@ -402,7 +429,7 @@ general:
 **Modes:**
 - `default` - Rich's built-in styling (adapts to terminal)
 - `light` - Dark colors optimized for light terminal themes
-- `dark` - Bright colors optimized for dark terminal themes  
+- `dark` - Bright colors optimized for dark terminal themes
 - `no-color` - Structured output without colors (accessibility)
 - `raw` - Machine-readable format for scripts/automation
 
@@ -479,9 +506,10 @@ Have a look through existing [Issues](https://github.com/narrowin/net-worker/iss
 
 ## Documentation
 
+- [Platform Compatibility](docs/platform-compatibility.md) - Cross-platform support details
 - [Development Guide](docs/development.md) - Contributing and extending the toolkit
 - [Multi-Vendor Support](docs/multi-vendor-support.md) - Using multiple network vendors
-- [Environment Variables](docs/environment-variables.md) - Secure credential management  
+- [Environment Variables](docs/environment-variables.md) - Secure credential management
 - [File Upload Guide](docs/file_upload.md) - Firmware and configuration management
 - [Interactive Credentials](docs/interactive-credentials.md) - Alternative authentication methods
 
@@ -492,7 +520,7 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 ## Acknowledgments
 
 - [Scrapli](https://github.com/carlmontanari/scrapli) - Network device connections
-- [Typer](https://github.com/tiangolo/typer) - CLI framework  
+- [Typer](https://github.com/tiangolo/typer) - CLI framework
 - [Pydantic](https://github.com/pydantic/pydantic) - Data validation
 - [Rich](https://github.com/Textualize/rich) - Terminal formatting
 

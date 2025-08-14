@@ -1,12 +1,37 @@
-# tmux-based SSH fanout (prototype)
+# Cross-Platform SSH fanout
 
-This adds a lean `nw ssh` command that opens a tmux session and starts SSH in one pane per device. It relies on your local SSH config/keys and tmux.
+This adds a `nw ssh` command that opens SSH sessions to multiple devices simultaneously. The implementation adapts to your platform capabilities.
+
+## Platform Support
+
+### Full tmux-based fanout (Recommended)
+**Platforms:** Linux, macOS, Windows with WSL
+- Opens tmux session with one pane per device
+- Synchronized typing across all panes
+- Native tmux navigation and controls
+
+### Sequential SSH fallback
+**Platforms:** Windows (native), any system without tmux
+- Opens SSH connections one by one
+- No synchronized typing
+- Basic cross-platform compatibility
 
 ## Requirements
-- Linux/macOS with tmux installed
+
+### For tmux-based fanout:
+- tmux installed and available
 - libtmux Python package (install with `uv add libtmux` or `pip install libtmux`)
-- SSH keys/agent recommended.
-- sshpass is required when using password authentication (either `--auth password` or when `--auth auto` detects a password). Install with your package manager, e.g. `apt install sshpass` or `brew install hudochenkov/sshpass/sshpass`.
+- SSH client (OpenSSH recommended)
+- sshpass for password authentication (Linux/macOS: `apt install sshpass` or `brew install hudochenkov/sshpass/sshpass`)
+
+### For sequential fallback:
+- Any SSH client (OpenSSH, PuTTY plink, etc.)
+- libtmux package still required (but tmux server not needed)
+
+### Windows-specific notes:
+- **Option 1 (Recommended):** Use WSL2 with tmux for full functionality
+- **Option 2:** Native Windows with sequential SSH fallback
+- **SSH clients supported:** Windows OpenSSH (Win10+), PuTTY plink, Git Bash SSH
 
 ## Usage
 - Single device: `nw ssh sw-acc1`

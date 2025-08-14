@@ -93,7 +93,41 @@ class FakeLibtmux:
     last_server: FakeServer | None = None
 
 
-def _patch_tmux_env() -> tuple[Any, Any]:
+class FakePlatformCapabilities:
+    """Mock platform capabilities that always supports tmux."""
+
+    def get_fallback_options(self) -> dict[str, Any]:
+        return {
+            "tmux_available": True,
+            "ssh_client": "openssh_unix",
+            "sshpass_available": True,
+            "platform": "Linux",
+            "can_do_sequential_ssh": True,
+            "can_do_tmux_fanout": True,
+        }
+
+    def suggest_alternatives(self) -> None:
+        pass
+
+
+class FakePlatformCapabilitiesNoSshpass:
+    """Mock platform capabilities that supports tmux but no sshpass."""
+
+    def get_fallback_options(self) -> dict[str, Any]:
+        return {
+            "tmux_available": True,
+            "ssh_client": "openssh_unix",
+            "sshpass_available": False,  # No sshpass
+            "platform": "Linux",
+            "can_do_sequential_ssh": True,
+            "can_do_tmux_fanout": True,
+        }
+
+    def suggest_alternatives(self) -> None:
+        pass
+
+
+def _patch_tmux_env() -> tuple[Any, Any, Any]:
     return (
         patch(
             "network_toolkit.commands.ssh.shutil.which",
@@ -103,6 +137,10 @@ def _patch_tmux_env() -> tuple[Any, Any]:
             "network_toolkit.commands.ssh._ensure_libtmux",
             return_value=FakeLibtmux,
         ),
+        patch(
+            "network_toolkit.commands.ssh.get_platform_capabilities",
+            return_value=FakePlatformCapabilities(),
+        ),
     )
 
 
@@ -111,8 +149,9 @@ def test_ssh_device_opens_session(config_file: Path) -> None:
     with (
         _patch_tmux_env()[0] as p1,
         _patch_tmux_env()[1] as p2,
+        _patch_tmux_env()[2] as p3,
     ):
-        _ = (p1, p2)
+        _ = (p1, p2, p3)
         result = runner.invoke(
             app,
             [
@@ -131,7 +170,7 @@ def test_ssh_device_opens_session(config_file: Path) -> None:
 
 def test_ssh_group_two_panes(config_file: Path) -> None:
     runner = CliRunner()
-    with _patch_tmux_env()[0], _patch_tmux_env()[1]:
+    with _patch_tmux_env()[0], _patch_tmux_env()[1], _patch_tmux_env()[2]:
         result = runner.invoke(
             app,
             [
@@ -181,6 +220,10 @@ def test_auth_key_first_uses_ssh_with_password_fallback(config_file: Path) -> No
             "network_toolkit.commands.ssh.shutil.which", side_effect=_which_side_effect
         ),
         patch("network_toolkit.commands.ssh._ensure_libtmux", return_value=FakeLibtmux),
+        patch(
+            "network_toolkit.commands.ssh.get_platform_capabilities",
+            return_value=FakePlatformCapabilities(),
+        ),
     ):
         result = runner.invoke(
             app,
@@ -224,6 +267,10 @@ def test_auth_key_forced_ignores_sshpass(config_file: Path) -> None:
             "network_toolkit.commands.ssh._ensure_libtmux",
             return_value=FakeLibtmux,
         ),
+        patch(
+            "network_toolkit.commands.ssh.get_platform_capabilities",
+            return_value=FakePlatformCapabilities(),
+        ),
     ):
         result = runner.invoke(
             app,
@@ -260,6 +307,10 @@ def test_auth_password_requires_sshpass_missing_errors(config_file: Path) -> Non
             "network_toolkit.commands.ssh._ensure_libtmux",
             return_value=FakeLibtmux,
         ),
+        patch(
+            "network_toolkit.commands.ssh.get_platform_capabilities",
+            return_value=FakePlatformCapabilitiesNoSshpass(),
+        ),
     ):
         result = runner.invoke(
             app,
@@ -287,6 +338,10 @@ def test_user_password_overrides_use_ssh_with_key_first(config_file: Path) -> No
         patch(
             "network_toolkit.commands.ssh._ensure_libtmux",
             return_value=FakeLibtmux,
+        ),
+        patch(
+            "network_toolkit.commands.ssh.get_platform_capabilities",
+            return_value=FakePlatformCapabilities(),
         ),
     ):
         result = runner.invoke(
@@ -328,6 +383,10 @@ def test_auth_interactive_no_sshpass(config_file: Path) -> None:
         patch(
             "network_toolkit.commands.ssh._ensure_libtmux",
             return_value=FakeLibtmux,
+        ),
+        patch(
+            "network_toolkit.commands.ssh.get_platform_capabilities",
+            return_value=FakePlatformCapabilities(),
         ),
     ):
         result = runner.invoke(
