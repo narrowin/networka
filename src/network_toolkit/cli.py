@@ -95,14 +95,14 @@ class CategorizedHelpGroup(TyperGroup):
 
 # Typer application instance
 help_text = (
-    "\n    🌐 Network Worker (nw)\n\n"
+    "\n    Network Worker (nw)\n\n"
     "    A powerful multi-vendor CLI tool for automating network devices based on ssh protocol.\n"
     "    Built with async/await support and type safety in mind.\n\n"
-    "    📋 QUICK START:\n"
+    "    QUICK START:\n"
     "      nw run sw-acc1 '/system/clock/print'  # Execute command\n"
     "      nw run office_switches system_info    # Run sequence on group\n\n"
-    "    📖 For detailed help on any command: nw <command> --help\n"
-    "    📁 Default config directory: config/ (use --config to override)\n    "
+    "    For detailed help on any command: nw <command> --help\n"
+    "    Default config directory: config/ (use --config to override)\n    "
 )
 app = typer.Typer(
     name="nw",
@@ -201,13 +201,13 @@ def _handle_file_downloads(
                 delete_remote=delete_remote,
             )
             if success:
-                console.print(f"[green]✓ Downloaded {remote_file} to {destination}[/green]")
+                console.print(f"[green]OK Downloaded {remote_file} to {destination}[/green]")
                 results[remote_file] = f"Downloaded to {destination}"
             else:
-                console.print(f"[red]✗ Failed to download {remote_file}[/red]")
+                console.print(f"[red]FAIL Failed to download {remote_file}[/red]")
                 results[remote_file] = "Download failed"
         except Exception as e:  # DeviceExecutionError or unexpected
-            console.print(f"[red]✗ Error downloading {remote_file}: {e}[/red]")
+            console.print(f"[red]FAIL Error downloading {remote_file}: {e}[/red]")
             results[remote_file] = f"Download error: {e}"
 
     return results

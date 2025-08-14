@@ -143,12 +143,12 @@ def register(app: typer.Typer) -> None:
                         )
                         if ok:
                             console.print(
-                                "[green]✓ Firmware upload initiated; device rebooting: "
+                                "[green]OK Firmware upload initiated; device rebooting: "
                                 f"{dev}[/green]"
                             )
                             return True
                         console.print(
-                            f"[red]✗ Firmware downgrade failed to start on {dev}[/red]"
+                            f"[red]FAIL Firmware downgrade failed to start on {dev}[/red]"
                         )
                         return False
                 except NetworkToolkitError as e:

@@ -33,7 +33,7 @@ def register(app: typer.Typer) -> None:
 
             config = load_config(config_file)
 
-            console.print("[bold green]✅ Configuration is valid![/bold green]")
+            console.print("[bold green]OK Configuration is valid![/bold green]")
             console.print()
 
             device_count = len(config.devices) if config.devices else 0
@@ -50,11 +50,11 @@ def register(app: typer.Typer) -> None:
                     console.print(f"  • {name} ({device.host}) - {device.device_type}")
 
         except NetworkToolkitError as e:
-            console.print("[red]❌ Configuration validation failed![/red]")
+            console.print("[red]FAIL Configuration validation failed![/red]")
             console.print(f"[red]Error: {e.message}[/red]")
             if verbose and e.details:
                 console.print(f"[red]Details: {e.details}[/red]")
             raise typer.Exit(1) from None
         except Exception as e:  # pragma: no cover - unexpected
-            console.print(f"[red]❌ Unexpected error during validation: {e}[/red]")
+            console.print(f"[red]FAIL Unexpected error during validation: {e}[/red]")
             raise typer.Exit(1) from None

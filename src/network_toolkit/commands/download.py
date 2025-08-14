@@ -112,13 +112,13 @@ def register(app: typer.Typer) -> None:
                         )
 
                 if success:
-                    console.print("[bold green]✓ Download successful![/bold green]")
+                    console.print("[bold green]OK Download successful![/bold green]")
                     console.print(
                         f"[green]File '{remote_file}' downloaded to "
                         f"'{local_path}'[/green]"
                     )
                 else:
-                    console.print("[bold red]✗ Download failed![/bold red]")
+                    console.print("[bold red]FAIL Download failed![/bold red]")
                     raise typer.Exit(1)
                 return
 
@@ -173,13 +173,13 @@ def register(app: typer.Typer) -> None:
                             if ok:
                                 successes += 1
                                 console.print(
-                                    f"[green]✓ {dev}: downloaded to {dest}[/green]"
+                                    f"[green]OK {dev}: downloaded to {dest}[/green]"
                                 )
                             else:
-                                console.print(f"[red]✗ {dev}: download failed[/red]")
+                                console.print(f"[red]FAIL {dev}: download failed[/red]")
                     except Exception as e:  # pragma: no cover - unexpected
                         results[dev] = False
-                        console.print(f"[red]✗ {dev}: error during download: {e}[/red]")
+                        console.print(f"[red]FAIL {dev}: error during download: {e}[/red]")
 
             total = len(members)
             console.print("[bold cyan]Group Download Results:[/bold cyan]")

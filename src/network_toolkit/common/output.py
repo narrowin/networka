@@ -159,9 +159,9 @@ class OutputManager:
             else:
                 sys.stdout.write(f"success: {message}\n")
         elif context:
-            self._console.print(f"[success]✓[/success] [{context}] {message}")
+            self._console.print(f"[success]OK[/success] [{context}] {message}")
         else:
-            self._console.print(f"[success]✓[/success] {message}")
+            self._console.print(f"[success]OK[/success] {message}")
 
     def print_error(self, message: str, context: str | None = None) -> None:
         """Print an error message."""
@@ -171,9 +171,9 @@ class OutputManager:
             else:
                 sys.stdout.write(f"error: {message}\n")
         elif context:
-            self._console.print(f"[error]✗[/error] [{context}] {message}")
+            self._console.print(f"[error]FAIL[/error] [{context}] {message}")
         else:
-            self._console.print(f"[error]✗[/error] {message}")
+            self._console.print(f"[error]FAIL[/error] {message}")
 
     def print_warning(self, message: str, context: str | None = None) -> None:
         """Print a warning message."""
@@ -183,9 +183,9 @@ class OutputManager:
             else:
                 sys.stdout.write(f"warning: {message}\n")
         elif context:
-            self._console.print(f"[warning]⚠[/warning] [{context}] {message}")
+            self._console.print(f"[warning]WARN[/warning] [{context}] {message}")
         else:
-            self._console.print(f"[warning]⚠[/warning] {message}")
+            self._console.print(f"[warning]WARN[/warning] {message}")
 
     def print_info(self, message: str, context: str | None = None) -> None:
         """Print an informational message."""
@@ -286,9 +286,9 @@ class OutputManager:
             status = "connected" if connected else "failed"
             sys.stdout.write(f"device={device} status={status}\n")
         elif connected:
-            self._console.print(f"[connected]✓ Connected to {device}[/connected]")
+            self._console.print(f"[connected]OK Connected to {device}[/connected]")
         else:
-            self._console.print(f"[failed]✗ Failed to connect to {device}[/failed]")
+            self._console.print(f"[failed]FAIL Failed to connect to {device}[/failed]")
 
     def print_downloading(self, device: str, filename: str) -> None:
         """Print download progress."""

@@ -122,12 +122,12 @@ def register(app: typer.Typer) -> None:
                         ok = session.routerboard_upgrade_and_reboot()
                         if ok:
                             console.print(
-                                "[green]✓ RouterBOARD upgrade scheduled; "
+                                "[green]OK RouterBOARD upgrade scheduled; "
                                 f"device rebooting: {dev}[/green]"
                             )
                             return True
                         console.print(
-                            f"[red]✗ RouterBOARD upgrade failed to start on {dev}[/red]"
+                            f"[red]FAIL RouterBOARD upgrade failed to start on {dev}[/red]"
                         )
                         return False
                 except NetworkToolkitError as e:

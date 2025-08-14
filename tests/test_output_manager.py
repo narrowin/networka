@@ -372,7 +372,7 @@ class TestOutputManagerUtilityMethods:
         manager.print_connection_status("sw-acc1", True)
 
         captured = capsys.readouterr()
-        assert "✓" in captured.out
+        assert "OK" in captured.out
         assert "Connected" in captured.out
         assert "sw-acc1" in captured.out
 
@@ -382,7 +382,7 @@ class TestOutputManagerUtilityMethods:
         manager.print_connection_status("sw-acc1", False)
 
         captured = capsys.readouterr()
-        assert "✗" in captured.out
+        assert "FAIL" in captured.out
         assert "Failed" in captured.out
         assert "sw-acc1" in captured.out
 

@@ -528,8 +528,8 @@ class DeviceSession:
         3. Execute system reset-configuration with the uploaded file
         4. Automatically answer 'yes' to the confirmation prompt
 
-        ⚠️  WARNING: This will completely reset the device configuration!
-        ⚠️  The device will lose connection and reboot after this operation!
+        WARNING: This will completely reset the device configuration!
+        WARNING: The device will lose connection and reboot after this operation!
 
         Parameters
         ----------
@@ -614,7 +614,7 @@ class DeviceSession:
                     details={"reason": "Upload verification failed"},
                 )
 
-            logger.info("✅ Config file uploaded successfully")
+            logger.info("OK Config file uploaded successfully")
 
             # Step 2: Prepare reset command with parameters
             reset_cmd_parts = ["/system", "reset-configuration"]
@@ -677,7 +677,7 @@ class DeviceSession:
 
                     logger.warning("🚨 NUCLEAR RESET EXECUTED! Device is rebooting...")
                     logger.warning("🔄 Device will apply new configuration on startup")
-                    logger.info("✅ Config deployment command executed successfully")
+                    logger.info("OK Config deployment command executed successfully")
 
                     # Mark as disconnected since device is rebooting
                     self._connected = False
@@ -758,9 +758,9 @@ class DeviceSession:
         3. Execute system reboot to apply the new firmware
         4. Automatically answer 'yes' to the reboot confirmation prompt
 
-        ⚠️  WARNING: This will reboot the device and may change firmware version!
-        ⚠️  The device will lose connection and reboot after this operation!
-        ⚠️  Make sure your firmware file is CORRECT for this device model!
+        WARNING: This will reboot the device and may change firmware version!
+        WARNING: The device will lose connection and reboot after this operation!
+        WARNING: Make sure your firmware file is CORRECT for this device model!
 
         Parameters
         ----------
@@ -854,7 +854,7 @@ class DeviceSession:
                     details={"reason": "Upload verification failed"},
                 )
 
-            logger.info("✅ Firmware file uploaded successfully")
+            logger.info("OK Firmware file uploaded successfully")
 
             # Step 2: Verify firmware file is recognized by RouterOS
             logger.info("Step 2/3: Verifying firmware file compatibility")
@@ -865,7 +865,7 @@ class DeviceSession:
                 logger.debug(f"Current packages: {package_result}")
 
                 # The uploaded .npk will be automatically recognized on reboot
-                logger.info("✅ Firmware upload completed, ready for reboot")
+                logger.info("OK Firmware upload completed, ready for reboot")
 
             except DeviceExecutionError as e:
                 logger.warning(f"Could not verify packages (non-critical): {e}")
@@ -908,7 +908,7 @@ class DeviceSession:
                     logger.warning("🚨 NUCLEAR REBOOT EXECUTED! Device is rebooting...")
                     logger.warning("🔄 Firmware will be applied during boot process...")
                     logger.warning("⏰ Boot process may take 2-5 minutes with firmware update")
-                    logger.info("✅ Firmware deployment command executed successfully")
+                    logger.info("OK Firmware deployment command executed successfully")
 
                     # Mark as disconnected since device is rebooting
                     self._connected = False
@@ -1025,7 +1025,7 @@ class DeviceSession:
 
         remote_name = remote_filename or local_firmware_path.name
 
-        logger.warning(f"⬇️  FIRMWARE DOWNGRADE INITIATED on {self.device_name}!")
+        logger.warning(f"DOWNGRADE FIRMWARE DOWNGRADE INITIATED on {self.device_name}!")
         logger.warning(f"   Firmware file: {local_firmware_path}")
         logger.warning(f"   Remote name: {remote_name}")
         logger.warning(f"   File size: {local_firmware_path.stat().st_size:,} bytes")
@@ -1046,7 +1046,7 @@ class DeviceSession:
                     msg,
                     details={"reason": "Upload verification failed"},
                 )
-            logger.info("✅ Firmware file uploaded successfully")
+            logger.info("OK Firmware file uploaded successfully")
 
             # Step 2: Optional verification of packages
             logger.info("Step 2/4: Verifying firmware packages (optional)")

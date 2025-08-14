@@ -148,7 +148,7 @@ class TestCLI:
         result = runner.invoke(app, ["config-validate", "--config", str(config_file)])
         # Config validation should succeed with valid test config
         assert result.exit_code == 0
-        assert "valid" in result.output.lower() or "✅" in result.output
+        assert "valid" in result.output.lower() or "OK" in result.output
 
     @patch("network_toolkit.cli.DeviceSession")
     def test_run_sequence_on_group(

@@ -141,7 +141,7 @@ def register(app: typer.Typer) -> None:
 
                 with DeviceSession(device, ctx.config, username_override, password_override) as session:
                     identity_result = session.execute_command("/system/identity/print")
-                    table.add_row("[bold green]Status[/bold green]", "[green]Connected ✓[/green]")
+                    table.add_row("[bold green]Status[/bold green]", "[green]Connected OK[/green]")
                     if identity_result:
                         lines = identity_result.strip().split("\n")
                         if lines:
@@ -149,12 +149,12 @@ def register(app: typer.Typer) -> None:
                             table.add_row("[bold cyan]Identity[/bold cyan]", identity)
 
             except NetworkToolkitError as e:
-                table.add_row("[bold red]Status[/bold red]", "[red]Failed ✗[/red]")
+                table.add_row("[bold red]Status[/bold red]", "[red]Failed FAIL[/red]")
                 table.add_row("[bold red]Error[/bold red]", f"[red]{e.message}[/red]")
                 if ctx.verbose and e.details:
                     table.add_row("[bold red]Details[/bold red]", f"[red]{e.details}[/red]")
             except Exception as e:
-                table.add_row("[bold red]Status[/bold red]", "[red]Failed ✗[/red]")
+                table.add_row("[bold red]Status[/bold red]", "[red]Failed FAIL[/red]")
                 table.add_row("[bold red]Error[/bold red]", f"[red]{str(e)}[/red]")
 
             ctx.console.print(table)
