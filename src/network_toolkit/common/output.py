@@ -58,7 +58,7 @@ class OutputManager:
             light_theme = Theme(
                 {
                     "info": "blue",
-                    "warning": "dark_orange", 
+                    "warning": "dark_orange",
                     "error": "red",
                     "success": "green",
                     "device": "cyan",
@@ -67,6 +67,14 @@ class OutputManager:
                     "summary": "blue",
                     "dim": "dim",
                     "bold": "bold blue",  # Make bold blue for light theme
+                    # Additional semantic colors for all use cases
+                    "transport": "purple",
+                    "running": "blue",
+                    "connected": "green",
+                    "failed": "red",
+                    "downloading": "cyan",
+                    "credential": "cyan",
+                    "unknown": "yellow",
                 }
             )
             return Console(theme=light_theme, stderr=False, force_terminal=True, color_system="standard")
@@ -84,6 +92,14 @@ class OutputManager:
                     "summary": "bright_blue",
                     "dim": "dim",
                     "bold": "bold bright_white",  # Make bold bright white for dark theme
+                    # Additional semantic colors for all use cases
+                    "transport": "bright_magenta",
+                    "running": "bright_blue",
+                    "connected": "bright_green",
+                    "failed": "bright_red",
+                    "downloading": "bright_cyan",
+                    "credential": "bright_cyan",
+                    "unknown": "bright_yellow",
                 }
             )
             return Console(theme=dark_theme, stderr=False, force_terminal=True, color_system="standard")
@@ -227,6 +243,52 @@ class OutputManager:
             self._console.print("-" * 80)
         else:
             self._console.rule()
+
+    def print_transport_info(self, transport_type: str) -> None:
+        """Print transport information."""
+        if self.mode == OutputMode.RAW:
+            sys.stdout.write(f"transport={transport_type}\n")
+        else:
+            self._console.print(f"[transport]Transport:[/transport] {transport_type}")
+
+    def print_running_command(self, command: str) -> None:
+        """Print information about a running command."""
+        if self.mode == OutputMode.RAW:
+            sys.stdout.write(f"running={command}\n")
+        else:
+            self._console.print(f"[running]Running:[/running] {command}")
+
+    def print_connection_status(self, device: str, connected: bool) -> None:
+        """Print connection status."""
+        if self.mode == OutputMode.RAW:
+            status = "connected" if connected else "failed"
+            sys.stdout.write(f"device={device} status={status}\n")
+        elif connected:
+            self._console.print(f"[connected]✓ Connected to {device}[/connected]")
+        else:
+            self._console.print(f"[failed]✗ Failed to connect to {device}[/failed]")
+
+    def print_downloading(self, device: str, filename: str) -> None:
+        """Print download progress."""
+        if self.mode == OutputMode.RAW:
+            sys.stdout.write(f"device={device} downloading={filename}\n")
+        else:
+            self._console.print(f"[downloading]Downloading {filename} from {device}...[/downloading]")
+
+    def print_credential_info(self, message: str) -> None:
+        """Print credential-related information."""
+        if self.mode == OutputMode.RAW:
+            sys.stdout.write(f"credential: {message}\n")
+        else:
+            self._console.print(f"[credential]{message}[/credential]")
+
+    def print_unknown_warning(self, unknowns: list[str]) -> None:
+        """Print warning about unknown targets."""
+        unknowns_str = ", ".join(unknowns)
+        if self.mode == OutputMode.RAW:
+            sys.stdout.write(f"warning: unknown targets: {unknowns_str}\n")
+        else:
+            self._console.print(f"[unknown]Warning: Unknown targets: {unknowns_str}[/unknown]")
 
 
 def get_output_mode_from_env() -> OutputMode:

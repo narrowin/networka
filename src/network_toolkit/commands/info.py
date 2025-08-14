@@ -72,50 +72,51 @@ def register(app: typer.Typer) -> None:
             output_mode = OutputMode.NORMAL
         set_output_mode(output_mode)
 
-        # Get the output manager console
-        console = get_output_manager().console
-
         try:
             config = load_config(config_file)
             resolver = DeviceResolver(config)
+            
+            # Get output manager and themed console
+            output_manager = get_output_manager()
+            themed_console = output_manager.console
 
             # Handle interactive authentication if requested
             interactive_creds = None
             if interactive_auth:
-                console.print("[yellow]Interactive authentication mode enabled[/yellow]")
+                output_manager.print_warning("Interactive authentication mode enabled")
                 interactive_creds = prompt_for_credentials(
                     "Enter username for devices",
                     "Enter password for devices",
                     "admin",  # Default username suggestion
                 )
-                console.print(f"[green]Will use username: {interactive_creds.username}[/green]")
+                output_manager.print_credential_info(f"Will use username: {interactive_creds.username}")
 
             # Resolve targets to device names
             devices, unknowns = resolver.resolve_targets(targets)
 
             if unknowns:
-                console.print(f"[yellow]Warning: Unknown targets: {', '.join(unknowns)}[/yellow]")
+                output_manager.print_unknown_warning(unknowns)
 
             if not devices:
-                console.print("[red]Error: No valid devices found in targets[/red]")
+                output_manager.print_error("Error: No valid devices found in targets")
                 raise typer.Exit(1) from None
 
-            console.print(f"[bold blue]Device Information ({len(devices)} devices)[/bold blue]")
+            themed_console.print(f"[bold]Device Information ({len(devices)} devices)[/bold]")
 
             # Show info for each resolved device
             for i, device in enumerate(devices):
                 if i > 0:
-                    console.print()  # Blank line between devices
+                    themed_console.print()  # Blank line between devices
 
                 if not config.devices or device not in config.devices:
-                    console.print(f"[red]Error: Device '{device}' not found in " "configuration[/red]")
+                    output_manager.print_error(f"Error: Device '{device}' not found in configuration")
                     continue
 
                 device_config = config.devices[device]
 
                 table = Table(title=f"Device: {device}")
-                table.add_column("Property", style="cyan")
-                table.add_column("Value", style="white")
+                table.add_column("Property", style="device")
+                table.add_column("Value", style="output")
 
                 table.add_row("Host", device_config.host)
                 table.add_row("Description", device_config.description or "N/A")
@@ -139,13 +140,13 @@ def register(app: typer.Typer) -> None:
 
                 # Show transport type
                 transport_type = config.get_transport_type(device)
-                table.add_row("Transport Type", f"[yellow]{transport_type}[/yellow]")
+                table.add_row("Transport Type", f"[transport]{transport_type}[/transport]")
 
                 # Show credential source
                 if interactive_auth:
-                    table.add_row("Credentials", "[green]Interactive input[/green]")
+                    table.add_row("Credentials", "[credential]Interactive input[/credential]")
                 else:
-                    table.add_row("Credentials", "[cyan]Environment/Config[/cyan]")
+                    table.add_row("Credentials", "[credential]Environment/Config[/credential]")
 
                 # Show group memberships
                 group_memberships = []
@@ -157,17 +158,13 @@ def register(app: typer.Typer) -> None:
                 if group_memberships:
                     table.add_row("Groups", ", ".join(group_memberships))
 
-                console.print(table)
+                themed_console.print(table)
 
         except NetworkToolkitError as e:
-            console.print(f"[red]Error: {e.message}[/red]")
+            output_manager.print_error(f"Error: {e.message}")
             if verbose and e.details:
-                console.print(f"[red]Details: {e.details}[/red]")
+                output_manager.print_error(f"Details: {e.details}")
             raise typer.Exit(1) from None
         except Exception as e:  # pragma: no cover - unexpected
-            console.print(f"[red]Unexpected error: {e}[/red]")
-            raise typer.Exit(1) from None
-            raise typer.Exit(1) from None
-        except Exception as e:  # pragma: no cover - unexpected
-            console.print(f"[red]Unexpected error: {e}[/red]")
+            output_manager.print_error(f"Unexpected error: {e}")
             raise typer.Exit(1) from None

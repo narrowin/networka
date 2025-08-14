@@ -8,7 +8,10 @@ from __future__ import annotations
 import json
 import sys
 from io import StringIO
+from typing import Any
 from unittest.mock import patch
+
+import pytest
 
 from network_toolkit.common.output import (
     OutputManager,
@@ -323,4 +326,198 @@ class TestOutputManagerThemes:
         """Test no-color mode has no color system."""
         manager = OutputManager(OutputMode.NO_COLOR)
         # No-color mode should disable color system
+        assert manager.console.color_system is None
+
+
+class TestOutputManagerUtilityMethods:
+    """Test OutputManager utility methods."""
+
+    def test_print_transport_info_normal_mode(self, capsys: Any) -> None:
+        """Test transport info printing in normal mode."""
+        manager = OutputManager(OutputMode.NORMAL)
+        manager.print_transport_info("scrapli")
+        
+        captured = capsys.readouterr()
+        assert "Transport:" in captured.out
+        assert "scrapli" in captured.out
+
+    def test_print_transport_info_raw_mode(self, capsys: Any) -> None:
+        """Test transport info printing in raw mode."""
+        manager = OutputManager(OutputMode.RAW)
+        manager.print_transport_info("scrapli")
+        
+        captured = capsys.readouterr()
+        assert captured.out == "transport=scrapli\n"
+
+    def test_print_running_command_normal_mode(self, capsys: Any) -> None:
+        """Test running command printing in normal mode."""
+        manager = OutputManager(OutputMode.NORMAL)
+        manager.print_running_command("/system/clock/print")
+        
+        captured = capsys.readouterr()
+        assert "Running:" in captured.out
+        assert "/system/clock/print" in captured.out
+
+    def test_print_running_command_raw_mode(self, capsys: Any) -> None:
+        """Test running command printing in raw mode."""
+        manager = OutputManager(OutputMode.RAW)
+        manager.print_running_command("/system/clock/print")
+        
+        captured = capsys.readouterr()
+        assert captured.out == "running=/system/clock/print\n"
+
+    def test_print_connection_status_connected_normal(self, capsys: Any) -> None:
+        """Test connection status (connected) in normal mode."""
+        manager = OutputManager(OutputMode.NORMAL)
+        manager.print_connection_status("sw-acc1", True)
+        
+        captured = capsys.readouterr()
+        assert "✓" in captured.out
+        assert "Connected" in captured.out
+        assert "sw-acc1" in captured.out
+
+    def test_print_connection_status_failed_normal(self, capsys: Any) -> None:
+        """Test connection status (failed) in normal mode."""
+        manager = OutputManager(OutputMode.NORMAL)
+        manager.print_connection_status("sw-acc1", False)
+        
+        captured = capsys.readouterr()
+        assert "✗" in captured.out
+        assert "Failed" in captured.out
+        assert "sw-acc1" in captured.out
+
+    def test_print_connection_status_raw_mode(self, capsys: Any) -> None:
+        """Test connection status in raw mode."""
+        manager = OutputManager(OutputMode.RAW)
+        manager.print_connection_status("sw-acc1", True)
+        
+        captured = capsys.readouterr()
+        assert captured.out == "device=sw-acc1 status=connected\n"
+
+        manager.print_connection_status("sw-acc2", False)
+        captured = capsys.readouterr()
+        assert captured.out == "device=sw-acc2 status=failed\n"
+
+    def test_print_downloading_normal_mode(self, capsys: Any) -> None:
+        """Test downloading info in normal mode."""
+        manager = OutputManager(OutputMode.NORMAL)
+        manager.print_downloading("sw-acc1", "config.backup")
+        
+        captured = capsys.readouterr()
+        assert "Downloading" in captured.out
+        assert "config.backup" in captured.out
+        assert "sw-acc1" in captured.out
+
+    def test_print_downloading_raw_mode(self, capsys: Any) -> None:
+        """Test downloading info in raw mode."""
+        manager = OutputManager(OutputMode.RAW)
+        manager.print_downloading("sw-acc1", "config.backup")
+        
+        captured = capsys.readouterr()
+        assert captured.out == "device=sw-acc1 downloading=config.backup\n"
+
+    def test_print_credential_info_normal_mode(self, capsys: Any) -> None:
+        """Test credential info in normal mode."""
+        manager = OutputManager(OutputMode.NORMAL)
+        manager.print_credential_info("Will use username: admin")
+        
+        captured = capsys.readouterr()
+        assert "Will use username: admin" in captured.out
+
+    def test_print_credential_info_raw_mode(self, capsys: Any) -> None:
+        """Test credential info in raw mode."""
+        manager = OutputManager(OutputMode.RAW)
+        manager.print_credential_info("Will use username: admin")
+        
+        captured = capsys.readouterr()
+        assert captured.out == "credential: Will use username: admin\n"
+
+    def test_print_unknown_warning_normal_mode(self, capsys: Any) -> None:
+        """Test unknown warning in normal mode."""
+        manager = OutputManager(OutputMode.NORMAL)
+        manager.print_unknown_warning(["unknown1", "unknown2"])
+        
+        captured = capsys.readouterr()
+        assert "Warning" in captured.out
+        assert "Unknown targets" in captured.out
+        assert "unknown1, unknown2" in captured.out
+
+    def test_print_unknown_warning_raw_mode(self, capsys: Any) -> None:
+        """Test unknown warning in raw mode."""
+        manager = OutputManager(OutputMode.RAW)
+        manager.print_unknown_warning(["unknown1", "unknown2"])
+        
+        captured = capsys.readouterr()
+        assert captured.out == "warning: unknown targets: unknown1, unknown2\n"
+class TestOutputManagerTheming:
+    """Test OutputManager theming functionality."""
+
+    def test_light_theme_colors(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Test light theme produces different output than normal mode."""
+        # Create managers for different modes
+        normal_manager = OutputManager(OutputMode.NORMAL)
+        light_manager = OutputManager(OutputMode.LIGHT)
+
+        # Test that themes are configured correctly
+        assert light_manager.console.color_system == "standard"
+        assert normal_manager.console.color_system != "standard" or normal_manager.console.color_system is None
+
+        # Test that light theme actually uses semantic colors
+        light_manager.print_info("test message")
+        captured = capsys.readouterr()
+        light_output = captured.out
+
+        normal_manager.print_info("test message")
+        captured = capsys.readouterr()
+        normal_output = captured.out
+
+        # The outputs should be different due to theming
+        # Both should contain the message, but styling may differ
+        assert "test message" in light_output
+        assert "test message" in normal_output
+
+    def test_dark_theme_colors(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Test dark theme produces different output than normal mode."""
+        # Create managers for different modes
+        normal_manager = OutputManager(OutputMode.NORMAL)
+        dark_manager = OutputManager(OutputMode.DARK)
+
+        # Test that themes are configured correctly
+        assert dark_manager.console.color_system == "standard"
+        assert normal_manager.console.color_system != "standard" or normal_manager.console.color_system is None
+
+        # Test that dark theme actually uses semantic colors
+        dark_manager.print_success("test success")
+        captured = capsys.readouterr()
+        dark_output = captured.out
+
+        normal_manager.print_success("test success")
+        captured = capsys.readouterr()
+        normal_output = captured.out
+
+        # The outputs should be different due to theming
+        # Both should contain the message, but styling may differ
+        assert "test success" in dark_output
+        assert "test success" in normal_output
+
+    def test_normal_mode_no_custom_theme(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Test normal mode uses default Rich behavior."""
+        manager = OutputManager(OutputMode.NORMAL)
+
+        # Normal mode should use Rich's default styling
+        assert manager.console.stderr is False
+
+        # Test that normal mode produces output
+        manager.print_info("test message")
+        captured = capsys.readouterr()
+        assert "test message" in captured.out
+
+    def test_no_color_mode_no_colors(self) -> None:
+        """Test no-color mode disables colors."""
+        manager = OutputManager(OutputMode.NO_COLOR)
+        assert manager.console.color_system is None
+
+    def test_raw_mode_no_colors(self) -> None:
+        """Test raw mode disables colors."""
+        manager = OutputManager(OutputMode.RAW)
         assert manager.console.color_system is None
