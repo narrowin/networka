@@ -240,8 +240,14 @@ class TestConfigMerging:
 
     def test_merge_configs_nested(self):
         """Test nested config merging."""
-        base = {"section1": {"key1": "value1", "key2": "value2"}, "section2": {"key3": "value3"}}
-        override = {"section1": {"key2": "override2", "key4": "value4"}, "section3": {"key5": "value5"}}
+        base = {
+            "section1": {"key1": "value1", "key2": "value2"},
+            "section2": {"key3": "value3"},
+        }
+        override = {
+            "section1": {"key2": "override2", "key4": "value4"},
+            "section3": {"key5": "value5"},
+        }
 
         merged = _merge_configs(base, override)
 
@@ -272,7 +278,11 @@ class TestModularConfigLoading:
             yaml.dump(config_content, f)
 
         # Create devices config
-        devices_content = {"devices": {"sw-01": {"host": "192.168.1.1", "device_type": "mikrotik_routeros"}}}
+        devices_content = {
+            "devices": {
+                "sw-01": {"host": "192.168.1.1", "device_type": "mikrotik_routeros"}
+            }
+        }
         with (tmp_path / "devices.yml").open("w") as f:
             yaml.dump(devices_content, f)
 
@@ -291,8 +301,10 @@ class TestModularConfigLoading:
             yaml.dump(config_content, f)
 
         # Create devices CSV
-        csv_content = """name,host,device_type,description,platform,model,location,tags
+        csv_content = (
+            """name,host,device_type,description,platform,model,location,tags
 sw-01,192.168.1.1,mikrotik_routeros,Switch 1,mipsbe,CRS326,Lab,switch"""
+        )
         (tmp_path / "devices.csv").write_text(csv_content)
 
         config = load_modular_config(tmp_path)
@@ -310,13 +322,19 @@ sw-01,192.168.1.1,mikrotik_routeros,Switch 1,mipsbe,CRS326,Lab,switch"""
             yaml.dump(config_content, f)
 
         # Create devices YAML
-        devices_yaml_content = {"devices": {"sw-yaml": {"host": "192.168.1.1", "device_type": "mikrotik_routeros"}}}
+        devices_yaml_content = {
+            "devices": {
+                "sw-yaml": {"host": "192.168.1.1", "device_type": "mikrotik_routeros"}
+            }
+        }
         with (tmp_path / "devices.yml").open("w") as f:
             yaml.dump(devices_yaml_content, f)
 
         # Create devices CSV
-        csv_content = """name,host,device_type,description,platform,model,location,tags
+        csv_content = (
+            """name,host,device_type,description,platform,model,location,tags
 sw-csv,192.168.1.2,mikrotik_routeros,Switch CSV,mipsbe,CRS326,Lab,switch"""
+        )
         (tmp_path / "devices.csv").write_text(csv_content)
 
         config = load_modular_config(tmp_path)
@@ -335,7 +353,9 @@ sw-csv,192.168.1.2,mikrotik_routeros,Switch CSV,mipsbe,CRS326,Lab,switch"""
             yaml.dump(config_content, f)
 
         # Create main devices file
-        main_devices = {"devices": {"sw-main": {"host": "192.168.1.1", "device_type": "mikrotik_routeros"}}}
+        main_devices = {
+            "devices": {"sw-main": {"host": "192.168.1.1", "device_type": "mikrotik_routeros"}}
+        }
         with (tmp_path / "devices.yml").open("w") as f:
             yaml.dump(main_devices, f)
 
@@ -344,13 +364,17 @@ sw-csv,192.168.1.2,mikrotik_routeros,Switch CSV,mipsbe,CRS326,Lab,switch"""
         devices_dir.mkdir()
 
         # Additional YAML file
-        sub_devices = {"devices": {"sw-sub": {"host": "192.168.1.2", "device_type": "mikrotik_routeros"}}}
+        sub_devices = {
+            "devices": {"sw-sub": {"host": "192.168.1.2", "device_type": "mikrotik_routeros"}}
+        }
         with (devices_dir / "additional.yml").open("w") as f:
             yaml.dump(sub_devices, f)
 
         # Additional CSV file
-        csv_content = """name,host,device_type,description,platform,model,location,tags
+        csv_content = (
+            """name,host,device_type,description,platform,model,location,tags
 sw-csv-sub,192.168.1.3,mikrotik_routeros,Subdirectory CSV,mipsbe,CRS326,Lab,switch"""
+        )
         (devices_dir / "bulk.csv").write_text(csv_content)
 
         config = load_modular_config(tmp_path)
@@ -413,9 +437,11 @@ class TestIntegration:
         devices_dir.mkdir()
 
         # Add CSV devices
-        csv_devices = """name,host,device_type,description,platform,model,location,tags
+        csv_devices = (
+            """name,host,device_type,description,platform,model,location,tags
 csv-device-1,192.168.1.10,mikrotik_routeros,CSV Device 1,mipsbe,CRS326,Lab,switch;access
 csv-device-2,192.168.1.11,mikrotik_routeros,CSV Device 2,mipsbe,CRS326,Lab,switch;access"""
+        )
         (devices_dir / "csv-devices.csv").write_text(csv_devices)
 
         # Add YAML devices in subdirectory
@@ -433,7 +459,14 @@ csv-device-2,192.168.1.11,mikrotik_routeros,CSV Device 2,mipsbe,CRS326,Lab,switc
             yaml.dump(sub_devices, f)
 
         # Create groups
-        groups_content = {"groups": {"yaml-group": {"description": "YAML defined group", "match_tags": ["switch"]}}}
+        groups_content = {
+            "groups": {
+                "yaml-group": {
+                    "description": "YAML defined group",
+                    "match_tags": ["switch"],
+                }
+            }
+        }
         with (tmp_path / "groups.yml").open("w") as f:
             yaml.dump(groups_content, f)
 

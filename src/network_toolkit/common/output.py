@@ -104,8 +104,30 @@ class OutputManager:
             )
             return Console(theme=dark_theme, stderr=False, force_terminal=True, color_system="standard")
         else:
-            # Default mode uses default Rich styling
-            return Console(stderr=False)
+            # Default mode uses Rich's default styling with our semantic colors
+            default_theme = Theme(
+                {
+                    "info": "blue",
+                    "warning": "yellow",
+                    "error": "red",
+                    "success": "green",
+                    "device": "cyan",
+                    "command": "magenta",
+                    "output": "default",
+                    "summary": "blue",
+                    "dim": "dim",
+                    "bold": "bold",
+                    # Additional semantic colors for all use cases
+                    "transport": "magenta",
+                    "running": "blue",
+                    "connected": "green",
+                    "failed": "red",
+                    "downloading": "cyan",
+                    "credential": "cyan",
+                    "unknown": "yellow",
+                }
+            )
+            return Console(theme=default_theme, stderr=False)
 
     @property
     def console(self) -> Console:
@@ -294,8 +316,8 @@ class OutputManager:
 def get_output_mode_from_env() -> OutputMode:
     """Determine output mode from environment variables.
 
-    Respects standard environment variables like NO_COLOR and FORCE_COLOR,
-    as well as custom NT_OUTPUT_MODE.
+    Respects standard environment variables like NO_COLOR and the custom
+    NW_OUTPUT_MODE environment variable.
 
     Returns
     -------
@@ -308,13 +330,10 @@ def get_output_mode_from_env() -> OutputMode:
     if os.getenv("NO_COLOR"):
         return OutputMode.NO_COLOR
 
-    # Check for custom output mode environment variable
-    output_mode = os.getenv("NT_OUTPUT_MODE", "").lower()
-    if output_mode and output_mode in OutputMode.__members__.values():
-        return OutputMode(output_mode)
-
-    # Check for theme preference (legacy support)
-    if output_mode in ["light", "dark"]:
+    # Check for custom output mode environment variable (new scheme)
+    output_mode = os.getenv("NW_OUTPUT_MODE", "").lower()
+    valid_values = {m.value for m in OutputMode}
+    if output_mode and output_mode in valid_values:
         return OutputMode(output_mode)
 
     # Default to default mode
@@ -341,20 +360,21 @@ def get_output_mode_from_config(config_output_mode: str | None = None) -> Output
     if os.getenv("NO_COLOR"):
         return OutputMode.NO_COLOR
 
-    # Check for custom output mode environment variable
-    env_output_mode = os.getenv("NT_OUTPUT_MODE", "").lower()
-    if env_output_mode and env_output_mode in OutputMode.__members__.values():
+    # Check for custom output mode environment variable (new scheme)
+    env_output_mode = os.getenv("NW_OUTPUT_MODE", "").lower()
+    valid_values = {m.value for m in OutputMode}
+    if env_output_mode and env_output_mode in valid_values:
         return OutputMode(env_output_mode)
 
     # Use config setting if available
-    if config_output_mode and config_output_mode.lower() in OutputMode.__members__.values():
+    if config_output_mode and config_output_mode.lower() in valid_values:
         return OutputMode(config_output_mode.lower())
 
     # Default to default mode
     return OutputMode.DEFAULT
 
 
-# Global output manager instance - managed through functions
+# Global output manager instance - simple singleton
 _output_manager: OutputManager | None = None
 
 
@@ -368,33 +388,19 @@ def get_output_manager() -> OutputManager:
 
 
 def get_output_manager_with_config(config_output_mode: str | None = None) -> OutputManager:
-    """Get the global output manager instance using config settings.
+    """Get output manager with config-based mode resolution.
 
-    Parameters
-    ----------
-    config_output_mode : str | None
-        The output mode from the config file, if any
-
-    Returns
-    -------
-    OutputManager
-        The global output manager instance
+    This creates a new manager each time to respect current environment state.
     """
-    global _output_manager  # noqa: PLW0603
-    if _output_manager is None:
-        mode = get_output_mode_from_config(config_output_mode)
-        _output_manager = OutputManager(mode)
-    return _output_manager
+    mode = get_output_mode_from_config(config_output_mode)
+    return OutputManager(mode)
 
 
 def set_output_mode(mode: OutputMode) -> OutputManager:
     """Set the global output mode and return the new manager."""
-    manager = OutputManager(mode)
-    # Store the manager globally for consistency
-    # Using global here is acceptable for a singleton pattern
     global _output_manager  # noqa: PLW0603
-    _output_manager = manager
-    return manager
+    _output_manager = OutputManager(mode)
+    return _output_manager
 
 
 def print_device_output(device: str, command: str, output: str) -> None:

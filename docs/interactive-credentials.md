@@ -40,7 +40,7 @@ nw run access_switches system_info --interactive-auth
 
 2. **Enhanced Configuration System** - `src/network_toolkit/config.py`:
    - `get_device_connection_params()` now accepts credential overrides
-   - Maintains backward compatibility with existing credential sources
+   - Maintains compatibility with existing credential sources
 
 3. **Updated Device Session** - `src/network_toolkit/device.py`:
    - `DeviceSession` constructor accepts username/password overrides
@@ -53,10 +53,8 @@ nw run access_switches system_info --interactive-auth
 ### Credential Resolution Priority
 
 1. **Interactive credentials** (highest priority) - When `--interactive-auth` is used
-2. **Environment variables** - Variables already set in shell environment
-3. **Config directory .env** - `.env` file in config directory (automatically loaded)
-4. **Current directory .env** - `.env` file in working directory (automatically loaded) 
-5. **Configuration file** - Default credentials in `devices.yml` (deprecated)
+2. **Environment variables** - `NW_USER_DEFAULT`, `NW_PASSWORD_DEFAULT`, device-specific overrides
+3. **Configuration file** - Default credentials in `devices.yml` (discouraged)
 
 ### Error Handling
 
@@ -70,7 +68,7 @@ nw run access_switches system_info --interactive-auth
 
 - **Unit tests**: `tests/test_credentials.py` - 14 tests covering all credential functionality
 - **Integration tests**: Existing CLI and config tests continue to pass
-- **Validation**: All 101 existing tests pass, ensuring no regressions
+- **Validation**: All tests pass, ensuring no regressions
 
 ### Test Categories
 

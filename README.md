@@ -146,11 +146,11 @@ nano .env  # Add your actual credentials
 **Option B: Export environment variables**
 ```bash
 # Set environment variables for security
-export NT_DEFAULT_USER="admin"
-export NT_DEFAULT_PASSWORD="your_secure_password"
+export NW_USER_DEFAULT="admin"
+export NW_PASSWORD_DEFAULT="your_secure_password"
 
 # Device-specific overrides (optional)
-export NT_SW_ACC1_PASSWORD="switch1_password"
+export NW_PASSWORD_SW_ACC1="switch1_password"
 ```
 
 ### 2. Create configuration files
@@ -229,11 +229,57 @@ nw run system_info sw-acc1
 
 ```bash
 # Default credentials (required)
-export NT_DEFAULT_USER="admin"
-export NT_DEFAULT_PASSWORD="your_secure_password"
+export NW_USER_DEFAULT="admin"
+export NW_PASSWORD_DEFAULT="your_secure_password"
 
 # Device-specific overrides (optional)
-export NT_SW_ACC1_PASSWORD="switch1_password"
+export NW_PASSWORD_SW_ACC1="switch1_password"
+```
+
+### Configuration Structure
+
+#### Modular Directory Structure
+```
+config/
+├── config.yml              # Main configuration (required)
+├── devices/                # Device definitions (all files here)
+│   ├── devices.yml         # Main devices file
+│   ├── devices.csv         # CSV format devices
+│   ├── production.yml      # YAML format devices
+│   └── customer-a.yml      # Customer-specific devices
+├── groups/                 # Group definitions (all files here)
+│   ├── groups.yml          # Main groups file
+│   ├── groups.csv          # CSV format groups
+│   └── production.yml      # YAML format groups
+├── sequences/              # Sequence definitions (all files here)
+│   ├── sequences.yml       # Main sequences file
+│   ├── sequences.csv       # CSV format sequences
+│   ├── advanced.yml        # YAML format sequences
+│   └── vendor_sequences/   # Vendor-specific sequences
+└── examples/               # Templates and examples
+    ├── devices/
+    ├── groups/
+    └── sequences/
+```
+
+#### CSV Format Reference
+
+**Devices CSV Headers:**
+```csv
+name,host,device_type,description,platform,model,location,tags
+sw-01,192.168.1.1,mikrotik_routeros,Lab Switch,mipsbe,CRS326,Lab,switch;access;lab
+```
+
+**Groups CSV Headers:**
+```csv
+name,description,members,match_tags
+lab_devices,Lab environment,sw-01;sw-02,lab;test
+```
+
+**Sequences CSV Headers:**
+```csv
+name,description,commands,tags
+system_info,Get system info,/system/identity/print;/system/clock/print,system;info
 ```
 
 ### Configuration Structure
@@ -363,7 +409,7 @@ general:
 
 **Override precedence:**
 1. CLI flag: `nw info device1 --output-mode raw`
-2. Environment: `export NT_OUTPUT_MODE=light`
+2. Environment: `export NW_OUTPUT_MODE=light`
 3. Config file: `general.output_mode`
 
 ## Examples

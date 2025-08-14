@@ -6,7 +6,7 @@ Keep it minimal: sync-only, small contract.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 
 @dataclass(frozen=True)
@@ -29,6 +29,7 @@ class ConnectionState:
     last_activity: float | None = None
 
 
+@runtime_checkable
 class Transport(Protocol):
     """Minimal sync transport contract."""
 
