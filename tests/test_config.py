@@ -201,9 +201,7 @@ class TestDeviceGroup:
 
     def test_device_group_both(self) -> None:
         """Test device group with both members and tags."""
-        group = DeviceGroup(
-            description="Test group", members=["device1"], match_tags=["switch"]
-        )
+        group = DeviceGroup(description="Test group", members=["device1"], match_tags=["switch"])
         assert group.description == "Test group"
         assert group.members == ["device1"]
         assert group.match_tags == ["switch"]
@@ -214,9 +212,7 @@ class TestCommandSequence:
 
     def test_command_sequence(self) -> None:
         """Test command sequence creation."""
-        sequence = CommandSequence(
-            description="Test sequence", commands=["command1", "command2", "command3"]
-        )
+        sequence = CommandSequence(description="Test sequence", commands=["command1", "command2", "command3"])
         assert sequence.description == "Test sequence"
         assert sequence.commands == ["command1", "command2", "command3"]
 
@@ -273,9 +269,7 @@ class TestNetworkConfig:
         with pytest.raises(ValueError, match="Device 'nonexistent' not found"):
             config.get_device_connection_params("nonexistent")
 
-    def test_get_device_connection_params_basic(
-        self, sample_config: NetworkConfig
-    ) -> None:
+    def test_get_device_connection_params_basic(self, sample_config: NetworkConfig) -> None:
         """Test getting basic device connection parameters."""
         params = sample_config.get_device_connection_params("test_device1")
 
@@ -292,9 +286,7 @@ class TestNetworkConfig:
 
         assert params == expected
 
-    def test_get_device_connection_params_with_overrides(
-        self, sample_config: NetworkConfig
-    ) -> None:
+    def test_get_device_connection_params_with_overrides(self, sample_config: NetworkConfig) -> None:
         """Test getting device connection parameters with overrides."""
         params = sample_config.get_device_connection_params("test_device2")
 
@@ -311,16 +303,12 @@ class TestNetworkConfig:
 
         assert params == expected
 
-    def test_get_group_members_nonexistent_group(
-        self, sample_config: NetworkConfig
-    ) -> None:
+    def test_get_group_members_nonexistent_group(self, sample_config: NetworkConfig) -> None:
         """Test getting members of nonexistent group."""
         with pytest.raises(NetworkToolkitError, match="Device group 'nonexistent'"):
             sample_config.get_group_members("nonexistent")
 
-    def test_get_group_members_direct_members(
-        self, sample_config: NetworkConfig
-    ) -> None:
+    def test_get_group_members_direct_members(self, sample_config: NetworkConfig) -> None:
         """Test getting group members from direct member list."""
         members = sample_config.get_group_members("lab_devices")
         assert set(members) == {"test_device1", "test_device2"}
@@ -489,9 +477,7 @@ class TestGeneralConfigValidation:
 
     def test_general_config_invalid_transport(self) -> None:
         """Test general config with invalid transport."""
-        with pytest.raises(
-            ValueError, match="transport must be either 'ssh' or 'telnet'"
-        ):
+        with pytest.raises(ValueError, match="transport must be either 'ssh' or 'telnet'"):
             GeneralConfig(transport="invalid")
 
     def test_general_config_invalid_log_level(self) -> None:
@@ -784,9 +770,7 @@ class TestNetworkConfigValidation:
         assert sequence.description == "Get system information"
         assert len(sequence.commands) == 2
 
-    def test_network_config_environment_variable_substitution(
-        self, tmp_path: Path
-    ) -> None:
+    def test_network_config_environment_variable_substitution(self, tmp_path: Path) -> None:
         """Test environment variable substitution in config."""
         # Set test environment variables
         os.environ["TEST_USER"] = "env_user"
@@ -976,9 +960,7 @@ class TestModularConfigLoading:
 
         # Invalid YAML in device fragment
         fragment_file = devices_dir / "invalid.yml"
-        fragment_file.write_text(
-            "devices:\n  test:\n    host: 192.168.1.1\n    invalid: ["
-        )
+        fragment_file.write_text("devices:\n  test:\n    host: 192.168.1.1\n    invalid: [")
 
         # Should load successfully but skip invalid files
         config = load_config(config_dir)
@@ -1018,11 +1000,7 @@ class TestModularConfigLoading:
 
         # Create devices
         devices_file = config_dir / "devices.yml"
-        devices_data = {
-            "devices": {
-                "device1": {"host": "192.168.1.1", "device_type": "mikrotik_routeros"}
-            }
-        }
+        devices_data = {"devices": {"device1": {"host": "192.168.1.1", "device_type": "mikrotik_routeros"}}}
         devices_file.write_text(yaml.safe_dump(devices_data))
 
         # Create groups file
@@ -1559,7 +1537,7 @@ NT_DEFAULT_PASSWORD=config_dotenv_pass
                     "host": "192.168.1.1",
                     "device_type": "mikrotik_routeros",
                 }
-            }
+            },
         }
         config_file.write_text(yaml.safe_dump(config_data))
 
