@@ -12,16 +12,12 @@ from typing import Any
 import typer
 from typer.core import TyperGroup
 
-from network_toolkit.commands.bios_upgrade import (
-    register as register_bios_upgrade,
-)
+from network_toolkit.commands.bios_upgrade import register as register_bios_upgrade
 from network_toolkit.commands.complete import register as register_complete
 
 # Command registration: import command factories that attach to `app`
 # Each module defines a `register(app)` function that adds its commands.
-from network_toolkit.commands.config_backup import (
-    register as register_config_backup,
-)
+from network_toolkit.commands.config_backup import register as register_config_backup
 from network_toolkit.commands.config_validate import (
     register as register_config_validate,
 )
@@ -81,9 +77,7 @@ class CategorizedHelpGroup(TyperGroup):
                     continue
                 # Prefer short help if available
                 short_getter = getattr(cmd, "get_short_help_str", None)
-                short_text = (
-                    short_getter() if callable(short_getter) else (cmd.help or "")
-                )
+                short_text = short_getter() if callable(short_getter) else (cmd.help or "")
                 items.append((name, str(short_text)))
             return items
 
@@ -101,7 +95,7 @@ class CategorizedHelpGroup(TyperGroup):
 # Typer application instance
 help_text = (
     "\n    🌐 Network Worker (nw)\n\n"
-    "    A powerful CLI tool for automating MikroTik RouterOS devices and beyond.\n"
+    "    A powerful multi-vendor CLI tool for automating network devices based on ssh protocol.\n"
     "    Built with async/await support and type safety in mind.\n\n"
     "    📋 QUICK START:\n"
     "      nw run sw-acc1 '/system/clock/print'  # Execute command\n"
@@ -199,9 +193,7 @@ def _handle_file_downloads(
                 delete_remote=delete_remote,
             )
             if success:
-                console.print(
-                    f"[green]✓ Downloaded {remote_file} to {destination}[/green]"
-                )
+                console.print(f"[green]✓ Downloaded {remote_file} to {destination}[/green]")
                 results[remote_file] = f"Downloaded to {destination}"
             else:
                 console.print(f"[red]✗ Failed to download {remote_file}[/red]")
