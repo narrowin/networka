@@ -25,11 +25,10 @@ Net-Worker is a CLI tool for automating network devices across multiple vendors.
 
 ## Features
 
-- **Multi-vendor support**: MikroTik RouterOS, Cisco IOS-XE/NX-OS, Arista EOS, Juniper JunOS
-- **Group operations**: Execute commands across device groups concurrently  
+- **Multi-vendor support**: MikroTik RouterOS, Cisco IOS-XE/NX-OS, Arista EOS, Juniper JunOS (... many more: all platforms supported by scrapli and netmiko!)
+- **Device/Group operations**: Execute commands across devices or groups of devices concurrently  
 - **Command sequences**: Vendor-aware predefined command sets
 - **Results management**: Organized storage with multiple output formats
-- **Security-first**: Automatic .env file loading, environment variable credentials, and comprehensive protection
 
 ## Installation
 
@@ -42,10 +41,10 @@ Net-Worker is a CLI tool for automating network devices across multiple vendors.
 
 ```bash
 # Install latest version
-pip install git+https://github.com/narrowin/net-worker.git
+uv pip install git+https://github.com/narrowin/net-worker.git
 
 # Install specific version
-pip install git+https://github.com/narrowin/net-worker.git@v0.1.0
+uv pip install git+https://github.com/narrowin/net-worker.git@v0.1.0
 
 # Verify installation
 nw --help
