@@ -123,7 +123,7 @@ def register(app: typer.Typer) -> None:
             output_mode = OutputMode.RAW
         elif output_mode is None:
             # Default to normal mode if nothing specified
-            output_mode = OutputMode.NORMAL
+            output_mode = OutputMode.DEFAULT
 
         # Set the global output mode for this command
         set_output_mode(output_mode)

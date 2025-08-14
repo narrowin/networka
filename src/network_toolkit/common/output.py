@@ -17,11 +17,11 @@ from rich.theme import Theme
 class OutputMode(str, Enum):
     """Output decoration modes for the CLI."""
 
-    NORMAL = "normal"
-    LIGHT = "light"
-    DARK = "dark"
-    NO_COLOR = "no-color"
-    RAW = "raw"
+    DEFAULT = "default"  # Rich's default styling
+    LIGHT = "light"      # Custom light theme (dark colors on light background)
+    DARK = "dark"        # Custom dark theme (bright colors on dark background)
+    NO_COLOR = "no-color"  # No colors, structured output only
+    RAW = "raw"          # Machine-readable, minimal formatting
 
 
 class OutputManager:
@@ -32,7 +32,7 @@ class OutputManager:
     and raw output mode.
     """
 
-    def __init__(self, mode: OutputMode = OutputMode.NORMAL) -> None:
+    def __init__(self, mode: OutputMode = OutputMode.DEFAULT) -> None:
         """Initialize the output manager with a specific mode.
 
         Parameters
@@ -104,7 +104,7 @@ class OutputManager:
             )
             return Console(theme=dark_theme, stderr=False, force_terminal=True, color_system="standard")
         else:
-            # Normal mode uses default Rich styling
+            # Default mode uses default Rich styling
             return Console(stderr=False)
 
     @property
@@ -308,17 +308,50 @@ def get_output_mode_from_env() -> OutputMode:
     if os.getenv("NO_COLOR"):
         return OutputMode.NO_COLOR
 
-    # Check for custom output mode
+    # Check for custom output mode environment variable
     output_mode = os.getenv("NT_OUTPUT_MODE", "").lower()
-    if output_mode in OutputMode.__members__.values():
+    if output_mode and output_mode in OutputMode.__members__.values():
         return OutputMode(output_mode)
 
-    # Check for theme preference
+    # Check for theme preference (legacy support)
     if output_mode in ["light", "dark"]:
         return OutputMode(output_mode)
 
-    # Default to normal mode
-    return OutputMode.NORMAL
+    # Default to default mode
+    return OutputMode.DEFAULT
+
+
+def get_output_mode_from_config(config_output_mode: str | None = None) -> OutputMode:
+    """Determine output mode from config, with environment variable override.
+
+    Parameters
+    ----------
+    config_output_mode : str | None
+        The output mode from the config file, if any
+
+    Returns
+    -------
+    OutputMode
+        The appropriate output mode based on config and environment
+    """
+    import os
+
+    # Environment variables always take precedence
+    # Check for NO_COLOR first (standard)
+    if os.getenv("NO_COLOR"):
+        return OutputMode.NO_COLOR
+
+    # Check for custom output mode environment variable
+    env_output_mode = os.getenv("NT_OUTPUT_MODE", "").lower()
+    if env_output_mode and env_output_mode in OutputMode.__members__.values():
+        return OutputMode(env_output_mode)
+
+    # Use config setting if available
+    if config_output_mode and config_output_mode.lower() in OutputMode.__members__.values():
+        return OutputMode(config_output_mode.lower())
+
+    # Default to default mode
+    return OutputMode.DEFAULT
 
 
 # Global output manager instance - managed through functions
@@ -330,6 +363,26 @@ def get_output_manager() -> OutputManager:
     global _output_manager  # noqa: PLW0603
     if _output_manager is None:
         mode = get_output_mode_from_env()
+        _output_manager = OutputManager(mode)
+    return _output_manager
+
+
+def get_output_manager_with_config(config_output_mode: str | None = None) -> OutputManager:
+    """Get the global output manager instance using config settings.
+
+    Parameters
+    ----------
+    config_output_mode : str | None
+        The output mode from the config file, if any
+
+    Returns
+    -------
+    OutputManager
+        The global output manager instance
+    """
+    global _output_manager  # noqa: PLW0603
+    if _output_manager is None:
+        mode = get_output_mode_from_config(config_output_mode)
         _output_manager = OutputManager(mode)
     return _output_manager
 

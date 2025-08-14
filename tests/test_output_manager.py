@@ -27,7 +27,7 @@ class TestOutputMode:
 
     def test_output_mode_values(self) -> None:
         """Test OutputMode enum values."""
-        assert OutputMode.NORMAL.value == "normal"
+        assert OutputMode.DEFAULT.value == "normal"
         assert OutputMode.LIGHT.value == "light"
         assert OutputMode.DARK.value == "dark"
         assert OutputMode.NO_COLOR.value == "no-color"
@@ -39,8 +39,8 @@ class TestOutputManager:
 
     def test_normal_mode_creation(self) -> None:
         """Test creating output manager in normal mode."""
-        manager = OutputManager(OutputMode.NORMAL)
-        assert manager.mode == OutputMode.NORMAL
+        manager = OutputManager(OutputMode.DEFAULT)
+        assert manager.mode == OutputMode.DEFAULT
         assert manager.console is not None
 
     def test_raw_mode_creation(self) -> None:
@@ -145,7 +145,7 @@ class TestOutputManagerNormalModes:
 
     def test_normal_mode_console_output(self) -> None:
         """Test that normal mode uses console output."""
-        manager = OutputManager(OutputMode.NORMAL)
+        manager = OutputManager(OutputMode.DEFAULT)
 
         # These should not raise exceptions and should use console
         manager.print_success("Test success")
@@ -166,14 +166,14 @@ class TestOutputManagerNormalModes:
 
     def test_summary_printed_in_normal_mode(self) -> None:
         """Test that summaries are printed in normal modes."""
-        manager = OutputManager(OutputMode.NORMAL)
+        manager = OutputManager(OutputMode.DEFAULT)
 
         # Should not raise exceptions - testing that it's called
         manager.print_summary(target="sw-acc1", operation_type="Command", name="test_command", duration=1.5)
 
     def test_results_directory_printed_in_normal_mode(self) -> None:
         """Test that results directory is printed in normal modes."""
-        manager = OutputManager(OutputMode.NORMAL)
+        manager = OutputManager(OutputMode.DEFAULT)
 
         # Should not raise exceptions - testing that it's called
         manager.print_results_directory("/path/to/results")
@@ -232,7 +232,7 @@ class TestEnvironmentVariables:
             mock_getenv.side_effect = lambda _key, default="": default
 
             mode = get_output_mode_from_env()
-            assert mode == OutputMode.NORMAL
+            assert mode == OutputMode.DEFAULT
 
 
 class TestGlobalOutputManager:
@@ -241,7 +241,7 @@ class TestGlobalOutputManager:
     def test_get_output_manager_singleton(self) -> None:
         """Test that get_output_manager returns the same instance."""
         # Reset global state first
-        set_output_mode(OutputMode.NORMAL)
+        set_output_mode(OutputMode.DEFAULT)
 
         manager1 = get_output_manager()
         manager2 = get_output_manager()
@@ -260,7 +260,7 @@ class TestGlobalOutputManager:
         assert global_manager.mode == OutputMode.RAW
 
         # Reset to normal for other tests
-        set_output_mode(OutputMode.NORMAL)
+        set_output_mode(OutputMode.DEFAULT)
 
     def test_convenience_functions(self) -> None:
         """Test convenience functions work without exceptions."""
@@ -309,7 +309,7 @@ class TestOutputManagerThemes:
 
     def test_normal_mode_basic_output(self) -> None:
         """Test normal mode console output works."""
-        manager = OutputManager(OutputMode.NORMAL)
+        manager = OutputManager(OutputMode.DEFAULT)
         console = manager.console
 
         # Normal mode should handle basic rich markup
@@ -334,7 +334,7 @@ class TestOutputManagerUtilityMethods:
 
     def test_print_transport_info_normal_mode(self, capsys: Any) -> None:
         """Test transport info printing in normal mode."""
-        manager = OutputManager(OutputMode.NORMAL)
+        manager = OutputManager(OutputMode.DEFAULT)
         manager.print_transport_info("scrapli")
         
         captured = capsys.readouterr()
@@ -351,7 +351,7 @@ class TestOutputManagerUtilityMethods:
 
     def test_print_running_command_normal_mode(self, capsys: Any) -> None:
         """Test running command printing in normal mode."""
-        manager = OutputManager(OutputMode.NORMAL)
+        manager = OutputManager(OutputMode.DEFAULT)
         manager.print_running_command("/system/clock/print")
         
         captured = capsys.readouterr()
@@ -368,7 +368,7 @@ class TestOutputManagerUtilityMethods:
 
     def test_print_connection_status_connected_normal(self, capsys: Any) -> None:
         """Test connection status (connected) in normal mode."""
-        manager = OutputManager(OutputMode.NORMAL)
+        manager = OutputManager(OutputMode.DEFAULT)
         manager.print_connection_status("sw-acc1", True)
         
         captured = capsys.readouterr()
@@ -378,7 +378,7 @@ class TestOutputManagerUtilityMethods:
 
     def test_print_connection_status_failed_normal(self, capsys: Any) -> None:
         """Test connection status (failed) in normal mode."""
-        manager = OutputManager(OutputMode.NORMAL)
+        manager = OutputManager(OutputMode.DEFAULT)
         manager.print_connection_status("sw-acc1", False)
         
         captured = capsys.readouterr()
@@ -400,7 +400,7 @@ class TestOutputManagerUtilityMethods:
 
     def test_print_downloading_normal_mode(self, capsys: Any) -> None:
         """Test downloading info in normal mode."""
-        manager = OutputManager(OutputMode.NORMAL)
+        manager = OutputManager(OutputMode.DEFAULT)
         manager.print_downloading("sw-acc1", "config.backup")
         
         captured = capsys.readouterr()
@@ -418,7 +418,7 @@ class TestOutputManagerUtilityMethods:
 
     def test_print_credential_info_normal_mode(self, capsys: Any) -> None:
         """Test credential info in normal mode."""
-        manager = OutputManager(OutputMode.NORMAL)
+        manager = OutputManager(OutputMode.DEFAULT)
         manager.print_credential_info("Will use username: admin")
         
         captured = capsys.readouterr()
@@ -434,7 +434,7 @@ class TestOutputManagerUtilityMethods:
 
     def test_print_unknown_warning_normal_mode(self, capsys: Any) -> None:
         """Test unknown warning in normal mode."""
-        manager = OutputManager(OutputMode.NORMAL)
+        manager = OutputManager(OutputMode.DEFAULT)
         manager.print_unknown_warning(["unknown1", "unknown2"])
         
         captured = capsys.readouterr()
@@ -455,7 +455,7 @@ class TestOutputManagerTheming:
     def test_light_theme_colors(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test light theme produces different output than normal mode."""
         # Create managers for different modes
-        normal_manager = OutputManager(OutputMode.NORMAL)
+        normal_manager = OutputManager(OutputMode.DEFAULT)
         light_manager = OutputManager(OutputMode.LIGHT)
 
         # Test that themes are configured correctly
@@ -479,7 +479,7 @@ class TestOutputManagerTheming:
     def test_dark_theme_colors(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test dark theme produces different output than normal mode."""
         # Create managers for different modes
-        normal_manager = OutputManager(OutputMode.NORMAL)
+        normal_manager = OutputManager(OutputMode.DEFAULT)
         dark_manager = OutputManager(OutputMode.DARK)
 
         # Test that themes are configured correctly
@@ -502,7 +502,7 @@ class TestOutputManagerTheming:
 
     def test_normal_mode_no_custom_theme(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test normal mode uses default Rich behavior."""
-        manager = OutputManager(OutputMode.NORMAL)
+        manager = OutputManager(OutputMode.DEFAULT)
 
         # Normal mode should use Rich's default styling
         assert manager.console.stderr is False

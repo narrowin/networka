@@ -90,6 +90,9 @@ class GeneralConfig(BaseModel):
     results_include_timestamp: bool = True
     results_include_command: bool = True
 
+    # Output formatting configuration
+    output_mode: str = "default"
+
     @property
     def default_user(self) -> str:
         """Get default username from environment variable."""
@@ -140,6 +143,15 @@ class GeneralConfig(BaseModel):
             msg = "log_level must be one of: DEBUG, INFO, WARNING, ERROR, CRITICAL"
             raise ValueError(msg)
         return v.upper()
+
+    @field_validator("output_mode")
+    @classmethod
+    def validate_output_mode(cls, v: str) -> str:
+        """Validate output mode is supported."""
+        if v.lower() not in ["default", "light", "dark", "no-color", "raw"]:
+            msg = "output_mode must be one of: default, light, dark, no-color, raw"
+            raise ValueError(msg)
+        return v.lower()
 
 
 class DeviceOverrides(BaseModel):

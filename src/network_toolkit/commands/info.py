@@ -13,7 +13,7 @@ from network_toolkit.common.credentials import prompt_for_credentials
 from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import (
     OutputMode,
-    get_output_manager,
+    get_output_manager_with_config,
     set_output_mode,
 )
 from network_toolkit.common.resolver import DeviceResolver
@@ -69,15 +69,24 @@ def register(app: typer.Typer) -> None:
 
         # Handle output mode configuration
         if output_mode is None:
-            output_mode = OutputMode.NORMAL
+            output_mode = OutputMode.DEFAULT
         set_output_mode(output_mode)
 
         try:
             config = load_config(config_file)
+
+            # Handle output mode configuration - check config first, then CLI override
+            if output_mode is not None:
+                # CLI parameter overrides everything
+                set_output_mode(output_mode)
+                output_manager = get_output_manager_with_config()
+            else:
+                # Use config-based output mode
+                output_manager = get_output_manager_with_config(config.general.output_mode)
+
             resolver = DeviceResolver(config)
-            
-            # Get output manager and themed console
-            output_manager = get_output_manager()
+
+            # Get themed console
             themed_console = output_manager.console
 
             # Handle interactive authentication if requested

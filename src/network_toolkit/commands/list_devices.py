@@ -39,7 +39,7 @@ def register(app: typer.Typer) -> None:
         """List all configured network devices."""
         # Handle output mode configuration
         if output_mode is None:
-            output_mode = OutputMode.NORMAL
+            output_mode = OutputMode.DEFAULT
         set_output_mode(output_mode)
 
         setup_logging("DEBUG" if verbose else "INFO")
