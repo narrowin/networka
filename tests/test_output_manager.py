@@ -27,7 +27,7 @@ class TestOutputMode:
 
     def test_output_mode_values(self) -> None:
         """Test OutputMode enum values."""
-        assert OutputMode.DEFAULT.value == "normal"
+        assert OutputMode.DEFAULT.value == "default"
         assert OutputMode.LIGHT.value == "light"
         assert OutputMode.DARK.value == "dark"
         assert OutputMode.NO_COLOR.value == "no-color"
