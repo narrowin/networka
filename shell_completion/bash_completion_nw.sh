@@ -131,6 +131,8 @@ _nw() {
             dirs=$(compgen -d -- "$cur")
             COMPREPLY=( $files $dirs )
             return 0 ;;
+        --output-mode|-o)
+            COMPREPLY=( $(compgen -W "default light dark no-color raw" -- "$cur") ); return 0 ;;
         --layout)
             COMPREPLY=( $(compgen -W "tiled even-horizontal even-vertical main-horizontal main-vertical" -- "$cur") ); return 0 ;;
         --results-dir)
@@ -147,18 +149,19 @@ _nw() {
 
     # Common options per command
     local common_opts="--config -c --verbose -v --help -h"
-    local run_opts="--store-results -s --results-dir --raw --interactive-auth -i --platform -p --port $common_opts"
+    local output_opts="--output-mode -o"
+    local run_opts="--store-results -s --results-dir --raw --interactive-auth -i --platform -p --port $output_opts $common_opts"
     local upload_opts="--remote-name -r --verify --no-verify --checksum-verify --no-checksum-verify --max-concurrent -j $common_opts"
     local download_opts="--delete-remote --keep-remote --verify --no-verify $common_opts"
     local config_backup_opts="$common_opts"
     local firmware_upgrade_opts="$common_opts"
     local firmware_downgrade_opts="$common_opts"
     local bios_upgrade_opts="$common_opts"
-    local list_devices_opts="$common_opts"
-    local list_groups_opts="$common_opts"
-    local list_sequences_opts="--vendor --category $common_opts"
+    local list_devices_opts="$output_opts $common_opts"
+    local list_groups_opts="$output_opts $common_opts"
+    local list_sequences_opts="--vendor --category $output_opts $common_opts"
     local ssh_opts="--config -c --auth --user --password --layout --session-name --window-name --reuse --sync --no-sync --use-sshpass --attach --no-attach --platform -p --port $common_opts"
-    local info_opts="--interactive-auth -i $common_opts"
+    local info_opts="--interactive-auth -i $output_opts $common_opts"
     local config_validate_opts="$common_opts"
     local diff_opts="$common_opts"
 

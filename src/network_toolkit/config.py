@@ -16,9 +16,7 @@ from pydantic import BaseModel, field_validator
 from network_toolkit.exceptions import NetworkToolkitError
 
 
-def get_env_credential(
-    device_name: str | None = None, credential_type: str = "user"
-) -> str | None:
+def get_env_credential(device_name: str | None = None, credential_type: str = "user") -> str | None:
     """
     Get credentials from environment variables.
 
@@ -90,15 +88,15 @@ class GeneralConfig(BaseModel):
     results_include_timestamp: bool = True
     results_include_command: bool = True
 
+    # Output formatting configuration
+    output_mode: str = "default"
+
     @property
     def default_user(self) -> str:
         """Get default username from environment variable."""
         user = get_env_credential(credential_type="user")
         if not user:
-            msg = (
-                "Default username not found in environment. "
-                "Please set NT_DEFAULT_USER environment variable."
-            )
+            msg = "Default username not found in environment. " "Please set NT_DEFAULT_USER environment variable."
             raise ValueError(msg)
         return user
 
@@ -107,10 +105,7 @@ class GeneralConfig(BaseModel):
         """Get default password from environment variable."""
         password = get_env_credential(credential_type="password")
         if not password:
-            msg = (
-                "Default password not found in environment. "
-                "Please set NT_DEFAULT_PASSWORD environment variable."
-            )
+            msg = "Default password not found in environment. " "Please set NT_DEFAULT_PASSWORD environment variable."
             raise ValueError(msg)
         return password
 
@@ -140,6 +135,15 @@ class GeneralConfig(BaseModel):
             msg = "log_level must be one of: DEBUG, INFO, WARNING, ERROR, CRITICAL"
             raise ValueError(msg)
         return v.upper()
+
+    @field_validator("output_mode")
+    @classmethod
+    def validate_output_mode(cls, v: str) -> str:
+        """Validate output mode is supported."""
+        if v.lower() not in ["default", "light", "dark", "no-color", "raw"]:
+            msg = "output_mode must be one of: default, light, dark, no-color, raw"
+            raise ValueError(msg)
+        return v.lower()
 
 
 class DeviceOverrides(BaseModel):
@@ -280,10 +284,7 @@ class NetworkConfig(BaseModel):
         # 3. Environment variables (device-specific)
         # 4. Default environment variables
         username = (
-            username_override
-            or device.user
-            or get_env_credential(device_name, "user")
-            or self.general.default_user
+            username_override or device.user or get_env_credential(device_name, "user") or self.general.default_user
         )
         password = (
             password_override
@@ -331,9 +332,7 @@ class NetworkConfig(BaseModel):
 
         # Direct members
         if group.members:
-            members.extend(
-                [m for m in group.members if self.devices and m in self.devices]
-            )
+            members.extend([m for m in group.members if self.devices and m in self.devices])
 
         # Tag-based members
         if group.match_tags and self.devices:
@@ -364,9 +363,7 @@ class NetworkConfig(BaseModel):
         device = self.devices[device_name]
         return device.transport_type or self.general.default_transport_type
 
-    def get_command_sequences_by_tags(
-        self, tags: list[str]
-    ) -> dict[str, CommandSequence]:
+    def get_command_sequences_by_tags(self, tags: list[str]) -> dict[str, CommandSequence]:
         """
         Get command sequences that match any of the specified tags.
 
@@ -401,9 +398,7 @@ class NetworkConfig(BaseModel):
         """
         return self.command_sequence_groups or {}
 
-    def get_command_sequences_by_group(
-        self, group_name: str
-    ) -> dict[str, CommandSequence]:
+    def get_command_sequences_by_group(self, group_name: str) -> dict[str, CommandSequence]:
         """
         Get command sequences that match a specific group's tags.
 
@@ -422,10 +417,7 @@ class NetworkConfig(BaseModel):
         ValueError
             If the group doesn't exist
         """
-        if (
-            not self.command_sequence_groups
-            or group_name not in self.command_sequence_groups
-        ):
+        if not self.command_sequence_groups or group_name not in self.command_sequence_groups:
             msg = f"Command sequence group '{group_name}' not found in configuration"
             raise ValueError(msg)
 
@@ -477,9 +469,7 @@ class NetworkConfig(BaseModel):
                             sources.append(dev_name)
         return sequences
 
-    def resolve_sequence_commands(
-        self, sequence_name: str, device_name: str | None = None
-    ) -> list[str] | None:
+    def resolve_sequence_commands(self, sequence_name: str, device_name: str | None = None) -> list[str] | None:
         """Resolve commands for a sequence name from any origin.
 
         Parameters
@@ -500,18 +490,13 @@ class NetworkConfig(BaseModel):
         3. Device-specific sequences (lowest priority)
         """
         # 1. Prefer global definition
-        if (
-            self.global_command_sequences
-            and sequence_name in self.global_command_sequences
-        ):
+        if self.global_command_sequences and sequence_name in self.global_command_sequences:
             return list(self.global_command_sequences[sequence_name].commands)
 
         # 2. Look for vendor-specific sequences
         if device_name and self.devices and device_name in self.devices:
             device = self.devices[device_name]
-            vendor_commands = self._resolve_vendor_sequence(
-                sequence_name, device.device_type
-            )
+            vendor_commands = self._resolve_vendor_sequence(sequence_name, device.device_type)
             if vendor_commands:
                 return vendor_commands
 
@@ -522,9 +507,7 @@ class NetworkConfig(BaseModel):
                     return list(dev.command_sequences[sequence_name])
         return None
 
-    def _resolve_vendor_sequence(
-        self, sequence_name: str, device_type: str
-    ) -> list[str] | None:
+    def _resolve_vendor_sequence(self, sequence_name: str, device_type: str) -> list[str] | None:
         """Resolve vendor-specific sequence commands.
 
         Parameters
@@ -656,13 +639,9 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
                     if isinstance(defaults_raw, dict):
                         dir_defaults = defaults_raw.get("defaults", {}) or {}
                 except yaml.YAMLError as e:
-                    logging.warning(
-                        f"Invalid YAML in devices defaults file {defaults_file}: {e}"
-                    )
+                    logging.warning(f"Invalid YAML in devices defaults file {defaults_file}: {e}")
 
-            files = sorted(devices_dir.glob("*.yml")) + sorted(
-                devices_dir.glob("*.yaml")
-            )
+            files = sorted(devices_dir.glob("*.yml")) + sorted(devices_dir.glob("*.yaml"))
             for file in files:
                 if file.name.startswith("_"):
                     # Skip special files like _defaults.yml
@@ -677,8 +656,7 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
                 fragment_devices_raw = fragment.get("devices", {})
                 if not isinstance(fragment_devices_raw, dict):
                     logging.warning(
-                        "Unexpected structure in %s; expected 'devices' mapping. "
-                        "Skipping.",
+                        "Unexpected structure in %s; expected 'devices' mapping. " "Skipping.",
                         file,
                     )
                     continue
@@ -730,9 +708,7 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
         raise ValueError(msg) from e
 
 
-def _load_vendor_sequences(
-    config_dir: Path, sequences_config: dict[str, Any]
-) -> dict[str, dict[str, VendorSequence]]:
+def _load_vendor_sequences(config_dir: Path, sequences_config: dict[str, Any]) -> dict[str, dict[str, VendorSequence]]:
     """Load vendor-specific sequences from sequences directory."""
     vendor_sequences: dict[str, dict[str, VendorSequence]] = {}
 
@@ -768,20 +744,13 @@ def _load_vendor_sequences(
                 for seq_name, seq_data in sequences.items():
                     platform_sequences[seq_name] = VendorSequence(**seq_data)
 
-                logging.debug(
-                    f"Loaded {len(sequences)} sequences for {platform_name} "
-                    f"from {vendor_file_path}"
-                )
+                logging.debug(f"Loaded {len(sequences)} sequences for {platform_name} " f"from {vendor_file_path}")
 
             except yaml.YAMLError as e:
-                logging.warning(
-                    f"Invalid YAML in vendor sequence file {vendor_file_path}: {e}"
-                )
+                logging.warning(f"Invalid YAML in vendor sequence file {vendor_file_path}: {e}")
                 continue
             except Exception as e:
-                logging.warning(
-                    f"Failed to load vendor sequence file {vendor_file_path}: {e}"
-                )
+                logging.warning(f"Failed to load vendor sequence file {vendor_file_path}: {e}")
                 continue
 
         if platform_sequences:

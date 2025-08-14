@@ -13,6 +13,7 @@ _nw_complete() {
     '(-s --store-results)'{-s,--store-results}'[Store results]' \
     '(-)-results-dir[Results directory]:directory:_files -/' \
     '(-)--raw[Raw output format]:format:(txt json)' \
+    '(-o --output-mode)'{-o,--output-mode}'[Output mode]:mode:(default light dark no-color raw)' \
     '(-i --interactive-auth)'{-i,--interactive-auth}'[Interactive authentication]' \
     '(-p --platform)'{-p,--platform}'[Platform type]:platform:(mikrotik_routeros)' \
     '(-)--port[SSH port]:port:(22 2222 8022)' \

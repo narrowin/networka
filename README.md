@@ -206,6 +206,27 @@ device_groups:
     members: ["device1", "device2"]  # Explicit device list
 ```
 
+### Output modes
+
+Control colors and formatting with the `output_mode` setting:
+
+```yaml
+general:
+  output_mode: "dark"  # default, light, dark, no-color, raw
+```
+
+**Modes:**
+- `default` - Rich's built-in styling (adapts to terminal)
+- `light` - Dark colors optimized for light terminal themes
+- `dark` - Bright colors optimized for dark terminal themes  
+- `no-color` - Structured output without colors (accessibility)
+- `raw` - Machine-readable format for scripts/automation
+
+**Override precedence:**
+1. CLI flag: `nw info device1 --output-mode raw`
+2. Environment: `export NT_OUTPUT_MODE=light`
+3. Config file: `general.output_mode`
+
 ## Examples
 
 ### Single device operations

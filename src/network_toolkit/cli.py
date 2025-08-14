@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import datetime
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import typer
 from typer.core import TyperGroup
@@ -37,6 +37,7 @@ from network_toolkit.commands.run import register as register_run
 from network_toolkit.commands.ssh import register as register_ssh
 from network_toolkit.commands.upload import register as register_upload
 from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.output import OutputMode, set_output_mode
 
 # Keep this import here to preserve tests that patch `network_toolkit.cli.DeviceSession`
 from network_toolkit.device import DeviceSession as _DeviceSession
@@ -112,6 +113,13 @@ app = typer.Typer(
     cls=CategorizedHelpGroup,
     context_settings={"help_option_names": ["-h", "--help"]},
 )
+
+
+@app.callback()
+def main() -> None:
+    """Configure global settings for the network toolkit."""
+    pass
+
 
 # Expose DeviceSession symbol for tests to patch (`network_toolkit.cli.DeviceSession`)
 DeviceSession = _DeviceSession
