@@ -336,7 +336,7 @@ class TestOutputManagerUtilityMethods:
         """Test transport info printing in normal mode."""
         manager = OutputManager(OutputMode.DEFAULT)
         manager.print_transport_info("scrapli")
-        
+
         captured = capsys.readouterr()
         assert "Transport:" in captured.out
         assert "scrapli" in captured.out
@@ -345,7 +345,7 @@ class TestOutputManagerUtilityMethods:
         """Test transport info printing in raw mode."""
         manager = OutputManager(OutputMode.RAW)
         manager.print_transport_info("scrapli")
-        
+
         captured = capsys.readouterr()
         assert captured.out == "transport=scrapli\n"
 
@@ -353,7 +353,7 @@ class TestOutputManagerUtilityMethods:
         """Test running command printing in normal mode."""
         manager = OutputManager(OutputMode.DEFAULT)
         manager.print_running_command("/system/clock/print")
-        
+
         captured = capsys.readouterr()
         assert "Running:" in captured.out
         assert "/system/clock/print" in captured.out
@@ -362,7 +362,7 @@ class TestOutputManagerUtilityMethods:
         """Test running command printing in raw mode."""
         manager = OutputManager(OutputMode.RAW)
         manager.print_running_command("/system/clock/print")
-        
+
         captured = capsys.readouterr()
         assert captured.out == "running=/system/clock/print\n"
 
@@ -370,7 +370,7 @@ class TestOutputManagerUtilityMethods:
         """Test connection status (connected) in normal mode."""
         manager = OutputManager(OutputMode.DEFAULT)
         manager.print_connection_status("sw-acc1", True)
-        
+
         captured = capsys.readouterr()
         assert "✓" in captured.out
         assert "Connected" in captured.out
@@ -380,7 +380,7 @@ class TestOutputManagerUtilityMethods:
         """Test connection status (failed) in normal mode."""
         manager = OutputManager(OutputMode.DEFAULT)
         manager.print_connection_status("sw-acc1", False)
-        
+
         captured = capsys.readouterr()
         assert "✗" in captured.out
         assert "Failed" in captured.out
@@ -390,7 +390,7 @@ class TestOutputManagerUtilityMethods:
         """Test connection status in raw mode."""
         manager = OutputManager(OutputMode.RAW)
         manager.print_connection_status("sw-acc1", True)
-        
+
         captured = capsys.readouterr()
         assert captured.out == "device=sw-acc1 status=connected\n"
 
@@ -402,7 +402,7 @@ class TestOutputManagerUtilityMethods:
         """Test downloading info in normal mode."""
         manager = OutputManager(OutputMode.DEFAULT)
         manager.print_downloading("sw-acc1", "config.backup")
-        
+
         captured = capsys.readouterr()
         assert "Downloading" in captured.out
         assert "config.backup" in captured.out
@@ -412,7 +412,7 @@ class TestOutputManagerUtilityMethods:
         """Test downloading info in raw mode."""
         manager = OutputManager(OutputMode.RAW)
         manager.print_downloading("sw-acc1", "config.backup")
-        
+
         captured = capsys.readouterr()
         assert captured.out == "device=sw-acc1 downloading=config.backup\n"
 
@@ -420,7 +420,7 @@ class TestOutputManagerUtilityMethods:
         """Test credential info in normal mode."""
         manager = OutputManager(OutputMode.DEFAULT)
         manager.print_credential_info("Will use username: admin")
-        
+
         captured = capsys.readouterr()
         assert "Will use username: admin" in captured.out
 
@@ -428,7 +428,7 @@ class TestOutputManagerUtilityMethods:
         """Test credential info in raw mode."""
         manager = OutputManager(OutputMode.RAW)
         manager.print_credential_info("Will use username: admin")
-        
+
         captured = capsys.readouterr()
         assert captured.out == "credential: Will use username: admin\n"
 
@@ -436,7 +436,7 @@ class TestOutputManagerUtilityMethods:
         """Test unknown warning in normal mode."""
         manager = OutputManager(OutputMode.DEFAULT)
         manager.print_unknown_warning(["unknown1", "unknown2"])
-        
+
         captured = capsys.readouterr()
         assert "Warning" in captured.out
         assert "Unknown targets" in captured.out
@@ -446,9 +446,11 @@ class TestOutputManagerUtilityMethods:
         """Test unknown warning in raw mode."""
         manager = OutputManager(OutputMode.RAW)
         manager.print_unknown_warning(["unknown1", "unknown2"])
-        
+
         captured = capsys.readouterr()
         assert captured.out == "warning: unknown targets: unknown1, unknown2\n"
+
+
 class TestOutputManagerTheming:
     """Test OutputManager theming functionality."""
 

@@ -18,10 +18,10 @@ class OutputMode(str, Enum):
     """Output decoration modes for the CLI."""
 
     DEFAULT = "default"  # Rich's default styling
-    LIGHT = "light"      # Custom light theme (dark colors on light background)
-    DARK = "dark"        # Custom dark theme (bright colors on dark background)
+    LIGHT = "light"  # Custom light theme (dark colors on light background)
+    DARK = "dark"  # Custom dark theme (bright colors on dark background)
     NO_COLOR = "no-color"  # No colors, structured output only
-    RAW = "raw"          # Machine-readable, minimal formatting
+    RAW = "raw"  # Machine-readable, minimal formatting
 
 
 class OutputManager:

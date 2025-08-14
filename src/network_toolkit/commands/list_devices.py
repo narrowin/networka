@@ -40,7 +40,7 @@ def register(app: typer.Typer) -> None:
         setup_logging("DEBUG" if verbose else "INFO")
         try:
             config = load_config(config_file)
-            
+
             # Handle output mode configuration
             if output_mode is not None:
                 set_output_mode(output_mode)
@@ -48,6 +48,7 @@ def register(app: typer.Typer) -> None:
             else:
                 # Use config-based output mode
                 from network_toolkit.common.output import get_output_manager_with_config
+
                 output_manager = get_output_manager_with_config(config.general.output_mode)
 
             if output_manager.mode == OutputMode.RAW:
