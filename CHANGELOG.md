@@ -19,6 +19,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 
 
 
+## [0.1.2] - 2025-08-15
+
+### Added
+- 
+
+### Changed
+- 
+
+### Fixed
+- 
+
+
 ### Changed
 - Renamed project from "netkit" to "net-worker"
 - Changed CLI command from "netkit" to "nw"
