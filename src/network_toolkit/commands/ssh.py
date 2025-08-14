@@ -16,7 +16,6 @@ from __future__ import annotations
 import datetime
 import shlex
 import shutil
-import subprocess
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -63,13 +62,8 @@ class Target:
     devices: list[str]
 
 
-def _ensure_tmux_available() -> None:
-    if not shutil.which("tmux"):
-        msg = "tmux not found on PATH. Please install tmux (e.g., apt install tmux)."
-        raise RuntimeError(msg)
-
-
 def _ensure_libtmux() -> Any:
+    """Ensure libtmux is available and can connect to tmux server."""
     try:
         import libtmux
     except Exception as e:  # pragma: no cover - simple import guard
@@ -78,6 +72,20 @@ def _ensure_libtmux() -> Any:
             "'pip install libtmux'."
         )
         raise RuntimeError(msg) from e
+
+    # Test if we can connect to tmux server (will start one if needed)
+    try:
+        server = libtmux.Server()
+        # This will fail if tmux is not installed or cannot start
+        _ = server.sessions
+    except Exception as e:
+        msg = (
+            "Cannot connect to tmux server. Please ensure tmux is installed.\n"
+            "Install with: apt install tmux (Linux), brew install tmux (macOS), "
+            "or use WSL on Windows."
+        )
+        raise RuntimeError(msg) from e
+
     return libtmux
 
 
@@ -254,7 +262,6 @@ def register(app: typer.Typer) -> None:
         setup_logging("DEBUG" if verbose else "INFO")
 
         try:
-            _ensure_tmux_available()
             libtmux = _ensure_libtmux()
         except Exception as e:  # pragma: no cover - trivial failures
             console.print(f"[red]{e}[/red]")
@@ -400,16 +407,10 @@ def register(app: typer.Typer) -> None:
         console.print("Use tmux to navigate. Press Ctrl-b d to detach.")
 
         if attach:
-            # Attach in foreground. If this fails, just print instructions.
+            # Use libtmux to attach directly instead of subprocess
             try:
-                tmux_bin = shutil.which("tmux") or "tmux"
-                safe_name = _sanitize_session_name(sname)
-                # tmux_bin from shutil.which; args are static literals + sanitized
-                # session name
-                subprocess.run(  # - safe_name sanitized; tmux_bin from PATH
-                    [tmux_bin, "attach-session", "-t", safe_name],
-                    check=False,
-                )
+                # Attach using libtmux server
+                session.attach_session()
             except Exception:
                 console.print(
                     "[yellow]Failed to attach automatically. "
