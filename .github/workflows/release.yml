@@ -37,7 +37,7 @@ jobs:
     - name: Check build artifacts
       run: |
         ls -la dist/
-        echo "✅ Built packages:"
+        echo "[OK] Built packages:"
         file dist/*
 
     - name: Upload build artifacts

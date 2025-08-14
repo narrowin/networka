@@ -14,6 +14,7 @@ permissions:
 
 env:
   FORCE_COLOR: "1"
+  PYTHONIOENCODING: "utf-8"
 
 jobs:
   test-git-install:
@@ -39,7 +40,7 @@ jobs:
     - name: Test installed package
       run: |
         nw --help
-        python -c "import network_toolkit; print('✅ Import successful')"
+        python -c "import network_toolkit; print('[OK] Import successful')"
         nw --version || echo "Version command not available"
 
     - name: Uninstall for next test
@@ -72,7 +73,7 @@ jobs:
     - name: Test installed package
       run: |
         nw --help
-        python -c "import network_toolkit; print('✅ Wheel installation successful')"
+        python -c "import network_toolkit; print('[OK] Wheel installation successful')"
 
     - name: Test source distribution installation
       run: |
@@ -84,4 +85,4 @@ jobs:
     - name: Test source installation
       run: |
         nw --help
-        python -c "import network_toolkit; print('✅ Source distribution installation successful')"
+        python -c "import network_toolkit; print('[OK] Source distribution installation successful')"
