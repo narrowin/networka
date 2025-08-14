@@ -12,6 +12,7 @@ from typing import Annotated, Any
 import typer
 from typer.core import TyperGroup
 
+from network_toolkit import __version__
 from network_toolkit.commands.bios_upgrade import register as register_bios_upgrade
 from network_toolkit.commands.complete import register as register_complete
 
@@ -78,7 +79,9 @@ class CategorizedHelpGroup(TyperGroup):
                     continue
                 # Prefer short help if available
                 short_getter = getattr(cmd, "get_short_help_str", None)
-                short_text = short_getter() if callable(short_getter) else (cmd.help or "")
+                short_text = (
+                    short_getter() if callable(short_getter) else (cmd.help or "")
+                )
                 items.append((name, str(short_text)))
             return items
 
@@ -112,13 +115,26 @@ app = typer.Typer(
     add_completion=False,
     cls=CategorizedHelpGroup,
     context_settings={"help_option_names": ["-h", "--help"]},
+    invoke_without_command=True,
 )
 
 
 @app.callback()
-def main() -> None:
+def main(
+    ctx: typer.Context,
+    version: Annotated[
+        bool, typer.Option("--version", help="Show version information")
+    ] = False,
+) -> None:
     """Configure global settings for the network toolkit."""
-    pass
+    if version:
+        console.print(f"Network Worker (nw) version {__version__}")
+        raise typer.Exit()
+
+    # If no command is invoked and no version flag, show help
+    if ctx.invoked_subcommand is None:
+        console.print(ctx.get_help())
+        raise typer.Exit()
 
 
 # Expose DeviceSession symbol for tests to patch (`network_toolkit.cli.DeviceSession`)
@@ -201,7 +217,9 @@ def _handle_file_downloads(
                 delete_remote=delete_remote,
             )
             if success:
-                console.print(f"[green]OK Downloaded {remote_file} to {destination}[/green]")
+                console.print(
+                    f"[green]OK Downloaded {remote_file} to {destination}[/green]"
+                )
                 results[remote_file] = f"Downloaded to {destination}"
             else:
                 console.print(f"[red]FAIL Failed to download {remote_file}[/red]")
