@@ -23,6 +23,8 @@ from typing import Annotated, Any
 
 import typer
 
+from network_toolkit.commands.ssh_fallback import open_sequential_ssh_sessions
+from network_toolkit.commands.ssh_platform import get_platform_capabilities
 from network_toolkit.common.logging import console, setup_logging
 from network_toolkit.common.resolver import DeviceResolver
 from network_toolkit.config import NetworkConfig, load_config
@@ -293,6 +295,31 @@ def register(app: typer.Typer) -> None:
 
             resolver = DeviceResolver(config, platform, port)
             tgt = Target(name=target, devices=resolver.resolve_targets(target)[0])
+
+            # Check platform capabilities after we have config and targets
+            platform_caps = get_platform_capabilities()
+            capabilities = platform_caps.get_fallback_options()
+
+            if not capabilities["can_do_tmux_fanout"]:
+                console.print(
+                    "[yellow]tmux-based SSH fanout not available on this platform.[/yellow]"
+                )
+
+                if not capabilities["tmux_available"]:
+                    console.print("[yellow]Reason: tmux not available[/yellow]")
+                    platform_caps.suggest_alternatives()
+
+                if capabilities["can_do_sequential_ssh"]:
+                    console.print(
+                        "[cyan]Falling back to sequential SSH connections...[/cyan]"
+                    )
+                    # Use fallback implementation
+                    open_sequential_ssh_sessions(tgt.devices, config)
+                    return
+                else:
+                    console.print("[red]No SSH client available[/red]")
+                    platform_caps.suggest_alternatives()
+                    raise typer.Exit(1)
         except Exception as e:
             console.print(f"[red]Failed to load config or resolve target: {e}[/red]")
             raise typer.Exit(1) from None
