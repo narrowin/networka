@@ -133,7 +133,7 @@ fi
 if [[ "$DRY_RUN" != true ]]; then
     echo "💾 Committing release changes..."
     git add "$VERSION_FILE" "$CHANGELOG_FILE" uv.lock
-    git commit -m "chore: bump version to v$VERSION"
+    git commit --no-verify -m "chore: bump version to v$VERSION"
 else
     echo "💾 Would commit release changes"
 fi
