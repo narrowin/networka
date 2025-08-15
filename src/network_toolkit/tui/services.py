@@ -36,7 +36,9 @@ class ExecutionService:
         self._data = data
         self._sem = asyncio.Semaphore(concurrency)
 
-    def resolve_devices(self, devices: Iterable[str], groups: Iterable[str]) -> list[str]:
+    def resolve_devices(
+        self, devices: Iterable[str], groups: Iterable[str]
+    ) -> list[str]:
         """Resolve devices and expand groups using the project's resolver."""
         resolver = DeviceResolver(self._data.config)
         selected: set[str] = set(devices)
@@ -93,7 +95,9 @@ class ExecutionService:
             cb.on_meta(f"progress: {completed}/{total}")
         return RunResult(total=total, successes=successes, failures=failures)
 
-    def _run_device_blocking(self, device: str, commands: list[str], cb: RunCallbacks) -> bool:
+    def _run_device_blocking(
+        self, device: str, commands: list[str], cb: RunCallbacks
+    ) -> bool:
         ok = True
         try:
             # Import here to avoid making CLI a hard dependency of module import

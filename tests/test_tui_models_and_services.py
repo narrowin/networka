@@ -49,7 +49,9 @@ async def test_execution_service_build_and_run_plan_smoke(monkeypatch: Any) -> N
     if not devices:
         pytest.skip("No devices available in repository test config")
 
-    plan: ExecutionPlan = svc.build_plan(devices, sequences=[], command_text="/system/identity/print")
+    plan: ExecutionPlan = svc.build_plan(
+        devices, sequences=[], command_text="/system/identity/print"
+    )
     assert set(plan.keys()) == set(devices)
     assert all(plan[d] for d in plan)
 

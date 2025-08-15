@@ -31,7 +31,6 @@ def _new_rich_text() -> Any:  # pragma: no cover - optional rich dependency help
     except Exception:
         return None
 
-
     # models.SelectionState is used instead of local dataclass
 
 
@@ -86,7 +85,9 @@ def run(config: str | Path = "config") -> None:
                 return binding_cls(key, action)
 
     # Use shared SelectionState model for state
-    state = SelectionState(devices=set(), groups=set(), sequences=set(), command_text="")
+    state = SelectionState(
+        devices=set(), groups=set(), sequences=set(), command_text=""
+    )
     # Services layer for plan building and execution
     service = ExecutionService(data)
 
@@ -386,9 +387,7 @@ def run(config: str | Path = "config") -> None:
                     except Exception:
                         pass
                     return
-                plan = service.build_plan(
-                    devices, state.sequences, state.command_text
-                )
+                plan = service.build_plan(devices, state.sequences, state.command_text)
                 if not plan:
                     self._render_summary("No sequences or commands provided.")
                     try:
@@ -418,7 +417,9 @@ def run(config: str | Path = "config") -> None:
                 # Update summary panel (include errors if any)
                 try:
                     elapsed = time.monotonic() - start_ts
-                    summary_with_time = f"{summary_result.human_summary()} (duration: {elapsed:.2f}s)"
+                    summary_with_time = (
+                        f"{summary_result.human_summary()} (duration: {elapsed:.2f}s)"
+                    )
                     self._render_summary(summary_with_time)
                     # Reflect summary on the status line; hint about errors if present
                     err_count = 0
@@ -652,7 +653,7 @@ def run(config: str | Path = "config") -> None:
                         except Exception as exc:
                             logging.debug(f"Selecting value via {method} failed: {exc}")
 
-    # Device resolution, plan building, and execution handled by services layer
+        # Device resolution, plan building, and execution handled by services layer
 
         def _add_error(self, msg: str) -> None:
             try:
