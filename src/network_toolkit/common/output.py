@@ -21,7 +21,8 @@ class OutputMode(str, Enum):
     LIGHT = "light"  # Custom light theme (dark colors on light background)
     DARK = "dark"  # Custom dark theme (bright colors on dark background)
     NO_COLOR = "no-color"  # No colors, structured output only
-    RAW = "raw"  # Machine-readable, minimal formatting
+    RAW = "raw"  # Machine-readable text, minimal formatting
+    JSON = "json"  # Machine-readable JSONL events per line
 
 
 class OutputManager:
@@ -45,10 +46,15 @@ class OutputManager:
 
     def _create_console(self) -> Console:
         """Create a console instance based on the current mode."""
-        if self.mode == OutputMode.RAW:
-            # Raw mode uses no styling at all
+        if self.mode in (OutputMode.RAW, OutputMode.JSON):
+            # Raw/JSON modes use no styling at all
             return Console(
-                color_system=None, force_terminal=False, stderr=False, file=sys.stdout, width=None, height=None
+                color_system=None,
+                force_terminal=False,
+                stderr=False,
+                file=sys.stdout,
+                width=None,
+                height=None,
             )
         elif self.mode == OutputMode.NO_COLOR:
             # No color mode disables colors but keeps other formatting
@@ -77,7 +83,12 @@ class OutputManager:
                     "unknown": "yellow",
                 }
             )
-            return Console(theme=light_theme, stderr=False, force_terminal=True, color_system="standard")
+            return Console(
+                theme=light_theme,
+                stderr=False,
+                force_terminal=True,
+                color_system="standard",
+            )
         elif self.mode == OutputMode.DARK:
             # Dark theme with more dramatic differences for testing
             dark_theme = Theme(
@@ -102,7 +113,12 @@ class OutputManager:
                     "unknown": "bright_yellow",
                 }
             )
-            return Console(theme=dark_theme, stderr=False, force_terminal=True, color_system="standard")
+            return Console(
+                theme=dark_theme,
+                stderr=False,
+                force_terminal=True,
+                color_system="standard",
+            )
         else:
             # Default mode uses Rich's default styling with our semantic colors
             default_theme = Theme(
@@ -136,14 +152,37 @@ class OutputManager:
 
     def print_device_info(self, device: str, message: str) -> None:
         """Print device-related information."""
-        if self.mode == OutputMode.RAW:
+        if self.mode == OutputMode.JSON:
+            sys.stdout.write(
+                json.dumps(
+                    {
+                        "type": "info",
+                        "device": device,
+                        "message": message,
+                    }
+                )
+                + "\n"
+            )
+        elif self.mode == OutputMode.RAW:
             sys.stdout.write(f"device={device} {message}\n")
         else:
             self._console.print(f"[device]{device}[/device]: {message}")
 
     def print_command_output(self, device: str, command: str, output: str) -> None:
         """Print command output with appropriate formatting."""
-        if self.mode == OutputMode.RAW:
+        if self.mode == OutputMode.JSON:
+            sys.stdout.write(
+                json.dumps(
+                    {
+                        "type": "output",
+                        "device": device,
+                        "command": command,
+                        "message": output,
+                    }
+                )
+                + "\n"
+            )
+        elif self.mode == OutputMode.RAW:
             sys.stdout.write(f"device={device} cmd={command}\n")
             sys.stdout.write(f"{output}\n")
         else:
@@ -165,7 +204,12 @@ class OutputManager:
 
     def print_error(self, message: str, context: str | None = None) -> None:
         """Print an error message."""
-        if self.mode == OutputMode.RAW:
+        if self.mode == OutputMode.JSON:
+            payload: dict[str, Any] = {"type": "error", "message": message}
+            if context:
+                payload["device"] = context
+            sys.stdout.write(json.dumps(payload) + "\n")
+        elif self.mode == OutputMode.RAW:
             if context:
                 sys.stdout.write(f"device={context} error: {message}\n")
             else:
@@ -177,7 +221,12 @@ class OutputManager:
 
     def print_warning(self, message: str, context: str | None = None) -> None:
         """Print a warning message."""
-        if self.mode == OutputMode.RAW:
+        if self.mode == OutputMode.JSON:
+            payload: dict[str, Any] = {"type": "warning", "message": message}
+            if context:
+                payload["device"] = context
+            sys.stdout.write(json.dumps(payload) + "\n")
+        elif self.mode == OutputMode.RAW:
             if context:
                 sys.stdout.write(f"device={context} warning: {message}\n")
             else:
@@ -189,7 +238,12 @@ class OutputManager:
 
     def print_info(self, message: str, context: str | None = None) -> None:
         """Print an informational message."""
-        if self.mode == OutputMode.RAW:
+        if self.mode == OutputMode.JSON:
+            payload: dict[str, Any] = {"type": "info", "message": message}
+            if context:
+                payload["device"] = context
+            sys.stdout.write(json.dumps(payload) + "\n")
+        elif self.mode == OutputMode.RAW:
             if context:
                 sys.stdout.write(f"device={context} info: {message}\n")
             else:
@@ -227,7 +281,11 @@ class OutputManager:
                 f"  [bold]Devices:[/bold] {total} total | "
                 f"[success]{succeeded} succeeded[/success], "
                 f"[error]{failed} failed[/error]\n"
-                + (f"  [bold]Results dir:[/bold] {results_dir}\n" if results_dir else "")
+                + (
+                    f"  [bold]Results dir:[/bold] {results_dir}\n"
+                    if results_dir
+                    else ""
+                )
                 + f"  [bold]Duration:[/bold] {duration:.2f}s"
             )
         else:
@@ -236,7 +294,11 @@ class OutputManager:
                 f"  [bold]Type:[/bold] {operation_type}\n"
                 f"  [bold]Operation:[/bold] {name}\n"
                 f"  [bold]Status:[/bold] {status}\n"
-                + (f"  [bold]Results dir:[/bold] {results_dir}\n" if results_dir else "")
+                + (
+                    f"  [bold]Results dir:[/bold] {results_dir}\n"
+                    if results_dir
+                    else ""
+                )
                 + f"  [bold]Duration:[/bold] {duration:.2f}s"
             )
 
@@ -295,7 +357,9 @@ class OutputManager:
         if self.mode == OutputMode.RAW:
             sys.stdout.write(f"device={device} downloading={filename}\n")
         else:
-            self._console.print(f"[downloading]Downloading {filename} from {device}...[/downloading]")
+            self._console.print(
+                f"[downloading]Downloading {filename} from {device}...[/downloading]"
+            )
 
     def print_credential_info(self, message: str) -> None:
         """Print credential-related information."""
@@ -310,7 +374,9 @@ class OutputManager:
         if self.mode == OutputMode.RAW:
             sys.stdout.write(f"warning: unknown targets: {unknowns_str}\n")
         else:
-            self._console.print(f"[unknown]Warning: Unknown targets: {unknowns_str}[/unknown]")
+            self._console.print(
+                f"[unknown]Warning: Unknown targets: {unknowns_str}[/unknown]"
+            )
 
 
 def get_output_mode_from_env() -> OutputMode:
@@ -387,7 +453,9 @@ def get_output_manager() -> OutputManager:
     return _output_manager
 
 
-def get_output_manager_with_config(config_output_mode: str | None = None) -> OutputManager:
+def get_output_manager_with_config(
+    config_output_mode: str | None = None,
+) -> OutputManager:
     """Get output manager with config-based mode resolution.
 
     This creates a new manager each time to respect current environment state.

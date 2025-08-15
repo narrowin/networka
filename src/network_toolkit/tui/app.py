@@ -75,12 +75,15 @@ def run(config: str | Path = "config") -> None:
 
     class _App(app_cls):
         _errors: list[str]
+        _meta: list[str]
         CSS = """
         #layout { height: 1fr; }
         #top { height: 1fr; }
         #bottom { height: 2fr; }
         #output-log { height: 1fr; border: round $accent; }
         #summary-panel { height: 7; }
+        .hidden { display: none; }
+        #top > .panel { height: 1fr; }
         .panel Static.title { content-align: center middle; color: $secondary; }
         .panel { border: round $surface; padding: 1 1; }
         .pane-title { height: 3; content-align: center middle; text-style: bold; }
@@ -92,6 +95,7 @@ def run(config: str | Path = "config") -> None:
             binding_cls("enter", "confirm", "Run"),
             binding_cls("r", "confirm", "Run"),
             binding_cls("ctrl+c", "quit", "Quit"),
+            binding_cls("s", "toggle_summary", "Summary"),
         ]
 
         def compose(self) -> Any:
@@ -107,8 +111,8 @@ def run(config: str | Path = "config") -> None:
                                     id="filter-devices",
                                     classes="search",
                                 )
-                                yield selection_list[str](
-                                    *[(d, d, False) for d in data.targets().devices],
+                                # Create empty list; we'll populate in on_mount for compatibility
+                                yield selection_list(
                                     id="list-devices",
                                     classes="scroll",
                                 )
@@ -118,8 +122,7 @@ def run(config: str | Path = "config") -> None:
                                     id="filter-groups",
                                     classes="search",
                                 )
-                                yield selection_list[str](
-                                    *[(g, g, False) for g in data.targets().groups],
+                                yield selection_list(
                                     id="list-groups",
                                     classes="scroll",
                                 )
@@ -132,8 +135,7 @@ def run(config: str | Path = "config") -> None:
                                     id="filter-sequences",
                                     classes="search",
                                 )
-                                yield selection_list[str](
-                                    *[(s, s, False) for s in data.actions().sequences],
+                                yield selection_list(
                                     id="list-sequences",
                                     classes="scroll",
                                 )
@@ -146,13 +148,27 @@ def run(config: str | Path = "config") -> None:
                         yield textual_widgets.Button("Run", id="run-button")
                 with vertical(id="bottom"):
                     yield static("Status: idle", id="run-status")
-                    with vertical(classes="panel", id="summary-panel"):
+                    with vertical(classes="panel hidden", id="summary-panel"):
                         yield static("Summary", classes="pane-title title")
                         yield static("", id="run-summary")
-                    with vertical(classes="panel"):
+                    with vertical(classes="panel hidden", id="output-panel"):
                         yield static("Output", classes="pane-title title")
                         yield text_log_cls(id="output-log", classes="scroll")
             yield footer()
+
+        async def on_mount(self) -> None:  # Populate lists after UI mounts
+            try:
+                t = data.targets()
+                a = data.actions()
+                self._populate_selection_list("list-devices", t.devices)
+                self._populate_selection_list("list-groups", t.groups)
+                self._populate_selection_list("list-sequences", a.sequences)
+            except Exception:
+                pass
+            # Internal state for user toggling of summary
+            self._summary_user_hidden = False
+            # Hide bottom area initially if no summary/output and idle status
+            self._refresh_bottom_visibility()
 
         async def action_confirm(self) -> None:
             out_log = self.query_one("#output-log")
@@ -160,11 +176,14 @@ def run(config: str | Path = "config") -> None:
                 out_log.clear()
             # reset summary and any previous errors
             self._errors = []
+            self._meta = []
             try:
                 self.query_one("#run-summary").update("")
+                self._hide_summary_panel()
+                self._hide_output_panel()
             except Exception:
                 pass
-            _log_write(out_log, "Starting run...")
+            self._add_meta("Starting run...")
             # Temporarily silence library logging to avoid background metadata
             logging.disable(logging.CRITICAL)
             try:
@@ -180,6 +199,7 @@ def run(config: str | Path = "config") -> None:
                 # Update status and run with streaming
                 total = len(plan)
                 try:
+                    self._show_bottom_panel()
                     self.query_one("#run-status").update(f"Status: running 0/{total}")
                 except Exception:
                     pass
@@ -188,6 +208,7 @@ def run(config: str | Path = "config") -> None:
                 try:
                     self._render_summary(summary)
                     self.query_one("#run-status").update("Status: idle")
+                    self._refresh_bottom_visibility()
                 except Exception:
                     pass
             except Exception as e:  # noqa: BLE001
@@ -252,6 +273,61 @@ def run(config: str | Path = "config") -> None:
                 # Last resort: empty set on unexpected structure
                 return set()
             return out
+
+        def _populate_selection_list(self, widget_id: str, items: list[str]) -> None:
+            """Populate a SelectionList with best-effort API compatibility across Textual versions."""
+            try:
+                sel = self.query_one(f"#{widget_id}")
+            except Exception:
+                return
+
+            # Clear existing options
+            for method in ("clear_options", "clear"):
+                if hasattr(sel, method):
+                    try:
+                        getattr(sel, method)()
+                        break
+                    except Exception:
+                        pass
+
+            # Try bulk add first
+            if hasattr(sel, "add_options"):
+                opts_variants: list[list[object]] = [
+                    [(label, label, False) for label in items],
+                    [(label, label) for label in items],
+                    list(items),
+                ]
+                for opts in opts_variants:
+                    try:
+                        sel.add_options(opts)
+                        return
+                    except Exception as exc:
+                        logging.debug(f"add_options variant failed: {exc}")
+
+            # Fallback to adding one by one with different signatures
+            if hasattr(sel, "add_option"):
+                for label in items:
+                    added = False
+                    for args in (
+                        (label, label, False),
+                        (label, label),
+                        (label,),
+                        ((label, label, False),),
+                        ((label, label),),
+                    ):
+                        try:
+                            sel.add_option(*args)
+                            added = True
+                            break
+                        except Exception as exc:
+                            logging.debug(f"add_option signature failed: {exc}")
+                    if not added:
+                        # Last resort: try 'append' of an option-like tuple
+                        try:
+                            if hasattr(sel, "append"):
+                                sel.append((label, label, False))
+                        except Exception as exc:
+                            logging.debug(f"append to selection list failed: {exc}")
 
         async def _resolve_devices(self) -> list[str]:
             from network_toolkit.common.resolver import DeviceResolver
@@ -343,28 +419,33 @@ def run(config: str | Path = "config") -> None:
                     except Exception:
                         pass
 
-                out(f"{device}: connecting...")
+                def meta(msg: str) -> None:
+                    try:
+                        self.call_from_thread(self._add_meta, msg)
+                    except Exception:
+                        pass
+
+                meta(f"{device}: connecting...")
                 with DeviceSession(device, data.config) as session:
-                    out(f"{device}: connected")
+                    meta(f"{device}: connected")
                     for cmd in commands:
-                        out(f"{device}$ {cmd}")
+                        meta(f"{device}$ {cmd}")
                         try:
                             raw = session.execute_command(cmd)
                             text = raw if type(raw) is str else str(raw)
                             out_strip = text.strip()
-                            is_err = out_strip.upper().startswith(
-                                "ERROR"
-                            ) or out_strip.upper().startswith("FAIL")
-                            target = err if is_err else out
                             if out_strip:
+                                # Show output panel on first actual output
+                                self.call_from_thread(self._show_output_panel)
                                 for line in text.rstrip().splitlines():
-                                    target(line)
+                                    out(line)
                             else:
-                                target("<no output>")
+                                # No actual output; keep output panel hidden
+                                pass
                         except Exception as e:  # noqa: BLE001
                             ok = False
                             err(f"{device}: command error: {e}")
-                out(f"{device}: done")
+                meta(f"{device}: done")
             except Exception as e:  # noqa: BLE001
                 ok = False
                 try:
@@ -378,23 +459,204 @@ def run(config: str | Path = "config") -> None:
                 self._errors.append(str(msg))
             except Exception:
                 self._errors = [str(msg)]
+            # refresh summary live
+            try:
+                self._render_summary()
+            except Exception:
+                pass
 
         def _render_summary(self, base_summary: str | None = None) -> None:
             try:
                 errors: list[str] = getattr(self, "_errors", [])
             except Exception:
                 errors = []
+            try:
+                meta: list[str] = getattr(self, "_meta", [])
+            except Exception:
+                meta = []
             parts: list[str] = []
             if base_summary:
                 parts.append(base_summary)
             if errors:
                 parts.append("Errors:")
                 parts.extend(errors)
+            if meta:
+                parts.append("Info:")
+                parts.extend(meta)
             text = "\n".join(parts)
             try:
                 self.query_one("#run-summary").update(text)
             except Exception:
                 pass
+            # Auto-show summary only when there's an actual summary (final) or errors
+            should_show = bool(base_summary) or bool(errors)
+            if should_show and not getattr(self, "_summary_user_hidden", False):
+                self._show_summary_panel()
+
+        def _add_meta(self, msg: str) -> None:
+            try:
+                self._meta.append(str(msg))
+            except Exception:
+                self._meta = [str(msg)]
+            # refresh summary live
+            try:
+                self._render_summary()
+            except Exception:
+                pass
+
+        def _show_output_panel(self) -> None:
+            try:
+                panel = self.query_one("#output-panel")
+            except Exception:
+                return
+            try:
+                panel.remove_class("hidden")
+            except Exception:
+                try:
+                    styles = getattr(panel, "styles", None)
+                    if styles and hasattr(styles, "display"):
+                        styles.display = "block"
+                except Exception:
+                    pass
+
+        def _hide_output_panel(self) -> None:
+            try:
+                panel = self.query_one("#output-panel")
+            except Exception:
+                return
+            try:
+                panel.add_class("hidden")
+            except Exception:
+                try:
+                    styles = getattr(panel, "styles", None)
+                    if styles and hasattr(styles, "display"):
+                        styles.display = "none"
+                except Exception:
+                    pass
+
+        def action_toggle_summary(self) -> None:
+            """Toggle visibility of the summary panel."""
+            try:
+                panel = self.query_one("#summary-panel")
+            except Exception:
+                return
+            # Determine if currently hidden via 'hidden' class
+            try:
+                classes: set[str] = set(getattr(panel, "classes", []) or [])
+            except Exception:
+                classes = set()
+            is_hidden = "hidden" in classes
+            if is_hidden:
+                # User explicitly wants to see it; clear the hidden flag
+                self._summary_user_hidden = False
+                # Only show if there is content to show
+                try:
+                    content = self.query_one("#run-summary")
+                    has_text = bool(
+                        getattr(content, "renderable", "")
+                        or getattr(content, "text", "")
+                    )
+                except Exception:
+                    has_text = False
+                if has_text:
+                    self._show_summary_panel()
+            else:
+                # User hides the panel; set the flag and hide
+                self._summary_user_hidden = True
+                self._hide_summary_panel()
+                self._refresh_bottom_visibility()
+
+        def _show_summary_panel(self) -> None:
+            # Ensure bottom area is visible when showing summary
+            self._show_bottom_panel()
+            # Ensure bottom area is visible when showing output
+            self._show_bottom_panel()
+            self._refresh_bottom_visibility()
+
+        def _show_bottom_panel(self) -> None:
+            try:
+                container = self.query_one("#bottom")
+            except Exception:
+                return
+            try:
+                container.remove_class("hidden")
+            except Exception:
+                try:
+                    styles = getattr(container, "styles", None)
+                    if styles and hasattr(styles, "display"):
+                        styles.display = "block"
+                except Exception:
+                    pass
+
+        def _hide_bottom_panel(self) -> None:
+            try:
+                container = self.query_one("#bottom")
+            except Exception:
+                return
+            try:
+                container.add_class("hidden")
+            except Exception:
+                try:
+                    styles = getattr(container, "styles", None)
+                    if styles and hasattr(styles, "display"):
+                        styles.display = "none"
+                except Exception:
+                    pass
+
+        def _refresh_bottom_visibility(self) -> None:
+            """Hide entire bottom area if no output and summary is hidden and status is idle."""
+            try:
+                summary_panel = self.query_one("#summary-panel")
+                output_panel = self.query_one("#output-panel")
+                status_widget = self.query_one("#run-status")
+            except Exception:
+                return
+            try:
+                s_classes: set[str] = set(getattr(summary_panel, "classes", []) or [])
+                o_classes: set[str] = set(getattr(output_panel, "classes", []) or [])
+                is_summary_hidden = "hidden" in s_classes
+                is_output_hidden = "hidden" in o_classes
+            except Exception:
+                is_summary_hidden = False
+                is_output_hidden = False
+            try:
+                status_text = getattr(status_widget, "renderable", "") or getattr(status_widget, "text", "")
+                is_running = isinstance(status_text, str) and ("running" in status_text)
+            except Exception:
+                is_running = False
+            if is_summary_hidden and is_output_hidden and not is_running:
+                self._hide_bottom_panel()
+            else:
+                self._show_bottom_panel()
+            try:
+                panel = self.query_one("#summary-panel")
+            except Exception:
+                return
+            # Prefer removing 'hidden' class; fallback to styles
+            try:
+                panel.remove_class("hidden")
+            except Exception:
+                try:
+                    styles = getattr(panel, "styles", None)
+                    if styles and hasattr(styles, "display"):
+                        styles.display = "block"
+                except Exception:
+                    pass
+
+        def _hide_summary_panel(self) -> None:
+            try:
+                panel = self.query_one("#summary-panel")
+            except Exception:
+                return
+            try:
+                panel.add_class("hidden")
+            except Exception:
+                try:
+                    styles = getattr(panel, "styles", None)
+                    if styles and hasattr(styles, "display"):
+                        styles.display = "none"
+                except Exception:
+                    pass
 
     def _iter_commands(text: str) -> Iterable[str]:
         for line in (text or "").splitlines():
@@ -419,6 +681,8 @@ def run(config: str | Path = "config") -> None:
                 log_widget.update(content)
         except Exception:
             pass
+
+    # Note: We rely on DeviceSession raising NetworkToolkitError for failures
 
     # Launch the app
     _App().run()
