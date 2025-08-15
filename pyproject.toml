@@ -74,6 +74,9 @@ docs = [
 tmux = [
     "libtmux>=0.21.0",
 ]
+tui = [
+    "textual>=0.58.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/narrowin/net-worker"
@@ -86,6 +89,7 @@ Changelog = "https://github.com/narrowin/net-worker/blob/main/CHANGELOG.md"
 
 [project.scripts]
 nw = "network_toolkit.cli:app"
+nw-tui = "network_toolkit.tui:run"
 
 [tool.hatch.version]
 path = "src/network_toolkit/__about__.py"
@@ -263,4 +267,14 @@ dev = [
     "pytest-cov>=6.2.1",
     "pytest-mock>=3.14.1",
     "pytest-xdist>=3.8.0",
+    # TUI runtime for local development
+    "textual>=0.58.0",
+    # Helper tooling for developing the Textual TUI (live reload, inspector)
+    "textual-dev>=1.0.0",
+]
+
+# Optional group for installing only TUI-related dependencies
+tui = [
+    "textual>=0.58.0",
+    "textual-dev>=1.0.0",
 ]
