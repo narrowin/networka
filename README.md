@@ -1,7 +1,7 @@
 <h2 align="center">
     Net-Worker (nw)
     <br>
-    Modern CLI tool for multi-vendor network automation
+    The `Eierlegende Wollmilchsau` of network operations — optimized for your daily workflows.
 </h2>
 
 <div align="center">
@@ -48,11 +48,35 @@ Net-Worker is a modern async CLI tool for automating network devices across mult
 ### Quick Install
 
 ```bash
-# Install from GitHub (latest)
-pip install git+https://github.com/narrowin/net-worker.git
+# Easiest (user-wide, isolated)
+uv tool install git+https://github.com/narrowin/net-worker.git
+# or
+pipx install git+https://github.com/narrowin/net-worker.git
+
+# If you prefer plain pip (user-wide, no sudo)
+pip install --user git+https://github.com/narrowin/net-worker.git
+# ensure ~/.local/bin (or platform-specific bin) is on PATH
 
 # Verify installation works
 nw --help
+```
+
+### Upgrade & Remove
+
+```bash
+# Upgrade to latest version
+uv tool upgrade network-toolkit
+# or
+pipx upgrade network-toolkit
+# or
+pip install --user --upgrade git+https://github.com/narrowin/net-worker.git
+
+# Remove installation
+uv tool uninstall network-toolkit
+# or
+pipx uninstall network-toolkit
+# or
+pip uninstall network-toolkit
 ```
 
 ### Platform-Specific Notes
