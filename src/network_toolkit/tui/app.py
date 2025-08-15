@@ -72,6 +72,24 @@ def run(config: str | Path = "config") -> None:
 
     data = TuiData(config)
 
+    # Helper to construct bindings with compatibility across Textual versions
+    def _mk_binding(
+        key: str,
+        action: str,
+        desc: str,
+        *,
+        show: bool = False,
+        key_display: str | None = None,
+        priority: bool = False,
+    ) -> Any:
+        try:
+            return binding_cls(key, action, desc, show, key_display, priority)
+        except TypeError:
+            try:
+                return binding_cls(key, action, desc, show)
+            except TypeError:
+                return binding_cls(key, action)
+
     @dataclass
     class _State:
         devices: set[str]
@@ -89,7 +107,8 @@ def run(config: str | Path = "config") -> None:
         CSS = """
         #layout { height: 1fr; }
         #top { height: 1fr; }
-    #bottom { height: 3fr; }
+    #bottom { height: auto; }
+    #bottom.expanded { height: 3fr; }
         #output-log { height: 1fr; border: round $accent; }
     #summary-panel { height: 1fr; }
         .hidden { display: none; }
@@ -101,12 +120,14 @@ def run(config: str | Path = "config") -> None:
         .scroll { height: 1fr; overflow: auto; }
         """
         BINDINGS: ClassVar[list[Any]] = [
-            binding_cls("q", "quit", "Quit", show=True),
-            binding_cls("enter", "confirm", "Run"),
-            binding_cls("r", "confirm", "Run"),
-            binding_cls("ctrl+c", "quit", "Quit"),
-            binding_cls("s", "toggle_summary", "Summary"),
-            binding_cls("f2", "toggle_summary", "Summary"),
+            _mk_binding("q", "quit", "Quit", show=True),
+            _mk_binding("enter", "confirm", "Run"),
+            _mk_binding("r", "confirm", "Run"),
+            _mk_binding("ctrl+c", "quit", "Quit"),
+            # Make toggles priority so they work even while typing or during runs
+            _mk_binding("s", "toggle_summary", "Summary", show=True, priority=True),
+            _mk_binding("o", "toggle_output", "Output", show=True, priority=True),
+            _mk_binding("f2", "toggle_summary", "Summary"),
         ]
 
         def compose(self) -> Any:
@@ -159,8 +180,6 @@ def run(config: str | Path = "config") -> None:
                         yield textual_widgets.Button("Run", id="run-button")
                 with vertical(id="bottom"):
                     yield static("Status: idle", id="run-status")
-                    # Toggle button to ensure summary visibility control even when inputs capture keys
-                    yield textual_widgets.Button("Summary (s)", id="toggle-summary-btn")
                     with vertical(classes="panel hidden", id="summary-panel"):
                         yield static("Summary", classes="pane-title title")
                         yield text_log_cls(id="run-summary", classes="scroll")
@@ -180,26 +199,12 @@ def run(config: str | Path = "config") -> None:
                 pass
             # Internal state for user toggling of summary
             self._summary_user_hidden = False
+            # Internal state for user toggling of output
+            self._output_user_hidden = False
+            # Track whether a run is currently active
+            self._run_active = False
             # Hide bottom area initially if no summary/output and idle status
             self._refresh_bottom_visibility()
-            # Show example summary so user can verify scrolling works
-            try:
-                self._show_summary_panel()
-                # Populate example lines
-                try:
-                    sum_log = self.query_one("#run-summary")
-                    if hasattr(sum_log, "clear"):
-                        sum_log.clear()
-                    _log_write(sum_log, "Example summary (scroll to see more).")
-                    for i in range(1, 51):
-                        _log_write(
-                            sum_log,
-                            f"Line {i}: This is example content for the summary panel.",
-                        )
-                except Exception:
-                    pass
-            except Exception:
-                pass
 
         async def action_confirm(self) -> None:
             out_log = self.query_one("#output-log")
@@ -219,6 +224,10 @@ def run(config: str | Path = "config") -> None:
             # Temporarily silence library logging to avoid background metadata
             logging.disable(logging.CRITICAL)
             try:
+                # Mark run active and disable inputs & run button to avoid focus capture
+                self._run_active = True
+                self._set_inputs_enabled(False)
+                self._set_run_enabled(False)
                 start_ts = time.monotonic()
                 self._collect_state()
                 devices = await self._resolve_devices()
@@ -284,6 +293,13 @@ def run(config: str | Path = "config") -> None:
                     pass
             finally:
                 logging.disable(logging.NOTSET)
+                # Re-enable controls after run
+                try:
+                    self._run_active = False
+                    self._set_inputs_enabled(True)
+                    self._set_run_enabled(True)
+                except Exception:
+                    pass
 
         async def on_input_submitted(self, event: Any) -> None:  # Textual Input submit
             # Only trigger when the commands input is submitted
@@ -308,12 +324,29 @@ def run(config: str | Path = "config") -> None:
                     await self.action_confirm()
                     if hasattr(event, "stop"):
                         event.stop()
-                elif getattr(btn, "id", "") == "toggle-summary-btn":
+            except Exception:
+                pass
+
+        def on_key(self, event: Any) -> None:
+            """Global key fallback to ensure toggles work even if focus is on inputs."""
+            try:
+                key = str(getattr(event, "key", "")).lower()
+            except Exception:
+                key = ""
+            if key == "s":
+                try:
                     self.action_toggle_summary()
                     if hasattr(event, "stop"):
                         event.stop()
-            except Exception:
-                pass
+                except Exception:
+                    pass
+            elif key == "o":
+                try:
+                    self.action_toggle_output()
+                    if hasattr(event, "stop"):
+                        event.stop()
+                except Exception:
+                    pass
 
         def _collect_state(self) -> None:
             dev_list = self.query_one("#list-devices")
@@ -509,7 +542,7 @@ def run(config: str | Path = "config") -> None:
                             out_strip = text.strip()
                             if out_strip:
                                 # Show output panel on first actual output
-                                self.call_from_thread(self._show_output_panel)
+                                self.call_from_thread(self._maybe_show_output_panel)
                                 for line in text.rstrip().splitlines():
                                     out(line)
                             else:
@@ -639,6 +672,7 @@ def run(config: str | Path = "config") -> None:
                         styles.display = "block"
                 except Exception:
                     pass
+            self._refresh_bottom_visibility()
 
         def _hide_output_panel(self) -> None:
             try:
@@ -654,6 +688,12 @@ def run(config: str | Path = "config") -> None:
                         styles.display = "none"
                 except Exception:
                     pass
+            self._refresh_bottom_visibility()
+
+        def _maybe_show_output_panel(self) -> None:
+            """Show output panel only if user hasn't hidden it explicitly."""
+            if not getattr(self, "_output_user_hidden", False):
+                self._show_output_panel()
 
         def action_toggle_summary(self) -> None:
             """Toggle visibility of the summary panel."""
@@ -677,6 +717,58 @@ def run(config: str | Path = "config") -> None:
                 self._summary_user_hidden = True
                 self._hide_summary_panel()
                 self._refresh_bottom_visibility()
+
+        def action_toggle_output(self) -> None:
+            """Toggle visibility of the output panel."""
+            try:
+                panel = self.query_one("#output-panel")
+            except Exception:
+                return
+            try:
+                classes: set[str] = set(getattr(panel, "classes", []) or [])
+            except Exception:
+                classes = set()
+            is_hidden = "hidden" in classes
+            if is_hidden:
+                self._output_user_hidden = False
+                # Always show when user toggles on
+                self._show_output_panel()
+            else:
+                self._output_user_hidden = True
+                self._hide_output_panel()
+                self._refresh_bottom_visibility()
+
+        def _set_inputs_enabled(self, enabled: bool) -> None:
+            """Enable/disable search and command inputs during a run to avoid key capture."""
+            ids = [
+                "#filter-devices",
+                "#filter-groups",
+                "#filter-sequences",
+                "#input-commands",
+            ]
+            for wid in ids:
+                try:
+                    w = self.query_one(wid)
+                except Exception:
+                    w = None
+                if w is None:
+                    continue
+                # Prefer 'disabled' attribute when available
+                try:
+                    if hasattr(w, "disabled"):
+                        w.disabled = not enabled
+                    elif hasattr(w, "can_focus"):
+                        w.can_focus = enabled
+                except Exception:
+                    pass
+
+        def _set_run_enabled(self, enabled: bool) -> None:
+            try:
+                btn = self.query_one("#run-button")
+                if hasattr(btn, "disabled"):
+                    btn.disabled = not enabled
+            except Exception:
+                pass
 
         def _show_summary_panel(self) -> None:
             # Ensure bottom area is visible and unhide summary panel
@@ -733,6 +825,7 @@ def run(config: str | Path = "config") -> None:
                 summary_panel = self.query_one("#summary-panel")
                 output_panel = self.query_one("#output-panel")
                 status_widget = self.query_one("#run-status")
+                bottom_container = self.query_one("#bottom")
             except Exception:
                 return
             try:
@@ -760,6 +853,16 @@ def run(config: str | Path = "config") -> None:
                 self._hide_bottom_panel()
             else:
                 self._show_bottom_panel()
+            # Expand bottom when any panel is visible; otherwise compact to auto height
+            try:
+                any_panel_visible = not (is_summary_hidden and is_output_hidden)
+                if any_panel_visible:
+                    bottom_container.add_class("expanded")
+                else:
+                    bottom_container.remove_class("expanded")
+            except Exception:
+                # Best-effort; ignore if styles not supported
+                pass
 
         def _hide_summary_panel(self) -> None:
             try:
