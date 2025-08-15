@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -73,10 +74,13 @@ def run(config: str | Path = "config") -> None:
     # Note: Preview screen removed; we now show output in bottom TextLog
 
     class _App(app_cls):
+        _errors: list[str]
         CSS = """
         #layout { height: 1fr; }
         #top { height: 1fr; }
+        #bottom { height: 2fr; }
         #output-log { height: 1fr; border: round $accent; }
+        #summary-panel { height: 7; }
         .panel Static.title { content-align: center middle; color: $secondary; }
         .panel { border: round $surface; padding: 1 1; }
         .pane-title { height: 3; content-align: center middle; text-style: bold; }
@@ -139,23 +143,57 @@ def run(config: str | Path = "config") -> None:
                                     id="input-commands",
                                 )
                         yield static("Press Enter to run", classes="title")
-                yield text_log_cls(id="output-log")
+                        yield textual_widgets.Button("Run", id="run-button")
+                with vertical(id="bottom"):
+                    yield static("Status: idle", id="run-status")
+                    with vertical(classes="panel", id="summary-panel"):
+                        yield static("Summary", classes="pane-title title")
+                        yield static("", id="run-summary")
+                    with vertical(classes="panel"):
+                        yield static("Output", classes="pane-title title")
+                        yield text_log_cls(id="output-log", classes="scroll")
             yield footer()
 
         async def action_confirm(self) -> None:
-            self._collect_state()
-            log = self.query_one("#output-log")
-            if hasattr(log, "clear"):
-                log.clear()
-            devices = await self._resolve_devices()
-            if not devices:
-                _log_write(log, "No devices selected.")
-                return
-            plan = self._build_execution_plan(devices)
-            if not plan:
-                _log_write(log, "No sequences or commands provided.")
-                return
-            await self._run_plan(plan, log)
+            out_log = self.query_one("#output-log")
+            if hasattr(out_log, "clear"):
+                out_log.clear()
+            # reset summary and any previous errors
+            self._errors = []
+            try:
+                self.query_one("#run-summary").update("")
+            except Exception:
+                pass
+            _log_write(out_log, "Starting run...")
+            # Temporarily silence library logging to avoid background metadata
+            logging.disable(logging.CRITICAL)
+            try:
+                self._collect_state()
+                devices = await self._resolve_devices()
+                if not devices:
+                    self._render_summary("No devices selected.")
+                    return
+                plan = self._build_execution_plan(devices)
+                if not plan:
+                    self._render_summary("No sequences or commands provided.")
+                    return
+                # Update status and run with streaming
+                total = len(plan)
+                try:
+                    self.query_one("#run-status").update(f"Status: running 0/{total}")
+                except Exception:
+                    pass
+                summary = await self._run_plan(plan, out_log)
+                # Update summary panel (include errors if any)
+                try:
+                    self._render_summary(summary)
+                    self.query_one("#run-status").update("Status: idle")
+                except Exception:
+                    pass
+            except Exception as e:  # noqa: BLE001
+                self._render_summary(f"Run failed: {e}")
+            finally:
+                logging.disable(logging.NOTSET)
 
         async def on_input_submitted(self, event: Any) -> None:  # Textual Input submit
             # Only trigger when the commands input is submitted
@@ -171,6 +209,16 @@ def run(config: str | Path = "config") -> None:
                         event.stop()
             except Exception:
                 # Best-effort; let Textual handle any event issues
+                pass
+
+        async def on_button_pressed(self, event: Any) -> None:
+            try:
+                btn = getattr(event, "button", None)
+                if getattr(btn, "id", "") == "run-button":
+                    await self.action_confirm()
+                    if hasattr(event, "stop"):
+                        event.stop()
+            except Exception:
                 pass
 
         def _collect_state(self) -> None:
@@ -235,72 +283,142 @@ def run(config: str | Path = "config") -> None:
                         plan[device] = commands
             return plan
 
-        async def _run_plan(self, plan: dict[str, list[str]], log: Any) -> None:
+        async def _run_plan(
+            self,
+            plan: dict[str, list[str]],
+            out_log: Any,
+        ) -> str:
             sem = asyncio.Semaphore(5)
+            total = len(plan)
+            completed = 0
+            successes = 0
+            failures = 0
 
-            async def run_device(
-                device: str, commands: list[str]
-            ) -> tuple[str, list[tuple[str, str]] | str]:
+            async def run_device(device: str, commands: list[str]) -> tuple[str, bool]:
                 async with sem:
-                    return await asyncio.to_thread(
-                        self._run_device_blocking, device, commands
+                    ok = await asyncio.to_thread(
+                        self._run_device_blocking_stream,
+                        device,
+                        commands,
+                        out_log,
                     )
+                    return device, ok
 
             tasks = [run_device(dev, cmds) for dev, cmds in plan.items()]
             for coro in asyncio.as_completed(tasks):
-                device, result = await coro
-                if isinstance(result, str):
-                    _log_write(log, f"[red]{device}: {result}[/red]")
+                _dev, ok = await coro
+                completed += 1
+                if ok:
+                    successes += 1
                 else:
-                    _log_write(
-                        log, f"[bold]{device}[/bold]: executed {len(result)} command(s)"
+                    failures += 1
+                try:
+                    self.query_one("#run-status").update(
+                        f"Status: running {completed}/{total}"
                     )
-                    for cmd, out in result:
-                        _log_write(log, f"[cyan]{device}[/cyan]$ {cmd}")
-                        if out.strip():
-                            for line in out.rstrip().splitlines():
-                                _log_write(log, line)
-                        else:
-                            _log_write(log, "<no output>")
+                except Exception:
+                    pass
+            return f"Devices completed: {successes} succeeded, {failures} failed, total: {total}"
 
-        def _run_device_blocking(
-            self, device: str, commands: list[str]
-        ) -> tuple[str, list[tuple[str, str]] | str]:
+        def _run_device_blocking_stream(
+            self,
+            device: str,
+            commands: list[str],
+            out_log: Any,
+        ) -> bool:
+            ok = True
             try:
                 from network_toolkit.cli import DeviceSession
 
-                results: list[tuple[str, str]] = []
+                def out(msg: str) -> None:
+                    try:
+                        self.call_from_thread(_log_write, out_log, msg)
+                    except Exception:
+                        pass
+
+                def err(msg: str) -> None:
+                    try:
+                        # record errors to be shown in summary later
+                        self.call_from_thread(self._add_error, msg)
+                    except Exception:
+                        pass
+
+                out(f"{device}: connecting...")
                 with DeviceSession(device, data.config) as session:
+                    out(f"{device}: connected")
                     for cmd in commands:
+                        out(f"{device}$ {cmd}")
                         try:
-                            out = session.execute_command(cmd)
+                            raw = session.execute_command(cmd)
+                            text = raw if type(raw) is str else str(raw)
+                            out_strip = text.strip()
+                            is_err = out_strip.upper().startswith(
+                                "ERROR"
+                            ) or out_strip.upper().startswith("FAIL")
+                            target = err if is_err else out
+                            if out_strip:
+                                for line in text.rstrip().splitlines():
+                                    target(line)
+                            else:
+                                target("<no output>")
                         except Exception as e:  # noqa: BLE001
-                            out = f"ERROR: {e}"
-                        results.append((cmd, out))
-                return device, results
+                            ok = False
+                            err(f"{device}: command error: {e}")
+                out(f"{device}: done")
             except Exception as e:  # noqa: BLE001
-                return device, f"Failed: {e}"
+                ok = False
+                try:
+                    self.call_from_thread(self._add_error, f"{device}: Failed: {e}")
+                except Exception:
+                    pass
+            return ok
 
-    def _iter_commands(text: str) -> Iterable[str]:
-        for raw in text.splitlines():
-            cmd = raw.strip()
-            if cmd:
-                yield cmd
-
-    def _log_write(log_widget: Any, message: str) -> None:
-        """Write a line to either RichLog or Log widgets."""
-        # RichLog has write(), Log has write_line(); both may have clear()
-        if hasattr(log_widget, "write"):
-            log_widget.write(message)
-        elif hasattr(log_widget, "write_line"):
-            log_widget.write_line(message)
-        else:
-            # Fallback: attempt to update content if possible
+        def _add_error(self, msg: str) -> None:
             try:
-                current = getattr(log_widget, "renderable", "")
-                new = f"{current}\n{message}" if current else message
-                log_widget.update(new)
+                self._errors.append(str(msg))
+            except Exception:
+                self._errors = [str(msg)]
+
+        def _render_summary(self, base_summary: str | None = None) -> None:
+            try:
+                errors: list[str] = getattr(self, "_errors", [])
+            except Exception:
+                errors = []
+            parts: list[str] = []
+            if base_summary:
+                parts.append(base_summary)
+            if errors:
+                parts.append("Errors:")
+                parts.extend(errors)
+            text = "\n".join(parts)
+            try:
+                self.query_one("#run-summary").update(text)
             except Exception:
                 pass
 
+    def _iter_commands(text: str) -> Iterable[str]:
+        for line in (text or "").splitlines():
+            stripped = line.strip()
+            if stripped:
+                yield stripped
+
+    def _log_write(log_widget: Any, message: str) -> None:
+        try:
+            msg = str(message)
+            if hasattr(log_widget, "write"):
+                log_widget.write(msg)
+            elif hasattr(log_widget, "write_line"):
+                log_widget.write_line(msg)
+            elif hasattr(log_widget, "update"):
+                # Fallback: append to existing content if possible
+                try:
+                    existing = getattr(log_widget, "renderable", "") or ""
+                except Exception:
+                    existing = ""
+                content = f"{existing}\n{msg}" if existing else msg
+                log_widget.update(content)
+        except Exception:
+            pass
+
+    # Launch the app
     _App().run()
