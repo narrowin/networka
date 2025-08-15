@@ -109,7 +109,7 @@ def run(config: str | Path = "config") -> None:
         #top { height: 1fr; }
     #bottom { height: auto; }
     #bottom.expanded { height: 3fr; }
-        #output-log { height: 1fr; border: round $accent; }
+    #output-log { height: 1fr; }
     #summary-panel { height: 1fr; }
         .hidden { display: none; }
         #top > .panel { height: 1fr; }
@@ -118,6 +118,44 @@ def run(config: str | Path = "config") -> None:
         .pane-title { height: 3; content-align: center middle; text-style: bold; }
         .search { height: 3; }
         .scroll { height: 1fr; overflow: auto; }
+    /* Improve visibility of selected items (full-line) in SelectionList */
+    /* Cover multiple Textual versions/states (class-based only) */
+    SelectionList .selected,
+        SelectionList .is-selected,
+        SelectionList .option--selected,
+        SelectionList .selection-list--option--selected,
+        SelectionList *.-selected,
+        SelectionList *.-highlight,
+        SelectionList .selection-list--option.-selected,
+        SelectionList .selection-list--option.--selected,
+        #list-devices .selected,
+        #list-devices .is-selected,
+        #list-devices .option--selected,
+        #list-devices .selection-list--option--selected,
+        #list-devices *.-selected,
+        #list-devices *.-highlight,
+        #list-devices .selection-list--option.-selected,
+        #list-devices .selection-list--option.--selected,
+        #list-groups .selected,
+        #list-groups .is-selected,
+        #list-groups .option--selected,
+        #list-groups .selection-list--option--selected,
+        #list-groups *.-selected,
+        #list-groups *.-highlight,
+        #list-groups .selection-list--option.-selected,
+        #list-groups .selection-list--option.--selected,
+        #list-sequences .selected,
+        #list-sequences .is-selected,
+        #list-sequences .option--selected,
+        #list-sequences .selection-list--option--selected,
+        #list-sequences *.-selected,
+        #list-sequences *.-highlight,
+        #list-sequences .selection-list--option.-selected,
+        #list-sequences .selection-list--option.--selected {
+            background: #0057d9;
+            color: #ffffff;
+            text-style: bold;
+        }
         """
         BINDINGS: ClassVar[list[Any]] = [
             _mk_binding("q", "quit", "Quit", show=True),
@@ -127,6 +165,8 @@ def run(config: str | Path = "config") -> None:
             # Make toggles priority so they work even while typing or during runs
             _mk_binding("s", "toggle_summary", "Summary", show=True, priority=True),
             _mk_binding("o", "toggle_output", "Output", show=True, priority=True),
+            _mk_binding("f", "focus_filter", "Focus filter", show=True, priority=True),
+            _mk_binding("t", "toggle_theme", "Theme", show=True, priority=True),
             _mk_binding("f2", "toggle_summary", "Summary"),
         ]
 
@@ -183,18 +223,32 @@ def run(config: str | Path = "config") -> None:
                     with vertical(classes="panel hidden", id="summary-panel"):
                         yield static("Summary", classes="pane-title title")
                         yield text_log_cls(id="run-summary", classes="scroll")
+                        yield input_widget(
+                            placeholder="Filter summary...",
+                            id="filter-summary",
+                            classes="search",
+                        )
                     with vertical(classes="panel hidden", id="output-panel"):
                         yield static("Output", classes="pane-title title")
                         yield text_log_cls(id="output-log", classes="scroll")
+                        yield input_widget(
+                            placeholder="Filter output...",
+                            id="filter-output",
+                            classes="search",
+                        )
             yield footer()
 
         async def on_mount(self) -> None:  # Populate lists after UI mounts
             try:
                 t = data.targets()
                 a = data.actions()
-                self._populate_selection_list("list-devices", t.devices)
-                self._populate_selection_list("list-groups", t.groups)
-                self._populate_selection_list("list-sequences", a.sequences)
+                # Keep base lists for filtering
+                self._all_devices = list(t.devices)
+                self._all_groups = list(t.groups)
+                self._all_sequences = list(a.sequences)
+                self._populate_selection_list("list-devices", self._all_devices)
+                self._populate_selection_list("list-groups", self._all_groups)
+                self._populate_selection_list("list-sequences", self._all_sequences)
             except Exception:
                 pass
             # Internal state for user toggling of summary
@@ -203,13 +257,112 @@ def run(config: str | Path = "config") -> None:
             self._output_user_hidden = False
             # Track whether a run is currently active
             self._run_active = False
+            # Theme
+            try:
+                self._dark_mode = bool(getattr(self, "dark", True))
+            except Exception:
+                self._dark_mode = True
+            # Filters state
+            self._summary_filter = ""
+            self._output_filter = ""
+            # Output lines buffer for filtering
+            self._output_lines: list[str] = []
             # Hide bottom area initially if no summary/output and idle status
             self._refresh_bottom_visibility()
+
+        async def on_input_changed(self, event: Any) -> None:  # Textual Input change
+            """Live-filter lists and logs based on associated input widgets."""
+            try:
+                sender = (
+                    getattr(event, "input", None)
+                    or getattr(event, "control", None)
+                    or getattr(event, "sender", None)
+                )
+                sender_id = getattr(sender, "id", "") or ""
+                value = getattr(sender, "value", "") or ""
+            except Exception:
+                return
+            text = value.strip().lower()
+            # Devices filter
+            if sender_id == "filter-devices":
+                base: list[str] = list(getattr(self, "_all_devices", []) or [])
+                try:
+                    sel_widget = self.query_one("#list-devices")
+                    current_sel: set[str] = self._selected_values(sel_widget)
+                except Exception:
+                    current_sel = set()
+                items = [d for d in base if text in d.lower()]
+                self._populate_selection_list(
+                    "list-devices", items, selected=current_sel
+                )
+                return
+            # Groups filter
+            if sender_id == "filter-groups":
+                base = list(getattr(self, "_all_groups", []) or [])
+                try:
+                    sel_widget = self.query_one("#list-groups")
+                    current_sel = self._selected_values(sel_widget)
+                except Exception:
+                    current_sel = set()
+                items = [g for g in base if text in g.lower()]
+                self._populate_selection_list(
+                    "list-groups", items, selected=current_sel
+                )
+                return
+            # Sequences filter
+            if sender_id == "filter-sequences":
+                base = list(getattr(self, "_all_sequences", []) or [])
+                try:
+                    sel_widget = self.query_one("#list-sequences")
+                    current_sel = self._selected_values(sel_widget)
+                except Exception:
+                    current_sel = set()
+                items = [s for s in base if text in s.lower()]
+                self._populate_selection_list(
+                    "list-sequences", items, selected=current_sel
+                )
+                return
+            # Summary filter
+            if sender_id == "filter-summary":
+                try:
+                    self._summary_filter = value
+                except Exception:
+                    self._summary_filter = value
+                # Re-render summary in-place
+                self._render_summary()
+                return
+            # Output filter
+            if sender_id == "filter-output":
+                try:
+                    self._output_filter = value
+                except Exception:
+                    self._output_filter = value
+                # Re-render output log from buffer
+                try:
+                    out_log = self.query_one("#output-log")
+                except Exception:
+                    out_log = None
+                if out_log is not None:
+                    try:
+                        if hasattr(out_log, "clear"):
+                            out_log.clear()
+                    except Exception:
+                        pass
+                    filt = (value or "").strip().lower()
+                    for line in getattr(self, "_output_lines", []) or []:
+                        if not filt or (filt in line.lower()):
+                            _log_write(out_log, line)
+                return
 
         async def action_confirm(self) -> None:
             out_log = self.query_one("#output-log")
             if hasattr(out_log, "clear"):
                 out_log.clear()
+            # reset buffered output lines for fresh run
+            try:
+                self._output_lines = []
+            except Exception:
+                pass
             # reset summary and any previous errors
             self._errors = []
             self._meta = []
@@ -347,6 +500,20 @@ def run(config: str | Path = "config") -> None:
                         event.stop()
                 except Exception:
                     pass
+            elif key == "t":
+                try:
+                    self.action_toggle_theme()
+                    if hasattr(event, "stop"):
+                        event.stop()
+                except Exception:
+                    pass
+            elif key == "f":
+                try:
+                    self.action_focus_filter()
+                    if hasattr(event, "stop"):
+                        event.stop()
+                except Exception:
+                    pass
 
         def _collect_state(self) -> None:
             dev_list = self.query_one("#list-devices")
@@ -380,8 +547,17 @@ def run(config: str | Path = "config") -> None:
                 return set()
             return out
 
-        def _populate_selection_list(self, widget_id: str, items: list[str]) -> None:
-            """Populate a SelectionList with best-effort API compatibility across Textual versions."""
+        def _populate_selection_list(
+            self,
+            widget_id: str,
+            items: list[str],
+            *,
+            selected: set[str] | None = None,
+        ) -> None:
+            """Populate a SelectionList with best-effort API compatibility across Textual versions.
+
+            If `selected` is provided, best-effort pre-select those values.
+            """
             try:
                 sel = self.query_one(f"#{widget_id}")
             except Exception:
@@ -398,14 +574,18 @@ def run(config: str | Path = "config") -> None:
 
             # Try bulk add first
             if hasattr(sel, "add_options"):
+                sel_set = selected or set()
                 opts_variants: list[list[object]] = [
-                    [(label, label, False) for label in items],
+                    [(label, label, (label in sel_set)) for label in items],
                     [(label, label) for label in items],
                     list(items),
                 ]
                 for opts in opts_variants:
                     try:
                         sel.add_options(opts)
+                        # Some variants ignore selection; enforce afterwards if needed
+                        if selected:
+                            self._try_apply_selection(sel, selected)
                         return
                     except Exception as exc:
                         logging.debug(f"add_options variant failed: {exc}")
@@ -415,7 +595,7 @@ def run(config: str | Path = "config") -> None:
                 for label in items:
                     added = False
                     for args in (
-                        (label, label, False),
+                        (label, label, (selected is not None and label in selected)),
                         (label, label),
                         (label,),
                         ((label, label, False),),
@@ -431,9 +611,42 @@ def run(config: str | Path = "config") -> None:
                         # Last resort: try 'append' of an option-like tuple
                         try:
                             if hasattr(sel, "append"):
-                                sel.append((label, label, False))
+                                sel.append(
+                                    (
+                                        label,
+                                        label,
+                                        (selected is not None and label in selected),
+                                    )
+                                )
                         except Exception as exc:
                             logging.debug(f"append to selection list failed: {exc}")
+                # Enforce selection afterwards
+                if selected:
+                    self._try_apply_selection(sel, selected)
+
+        def _try_apply_selection(self, sel: Any, selected: set[str]) -> None:
+            """Best-effort to set selected values on a SelectionList across versions."""
+            try:
+                if hasattr(sel, "set_value"):
+                    sel.set_value(list(selected))
+                    return
+            except Exception:
+                pass
+            try:
+                if hasattr(sel, "selected") and isinstance(sel.selected, list):
+                    sel.selected = list(selected)
+                    return
+            except Exception as exc:
+                logging.debug(f"Direct selected assignment failed: {exc}")
+            # Fallback: toggle/select by value methods
+            for val in selected:
+                for method in ("select", "select_by_value", "toggle_value"):
+                    if hasattr(sel, method):
+                        try:
+                            getattr(sel, method)(val)
+                            break
+                        except Exception as exc:
+                            logging.debug(f"Selecting value via {method} failed: {exc}")
 
         async def _resolve_devices(self) -> list[str]:
             from network_toolkit.common.resolver import DeviceResolver
@@ -514,7 +727,7 @@ def run(config: str | Path = "config") -> None:
 
                 def out(msg: str) -> None:
                     try:
-                        self.call_from_thread(_log_write, out_log, msg)
+                        self.call_from_thread(self._output_append, msg)
                     except Exception:
                         pass
 
@@ -581,43 +794,60 @@ def run(config: str | Path = "config") -> None:
             except Exception:
                 meta = []
             renderable: Any = None
-            # Try to build a Rich Text for styled output (errors in red)
-            try:
-                rich_text = _new_rich_text()
-                if rich_text is not None:
-                    first = True
-                    if base_summary:
-                        rich_text.append(base_summary)
-                        first = False
-                    if errors:
-                        if not first:
-                            rich_text.append("\n")
-                        rich_text.append("Errors:", style="bold")
-                        for err in errors:
-                            rich_text.append("\n • ")
-                            rich_text.append(str(err), style="red")
-                        first = False
-                    if meta:
-                        if not first:
-                            rich_text.append("\n")
-                        rich_text.append("Info:", style="bold")
-                        for m in meta:
-                            rich_text.append("\n • ")
-                            rich_text.append(str(m))
-                    renderable = rich_text
-            except Exception:
-                renderable = None
+            # If a filter is active, compile plain text and filter lines for simplicity
+            filt = (getattr(self, "_summary_filter", "") or "").strip().lower()
+            if filt:
+                lines: list[str] = []
+                if base_summary:
+                    lines.append(base_summary)
+                # Info first
+                if meta:
+                    lines.append("Info:")
+                    lines.extend([f" • {m}" for m in meta])
+                # Errors at the bottom
+                if errors:
+                    lines.append("Errors:")
+                    lines.extend([f" • {e}" for e in errors])
+                filtered = [ln for ln in lines if filt in ln.lower()]
+                renderable = "\n".join(filtered)
+            else:
+                # Try to build a Rich Text for styled output (errors in red)
+                try:
+                    rich_text = _new_rich_text()
+                    if rich_text is not None:
+                        first = True
+                        if base_summary:
+                            rich_text.append(base_summary)
+                            first = False
+                        if meta:
+                            if not first:
+                                rich_text.append("\n")
+                            rich_text.append("Info:", style="bold")
+                            for m in meta:
+                                rich_text.append("\n • ")
+                                rich_text.append(str(m))
+                            first = False
+                        if errors:
+                            if not first:
+                                rich_text.append("\n")
+                            rich_text.append("Errors:", style="bold")
+                            for err in errors:
+                                rich_text.append("\n • ")
+                                rich_text.append(str(err), style="red")
+                        renderable = rich_text
+                except Exception:
+                    renderable = None
             if renderable is None:
                 # Fallback to plain text without styling
                 parts: list[str] = []
                 if base_summary:
                     parts.append(base_summary)
-                if errors:
-                    parts.append("Errors:")
-                    parts.extend([f" • {e}" for e in errors])
                 if meta:
                     parts.append("Info:")
                     parts.extend([f" • {m}" for m in meta])
+                if errors:
+                    parts.append("Errors:")
+                    parts.extend([f" • {e}" for e in errors])
                 renderable = "\n".join(parts)
             try:
                 widget = self.query_one("#run-summary")
@@ -657,6 +887,36 @@ def run(config: str | Path = "config") -> None:
                 self._render_summary()
             except Exception:
                 pass
+
+        def _output_append(self, msg: str) -> None:
+            """Append a line to the output log honoring the current output filter."""
+            try:
+                text = str(msg)
+            except Exception:
+                text = f"{msg}"
+            try:
+                self._output_lines.append(text)
+            except Exception:
+                self._output_lines = [text]
+            # Re-render depending on filter
+            try:
+                out_log = self.query_one("#output-log")
+            except Exception:
+                out_log = None
+            if out_log is None:
+                return
+            filt = (getattr(self, "_output_filter", "") or "").strip().lower()
+            if filt:
+                try:
+                    if hasattr(out_log, "clear"):
+                        out_log.clear()
+                except Exception:
+                    pass
+                for line in self._output_lines:
+                    if filt in line.lower():
+                        _log_write(out_log, line)
+            else:
+                _log_write(out_log, text)
 
         def _show_output_panel(self) -> None:
             try:
@@ -744,6 +1004,8 @@ def run(config: str | Path = "config") -> None:
                 "#filter-devices",
                 "#filter-groups",
                 "#filter-sequences",
+                "#filter-summary",
+                "#filter-output",
                 "#input-commands",
             ]
             for wid in ids:
@@ -878,6 +1140,179 @@ def run(config: str | Path = "config") -> None:
                         styles.display = "none"
                 except Exception:
                     pass
+
+        def action_focus_filter(self) -> None:
+            """Focus the most relevant filter/input for the active pane."""
+            target_input_id: str | None = None
+            focus = None
+            # Try to get currently focused widget
+            for attr in ("focused",):
+                try:
+                    focus = getattr(self, attr, None) or getattr(
+                        self.screen, attr, None
+                    )
+                except Exception as exc:
+                    logging.debug(f"Focus attribute retrieval failed: {exc}")
+                    continue
+                if focus is not None:
+                    break
+
+            # Helper to check ancestry membership
+            def within(container_id: str) -> bool:
+                try:
+                    container = self.query_one(f"#{container_id}")
+                except Exception:
+                    return False
+                node = focus
+                seen = 0
+                while node is not None and seen < 100:
+                    if node is container:
+                        return True
+                    try:
+                        node = getattr(node, "parent", None)
+                    except Exception as exc:
+                        logging.debug(f"Focus ancestry traversal failed: {exc}")
+                        node = None
+                    seen += 1
+                return False
+
+            # Prefer bottom panels when focus is inside them
+            try:
+                if within("output-panel"):
+                    target_input_id = "filter-output"
+                elif within("summary-panel"):
+                    target_input_id = "filter-summary"
+            except Exception as exc:
+                logging.debug(f"Bottom panel detection failed: {exc}")
+
+            # If not bottom, detect active top tab via focus location
+            if target_input_id is None:
+                if within("tab-devices"):
+                    target_input_id = "filter-devices"
+                elif within("tab-groups"):
+                    target_input_id = "filter-groups"
+                elif within("tab-sequences"):
+                    target_input_id = "filter-sequences"
+                elif within("tab-commands"):
+                    # Not a filter but sensible default
+                    target_input_id = "input-commands"
+
+            # If still unknown, look up active tabs by container state
+            if target_input_id is None:
+                # Check targets-tabs active
+                try:
+                    tabs = self.query_one("#targets-tabs")
+                    active = getattr(tabs, "active", None)
+                    active_id = getattr(active, "id", None) or str(active or "")
+                    if "devices" in str(active_id):
+                        target_input_id = "filter-devices"
+                    elif "groups" in str(active_id):
+                        target_input_id = "filter-groups"
+                except Exception:
+                    pass
+            if target_input_id is None:
+                try:
+                    tabs = self.query_one("#actions-tabs")
+                    active = getattr(tabs, "active", None)
+                    active_id = getattr(active, "id", None) or str(active or "")
+                    if "sequences" in str(active_id):
+                        target_input_id = "filter-sequences"
+                    elif "commands" in str(active_id):
+                        target_input_id = "input-commands"
+                except Exception:
+                    pass
+
+            # Final fallback: prefer output filter if panel visible, else summary, else devices
+            if target_input_id is None:
+                try:
+                    out_panel = self.query_one("#output-panel")
+                    out_hidden = "hidden" in (getattr(out_panel, "classes", []) or [])
+                    if not out_hidden:
+                        target_input_id = "filter-output"
+                except Exception:
+                    pass
+            if target_input_id is None:
+                try:
+                    sum_panel = self.query_one("#summary-panel")
+                    sum_hidden = "hidden" in (getattr(sum_panel, "classes", []) or [])
+                    if not sum_hidden:
+                        target_input_id = "filter-summary"
+                except Exception:
+                    pass
+            if target_input_id is None:
+                target_input_id = "filter-devices"
+
+            self._focus_input_by_id(target_input_id)
+
+        def _focus_input_by_id(self, element_id: str) -> None:
+            try:
+                w = self.query_one(f"#{element_id}")
+            except Exception:
+                return
+            # Try widget's focus method first
+            try:
+                if hasattr(w, "focus"):
+                    w.focus()
+                    return
+            except Exception:
+                pass
+            # Fallback to focusing via app
+            try:
+                if hasattr(self, "set_focus"):
+                    self.set_focus(w)
+            except Exception:
+                pass
+
+        def action_toggle_theme(self) -> None:
+            """Toggle between light and dark theme, with compatibility fallbacks."""
+            try:
+                current_dark = bool(self.dark)
+            except Exception:
+                current_dark = getattr(self, "_dark_mode", True)
+            new_dark = not current_dark
+            self._dark_mode = new_dark
+            self._apply_theme(new_dark)
+
+        def _apply_theme(self, dark: bool) -> None:
+            # Preferred: property 'dark' on App
+            try:
+                if hasattr(self, "dark"):
+                    self.dark = dark
+                    return
+            except Exception as exc:
+                logging.debug(f"Setting App.dark failed: {exc}")
+            # Legacy: set_theme("dark"|"light")
+            try:
+                if hasattr(self, "set_theme"):
+                    theme_name = "dark" if dark else "light"
+                    self.set_theme(theme_name)
+                    # Continue to refresh UI below
+            except Exception as exc:
+                logging.debug(f"set_theme failed: {exc}")
+            # Fallback: use built-in action if available
+            try:
+                # If App has an action to toggle, ensure it matches desired state
+                has_dark_attr = hasattr(self, "dark")
+                current = bool(self.dark) if has_dark_attr else None
+                if hasattr(self, "action_toggle_dark"):
+                    if current is None or current != dark:
+                        self.action_toggle_dark()
+            except Exception as exc:
+                logging.debug(f"action_toggle_dark failed: {exc}")
+            # Refresh CSS/Screen to reflect theme changes
+            for method in ("refresh_css", "reload_css"):
+                try:
+                    if hasattr(self, method):
+                        getattr(self, method)()
+                        break
+                except Exception as exc:
+                    logging.debug(f"{method} failed: {exc}")
+            try:
+                if hasattr(self, "refresh"):
+                    self.refresh()
+            except Exception:
+                pass
+            # Fallback: no-op; CSS uses theme vars so best effort only
 
     def _iter_commands(text: str) -> Iterable[str]:
         for line in (text or "").splitlines():
