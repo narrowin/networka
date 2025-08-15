@@ -192,7 +192,10 @@ def run(config: str | Path = "config") -> None:
                         sum_log.clear()
                     _log_write(sum_log, "Example summary (scroll to see more).")
                     for i in range(1, 51):
-                        _log_write(sum_log, f"Line {i}: This is example content for the summary panel.")
+                        _log_write(
+                            sum_log,
+                            f"Line {i}: This is example content for the summary panel.",
+                        )
                 except Exception:
                     pass
             except Exception:
