@@ -14,12 +14,13 @@ import asyncio
 import importlib
 import logging
 import time
-from collections.abc import Iterable
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, ClassVar
 
 from network_toolkit.tui.data import TuiData
+from network_toolkit.tui.helpers import log_write
+from network_toolkit.tui.models import RunCallbacks, SelectionState
+from network_toolkit.tui.services import ExecutionService
 
 
 def _new_rich_text() -> Any:  # pragma: no cover - optional rich dependency helper
@@ -31,13 +32,7 @@ def _new_rich_text() -> Any:  # pragma: no cover - optional rich dependency help
         return None
 
 
-@dataclass
-class SelectionState:
-    devices: set[str]
-    groups: set[str]
-    sequences: set[str]
-    # commands are free-form; collected via input
-    command_text: str = ""
+    # models.SelectionState is used instead of local dataclass
 
 
 def run(config: str | Path = "config") -> None:
@@ -90,14 +85,10 @@ def run(config: str | Path = "config") -> None:
             except TypeError:
                 return binding_cls(key, action)
 
-    @dataclass
-    class _State:
-        devices: set[str]
-        groups: set[str]
-        sequences: set[str]
-        command_text: str = ""
-
-    state = _State(set(), set(), set(), "")
+    # Use shared SelectionState model for state
+    state = SelectionState(devices=set(), groups=set(), sequences=set(), command_text="")
+    # Services layer for plan building and execution
+    service = ExecutionService(data)
 
     # Note: Preview screen removed; we now show output in bottom TextLog
 
@@ -351,7 +342,7 @@ def run(config: str | Path = "config") -> None:
                     filt = (value or "").strip().lower()
                     for line in getattr(self, "_output_lines", []) or []:
                         if not filt or (filt in line.lower()):
-                            _log_write(out_log, line)
+                            log_write(out_log, line)
                 return
 
         async def action_confirm(self) -> None:
@@ -383,7 +374,9 @@ def run(config: str | Path = "config") -> None:
                 self._set_run_enabled(False)
                 start_ts = time.monotonic()
                 self._collect_state()
-                devices = await self._resolve_devices()
+                devices = await asyncio.to_thread(
+                    service.resolve_devices, state.devices, state.groups
+                )
                 if not devices:
                     self._render_summary("No devices selected.")
                     try:
@@ -393,7 +386,9 @@ def run(config: str | Path = "config") -> None:
                     except Exception:
                         pass
                     return
-                plan = self._build_execution_plan(devices)
+                plan = service.build_plan(
+                    devices, state.sequences, state.command_text
+                )
                 if not plan:
                     self._render_summary("No sequences or commands provided.")
                     try:
@@ -410,11 +405,20 @@ def run(config: str | Path = "config") -> None:
                     self.query_one("#run-status").update(f"Status: running 0/{total}")
                 except Exception:
                     pass
-                summary = await self._run_plan(plan, out_log)
+                summary_result = await service.run_plan(
+                    plan,
+                    RunCallbacks(
+                        on_output=lambda m: self.call_from_thread(
+                            self._output_append, m
+                        ),
+                        on_error=lambda m: self.call_from_thread(self._add_error, m),
+                        on_meta=lambda m: self.call_from_thread(self._add_meta, m),
+                    ),
+                )
                 # Update summary panel (include errors if any)
                 try:
                     elapsed = time.monotonic() - start_ts
-                    summary_with_time = f"{summary} (duration: {elapsed:.2f}s)"
+                    summary_with_time = f"{summary_result.human_summary()} (duration: {elapsed:.2f}s)"
                     self._render_summary(summary_with_time)
                     # Reflect summary on the status line; hint about errors if present
                     err_count = 0
@@ -648,130 +652,7 @@ def run(config: str | Path = "config") -> None:
                         except Exception as exc:
                             logging.debug(f"Selecting value via {method} failed: {exc}")
 
-        async def _resolve_devices(self) -> list[str]:
-            from network_toolkit.common.resolver import DeviceResolver
-
-            resolver = DeviceResolver(data.config)
-            selected: set[str] = set(state.devices)
-            for g in state.groups:
-                try:
-                    for m in data.config.get_group_members(g):
-                        selected.add(m)
-                except Exception:  # pragma: no cover - non-critical
-                    pass
-            return [d for d in sorted(selected) if resolver.is_device(d)]
-
-        def _build_execution_plan(self, devices: list[str]) -> dict[str, list[str]]:
-            plan: dict[str, list[str]] = {}
-            if state.sequences:
-                for device in devices:
-                    cmds: list[str] = []
-                    for seq in sorted(state.sequences):
-                        resolved = data.sequence_manager.resolve(seq, device) or []
-                        cmds.extend(resolved)
-                    if cmds:
-                        plan[device] = cmds
-            else:
-                commands = list(_iter_commands(state.command_text))
-                if commands:
-                    for device in devices:
-                        plan[device] = commands
-            return plan
-
-        async def _run_plan(
-            self,
-            plan: dict[str, list[str]],
-            out_log: Any,
-        ) -> str:
-            sem = asyncio.Semaphore(5)
-            total = len(plan)
-            completed = 0
-            successes = 0
-            failures = 0
-
-            async def run_device(device: str, commands: list[str]) -> tuple[str, bool]:
-                async with sem:
-                    ok = await asyncio.to_thread(
-                        self._run_device_blocking_stream,
-                        device,
-                        commands,
-                        out_log,
-                    )
-                    return device, ok
-
-            tasks = [run_device(dev, cmds) for dev, cmds in plan.items()]
-            for coro in asyncio.as_completed(tasks):
-                _dev, ok = await coro
-                completed += 1
-                if ok:
-                    successes += 1
-                else:
-                    failures += 1
-                try:
-                    self.query_one("#run-status").update(
-                        f"Status: running {completed}/{total}"
-                    )
-                except Exception:
-                    pass
-            return f"Devices completed: {successes} succeeded, {failures} failed, total: {total}"
-
-        def _run_device_blocking_stream(
-            self,
-            device: str,
-            commands: list[str],
-            out_log: Any,
-        ) -> bool:
-            ok = True
-            try:
-                from network_toolkit.cli import DeviceSession
-
-                def out(msg: str) -> None:
-                    try:
-                        self.call_from_thread(self._output_append, msg)
-                    except Exception:
-                        pass
-
-                def err(msg: str) -> None:
-                    try:
-                        # record errors to be shown in summary later
-                        self.call_from_thread(self._add_error, msg)
-                    except Exception:
-                        pass
-
-                def meta(msg: str) -> None:
-                    try:
-                        self.call_from_thread(self._add_meta, msg)
-                    except Exception:
-                        pass
-
-                meta(f"{device}: connecting...")
-                with DeviceSession(device, data.config) as session:
-                    meta(f"{device}: connected")
-                    for cmd in commands:
-                        meta(f"{device}$ {cmd}")
-                        try:
-                            raw = session.execute_command(cmd)
-                            text = raw if type(raw) is str else str(raw)
-                            out_strip = text.strip()
-                            if out_strip:
-                                # Show output panel on first actual output
-                                self.call_from_thread(self._maybe_show_output_panel)
-                                for line in text.rstrip().splitlines():
-                                    out(line)
-                            else:
-                                # No actual output; keep output panel hidden
-                                pass
-                        except Exception as e:  # noqa: BLE001
-                            ok = False
-                            err(f"{device}: command error: {e}")
-                meta(f"{device}: done")
-            except Exception as e:  # noqa: BLE001
-                ok = False
-                try:
-                    self.call_from_thread(self._add_error, f"{device}: Failed: {e}")
-                except Exception:
-                    pass
-            return ok
+    # Device resolution, plan building, and execution handled by services layer
 
         def _add_error(self, msg: str) -> None:
             try:
@@ -894,6 +775,11 @@ def run(config: str | Path = "config") -> None:
                 text = str(msg)
             except Exception:
                 text = f"{msg}"
+            # Show output panel on first output unless user hid it
+            try:
+                self._maybe_show_output_panel()
+            except Exception:
+                pass
             try:
                 self._output_lines.append(text)
             except Exception:
@@ -914,9 +800,9 @@ def run(config: str | Path = "config") -> None:
                     pass
                 for line in self._output_lines:
                     if filt in line.lower():
-                        _log_write(out_log, line)
+                        log_write(out_log, line)
             else:
-                _log_write(out_log, text)
+                log_write(out_log, text)
 
         def _show_output_panel(self) -> None:
             try:
@@ -1314,29 +1200,7 @@ def run(config: str | Path = "config") -> None:
                 pass
             # Fallback: no-op; CSS uses theme vars so best effort only
 
-    def _iter_commands(text: str) -> Iterable[str]:
-        for line in (text or "").splitlines():
-            stripped = line.strip()
-            if stripped:
-                yield stripped
-
-    def _log_write(log_widget: Any, message: str) -> None:
-        try:
-            msg = str(message)
-            if hasattr(log_widget, "write"):
-                log_widget.write(msg)
-            elif hasattr(log_widget, "write_line"):
-                log_widget.write_line(msg)
-            elif hasattr(log_widget, "update"):
-                # Fallback: append to existing content if possible
-                try:
-                    existing = getattr(log_widget, "renderable", "") or ""
-                except Exception:
-                    existing = ""
-                content = f"{existing}\n{msg}" if existing else msg
-                log_widget.update(content)
-        except Exception:
-            pass
+    # Helpers are provided by network_toolkit.tui.helpers
 
     # Note: We rely on DeviceSession raising NetworkToolkitError for failures
 
