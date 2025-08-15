@@ -1,10 +1,6 @@
-<h2 align="center">
-    Net-Worker (nw)
-    <br>
-    The `Eierlegende Wollmilchsau` of network operations — optimized for your daily workflows.
-</h2>
+# Net-Worker (nw)
 
-<div align="center">
+**The `Eierlegende Wollmilchsau` of network operations — optimized for your daily workflows.**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](https://github.com/narrowin/net-worker)
@@ -12,18 +8,14 @@
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Type checked with mypy](https://img.shields.io/badge/mypy-checked-blue.svg)](http://mypy-lang.org/)
 
-</div>
-
 Net-Worker is a modern async CLI tool for automating network devices across multiple vendors. Built with async/await patterns for high performance and reliability. Designed for network engineers who want fast, scalable automation with full cross-platform support.
 
-**Cross-Platform Support**: Runs on Linux, macOS, and Windows with Python
-
-## Getting started
+## Getting Started
 
 - [Installation instructions →](#installation)
 - [Platform compatibility →](docs/platform-compatibility.md)
 - [CLI overview →](#cli-overview)
-- [Quick start guide →](#quick-start)
+- [Quick Start guide →](#quick-start)
 - [Configuration →](#configuration)
 - [Examples →](#examples)
 
@@ -65,18 +57,18 @@ nw --help
 
 ```bash
 # Upgrade to latest version
-uv tool upgrade network-toolkit
+uv tool upgrade net-worker
 # or
-pipx upgrade network-toolkit
+pipx upgrade net-worker
 # or
 pip install --user --upgrade git+https://github.com/narrowin/net-worker.git
 
 # Remove installation
-uv tool uninstall network-toolkit
+uv tool uninstall net-worker
 # or
-pipx uninstall network-toolkit
+pipx uninstall net-worker
 # or
-pip uninstall network-toolkit
+pip uninstall net-worker
 ```
 
 ### Platform-Specific Notes
@@ -182,7 +174,7 @@ Built with async/await support and type safety in mind.
 ╰────────────────────────────────────────────────────────────────────────────╯
 ```
 
-## Quick start
+## Quick Start
 
 ### 1. Set up credentials
 
@@ -284,52 +276,6 @@ export NW_PASSWORD_DEFAULT="your_secure_password"  # pragma: allowlist secret
 
 # Device-specific overrides (optional)
 export NW_PASSWORD_SW_ACC1="switch1_password"  # pragma: allowlist secret
-```
-
-### Configuration Structure
-
-#### Modular Directory Structure
-```
-config/
-├── config.yml              # Main configuration (required)
-├── devices/                # Device definitions (all files here)
-│   ├── devices.yml         # Main devices file
-│   ├── devices.csv         # CSV format devices
-│   ├── production.yml      # YAML format devices
-│   └── customer-a.yml      # Customer-specific devices
-├── groups/                 # Group definitions (all files here)
-│   ├── groups.yml          # Main groups file
-│   ├── groups.csv          # CSV format groups
-│   └── production.yml      # YAML format groups
-├── sequences/              # Sequence definitions (all files here)
-│   ├── sequences.yml       # Main sequences file
-│   ├── sequences.csv       # CSV format sequences
-│   ├── advanced.yml        # YAML format sequences
-│   └── vendor_sequences/   # Vendor-specific sequences
-└── examples/               # Templates and examples
-    ├── devices/
-    ├── groups/
-    └── sequences/
-```
-
-#### CSV Format Reference
-
-**Devices CSV Headers:**
-```csv
-name,host,device_type,description,platform,model,location,tags
-sw-01,192.168.1.1,mikrotik_routeros,Lab Switch,mipsbe,CRS326,Lab,switch;access;lab
-```
-
-**Groups CSV Headers:**
-```csv
-name,description,members,match_tags
-lab_devices,Lab environment,sw-01;sw-02,lab;test
-```
-
-**Sequences CSV Headers:**
-```csv
-name,description,commands,tags
-system_info,Get system info,/system/identity/print;/system/clock/print,system;info
 ```
 
 ### Configuration Structure
