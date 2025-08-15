@@ -13,12 +13,22 @@ from __future__ import annotations
 import asyncio
 import importlib
 import logging
+import time
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, ClassVar
 
 from network_toolkit.tui.data import TuiData
+
+
+def _new_rich_text() -> Any:  # pragma: no cover - optional rich dependency helper
+    try:
+        from rich.text import Text
+
+        return Text()
+    except Exception:
+        return None
 
 
 @dataclass
@@ -79,9 +89,9 @@ def run(config: str | Path = "config") -> None:
         CSS = """
         #layout { height: 1fr; }
         #top { height: 1fr; }
-        #bottom { height: 2fr; }
+    #bottom { height: 3fr; }
         #output-log { height: 1fr; border: round $accent; }
-        #summary-panel { height: 7; }
+    #summary-panel { height: 1fr; }
         .hidden { display: none; }
         #top > .panel { height: 1fr; }
         .panel Static.title { content-align: center middle; color: $secondary; }
@@ -96,6 +106,7 @@ def run(config: str | Path = "config") -> None:
             binding_cls("r", "confirm", "Run"),
             binding_cls("ctrl+c", "quit", "Quit"),
             binding_cls("s", "toggle_summary", "Summary"),
+            binding_cls("f2", "toggle_summary", "Summary"),
         ]
 
         def compose(self) -> Any:
@@ -148,9 +159,11 @@ def run(config: str | Path = "config") -> None:
                         yield textual_widgets.Button("Run", id="run-button")
                 with vertical(id="bottom"):
                     yield static("Status: idle", id="run-status")
+                    # Toggle button to ensure summary visibility control even when inputs capture keys
+                    yield textual_widgets.Button("Summary (s)", id="toggle-summary-btn")
                     with vertical(classes="panel hidden", id="summary-panel"):
                         yield static("Summary", classes="pane-title title")
-                        yield static("", id="run-summary")
+                        yield text_log_cls(id="run-summary", classes="scroll")
                     with vertical(classes="panel hidden", id="output-panel"):
                         yield static("Output", classes="pane-title title")
                         yield text_log_cls(id="output-log", classes="scroll")
@@ -169,6 +182,21 @@ def run(config: str | Path = "config") -> None:
             self._summary_user_hidden = False
             # Hide bottom area initially if no summary/output and idle status
             self._refresh_bottom_visibility()
+            # Show example summary so user can verify scrolling works
+            try:
+                self._show_summary_panel()
+                # Populate example lines
+                try:
+                    sum_log = self.query_one("#run-summary")
+                    if hasattr(sum_log, "clear"):
+                        sum_log.clear()
+                    _log_write(sum_log, "Example summary (scroll to see more).")
+                    for i in range(1, 51):
+                        _log_write(sum_log, f"Line {i}: This is example content for the summary panel.")
+                except Exception:
+                    pass
+            except Exception:
+                pass
 
         async def action_confirm(self) -> None:
             out_log = self.query_one("#output-log")
@@ -177,6 +205,7 @@ def run(config: str | Path = "config") -> None:
             # reset summary and any previous errors
             self._errors = []
             self._meta = []
+            start_ts: float | None = None
             try:
                 self.query_one("#run-summary").update("")
                 self._hide_summary_panel()
@@ -187,14 +216,27 @@ def run(config: str | Path = "config") -> None:
             # Temporarily silence library logging to avoid background metadata
             logging.disable(logging.CRITICAL)
             try:
+                start_ts = time.monotonic()
                 self._collect_state()
                 devices = await self._resolve_devices()
                 if not devices:
                     self._render_summary("No devices selected.")
+                    try:
+                        msg = "Status: idle — No devices selected."
+                        self.query_one("#run-status").update(msg)
+                        self._refresh_bottom_visibility()
+                    except Exception:
+                        pass
                     return
                 plan = self._build_execution_plan(devices)
                 if not plan:
                     self._render_summary("No sequences or commands provided.")
+                    try:
+                        msg = "Status: idle — No sequences or commands provided."
+                        self.query_one("#run-status").update(msg)
+                        self._refresh_bottom_visibility()
+                    except Exception:
+                        pass
                     return
                 # Update status and run with streaming
                 total = len(plan)
@@ -206,13 +248,37 @@ def run(config: str | Path = "config") -> None:
                 summary = await self._run_plan(plan, out_log)
                 # Update summary panel (include errors if any)
                 try:
-                    self._render_summary(summary)
-                    self.query_one("#run-status").update("Status: idle")
+                    elapsed = time.monotonic() - start_ts
+                    summary_with_time = f"{summary} (duration: {elapsed:.2f}s)"
+                    self._render_summary(summary_with_time)
+                    # Reflect summary on the status line; hint about errors if present
+                    err_count = 0
+                    try:
+                        err_count = len(getattr(self, "_errors", []) or [])
+                    except Exception:
+                        err_count = 0
+                    status_msg = f"Status: idle — {summary_with_time}"
+                    if err_count:
+                        status_msg += " — errors available (press s)"
+                    self.query_one("#run-status").update(status_msg)
                     self._refresh_bottom_visibility()
                 except Exception:
                     pass
             except Exception as e:  # noqa: BLE001
-                self._render_summary(f"Run failed: {e}")
+                try:
+                    elapsed = (
+                        (time.monotonic() - start_ts) if (start_ts is not None) else 0.0
+                    )
+                except Exception:
+                    elapsed = 0.0
+                self._render_summary(f"Run failed: {e} (after {elapsed:.2f}s)")
+                try:
+                    self.query_one("#run-status").update(
+                        f"Status: idle — Run failed: {e}"
+                    )
+                    self._refresh_bottom_visibility()
+                except Exception:
+                    pass
             finally:
                 logging.disable(logging.NOTSET)
 
@@ -237,6 +303,10 @@ def run(config: str | Path = "config") -> None:
                 btn = getattr(event, "button", None)
                 if getattr(btn, "id", "") == "run-button":
                     await self.action_confirm()
+                    if hasattr(event, "stop"):
+                        event.stop()
+                elif getattr(btn, "id", "") == "toggle-summary-btn":
+                    self.action_toggle_summary()
                     if hasattr(event, "stop"):
                         event.stop()
             except Exception:
@@ -474,20 +544,68 @@ def run(config: str | Path = "config") -> None:
                 meta: list[str] = getattr(self, "_meta", [])
             except Exception:
                 meta = []
-            parts: list[str] = []
-            if base_summary:
-                parts.append(base_summary)
-            if errors:
-                parts.append("Errors:")
-                parts.extend(errors)
-            if meta:
-                parts.append("Info:")
-                parts.extend(meta)
-            text = "\n".join(parts)
+            renderable: Any = None
+            # Try to build a Rich Text for styled output (errors in red)
             try:
-                self.query_one("#run-summary").update(text)
+                rich_text = _new_rich_text()
+                if rich_text is not None:
+                    first = True
+                    if base_summary:
+                        rich_text.append(base_summary)
+                        first = False
+                    if errors:
+                        if not first:
+                            rich_text.append("\n")
+                        rich_text.append("Errors:", style="bold")
+                        for err in errors:
+                            rich_text.append("\n • ")
+                            rich_text.append(str(err), style="red")
+                        first = False
+                    if meta:
+                        if not first:
+                            rich_text.append("\n")
+                        rich_text.append("Info:", style="bold")
+                        for m in meta:
+                            rich_text.append("\n • ")
+                            rich_text.append(str(m))
+                    renderable = rich_text
             except Exception:
-                pass
+                renderable = None
+            if renderable is None:
+                # Fallback to plain text without styling
+                parts: list[str] = []
+                if base_summary:
+                    parts.append(base_summary)
+                if errors:
+                    parts.append("Errors:")
+                    parts.extend([f" • {e}" for e in errors])
+                if meta:
+                    parts.append("Info:")
+                    parts.extend([f" • {m}" for m in meta])
+                renderable = "\n".join(parts)
+            try:
+                widget = self.query_one("#run-summary")
+            except Exception:
+                widget = None
+            if widget is not None:
+                try:
+                    # Clear previous content if it's a Log-like widget
+                    if hasattr(widget, "clear"):
+                        widget.clear()
+                except Exception:
+                    pass
+                try:
+                    if hasattr(widget, "update"):
+                        widget.update(renderable)
+                    elif hasattr(widget, "write"):
+                        text = str(renderable)
+                        for line in text.splitlines():
+                            widget.write(line)
+                    else:
+                        # Last resort
+                        widget.update(str(renderable))
+                except Exception:
+                    pass
             # Auto-show summary only when there's an actual summary (final) or errors
             should_show = bool(base_summary) or bool(errors)
             if should_show and not getattr(self, "_summary_user_hidden", False):
@@ -549,17 +667,8 @@ def run(config: str | Path = "config") -> None:
             if is_hidden:
                 # User explicitly wants to see it; clear the hidden flag
                 self._summary_user_hidden = False
-                # Only show if there is content to show
-                try:
-                    content = self.query_one("#run-summary")
-                    has_text = bool(
-                        getattr(content, "renderable", "")
-                        or getattr(content, "text", "")
-                    )
-                except Exception:
-                    has_text = False
-                if has_text:
-                    self._show_summary_panel()
+                # Always show when user toggles on, regardless of current content
+                self._show_summary_panel()
             else:
                 # User hides the panel; set the flag and hide
                 self._summary_user_hidden = True
@@ -567,10 +676,22 @@ def run(config: str | Path = "config") -> None:
                 self._refresh_bottom_visibility()
 
         def _show_summary_panel(self) -> None:
-            # Ensure bottom area is visible when showing summary
+            # Ensure bottom area is visible and unhide summary panel
             self._show_bottom_panel()
-            # Ensure bottom area is visible when showing output
-            self._show_bottom_panel()
+            try:
+                panel = self.query_one("#summary-panel")
+            except Exception:
+                panel = None
+            if panel is not None:
+                try:
+                    panel.remove_class("hidden")
+                except Exception:
+                    try:
+                        styles = getattr(panel, "styles", None)
+                        if styles and hasattr(styles, "display"):
+                            styles.display = "block"
+                    except Exception:
+                        pass
             self._refresh_bottom_visibility()
 
         def _show_bottom_panel(self) -> None:
@@ -620,28 +741,22 @@ def run(config: str | Path = "config") -> None:
                 is_summary_hidden = False
                 is_output_hidden = False
             try:
-                status_text = getattr(status_widget, "renderable", "") or getattr(status_widget, "text", "")
-                is_running = isinstance(status_text, str) and ("running" in status_text)
+                status_text = getattr(status_widget, "renderable", "") or getattr(
+                    status_widget, "text", ""
+                )
+                status_str = (
+                    str(status_text)
+                    if not isinstance(status_text, str)
+                    else status_text
+                )
+                # Show bottom if status has more than the plain idle marker
+                has_status_info = status_str.strip() not in {"", "Status: idle"}
             except Exception:
-                is_running = False
-            if is_summary_hidden and is_output_hidden and not is_running:
+                has_status_info = False
+            if is_summary_hidden and is_output_hidden and not has_status_info:
                 self._hide_bottom_panel()
             else:
                 self._show_bottom_panel()
-            try:
-                panel = self.query_one("#summary-panel")
-            except Exception:
-                return
-            # Prefer removing 'hidden' class; fallback to styles
-            try:
-                panel.remove_class("hidden")
-            except Exception:
-                try:
-                    styles = getattr(panel, "styles", None)
-                    if styles and hasattr(styles, "display"):
-                        styles.display = "block"
-                except Exception:
-                    pass
 
         def _hide_summary_panel(self) -> None:
             try:
