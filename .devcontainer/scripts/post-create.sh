@@ -6,6 +6,16 @@ echo "=== Post-create setup ==="
 # Make scripts executable
 chmod +x .devcontainer/scripts/*.sh
 
+# Test networking tools installation
+echo ""
+echo "Testing networking tools installation..."
+.devcontainer/scripts/test-networking-tools.sh
+
+# Setup atuin shell history
+echo ""
+echo "Setting up atuin shell history..."
+.devcontainer/scripts/setup-atuin.sh
+
 # Create necessary directories in volumes
 mkdir -p outputs test_results results
 
