@@ -63,6 +63,7 @@ dev = [
     "detect-secrets>=1.4.0",
     "bandit>=1.7.0",
     "build>=0.10.0",
+    "twine>=4.0.0",
     "types-PyYAML>=6.0.0",
     "types-paramiko>=3.0.0",
 ]
