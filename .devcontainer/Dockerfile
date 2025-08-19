@@ -1,48 +1,20 @@
-# syntax=docker/dockerfile:1.7-labs
-ARG PYTHON_VERSION=3.12.7
-
-FROM python:${PYTHON_VERSION}-slim-bookworm
+FROM python:3.12-slim
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    curl \
+RUN apt-get update && apt-get install -y \
     git \
-    openssh-client \
+    curl \
     build-essential \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+    && rm -rf /var/lib/apt/lists/*
 
-# Install pipx and uv
-RUN python -m pip install --no-cache-dir pipx \
-    && python -m pipx install uv \
-    && python -m pipx ensurepath
+# Install uv globally using pip
+RUN pip install uv
 
-# Create non-root user
-ARG USERNAME=vscode
-ARG USER_UID=1000
-ARG USER_GID=$USER_UID
+# Create vscode user
+RUN useradd -m -s /bin/bash vscode
 
-RUN groupadd --gid $USER_GID $USERNAME \
-    && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
-    && mkdir -p /home/$USERNAME/.cache/pip /home/$USERNAME/.cache/uv \
-    && chown -R $USERNAME:$USERNAME /home/$USERNAME
+# Set up workspace
+RUN mkdir -p /workspace && chown vscode:vscode /workspace
 
-# Create workspace directory
-RUN mkdir -p /workspace && chown $USERNAME:$USERNAME /workspace
-
-# Create writable directories for volumes
-RUN mkdir -p /workspace/.venv /workspace/outputs /workspace/test_results /workspace/results \
-    && chown -R $USERNAME:$USERNAME /workspace
-
-# Switch to non-root user
-USER $USERNAME
-
-# Add pipx bin to PATH for user
-ENV PATH="/root/.local/bin:$PATH"
-
-# Set working directory
+USER vscode
 WORKDIR /workspace
-
-# Set default command
-CMD ["/bin/bash"]

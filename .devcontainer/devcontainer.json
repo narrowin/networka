@@ -23,8 +23,7 @@
     "source=uv-cache-${localWorkspaceFolderBasename},target=/home/vscode/.cache/uv,type=volume",
     "source=outputs-${localWorkspaceFolderBasename},target=${containerWorkspaceFolder}/outputs,type=volume",
     "source=test-results-${localWorkspaceFolderBasename},target=${containerWorkspaceFolder}/test_results,type=volume",
-    "source=results-${localWorkspaceFolderBasename},target=${containerWorkspaceFolder}/results,type=volume",
-    "source=env-${localWorkspaceFolderBasename},target=${containerWorkspaceFolder}/.env,type=volume,readonly"
+    "source=results-${localWorkspaceFolderBasename},target=${containerWorkspaceFolder}/results,type=volume"
   ],
   "workspaceMount": "source=${localWorkspaceFolder},target=${containerWorkspaceFolder},type=bind,readonly",
   "workspaceFolder": "/workspace",

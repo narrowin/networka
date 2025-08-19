@@ -9,12 +9,12 @@ chmod +x .devcontainer/scripts/*.sh
 # Create necessary directories in volumes
 mkdir -p outputs test_results results
 
-# Check if .env exists, if not prompt to seed it
+# Check if .env exists, if not prompt to create it
 if [[ ! -f .env ]]; then
     echo ""
-    echo "WARNING: No .env file found in volume."
-    echo "Run the 'Seed Environment' task to create one:"
-    echo "  Ctrl+Shift+P -> Tasks: Run Task -> Seed Environment"
+    echo "INFO: No .env file found."
+    echo "You can copy .env.example to .env and customize it:"
+    echo "  cp .env.example .env"
     echo ""
 fi
 
