@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, ClassVar
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Footer, Header, TabbedContent
+from textual.widgets import Footer, Header
 
 from network_toolkit.tui.data import TuiDataService
 from network_toolkit.tui.state import AppState
@@ -25,7 +25,7 @@ from network_toolkit.tui.widgets import (
 )
 
 if TYPE_CHECKING:
-    pass
+    from textual.css.query import NoMatches
 
 
 class NetworkWorkerApp(App[None]):
@@ -34,7 +34,7 @@ class NetworkWorkerApp(App[None]):
     TITLE = "Network Worker TUI"
     SUB_TITLE = "Network Device Automation"
 
-    BINDINGS: ClassVar = [
+    BINDINGS: ClassVar[list[Binding]] = [
         Binding("q", "quit", "Quit"),
         Binding("ctrl+c", "quit", "Quit"),
         Binding("r", "run", "Run", priority=True),
@@ -50,78 +50,64 @@ class NetworkWorkerApp(App[None]):
     def __init__(self, config_path: Path | None = None) -> None:
         """Initialize the TUI application."""
         super().__init__()
-        self._config_path = config_path or Path("config")
-        self._data_service = TuiDataService(self._config_path)
+        self._config_path = config_path
+        self._data_service: TuiDataService | None = None
         self._state = AppState()
 
     def compose(self) -> ComposeResult:
         """Create the application layout."""
         yield Header(show_clock=True)
 
+        # Initialize data service
+        self._data_service = TuiDataService(self._config_path or Path("devices.yml"))
+
         # Main layout
         with Vertical(id="main-container"):
             with Horizontal(id="panels-container"):
-                yield TargetsPanel(
-                    self._data_service,
-                    self._state,
-                    widget_id="targets-panel",
-                    classes="panel",
-                )
-                yield ActionsPanel(
-                    self._data_service,
-                    self._state,
-                    widget_id="actions-panel",
-                    classes="panel",
-                )
-            yield ExecutionPanel(
-                self._data_service,
-                self._state,
-                widget_id="execution-panel",
-                classes="panel",
-            )
+                yield TargetsPanel(id="targets-panel", classes="panel")
+                yield ActionsPanel(id="actions-panel", classes="panel")
+            yield ExecutionPanel(id="execution-panel", classes="panel")
 
-        yield StatusBar(self._state, widget_id="status-bar")
+        yield StatusBar(id="status-bar")
         yield Footer()
 
-    async def on_mount(self) -> None:
+    def on_mount(self) -> None:
         """Initialize the app after mounting."""
-        try:
-            await self._data_service.load_data()
-            self.notify("Configuration loaded successfully")
-        except Exception as e:
-            self.notify(f"Failed to load configuration: {e}", severity="error")
+        if self._data_service:
+            self._data_service.load_data()
+            self._update_status("Ready")
 
     def action_run(self) -> None:
-        """Handle run action (r key)."""
-        try:
-            execution_panel = self.query_one("#execution-panel", ExecutionPanel)
-            execution_panel.start_execution()
-        except Exception as e:
-            self.notify(f"Execution failed: {e}", severity="error")
+        """Handle run action."""
+        self._update_status("Running execution...")
+        # Implementation would go here
 
     def action_toggle_summary(self) -> None:
-        """Toggle execution summary view (s key)."""
-        try:
-            execution_panel = self.query_one("#execution-panel", ExecutionPanel)
-            tabs = execution_panel.query_one("#output-tabs", TabbedContent)
-            tabs.active = "tab-summary"
-        except Exception:
-            pass
+        """Toggle execution summary view."""
+        execution_panel = self.query_one("#execution-panel", ExecutionPanel)
+        execution_panel.toggle_summary_view()
 
     def action_toggle_output(self) -> None:
-        """Toggle execution output view (o key)."""
-        try:
-            execution_panel = self.query_one("#execution-panel", ExecutionPanel)
-            tabs = execution_panel.query_one("#output-tabs", TabbedContent)
-            tabs.active = "tab-output"
-        except Exception:
-            pass
+        """Toggle execution output view."""
+        execution_panel = self.query_one("#execution-panel", ExecutionPanel)
+        execution_panel.toggle_output_view()
 
     def action_toggle_theme(self) -> None:
         """Toggle between light and dark themes."""
         self.dark = not self.dark
+        theme = "dark" if self.dark else "light"
+        self._update_status(f"Switched to {theme} theme")
 
     def action_clear_focus(self) -> None:
         """Clear focus from current widget."""
         if self.focused:
             self.focused.blur()
+
+    def _update_status(self, message: str) -> None:
+        """Update the status bar message."""
+        try:
+            status_bar = self.query_one("#status-bar", StatusBar)
+            status_bar.update_status(message)
+        except Exception:
+            # Ignore if status bar not found
+            pass

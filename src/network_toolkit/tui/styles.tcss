@@ -1,0 +1,219 @@
+/* Network Worker TUI Styles */
+
+/* Main layout */
+#main-container {
+    height: 100%;
+}
+
+#panels-container {
+    height: 1fr;
+    min-height: 20;
+}
+
+/* Panel styling */
+.panel {
+    border: round $surface;
+    padding: 1;
+    margin: 1;
+}
+
+.panel-title {
+    text-style: bold;
+    text-align: center;
+    color: $accent;
+    height: 3;
+    content-align: center middle;
+}
+
+/* Target and Actions panels */
+#targets-panel, #actions-panel {
+    width: 1fr;
+    height: 100%;
+}
+
+/* Tabs styling */
+TabbedContent {
+    height: 100%;
+}
+
+TabPane {
+    height: 100%;
+    padding: 1;
+}
+
+/* Filter inputs */
+.filter-input {
+    height: 3;
+    margin-bottom: 1;
+    border: round $primary;
+}
+
+.filter-input:focus {
+    border: round $accent;
+}
+
+/* Selection lists */
+SelectionList {
+    height: 1fr;
+    border: round $surface;
+}
+
+SelectionList > .option-list--option {
+    padding: 0 1;
+}
+
+SelectionList > .option-list--option-selected {
+    background: $accent;
+    color: $text;
+    text-style: bold;
+}
+
+SelectionList > .option-list--option-highlighted {
+    background: $primary;
+    color: $text;
+}
+
+/* Command input */
+.command-input {
+    height: 5;
+    border: round $primary;
+}
+
+.command-input:focus {
+    border: round $accent;
+}
+
+/* Execution panel */
+#execution-panel {
+    height: auto;
+    min-height: 10;
+}
+
+#execution-panel.expanded {
+    height: 1fr;
+}
+
+.execution-controls {
+    height: auto;
+    dock: top;
+}
+
+.run-button {
+    width: 1fr;
+    margin: 1;
+}
+
+.run-button.-primary {
+    background: $success;
+    color: $text;
+}
+
+.run-button:disabled {
+    background: $surface;
+    color: $text-muted;
+}
+
+/* Output areas */
+.output-container {
+    height: 1fr;
+    border: round $surface;
+    margin: 1 0;
+}
+
+.output-log {
+    height: 1fr;
+    background: $surface;
+    color: $text;
+    scrollbar-gutter: stable;
+}
+
+.summary-panel {
+    height: 1fr;
+    border: round $warning;
+}
+
+.output-panel {
+    height: 1fr;
+    border: round $primary;
+}
+
+/* Status bar */
+#status-bar {
+    height: 3;
+    background: $panel;
+    color: $text;
+    text-align: center;
+    content-align: center middle;
+    dock: bottom;
+}
+
+.status-idle {
+    color: $text-muted;
+}
+
+.status-running {
+    color: $warning;
+    text-style: bold;
+}
+
+.status-success {
+    color: $success;
+}
+
+.status-error {
+    color: $error;
+}
+
+/* Hidden elements */
+.hidden {
+    display: none;
+}
+
+/* Dark theme overrides */
+App.-dark-mode {
+    background: $background;
+}
+
+App.-dark-mode .panel {
+    border: round $surface;
+}
+
+App.-dark-mode .filter-input {
+    border: round $primary;
+    background: $surface;
+}
+
+App.-dark-mode .output-log {
+    background: $surface;
+    color: $text;
+}
+
+/* Error styling */
+.error-message {
+    color: $error;
+    text-style: bold;
+}
+
+.warning-message {
+    color: $warning;
+}
+
+.success-message {
+    color: $success;
+}
+
+/* Progress indicators */
+.progress-container {
+    height: 3;
+    margin: 1 0;
+}
+
+ProgressBar {
+    height: 1;
+}
+
+/* Scrollbars */
+.scrollable {
+    scrollbar-gutter: stable;
+    overflow-y: auto;
+}

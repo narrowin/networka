@@ -31,8 +31,7 @@ def common_options(
         typer.Option("--config", "-c", help="Configuration file path"),
     ] = Path("devices.yml"),
     verbose: Annotated[
-        bool,
-        typer.Option("--verbose", "-v", help="Enable verbose logging")
+        bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
     ] = False,
     output_mode: Annotated[
         OutputMode | None,
@@ -108,6 +107,7 @@ class CommandContext:
 # Standard error handling decorator
 def handle_toolkit_errors(func: Callable[..., T]) -> Callable[..., T]:
     """Decorator to handle NetworkToolkitError consistently."""
+
     def wrapper(*args: Any, **kwargs: Any) -> T:
         try:
             return func(*args, **kwargs)
@@ -129,10 +129,6 @@ def handle_toolkit_errors(func: Callable[..., T]) -> Callable[..., T]:
 def create_command_context(**options: Any) -> CommandContext:
     """Create a command context from common options."""
     return CommandContext(
-        config_file=options.get("config_file", Path("devices.yml")),
-        verbose=options.get("verbose", False),
-        output_mode=options.get("output_mode"),
-    )
         config_file=options.get("config_file", Path("devices.yml")),
         verbose=options.get("verbose", False),
         output_mode=options.get("output_mode"),

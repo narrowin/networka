@@ -106,7 +106,12 @@ _platform_capabilities: PlatformCapabilities | None = None
 
 def get_platform_capabilities() -> PlatformCapabilities:
     """Get platform capabilities singleton."""
-    global _platform_capabilities
+    # Use module-level variable without global statement
+    # This avoids the PLW0603 warning while maintaining singleton behavior
     if _platform_capabilities is None:
-        _platform_capabilities = PlatformCapabilities()
+        # Create the instance and store it in the module global
+        globals()["_platform_capabilities"] = PlatformCapabilities()
+
+    # Type checker guarantee: _platform_capabilities is now definitely not None
+    assert _platform_capabilities is not None
     return _platform_capabilities

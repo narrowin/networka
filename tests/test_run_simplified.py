@@ -11,9 +11,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 import typer
 
-# Skip all tests in this module due to import issues
-pytest.skip("Module has import/attribute errors, needs investigation", allow_module_level=True)
-
 from network_toolkit.commands.run_simplified import (
     OutputFormat,
     RunExecutor,
@@ -21,6 +18,11 @@ from network_toolkit.commands.run_simplified import (
 )
 from network_toolkit.config import NetworkConfig
 from network_toolkit.exceptions import DeviceConnectionError, DeviceExecutionError
+
+# Skip all tests in this module due to import issues
+pytest.skip(
+    "Module has import/attribute errors, needs investigation", allow_module_level=True
+)
 
 
 class TestOutputFormat:
