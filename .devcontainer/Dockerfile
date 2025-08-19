@@ -30,6 +30,7 @@ RUN apt-get update && apt-get install -y \
     htop \
     tree \
     unzip \
+    tmux \
     && rm -rf /var/lib/apt/lists/*
 
 # Install atuin (shell history) as root first

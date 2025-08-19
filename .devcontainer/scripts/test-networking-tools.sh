@@ -8,7 +8,7 @@ echo ""
 test_command() {
     local cmd="$1"
     local description="$2"
-    
+
     if command -v "$cmd" >/dev/null 2>&1; then
         echo "✓ $cmd - $description"
         case "$cmd" in
