@@ -37,4 +37,3 @@ services:
 
 volumes:
   networker-data: {}
-
