@@ -30,7 +30,7 @@ NW_PASSWORD_DEFAULT=changeme123
 # Results directory override (optional)
 # NW_RESULTS_DIR=./custom_results
 
-# Test results directory override (optional)  
+# Test results directory override (optional)
 # NW_TEST_RESULTS_DIR=./custom_test_results
 """
     env_file = target_dir / ".env"
@@ -129,7 +129,7 @@ devices:
     model: "Catalyst 3850"
     location: "Data Center"
     tags:
-      - "switch" 
+      - "switch"
       - "core"
       - "cisco"
 
@@ -149,7 +149,7 @@ devices:
     mikrotik_file.write_text(mikrotik_content.strip() + "\n")
     console.print(f"[green]Created MikroTik devices: {mikrotik_file}[/green]")
 
-    cisco_file = devices_dir / "cisco.yml"  
+    cisco_file = devices_dir / "cisco.yml"
     cisco_file.write_text(cisco_content.strip() + "\n")
     console.print(f"[green]Created Cisco devices: {cisco_file}[/green]")
 
@@ -180,7 +180,7 @@ groups:
     description: "All MikroTik devices"
     device_list:
       - "sw-office-01"
-      - "rtr-main-01" 
+      - "rtr-main-01"
       - "ap-lobby-01"
 
   all_cisco:
@@ -264,14 +264,14 @@ def register(app: typer.Typer) -> None:
         ] = False,
     ) -> None:
         """Initialize a minimal working configuration environment.
-        
+
         Creates a complete starter configuration with:
         - .env file with credential templates
         - config/config.yml with basic settings
         - config/devices/ with MikroTik and Cisco examples
         - config/groups/ with logical device groups
         - config/sequences/ with common command sequences
-        
+
         Examples:
         - nw config-init                    # Initialize in current directory
         - nw config-init ~/my-network       # Initialize in specific directory
@@ -281,7 +281,7 @@ def register(app: typer.Typer) -> None:
 
         # Resolve target directory
         target_path = Path(target_dir).resolve()
-        
+
         if not target_path.exists():
             target_path.mkdir(parents=True, exist_ok=True)
             console.print(f"[cyan]Created directory: {target_path}[/cyan]")
@@ -289,14 +289,14 @@ def register(app: typer.Typer) -> None:
         # Check for existing files unless force is used
         env_file = target_path / ".env"
         config_dir = target_path / "config"
-        
+
         if not force:
             existing_files = []
             if env_file.exists():
                 existing_files.append(str(env_file))
             if config_dir.exists():
                 existing_files.append(str(config_dir))
-                
+
             if existing_files:
                 console.print("[yellow]Warning: The following files/directories already exist:[/yellow]")
                 for file in existing_files:
