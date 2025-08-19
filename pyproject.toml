@@ -267,6 +267,11 @@ dev = [
     "pytest-cov>=6.2.1",
     "pytest-mock>=3.14.1",
     "pytest-xdist>=3.8.0",
+    "pip-audit>=2.6.0",
+    "ruff>=0.6.9",
+    "mypy>=1.11.2",
+    "types-PyYAML>=6.0.0",
+    "types-requests>=2.31.0",
     # TUI runtime for local development
     "textual>=0.58.0",
     # Helper tooling for developing the Textual TUI (live reload, inspector)
@@ -277,4 +282,36 @@ dev = [
 tui = [
     "textual>=0.58.0",
     "textual-dev>=1.0.0",
+]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--cov=src/network_toolkit",
+    "--cov-branch",
+    "--cov-report=term-missing:skip-covered",
+    "--cov-report=html:htmlcov",
+    "--cov-report=xml",
+]
+testpaths = [
+    "tests",
+]
+asyncio_mode = "auto"
+python_files = [
+    "test_*.py",
+    "*_test.py",
+]
+python_classes = [
+    "Test*",
+]
+python_functions = [
+    "test_*",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
 ]

@@ -1,0 +1,117 @@
+{
+  "name": "Network Toolkit (Default)",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".",
+    "args": {
+      "PYTHON_VERSION": "3.12.7"
+    }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": false,
+      "installOhMyZsh": false,
+      "upgradePackages": false,
+      "username": "vscode",
+      "userUid": "automatic",
+      "userGid": "automatic"
+    }
+  },
+  "mounts": [
+    "source=venv-${localWorkspaceFolderBasename},target=${containerWorkspaceFolder}/.venv,type=volume",
+    "source=pip-cache-${localWorkspaceFolderBasename},target=/home/vscode/.cache/pip,type=volume",
+    "source=uv-cache-${localWorkspaceFolderBasename},target=/home/vscode/.cache/uv,type=volume",
+    "source=outputs-${localWorkspaceFolderBasename},target=${containerWorkspaceFolder}/outputs,type=volume",
+    "source=test-results-${localWorkspaceFolderBasename},target=${containerWorkspaceFolder}/test_results,type=volume",
+    "source=results-${localWorkspaceFolderBasename},target=${containerWorkspaceFolder}/results,type=volume",
+    "source=env-${localWorkspaceFolderBasename},target=${containerWorkspaceFolder}/.env,type=volume,readonly"
+  ],
+  "workspaceMount": "source=${localWorkspaceFolder},target=${containerWorkspaceFolder},type=bind,readonly",
+  "workspaceFolder": "/workspace",
+  "runArgs": [
+    "--read-only",
+    "--cap-drop=ALL",
+    "--security-opt=no-new-privileges",
+    "--pids-limit=100",
+    "--memory=2g",
+    "--cpus=2",
+    "--tmpfs=/tmp:rw,exec,nosuid,nodev,size=500m",
+    "--tmpfs=/run:rw,exec,nosuid,nodev,size=100m",
+    "--tmpfs=/home/vscode/.cache:rw,nosuid,nodev,size=200m"
+  ],
+  "containerEnv": {
+    "PYTHONPATH": "${containerWorkspaceFolder}/src",
+    "PYTHONUNBUFFERED": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "UV_CACHE_DIR": "/home/vscode/.cache/uv",
+    "PIP_CACHE_DIR": "/home/vscode/.cache/pip"
+  },
+  "remoteEnv": {
+    "PATH": "${containerWorkspaceFolder}/.venv/bin:${containerEnv:PATH}"
+  },
+  "updateRemoteUserUID": true,
+  "remoteUser": "vscode",
+  "postCreateCommand": "bash .devcontainer/scripts/post-create.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-toolsai.jupyter",
+        "charliermarsh.ruff",
+        "EditorConfig.EditorConfig",
+        "ms-azuretools.vscode-docker",
+        "ms-python.debugpy",
+        "tamasfe.even-better-toml",
+        "redhat.vscode-yaml"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+        "python.terminal.activateEnvironment": false,
+        "python.analysis.typeCheckingMode": "strict",
+        "python.analysis.autoImportCompletions": true,
+        "python.testing.pytestEnabled": true,
+        "python.testing.unittestEnabled": false,
+        "python.testing.pytestArgs": ["tests"],
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": "explicit"
+        },
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.organizeImports.ruff": "explicit",
+            "source.fixAll.ruff": "explicit"
+          }
+        },
+        "ruff.nativeServer": true,
+        "ruff.organizeImports": true,
+        "ruff.fixAll": true,
+        "files.eol": "\n",
+        "files.insertFinalNewline": true,
+        "files.trimTrailingWhitespace": true,
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "git.autofetch": false,
+        "git.enableSmartCommit": false,
+        "extensions.autoUpdate": false
+      }
+    }
+  },
+  "forwardPorts": [5678, 8000, 8888],
+  "portsAttributes": {
+    "5678": {
+      "label": "Python Debug",
+      "onAutoForward": "silent"
+    },
+    "8000": {
+      "label": "Web Server",
+      "onAutoForward": "notify"
+    },
+    "8888": {
+      "label": "Jupyter",
+      "onAutoForward": "notify"
+    }
+  },
+  "shutdownAction": "stopContainer"
+}

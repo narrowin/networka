@@ -121,6 +121,8 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+!.env.example
 .venv
 env/
 venv/
@@ -191,6 +193,8 @@ log/
 # Results and output files
 results/
 output/
+outputs/
+test_results/
 reports/
 *.out
 *.txt.results
