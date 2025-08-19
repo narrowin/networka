@@ -108,19 +108,20 @@ uv pip install .
 
 ## Quick Start
 
-Get up and running in 3 steps:
+Get up and running in 2 steps:
 
 ```bash
-# 1. Set up credentials (automatically loaded)
-cp .env.example .env
-nano .env  # Add your actual device credentials
+# 1. Initialize your configuration environment
+nw config-init
+# This creates: .env, config/config.yml, config/devices/, config/groups/, config/sequences/
 
-# 2. Configure your devices
-nano config/devices/devices.yml
+# 2. Update credentials and device IPs
+nano .env                           # Add your actual credentials
+nano config/devices/mikrotik.yml    # Update device IP addresses
 
 # 3. Start managing your network
-nw run sw-acc1 "/system/identity/print"
-nw run office_switches system_info
+nw run sw-office-01 system_info
+nw run office_switches "/system/identity/print"
 ```
 
 ## CLI overview
@@ -153,6 +154,8 @@ Built with async/await support and type safety in mind.
 │ list-groups          List all configured device groups and their members.  │
 │ list-sequences       List all available command sequences, optionally      │
 │                      filtered by vendor or category.                       │
+│ config-init          Initialize a minimal working configuration            │
+│                      environment with examples.                            │
 │ config-validate      Validate the configuration file and show any issues.  │
 │ diff                 Diff config, a command, or a sequence.               │
 ╰────────────────────────────────────────────────────────────────────────────╯

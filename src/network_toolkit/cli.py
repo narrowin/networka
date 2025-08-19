@@ -19,6 +19,7 @@ from network_toolkit.commands.complete import register as register_complete
 # Command registration: import command factories that attach to `app`
 # Each module defines a `register(app)` function that adds its commands.
 from network_toolkit.commands.config_backup import register as register_config_backup
+from network_toolkit.commands.config_init import register as register_config_init
 from network_toolkit.commands.config_validate import (
     register as register_config_validate,
 )
@@ -67,6 +68,7 @@ class CategorizedHelpGroup(TyperGroup):
             "list-devices",
             "list-groups",
             "list-sequences",
+            "config-init",
             "config-validate",
             "diff",
         ]
@@ -237,6 +239,7 @@ register_run(app)
 register_list_devices(app)
 register_list_groups(app)
 register_list_sequences(app)
+register_config_init(app)
 register_config_validate(app)
 register_upload(app)
 register_download(app)

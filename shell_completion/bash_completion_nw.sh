@@ -60,7 +60,7 @@ _nw() {
                 if [[ -n "$result" ]]; then
                     echo "$result"
                 else
-                    echo "info run upload download config-backup backup firmware-upgrade firmware-downgrade bios-upgrade ssh diff list-devices list-groups list-sequences config-validate"
+                    echo "info run upload download config-backup backup firmware-upgrade firmware-downgrade bios-upgrade ssh diff list-devices list-groups list-sequences config-init config-validate"
                 fi
                 return ;;
             devices)
@@ -163,6 +163,7 @@ _nw() {
     local ssh_opts="--config -c --auth --user --password --layout --session-name --window-name --reuse --sync --no-sync --use-sshpass --attach --no-attach --platform -p --port $common_opts"
     local info_opts="--interactive-auth -i $output_opts $common_opts"
     local config_validate_opts="$common_opts"
+    local config_init_opts="$common_opts --force"
     local diff_opts="$common_opts"
 
     # Helper: complete from a list or options
@@ -284,6 +285,8 @@ _nw() {
             _opts "$list_groups_opts" ;;
         list-sequences)
             _opts "$list_sequences_opts" ;;
+        config-init)
+            _opts "$config_init_opts" ;;
         config-validate)
             _opts "$config_validate_opts" ;;
         *)
