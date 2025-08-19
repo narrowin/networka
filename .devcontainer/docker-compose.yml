@@ -1,0 +1,40 @@
+services:
+  dev:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    user: "${UID:-1000}:${GID:-1000}"
+    working_dir: /workspace
+    volumes:
+      - type: bind
+        source: ..
+        target: /workspace
+        read_only: true
+      - networker-data:/workdata
+    environment:
+      VIRTUAL_ENV: "/workdata/venv"
+      PATH: "/workdata/venv/bin:${PATH}"
+      UV_CACHE_DIR: "/workdata/cache/uv"
+      PIP_CACHE_DIR: "/workdata/cache/pip"
+      XDG_CACHE_HOME: "/workdata/cache"
+      PYTHONDONTWRITEBYTECODE: "1"
+      COVERAGE_FILE: "/workdata/.coverage"
+      RUFF_CACHE_DIR: "/workdata/cache/ruff"
+      MYPY_CACHE_DIR: "/workdata/cache/mypy"
+      PYTEST_ADDOPTS: "--override-ini cache_dir=/workdata/cache/pytest"
+      NW_RESULTS_DIR: "/workdata/results"
+      NW_TEST_RESULTS_DIR: "/workdata/test_results"
+      DOTENV_PATH: "/workdata/.env"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    init: true
+    tty: true
+
+volumes:
+  networker-data: {}
+

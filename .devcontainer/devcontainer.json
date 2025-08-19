@@ -1,0 +1,31 @@
+{
+  "name": "Network Toolkit Dev",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+
+  "mounts": ["source=networker-data,target=/workdata,type=volume"],
+
+  "containerEnv": {
+    "VIRTUAL_ENV": "/workdata/venv",
+    "PATH": "/workdata/venv/bin:${containerEnv:PATH}",
+    "UV_CACHE_DIR": "/workdata/cache/uv",
+    "PIP_CACHE_DIR": "/workdata/cache/pip",
+    "NW_RESULTS_DIR": "/workdata/results"
+  },
+
+  "postCreateCommand": "mkdir -p /workdata/{venv,cache,results} && python -m venv /workdata/venv && /workdata/venv/bin/pip install --upgrade pip uv && /workdata/venv/bin/uv sync",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "charliermarsh.ruff"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/workdata/venv/bin/python"
+      }
+    }
+  },
+
+  "remoteUser": "vscode"
+}
