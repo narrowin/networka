@@ -23,13 +23,18 @@ RUN groupadd --gid $USER_GID $USERNAME \
     && mkdir -p /home/$USERNAME/.cache/pip /home/$USERNAME/.cache/uv \
     && chown -R $USERNAME:$USERNAME /home/$USERNAME
 
-# Install uv with pinned version
+# Install uv with pinned version - more robust approach
 ENV UV_VERSION=0.4.18
-RUN curl -LsSf https://astral.sh/uv/$UV_VERSION/install.sh | sh
-ENV PATH="/root/.local/bin:$PATH"
-
-# Copy uv binary to system location for all users
-RUN cp /root/.local/bin/uv /usr/local/bin/uv
+RUN curl -LsSf https://astral.sh/uv/$UV_VERSION/install.sh | sh \
+    && ls -la /root/.local/bin/ \
+    && if [ -f /root/.local/bin/uv ]; then \
+    cp /root/.local/bin/uv /usr/local/bin/uv; \
+    elif [ -f /root/.cargo/bin/uv ]; then \
+    cp /root/.cargo/bin/uv /usr/local/bin/uv; \
+    else \
+    echo "uv binary not found in expected locations" && exit 1; \
+    fi \
+    && chmod +x /usr/local/bin/uv
 
 # Create workspace directory
 RUN mkdir -p /workspace && chown $USERNAME:$USERNAME /workspace
@@ -45,7 +50,7 @@ USER $USERNAME
 WORKDIR /workspace
 
 # Verify installation
-RUN python --version && uv --version
+RUN python --version && /usr/local/bin/uv --version
 
 # Set default command
 CMD ["/bin/bash"]
