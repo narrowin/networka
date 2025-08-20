@@ -6,7 +6,7 @@ SUPPORTED_FIRMWARE_EXTENSIONS = [".bin", ".tar"]
 
 # Platform information
 PLATFORM_NAME = "Cisco IOS"
-DEVICE_TYPES = ["cisco_ios", "cisco_iosxe"]
+DEVICE_TYPES = ["cisco_ios"]
 
 # Default backup sequence commands (example - not implemented)
 DEFAULT_BACKUP_SEQUENCE = [
