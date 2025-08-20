@@ -58,6 +58,8 @@ class CategorizedHelpGroup(TyperGroup):
             "upload",
             "download",
             "config-backup",
+        ]
+        vendor_names = [
             "firmware-upgrade",
             "firmware-downgrade",
             "bios-upgrade",
@@ -86,11 +88,15 @@ class CategorizedHelpGroup(TyperGroup):
             return items
 
         exec_rows = rows(exec_names)
+        vendor_rows = rows(vendor_names)
         info_rows = rows(info_names)
 
         if exec_rows:
             formatter.write_text("\nExecuting Operations")
             formatter.write_dl(exec_rows)
+        if vendor_rows:
+            formatter.write_text("\nVendor-Specific Operations")
+            formatter.write_dl(vendor_rows)
         if info_rows:
             formatter.write_text("\nInfo & Configuration")
             formatter.write_dl(info_rows)
