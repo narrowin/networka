@@ -133,17 +133,16 @@ def check_operation_support(device_type: str, operation_name: str) -> tuple[bool
     # Get platform name for error messages
     platform_name = get_supported_platforms()[device_type]
 
-    # For our current implementation, Cisco platforms don't support firmware operations
-    if device_type in ["cisco_ios", "cisco_iosxe"] and operation_name in [
-        "firmware_upgrade",
-        "firmware_downgrade",
-        "bios_upgrade",
-        "create_backup",
-    ]:
-        return (
-            False,
-            f"Operation '{operation_name}' is not supported on platform '{platform_name}'",
-        )
+    # Check which operations are supported by each platform
+    if device_type in ["cisco_ios", "cisco_iosxe"]:
+        # Cisco platforms support firmware operations but not other operations yet
+        if operation_name in ["firmware_upgrade", "firmware_downgrade"]:
+            return True, ""
+        elif operation_name in ["bios_upgrade", "create_backup"]:
+            return (
+                False,
+                f"Operation '{operation_name}' is not supported on platform '{platform_name}'",
+            )
 
     # MikroTik RouterOS supports all operations
     if device_type == "mikrotik_routeros":

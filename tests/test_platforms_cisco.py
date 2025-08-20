@@ -24,7 +24,9 @@ class TestCiscoIOSOperations:
     def test_platform_metadata(self) -> None:
         """Test platform metadata methods."""
         assert self.platform_ops.get_platform_name() == "Cisco IOS"
-        assert self.platform_ops.get_device_types() == ["cisco_ios"]  # Fixed to only include cisco_ios
+        assert self.platform_ops.get_device_types() == [
+            "cisco_ios"
+        ]  # Fixed to only include cisco_ios
         supported_exts = self.platform_ops.get_supported_file_extensions()
         assert ".bin" in supported_exts
         assert ".tar" in supported_exts

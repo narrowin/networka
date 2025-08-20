@@ -14,28 +14,22 @@ class TestUnsupportedOperations:
     """Test detection of unsupported operations before device connection."""
 
     def test_check_operation_support_cisco_firmware_upgrade(self) -> None:
-        """Test that Cisco platforms don't support firmware upgrade."""
+        """Test that Cisco IOS platforms support firmware upgrade."""
         is_supported, error_msg = check_operation_support(
             "cisco_ios", "firmware_upgrade"
         )
 
-        assert not is_supported
-        assert (
-            "Operation 'firmware_upgrade' is not supported on platform 'Cisco IOS'"
-            in error_msg
-        )
+        assert is_supported
+        assert error_msg == ""
 
     def test_check_operation_support_cisco_iosxe_firmware_upgrade(self) -> None:
-        """Test that Cisco IOS-XE platforms don't support firmware upgrade."""
+        """Test that Cisco IOS-XE platforms support firmware upgrade."""
         is_supported, error_msg = check_operation_support(
             "cisco_iosxe", "firmware_upgrade"
         )
 
-        assert not is_supported
-        assert (
-            "Operation 'firmware_upgrade' is not supported on platform 'Cisco IOS-XE'"
-            in error_msg
-        )
+        assert is_supported
+        assert error_msg == ""
 
     def test_check_operation_support_cisco_bios_upgrade(self) -> None:
         """Test that Cisco platforms don't support BIOS upgrade."""
@@ -152,9 +146,8 @@ class TestCommandLineUnsupportedOperations:
     def test_all_unsupported_cisco_operations(self) -> None:
         """Test that all firmware/BIOS operations are unsupported on Cisco."""
         cisco_platforms = ["cisco_ios", "cisco_iosxe"]
+        # Cisco platforms now support firmware operations, but not other operations
         unsupported_operations = [
-            "firmware_upgrade",
-            "firmware_downgrade",
             "bios_upgrade",
             "create_backup",
         ]
@@ -172,6 +165,16 @@ class TestCommandLineUnsupportedOperations:
                     assert "Cisco IOS" in error_msg
                 elif platform == "cisco_iosxe":
                     assert "Cisco IOS-XE" in error_msg
+
+        # Test that firmware operations ARE supported now
+        firmware_operations = ["firmware_upgrade", "firmware_downgrade"]
+        for platform in cisco_platforms:
+            for operation in firmware_operations:
+                is_supported, error_msg = check_operation_support(platform, operation)
+                assert is_supported, (
+                    f"{operation} should be supported on {platform}"
+                )
+                assert error_msg == ""
 
     def test_mikrotik_operations_supported(self) -> None:
         """Test that MikroTik RouterOS supports all operations."""
