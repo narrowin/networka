@@ -15,7 +15,11 @@ import typer
 from network_toolkit.common.logging import console, setup_logging
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
-from network_toolkit.platforms import UnsupportedOperationError, get_platform_operations
+from network_toolkit.platforms import (
+    check_operation_support,
+    get_platform_file_extensions,
+    get_platform_operations,
+)
 
 MAX_LIST_PREVIEW = 10
 
@@ -102,23 +106,44 @@ def register(app: typer.Typer) -> None:
 
             def process_device(dev: str) -> bool:
                 try:
-                    with device_session(dev, config) as session:
-                        # Get platform-specific operations
-                        try:
-                            platform_ops = get_platform_operations(session)
-                        except UnsupportedOperationError as e:
-                            console.print(f"[red]Error on {dev}: {e}[/red]")
-                            return False
+                    # Check device exists in configuration
+                    devices = config.devices or {}
+                    if dev not in devices:
+                        console.print(
+                            f"[red]Error: Device '{dev}' not found in configuration[/red]"
+                        )
+                        return False
 
-                        # Validate firmware file extension for this platform
-                        supported_exts = platform_ops.get_supported_file_extensions()
-                        if firmware_file.suffix.lower() not in supported_exts:
-                            ext_list = ", ".join(supported_exts)
-                            console.print(
-                                f"[red]Error: Invalid firmware file for {platform_ops.get_platform_name()}. "
-                                f"Expected {ext_list}, got {firmware_file.suffix}[/red]"
-                            )
-                            return False
+                    device_config = devices[dev]
+                    device_type = device_config.device_type
+
+                    # Check if platform supports firmware upgrade BEFORE connecting
+                    is_supported, error_msg = check_operation_support(
+                        device_type, "firmware_upgrade"
+                    )
+                    if not is_supported:
+                        console.print(f"[red]Error on {dev}: {error_msg}[/red]")
+                        return False
+
+                    # Check supported file extensions before connecting
+                    supported_exts = get_platform_file_extensions(device_type)
+                    if firmware_file.suffix.lower() not in supported_exts:
+                        ext_list = ", ".join(supported_exts)
+                        platform_name = {
+                            "mikrotik_routeros": "MikroTik RouterOS",
+                            "cisco_ios": "Cisco IOS",
+                            "cisco_iosxe": "Cisco IOS-XE",
+                        }.get(device_type, device_type)
+                        console.print(
+                            f"[red]Error: Invalid firmware file for {platform_name}. "
+                            f"Expected {ext_list}, got {firmware_file.suffix}[/red]"
+                        )
+                        return False
+
+                    # Now connect to device and proceed with actual operation
+                    with device_session(dev, config) as session:
+                        # Get platform-specific operations (this should now always work)
+                        platform_ops = get_platform_operations(session)
 
                         if precheck_sequence and not skip_precheck:
                             console.print(

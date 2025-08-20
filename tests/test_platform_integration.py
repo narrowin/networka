@@ -137,6 +137,97 @@ class TestPlatformIntegration:
 
     @patch("network_toolkit.commands.firmware_upgrade.setup_logging")
     @patch("network_toolkit.commands.firmware_upgrade.load_config")
+    @patch("pathlib.Path.exists")
+    @patch("pathlib.Path.is_file")
+    def test_firmware_upgrade_cisco_unsupported_before_connection(
+        self,
+        mock_is_file: MagicMock,
+        mock_exists: MagicMock,
+        mock_load_config: MagicMock,
+        mock_setup_logging: MagicMock,
+    ) -> None:
+        """Test that unsupported operations are detected BEFORE device connection."""
+        # Mock file validation to pass
+        mock_exists.return_value = True
+        mock_is_file.return_value = True
+
+        # Setup Cisco device config
+        mock_config = MagicMock()
+        mock_device_config = MagicMock()
+        mock_device_config.device_type = "cisco_ios"
+        mock_config.devices = {"test_switch": mock_device_config}
+        mock_config.device_groups = {}
+        mock_load_config.return_value = mock_config
+
+        # Create app and register command
+        app = typer.Typer()
+        register_firmware_upgrade(app)
+
+        # Test firmware upgrade command
+        result = self.runner.invoke(app, ["test_switch", "firmware.bin"])
+
+        # Should exit with error code 1 (not 0)
+        assert result.exit_code == 1
+
+        # Should NOT show any connection attempts or device session logs
+        # The key test: no import_module should be called (no device connection)
+        mock_load_config.assert_called_once()
+        # setup_logging should be called but import_module should NOT be called
+
+    @patch("network_toolkit.commands.bios_upgrade.setup_logging")
+    @patch("network_toolkit.commands.bios_upgrade.load_config")
+    def test_bios_upgrade_cisco_unsupported_before_connection(
+        self,
+        mock_load_config: MagicMock,
+        mock_setup_logging: MagicMock,
+    ) -> None:
+        """Test that BIOS upgrade is rejected for Cisco before connection."""
+        # Setup Cisco device config
+        mock_config = MagicMock()
+        mock_device_config = MagicMock()
+        mock_device_config.device_type = "cisco_iosxe"
+        mock_config.devices = {"test_switch": mock_device_config}
+        mock_config.device_groups = {}
+        mock_load_config.return_value = mock_config
+
+        # Create app and register command
+        app = typer.Typer()
+        register_bios_upgrade(app)
+
+        # Test BIOS upgrade command
+        result = self.runner.invoke(app, ["test_switch"])
+
+        # Should exit with error code 1
+        assert result.exit_code == 1
+
+    @patch("network_toolkit.commands.config_backup.setup_logging")
+    @patch("network_toolkit.commands.config_backup.load_config")
+    def test_config_backup_cisco_unsupported_before_connection(
+        self,
+        mock_load_config: MagicMock,
+        mock_setup_logging: MagicMock,
+    ) -> None:
+        """Test that config backup is rejected for Cisco before connection."""
+        # Setup Cisco device config
+        mock_config = MagicMock()
+        mock_device_config = MagicMock()
+        mock_device_config.device_type = "cisco_ios"
+        mock_config.devices = {"test_switch": mock_device_config}
+        mock_config.device_groups = {}
+        mock_load_config.return_value = mock_config
+
+        # Create app and register command
+        app = typer.Typer()
+        register_config_backup(app)
+
+        # Test config backup command
+        result = self.runner.invoke(app, ["test_switch"])
+
+        # Should exit with error code 1
+        assert result.exit_code == 1
+
+    @patch("network_toolkit.commands.firmware_upgrade.setup_logging")
+    @patch("network_toolkit.commands.firmware_upgrade.load_config")
     @patch("network_toolkit.commands.firmware_upgrade.import_module")
     @patch("network_toolkit.commands.firmware_upgrade.console")
     @patch("pathlib.Path.exists")

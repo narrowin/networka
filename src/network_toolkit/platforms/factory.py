@@ -105,3 +105,87 @@ def is_platform_supported(device_type: str) -> bool:
         True if platform is supported
     """
     return device_type in get_supported_platforms()
+
+
+def check_operation_support(device_type: str, operation_name: str) -> tuple[bool, str]:
+    """Check if a specific operation is supported by a platform.
+
+    Parameters
+    ----------
+    device_type : str
+        Device type to check
+    operation_name : str
+        Name of the operation to check (e.g., 'firmware_upgrade')
+
+    Returns
+    -------
+    tuple[bool, str]
+        (is_supported, error_message_if_not_supported)
+    """
+    if not is_platform_supported(device_type):
+        platforms = get_supported_platforms()
+        supported_list = ", ".join(platforms.keys())
+        return (
+            False,
+            f"Platform '{device_type}' is not supported. Supported platforms: {supported_list}",
+        )
+
+    # Get platform name for error messages
+    platform_name = get_supported_platforms()[device_type]
+
+    # For our current implementation, Cisco platforms don't support firmware operations
+    if device_type in ["cisco_ios", "cisco_iosxe"] and operation_name in [
+        "firmware_upgrade",
+        "firmware_downgrade",
+        "bios_upgrade",
+        "create_backup",
+    ]:
+        return (
+            False,
+            f"Operation '{operation_name}' is not supported on platform '{platform_name}'",
+        )
+
+    # MikroTik RouterOS supports all operations
+    if device_type == "mikrotik_routeros":
+        return True, ""
+
+    # Default case for unknown operations
+    return (
+        False,
+        f"Operation '{operation_name}' is not supported on platform '{platform_name}'",
+    )
+
+
+def get_platform_file_extensions(device_type: str) -> list[str]:
+    """Get supported file extensions for a platform without requiring a session.
+
+    Parameters
+    ----------
+    device_type : str
+        Device type to check
+
+    Returns
+    -------
+    list[str]
+        List of supported file extensions
+    """
+    if device_type == "mikrotik_routeros":
+        from network_toolkit.platforms.mikrotik_routeros.constants import (
+            SUPPORTED_FIRMWARE_EXTENSIONS,
+        )
+
+        return SUPPORTED_FIRMWARE_EXTENSIONS
+    elif device_type == "cisco_ios":
+        from network_toolkit.platforms.cisco_ios.constants import (
+            SUPPORTED_FIRMWARE_EXTENSIONS,
+        )
+
+        return SUPPORTED_FIRMWARE_EXTENSIONS
+    elif device_type == "cisco_iosxe":
+        from network_toolkit.platforms.cisco_iosxe.constants import (
+            SUPPORTED_FIRMWARE_EXTENSIONS,
+        )
+
+        return SUPPORTED_FIRMWARE_EXTENSIONS
+    else:
+        return []
