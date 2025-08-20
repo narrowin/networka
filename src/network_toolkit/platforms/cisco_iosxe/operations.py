@@ -490,7 +490,9 @@ class CiscoIOSXEOperations(PlatformOperations):
         if not backup_sequence:
             backup_sequence = ["show running-config"]
 
-        logger.info(f"Creating Cisco IOS-XE configuration backup on {self.session.device_name}")
+        logger.info(
+            f"Creating Cisco IOS-XE configuration backup on {self.session.device_name}"
+        )
 
         try:
             # Execute configuration backup commands
@@ -498,7 +500,9 @@ class CiscoIOSXEOperations(PlatformOperations):
                 logger.debug(f"Executing config backup command: {cmd}")
                 self.session.execute_command(cmd)
 
-            logger.info("OK Cisco IOS-XE configuration backup commands executed successfully")
+            logger.info(
+                "OK Cisco IOS-XE configuration backup commands executed successfully"
+            )
             return True
 
         except DeviceExecutionError as e:
@@ -541,7 +545,9 @@ class CiscoIOSXEOperations(PlatformOperations):
                 "show license status",
             ]
 
-        logger.info(f"Creating comprehensive Cisco IOS-XE backup on {self.session.device_name}")
+        logger.info(
+            f"Creating comprehensive Cisco IOS-XE backup on {self.session.device_name}"
+        )
 
         try:
             # Execute comprehensive backup commands
@@ -549,7 +555,9 @@ class CiscoIOSXEOperations(PlatformOperations):
                 logger.debug(f"Executing backup command: {cmd}")
                 self.session.execute_command(cmd)
 
-            logger.info("OK Cisco IOS-XE comprehensive backup commands executed successfully")
+            logger.info(
+                "OK Cisco IOS-XE comprehensive backup commands executed successfully"
+            )
             return True
 
         except DeviceExecutionError as e:

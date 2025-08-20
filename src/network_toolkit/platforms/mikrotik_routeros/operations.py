@@ -578,7 +578,9 @@ class MikroTikRouterOSOperations(PlatformOperations):
         if not backup_sequence:
             backup_sequence = ["/export file=nw-config-export"]
 
-        logger.info(f"Creating RouterOS configuration backup on {self.session.device_name}")
+        logger.info(
+            f"Creating RouterOS configuration backup on {self.session.device_name}"
+        )
 
         try:
             # Execute configuration backup commands
@@ -586,7 +588,9 @@ class MikroTikRouterOSOperations(PlatformOperations):
                 logger.debug(f"Executing config backup command: {cmd}")
                 self.session.execute_command(cmd)
 
-            logger.info("OK RouterOS configuration backup commands executed successfully")
+            logger.info(
+                "OK RouterOS configuration backup commands executed successfully"
+            )
             return True
 
         except DeviceExecutionError as e:
@@ -626,7 +630,9 @@ class MikroTikRouterOSOperations(PlatformOperations):
                 "/system/backup/save name=nw-system-backup",
             ]
 
-        logger.info(f"Creating comprehensive RouterOS backup on {self.session.device_name}")
+        logger.info(
+            f"Creating comprehensive RouterOS backup on {self.session.device_name}"
+        )
 
         try:
             # Execute comprehensive backup commands
@@ -634,7 +640,9 @@ class MikroTikRouterOSOperations(PlatformOperations):
                 logger.debug(f"Executing backup command: {cmd}")
                 self.session.execute_command(cmd)
 
-            logger.info("OK RouterOS comprehensive backup commands executed successfully")
+            logger.info(
+                "OK RouterOS comprehensive backup commands executed successfully"
+            )
             return True
 
         except DeviceExecutionError as e:

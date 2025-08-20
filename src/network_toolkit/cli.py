@@ -37,7 +37,9 @@ from network_toolkit.commands.run import register as register_run
 from network_toolkit.commands.ssh import register as register_ssh
 from network_toolkit.commands.upload import register as register_upload
 from network_toolkit.commands.vendor_backup import register as register_vendor_backup
-from network_toolkit.commands.vendor_config_backup import register as register_vendor_config_backup
+from network_toolkit.commands.vendor_config_backup import (
+    register as register_vendor_config_backup,
+)
 from network_toolkit.common.logging import console, setup_logging
 
 # Keep this import here to preserve tests that patch `network_toolkit.cli.DeviceSession`

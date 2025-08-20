@@ -64,7 +64,9 @@ class TestCiscoIOSBackupOperations:
         # Create mock session
         mock_session = MagicMock()
         mock_session.is_connected = True
-        mock_session.execute_command.side_effect = DeviceExecutionError("Command failed")
+        mock_session.execute_command.side_effect = DeviceExecutionError(
+            "Command failed"
+        )
 
         # Create operations instance
         ops = CiscoIOSOperations(mock_session)
@@ -130,7 +132,9 @@ class TestCiscoIOSBackupOperations:
         # Create mock session
         mock_session = MagicMock()
         mock_session.is_connected = True
-        mock_session.execute_command.side_effect = DeviceExecutionError("Command failed")
+        mock_session.execute_command.side_effect = DeviceExecutionError(
+            "Command failed"
+        )
 
         # Create operations instance
         ops = CiscoIOSOperations(mock_session)

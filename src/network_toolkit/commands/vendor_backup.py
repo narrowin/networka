@@ -60,9 +60,7 @@ def register(app: typer.Typer) -> None:
             bool,
             typer.Option(
                 "--download/--no-download",
-                help=(
-                    "Download created backup files after running the sequence"
-                ),
+                help=("Download created backup files after running the sequence"),
             ),
         ] = True,
         delete_remote: Annotated[
@@ -170,13 +168,17 @@ def register(app: typer.Typer) -> None:
                                     {
                                         "remote_file": "nw-config-export.rsc",
                                         "local_path": str(config.general.backup_dir),
-                                        "local_filename": ("{device}_{date}_config.rsc"),
+                                        "local_filename": (
+                                            "{device}_{date}_config.rsc"
+                                        ),
                                         "delete_remote": delete_remote,
                                     },
                                     {
                                         "remote_file": "nw-system-backup.backup",
                                         "local_path": str(config.general.backup_dir),
-                                        "local_filename": ("{device}_{date}_system.backup"),
+                                        "local_filename": (
+                                            "{device}_{date}_system.backup"
+                                        ),
                                         "delete_remote": delete_remote,
                                     },
                                 ]
@@ -227,7 +229,8 @@ def register(app: typer.Typer) -> None:
                 raise typer.Exit(1)
 
             console.print(
-                "[bold cyan]Starting comprehensive backups for group:[/bold cyan] " + target_name
+                "[bold cyan]Starting comprehensive backups for group:[/bold cyan] "
+                + target_name
             )
             failures = 0
             for dev in members:
@@ -264,9 +267,7 @@ def register(app: typer.Typer) -> None:
             bool,
             typer.Option(
                 "--download/--no-download",
-                help=(
-                    "Download created backup files after running the sequence"
-                ),
+                help=("Download created backup files after running the sequence"),
             ),
         ] = True,
         delete_remote: Annotated[

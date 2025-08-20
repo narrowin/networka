@@ -6,9 +6,11 @@ import typer
 from typer.testing import CliRunner
 
 from network_toolkit.commands.bios_upgrade import register as register_bios_upgrade
-from network_toolkit.commands.vendor_config_backup import register as register_config_backup
 from network_toolkit.commands.firmware_upgrade import (
     register as register_firmware_upgrade,
+)
+from network_toolkit.commands.vendor_config_backup import (
+    register as register_config_backup,
 )
 
 

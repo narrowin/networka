@@ -69,7 +69,9 @@ def register(app: typer.Typer) -> None:
             bool,
             typer.Option(
                 "--delete-remote/--keep-remote",
-                help=("Delete remote configuration backup files after successful download"),
+                help=(
+                    "Delete remote configuration backup files after successful download"
+                ),
             ),
         ] = False,
         config_file: Annotated[
@@ -170,7 +172,9 @@ def register(app: typer.Typer) -> None:
                                     {
                                         "remote_file": "nw-config-export.rsc",
                                         "local_path": str(config.general.backup_dir),
-                                        "local_filename": ("{device}_{date}_config.rsc"),
+                                        "local_filename": (
+                                            "{device}_{date}_config.rsc"
+                                        ),
                                         "delete_remote": delete_remote,
                                     },
                                 ]
@@ -221,7 +225,8 @@ def register(app: typer.Typer) -> None:
                 raise typer.Exit(1)
 
             console.print(
-                "[bold cyan]Starting configuration backups for group:[/bold cyan] " + target_name
+                "[bold cyan]Starting configuration backups for group:[/bold cyan] "
+                + target_name
             )
             failures = 0
             for dev in members:
@@ -267,7 +272,9 @@ def register(app: typer.Typer) -> None:
             bool,
             typer.Option(
                 "--delete-remote/--keep-remote",
-                help=("Delete remote configuration backup files after successful download"),
+                help=(
+                    "Delete remote configuration backup files after successful download"
+                ),
             ),
         ] = False,
         config_file: Annotated[

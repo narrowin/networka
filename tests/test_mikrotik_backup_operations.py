@@ -7,7 +7,9 @@ from unittest.mock import MagicMock
 import pytest
 
 from network_toolkit.exceptions import DeviceConnectionError, DeviceExecutionError
-from network_toolkit.platforms.mikrotik_routeros.operations import MikroTikRouterOSOperations
+from network_toolkit.platforms.mikrotik_routeros.operations import (
+    MikroTikRouterOSOperations,
+)
 
 
 class TestMikroTikRouterOSBackupOperations:
@@ -64,7 +66,9 @@ class TestMikroTikRouterOSBackupOperations:
         # Create mock session
         mock_session = MagicMock()
         mock_session.is_connected = True
-        mock_session.execute_command.side_effect = DeviceExecutionError("Command failed")
+        mock_session.execute_command.side_effect = DeviceExecutionError(
+            "Command failed"
+        )
 
         # Create operations instance
         ops = MikroTikRouterOSOperations(mock_session)
@@ -85,7 +89,9 @@ class TestMikroTikRouterOSBackupOperations:
         ops = MikroTikRouterOSOperations(mock_session)
 
         # Test comprehensive backup
-        result = ops.backup(backup_sequence=["/export file=test", "/system/backup/save name=test"])
+        result = ops.backup(
+            backup_sequence=["/export file=test", "/system/backup/save name=test"]
+        )
 
         assert result is True
         assert mock_session.execute_command.call_count == 2
@@ -128,7 +134,9 @@ class TestMikroTikRouterOSBackupOperations:
         # Create mock session
         mock_session = MagicMock()
         mock_session.is_connected = True
-        mock_session.execute_command.side_effect = DeviceExecutionError("Command failed")
+        mock_session.execute_command.side_effect = DeviceExecutionError(
+            "Command failed"
+        )
 
         # Create operations instance
         ops = MikroTikRouterOSOperations(mock_session)
