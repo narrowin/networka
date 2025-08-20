@@ -1,6 +1,7 @@
 """Tests for platform abstraction layer."""
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -131,16 +132,22 @@ class TestPlatformOperationsBase:
 
         # Create a test implementation
         class TestPlatformOps(PlatformOperations):
-            def firmware_upgrade(self, *args, **kwargs) -> bool:
+            def firmware_upgrade(self, *args: Any, **kwargs: Any) -> bool:
                 return True
 
-            def firmware_downgrade(self, *args, **kwargs) -> bool:
+            def firmware_downgrade(self, *args: Any, **kwargs: Any) -> bool:
                 return True
 
-            def bios_upgrade(self, *args, **kwargs) -> bool:
+            def bios_upgrade(self, *args: Any, **kwargs: Any) -> bool:
                 return True
 
-            def create_backup(self, *args, **kwargs) -> bool:
+            def create_backup(self, *args: Any, **kwargs: Any) -> bool:
+                return True
+
+            def config_backup(self, *args: Any, **kwargs: Any) -> bool:
+                return True
+
+            def backup(self, *args: Any, **kwargs: Any) -> bool:
                 return True
 
             @classmethod

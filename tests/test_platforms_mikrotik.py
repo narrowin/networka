@@ -184,7 +184,7 @@ class TestMikroTikRouterOSOperations:
 
     def test_create_backup_not_connected(self) -> None:
         """Test backup creation when device not connected."""
-        self.mock_session._connected = False
+        self.mock_session.is_connected = False
         backup_sequence = ["/system backup save"]
 
         # Should raise DeviceConnectionError

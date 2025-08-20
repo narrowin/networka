@@ -18,7 +18,6 @@ from network_toolkit.commands.complete import register as register_complete
 
 # Command registration: import command factories that attach to `app`
 # Each module defines a `register(app)` function that adds its commands.
-from network_toolkit.commands.config_backup import register as register_config_backup
 from network_toolkit.commands.config_validate import (
     register as register_config_validate,
 )
@@ -37,8 +36,9 @@ from network_toolkit.commands.list_sequences import register as register_list_se
 from network_toolkit.commands.run import register as register_run
 from network_toolkit.commands.ssh import register as register_ssh
 from network_toolkit.commands.upload import register as register_upload
+from network_toolkit.commands.vendor_backup import register as register_vendor_backup
+from network_toolkit.commands.vendor_config_backup import register as register_vendor_config_backup
 from network_toolkit.common.logging import console, setup_logging
-from network_toolkit.common.output import OutputMode, set_output_mode
 
 # Keep this import here to preserve tests that patch `network_toolkit.cli.DeviceSession`
 from network_toolkit.device import DeviceSession as _DeviceSession
@@ -57,9 +57,10 @@ class CategorizedHelpGroup(TyperGroup):
             "ssh",
             "upload",
             "download",
-            "config-backup",
         ]
         vendor_names = [
+            "config-backup",
+            "backup",
             "firmware-upgrade",
             "firmware-downgrade",
             "bios-upgrade",
@@ -246,7 +247,8 @@ register_list_sequences(app)
 register_config_validate(app)
 register_upload(app)
 register_download(app)
-register_config_backup(app)
+register_vendor_config_backup(app)
+register_vendor_backup(app)
 register_firmware_upgrade(app)
 register_firmware_downgrade(app)
 register_bios_upgrade(app)

@@ -164,8 +164,12 @@ Built with async/await support and type safety in mind.
 │                      group.                                                │
 │ download             Download a file from a device or all devices in a     │
 │                      group.                                                │
-│ config-backup        Create configuration backup                           │
-│ backup               Create device backup                                  │
+╰────────────────────────────────────────────────────────────────────────────╯
+╭─ Vendor-Specific Operations ───────────────────────────────────────────────╮
+│ config-backup        Create vendor-specific configuration backup (text     │
+│                      configuration export).                                │
+│ backup               Create comprehensive vendor-specific backup (text +   │
+│                      binary system backup).                                │
 │ firmware-upgrade     Upload firmware package and reboot device to apply    │
 │                      it.                                                   │
 │ firmware-downgrade   Upload older firmware package, schedule downgrade,    │
@@ -473,6 +477,32 @@ nw run sw-acc1 diagnostic --results-dir ./maintenance-2025-08
 # Different output formats
 nw run sw-acc1 system_info --store-results --results-format json
 ```
+
+### Vendor-specific backup operations
+
+Net-Worker provides vendor-specific backup operations that automatically use the correct commands and file formats for each platform:
+
+```bash
+# Configuration backup (text-only configuration export)
+nw config-backup sw-acc1                    # MikroTik: /export commands
+nw config-backup cisco-sw1                  # Cisco: show running-config
+nw config-backup --no-download sw-acc1      # Create but don't download files
+
+# Comprehensive backup (configuration + system data)
+nw backup sw-acc1                           # MikroTik: /export + /system/backup
+nw backup cisco-sw1                         # Cisco: show commands (running/startup/version/inventory)
+nw backup office_switches                   # Run on device group
+
+# Options for backup operations
+nw config-backup sw-acc1 --delete-remote    # Remove remote files after download
+nw backup sw-acc1 --verbose                 # Detailed operation logging
+```
+
+**Platform-specific behavior:**
+
+- **MikroTik RouterOS**: Creates .rsc (export) and .backup (system) files
+- **Cisco IOS/IOS-XE**: Displays configuration and system information (typically not saved to files)
+- **Download handling**: Automatically determines which files to download based on platform
 
 ## Community & support
 

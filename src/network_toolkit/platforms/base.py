@@ -140,6 +140,56 @@ class PlatformOperations(ABC):
         """
         ...
 
+    @abstractmethod
+    def config_backup(
+        self,
+        backup_sequence: list[str],
+        download_files: list[dict[str, str]] | None = None,
+    ) -> bool:
+        """Create device configuration backup using platform-specific commands.
+
+        This operation creates a text representation of the device configuration.
+        For text-only configuration exports.
+
+        Parameters
+        ----------
+        backup_sequence : list[str]
+            List of commands to execute for configuration backup
+        download_files : list[dict[str, str]] | None
+            Optional list of files to download after backup
+
+        Returns
+        -------
+        bool
+            True if configuration backup was created successfully
+        """
+        ...
+
+    @abstractmethod
+    def backup(
+        self,
+        backup_sequence: list[str],
+        download_files: list[dict[str, str]] | None = None,
+    ) -> bool:
+        """Create comprehensive device backup using platform-specific commands.
+
+        This operation creates both text and binary backups of the device.
+        For full system backup including configuration and system state.
+
+        Parameters
+        ----------
+        backup_sequence : list[str]
+            List of commands to execute for comprehensive backup
+        download_files : list[dict[str, str]] | None
+            Optional list of files to download after backup
+
+        Returns
+        -------
+        bool
+            True if comprehensive backup was created successfully
+        """
+        ...
+
     @classmethod
     @abstractmethod
     def get_supported_file_extensions(cls) -> list[str]:

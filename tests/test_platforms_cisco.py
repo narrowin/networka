@@ -63,13 +63,15 @@ class TestCiscoIOSOperations:
         assert "bios_upgrade" in str(exc_info.value)
         assert "Cisco IOS" in str(exc_info.value)
 
-    def test_create_backup_not_implemented(self) -> None:
-        """Test that backup creation raises UnsupportedOperationError."""
-        with pytest.raises(UnsupportedOperationError) as exc_info:
-            self.platform_ops.create_backup([])
+    def test_create_backup_success(self) -> None:
+        """Test that backup creation works successfully."""
+        # Mock device session
+        self.mock_session.is_connected = True
 
-        assert "create_backup" in str(exc_info.value)
-        assert "Cisco IOS" in str(exc_info.value)
+        result = self.platform_ops.create_backup(["show running-config"])
+
+        assert result is True
+        self.mock_session.execute_command.assert_called_with("show running-config")
 
     def test_operation_support_checking(self) -> None:
         """Test that operations are reported as supported."""
@@ -133,13 +135,15 @@ class TestCiscoIOSXEOperations:
         assert "bios_upgrade" in str(exc_info.value)
         assert "Cisco IOS-XE" in str(exc_info.value)
 
-    def test_create_backup_not_implemented(self) -> None:
-        """Test that backup creation raises UnsupportedOperationError."""
-        with pytest.raises(UnsupportedOperationError) as exc_info:
-            self.platform_ops.create_backup([])
+    def test_create_backup_success(self) -> None:
+        """Test that backup creation works successfully."""
+        # Mock device session
+        self.mock_session.is_connected = True
 
-        assert "create_backup" in str(exc_info.value)
-        assert "Cisco IOS-XE" in str(exc_info.value)
+        result = self.platform_ops.create_backup(["show running-config"])
+
+        assert result is True
+        self.mock_session.execute_command.assert_called_with("show running-config")
 
     def test_operation_support_checking(self) -> None:
         """Test that operations are reported as supported."""
