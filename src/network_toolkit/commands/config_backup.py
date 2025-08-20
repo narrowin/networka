@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 """`nw config-backup` command implementation (device or group).
 
-Runs the configured backup command sequence and optionally downloads artifacts.
+Platform-agnostic backup using vendor-specific implementations.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ import typer
 from network_toolkit.common.logging import console, setup_logging
 from network_toolkit.config import DeviceConfig, NetworkConfig, load_config
 from network_toolkit.exceptions import NetworkToolkitError
+from network_toolkit.platforms import UnsupportedOperationError, get_platform_operations
 
 MAX_LIST_PREVIEW = 10
 
@@ -78,8 +79,8 @@ def register(app: typer.Typer) -> None:
     ) -> None:
         """Create device backup and export; optionally download artifacts.
 
-        Runs the 'backup_config' command sequence and downloads files to
-        the configured backup_dir unless disabled.
+        Uses platform-specific implementations to handle vendor differences
+        in backup procedures.
         """
         setup_logging("DEBUG" if verbose else "INFO")
         try:
@@ -115,25 +116,43 @@ def register(app: typer.Typer) -> None:
                 raise typer.Exit(1)
 
             def process_device(dev: str) -> bool:
-                seq_cmds = _resolve_backup_sequence(config, dev)
-                if not seq_cmds:
-                    console.print(
-                        "[red]Error: backup sequence 'backup_config' not defined "
-                        f"for {dev}[/red]"
-                    )
-                    return False
-
-                console.print(
-                    f"[bold cyan]Creating configuration backup on {dev}[/bold cyan]"
-                )
-                transport_type = config.get_transport_type(dev)
-                console.print(f"[yellow]Transport:[/yellow] {transport_type}")
-
                 try:
                     with device_session(dev, config) as session:
-                        for cmd in seq_cmds:
-                            console.print(f"[cyan]Running:[/cyan] {cmd}")
-                            session.execute_command(cmd)
+                        # Get platform-specific operations
+                        try:
+                            platform_ops = get_platform_operations(session)
+                        except UnsupportedOperationError as e:
+                            console.print(f"[red]Error on {dev}: {e}[/red]")
+                            return False
+
+                        # Resolve backup sequence (device-specific or global)
+                        seq_cmds = _resolve_backup_sequence(config, dev)
+                        if not seq_cmds:
+                            console.print(
+                                "[red]Error: backup sequence 'backup_config' not defined "
+                                f"for {dev}[/red]"
+                            )
+                            return False
+
+                        console.print(
+                            f"[bold cyan]Creating configuration backup on {dev}[/bold cyan]"
+                        )
+                        transport_type = config.get_transport_type(dev)
+                        platform_name = platform_ops.get_platform_name()
+                        console.print(f"[yellow]Platform:[/yellow] {platform_name}")
+                        console.print(f"[yellow]Transport:[/yellow] {transport_type}")
+
+                        # Use platform-specific backup creation
+                        backup_success = platform_ops.create_backup(
+                            backup_sequence=seq_cmds,
+                            download_files=None,  # Will handle downloads separately
+                        )
+
+                        if not backup_success:
+                            console.print(
+                                f"[red]Error: Backup creation failed on {dev}[/red]"
+                            )
+                            return False
 
                         if download:
                             downloads: list[dict[str, Any]] = [

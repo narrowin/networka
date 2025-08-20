@@ -48,7 +48,12 @@ class OutputManager:
         if self.mode == OutputMode.RAW:
             # Raw mode uses no styling at all
             return Console(
-                color_system=None, force_terminal=False, stderr=False, file=sys.stdout, width=None, height=None
+                color_system=None,
+                force_terminal=False,
+                stderr=False,
+                file=sys.stdout,
+                width=None,
+                height=None,
             )
         elif self.mode == OutputMode.NO_COLOR:
             # No color mode disables colors but keeps other formatting
@@ -77,7 +82,12 @@ class OutputManager:
                     "unknown": "yellow",
                 }
             )
-            return Console(theme=light_theme, stderr=False, force_terminal=True, color_system="standard")
+            return Console(
+                theme=light_theme,
+                stderr=False,
+                force_terminal=True,
+                color_system="standard",
+            )
         elif self.mode == OutputMode.DARK:
             # Dark theme with more dramatic differences for testing
             dark_theme = Theme(
@@ -102,7 +112,12 @@ class OutputManager:
                     "unknown": "bright_yellow",
                 }
             )
-            return Console(theme=dark_theme, stderr=False, force_terminal=True, color_system="standard")
+            return Console(
+                theme=dark_theme,
+                stderr=False,
+                force_terminal=True,
+                color_system="standard",
+            )
         else:
             # Default mode uses Rich's default styling with our semantic colors
             default_theme = Theme(
@@ -227,7 +242,11 @@ class OutputManager:
                 f"  [bold]Devices:[/bold] {total} total | "
                 f"[success]{succeeded} succeeded[/success], "
                 f"[error]{failed} failed[/error]\n"
-                + (f"  [bold]Results dir:[/bold] {results_dir}\n" if results_dir else "")
+                + (
+                    f"  [bold]Results dir:[/bold] {results_dir}\n"
+                    if results_dir
+                    else ""
+                )
                 + f"  [bold]Duration:[/bold] {duration:.2f}s"
             )
         else:
@@ -236,7 +255,11 @@ class OutputManager:
                 f"  [bold]Type:[/bold] {operation_type}\n"
                 f"  [bold]Operation:[/bold] {name}\n"
                 f"  [bold]Status:[/bold] {status}\n"
-                + (f"  [bold]Results dir:[/bold] {results_dir}\n" if results_dir else "")
+                + (
+                    f"  [bold]Results dir:[/bold] {results_dir}\n"
+                    if results_dir
+                    else ""
+                )
                 + f"  [bold]Duration:[/bold] {duration:.2f}s"
             )
 
@@ -295,7 +318,9 @@ class OutputManager:
         if self.mode == OutputMode.RAW:
             sys.stdout.write(f"device={device} downloading={filename}\n")
         else:
-            self._console.print(f"[downloading]Downloading {filename} from {device}...[/downloading]")
+            self._console.print(
+                f"[downloading]Downloading {filename} from {device}...[/downloading]"
+            )
 
     def print_credential_info(self, message: str) -> None:
         """Print credential-related information."""
@@ -310,7 +335,9 @@ class OutputManager:
         if self.mode == OutputMode.RAW:
             sys.stdout.write(f"warning: unknown targets: {unknowns_str}\n")
         else:
-            self._console.print(f"[unknown]Warning: Unknown targets: {unknowns_str}[/unknown]")
+            self._console.print(
+                f"[unknown]Warning: Unknown targets: {unknowns_str}[/unknown]"
+            )
 
 
 def get_output_mode_from_env() -> OutputMode:
@@ -387,7 +414,9 @@ def get_output_manager() -> OutputManager:
     return _output_manager
 
 
-def get_output_manager_with_config(config_output_mode: str | None = None) -> OutputManager:
+def get_output_manager_with_config(
+    config_output_mode: str | None = None,
+) -> OutputManager:
     """Get output manager with config-based mode resolution.
 
     This creates a new manager each time to respect current environment state.

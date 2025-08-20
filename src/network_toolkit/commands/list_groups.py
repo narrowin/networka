@@ -22,9 +22,9 @@ from network_toolkit.exceptions import NetworkToolkitError
 def register(app: typer.Typer) -> None:
     @app.command("list-groups", rich_help_panel="Info & Configuration")
     def list_groups(
-        config_file: Annotated[Path, typer.Option("--config", "-c", help="Configuration file path")] = Path(
-            "devices.yml"
-        ),
+        config_file: Annotated[
+            Path, typer.Option("--config", "-c", help="Configuration file path")
+        ] = Path("devices.yml"),
         output_mode: Annotated[
             OutputMode | None,
             typer.Option(
@@ -34,7 +34,9 @@ def register(app: typer.Typer) -> None:
                 show_default=False,
             ),
         ] = None,
-        verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Show detailed information")] = False,
+        verbose: Annotated[
+            bool, typer.Option("--verbose", "-v", help="Show detailed information")
+        ] = False,
     ) -> None:
         """List all configured device groups and their members."""
         setup_logging("DEBUG" if verbose else "INFO")
@@ -50,7 +52,9 @@ def register(app: typer.Typer) -> None:
                 # Use config-based output mode
                 from network_toolkit.common.output import get_output_manager_with_config
 
-                output_manager = get_output_manager_with_config(config.general.output_mode)
+                output_manager = get_output_manager_with_config(
+                    config.general.output_mode
+                )
 
             if output_manager.mode == OutputMode.RAW:
                 # Raw mode output
@@ -64,13 +68,19 @@ def register(app: typer.Typer) -> None:
                     elif group.match_tags and config.devices:
                         # Find devices matching tags
                         for device_name, device_config in config.devices.items():
-                            if device_config.tags and any(tag in group.match_tags for tag in device_config.tags):
+                            if device_config.tags and any(
+                                tag in group.match_tags for tag in device_config.tags
+                            ):
                                 group_members.append(device_name)
 
                     members_str = ",".join(group_members) if group_members else "none"
-                    tags_str = ",".join(group.match_tags or []) if group.match_tags else "none"
+                    tags_str = (
+                        ",".join(group.match_tags or []) if group.match_tags else "none"
+                    )
                     description = group.description or ""
-                    print(f"group={name} description={description} tags={tags_str} members={members_str}")
+                    print(
+                        f"group={name} description={description} tags={tags_str} members={members_str}"
+                    )
                 return
 
             # Get the themed console from output manager
@@ -95,7 +105,9 @@ def register(app: typer.Typer) -> None:
                     members = group.members
                 elif group.match_tags and config.devices:
                     for device_name, device_config in config.devices.items():
-                        if device_config.tags and any(tag in device_config.tags for tag in group.match_tags):
+                        if device_config.tags and any(
+                            tag in device_config.tags for tag in group.match_tags
+                        ):
                             members.append(device_name)
 
                 table.add_row(
@@ -106,7 +118,9 @@ def register(app: typer.Typer) -> None:
                 )
 
             themed_console.print(table)
-            themed_console.print(f"\n[bold]Total groups: {len(config.device_groups)}[/bold]")
+            themed_console.print(
+                f"\n[bold]Total groups: {len(config.device_groups)}[/bold]"
+            )
 
             if verbose:
                 themed_console.print("\n[bold success]Usage Examples:[/bold success]")

@@ -22,9 +22,9 @@ from network_toolkit.exceptions import NetworkToolkitError
 def register(app: typer.Typer) -> None:
     @app.command("list-devices", rich_help_panel="Info & Configuration")
     def list_devices(
-        config_file: Annotated[Path, typer.Option("--config", "-c", help="Configuration file path")] = Path(
-            "devices.yml"
-        ),
+        config_file: Annotated[
+            Path, typer.Option("--config", "-c", help="Configuration file path")
+        ] = Path("devices.yml"),
         output_mode: Annotated[
             OutputMode | None,
             typer.Option(
@@ -34,7 +34,9 @@ def register(app: typer.Typer) -> None:
                 show_default=False,
             ),
         ] = None,
-        verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose logging")] = False,
+        verbose: Annotated[
+            bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
+        ] = False,
     ) -> None:
         """List all configured network devices."""
         setup_logging("DEBUG" if verbose else "INFO")
@@ -49,7 +51,9 @@ def register(app: typer.Typer) -> None:
                 # Use config-based output mode
                 from network_toolkit.common.output import get_output_manager_with_config
 
-                output_manager = get_output_manager_with_config(config.general.output_mode)
+                output_manager = get_output_manager_with_config(
+                    config.general.output_mode
+                )
 
             if output_manager.mode == OutputMode.RAW:
                 # Raw mode output
@@ -59,7 +63,9 @@ def register(app: typer.Typer) -> None:
                 for name, device in config.devices.items():
                     tags_str = ",".join(device.tags or []) if device.tags else "none"
                     platform = device.platform or "unknown"
-                    print(f"device={name} host={device.host} platform={platform} tags={tags_str}")
+                    print(
+                        f"device={name} host={device.host} platform={platform} tags={tags_str}"
+                    )
                 return
 
             # Get the themed console from output manager

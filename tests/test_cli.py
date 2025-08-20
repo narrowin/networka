@@ -238,7 +238,10 @@ class TestCLI:
     ) -> None:
         """Test firmware-downgrade on single device."""
         mock_session = MagicMock()
-        mock_session.downgrade_firmware_and_reboot.return_value = True
+        mock_session.config.devices = {
+            "test_device1": MagicMock(device_type="mikrotik_routeros")
+        }
+        mock_session.device_name = "test_device1"
         mock_session.__enter__ = MagicMock(return_value=mock_session)
         mock_session.__exit__ = MagicMock(return_value=None)
         mock_device_session.return_value = mock_session
@@ -286,7 +289,10 @@ class TestCLI:
     ) -> None:
         """Test bios-upgrade on single device."""
         mock_session = MagicMock()
-        mock_session.routerboard_upgrade_and_reboot.return_value = True
+        mock_session.config.devices = {
+            "test_device1": MagicMock(device_type="mikrotik_routeros")
+        }
+        mock_session.device_name = "test_device1"
         mock_session.__enter__ = MagicMock(return_value=mock_session)
         mock_session.__exit__ = MagicMock(return_value=None)
         mock_device_session.return_value = mock_session

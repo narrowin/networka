@@ -32,6 +32,7 @@ Net-Worker is a modern async CLI tool for automating network devices across mult
 ## Installation
 
 ### System Requirements
+
 - **Operating System**: Linux, macOS, or Windows
 - **Python**: 3.11, 3.12, or 3.13
 - **Network Access**: SSH connectivity to target devices
@@ -142,7 +143,7 @@ Built with async/await support and type safety in mind.
 📁 Default config directory: config/ (use --config to override)
 
 ╭─ Options ──────────────────────────────────────────────────────────────────╮
-│ --help  -h        Show this message and exit.                              │
+│ --help               Show this message and exit.                           │
 ╰────────────────────────────────────────────────────────────────────────────╯
 ╭─ Commands ─────────────────────────────────────────────────────────────────╮
 │ ssh                  Open tmux with SSH panes for a device or group.       │
@@ -166,8 +167,12 @@ Built with async/await support and type safety in mind.
 │                      group.                                                │
 │ download             Download a file from a device or all devices in a     │
 │                      group.                                                │
-│ config-backup        Create configuration backup                           │
-│ backup               Create device backup                                  │
+╰────────────────────────────────────────────────────────────────────────────╯
+╭─ Vendor-Specific Operations ───────────────────────────────────────────────╮
+│ config-backup        Create vendor-specific configuration backup (text     │
+│                      configuration export).                                │
+│ backup               Create comprehensive vendor-specific backup (text +   │
+│                      binary system backup).                                │
 │ firmware-upgrade     Upload firmware package and reboot device to apply    │
 │                      it.                                                   │
 │ firmware-downgrade   Upload older firmware package, schedule downgrade,    │
@@ -182,6 +187,7 @@ Built with async/await support and type safety in mind.
 ### 1. Set up credentials
 
 **Option A: Use .env file (Recommended)**
+
 ```bash
 # Copy and edit the example file
 cp .env.example .env
@@ -189,6 +195,7 @@ nano .env  # Add your actual credentials
 ```
 
 **Option B: Export environment variables**
+
 ```bash
 # Set environment variables for security
 export NW_USER_DEFAULT="admin"
@@ -284,6 +291,7 @@ export NW_PASSWORD_SW_ACC1="switch1_password"  # pragma: allowlist secret
 ### Configuration Structure
 
 #### Modular Directory Structure
+
 ```
 config/
 ├── config.yml              # Main configuration (required)
@@ -310,18 +318,21 @@ config/
 #### CSV Format Reference
 
 **Devices CSV Headers:**
+
 ```csv
 name,host,device_type,description,platform,model,location,tags
 sw-01,192.168.1.1,mikrotik_routeros,Lab Switch,mipsbe,CRS326,Lab,switch;access;lab
 ```
 
 **Groups CSV Headers:**
+
 ```csv
 name,description,members,match_tags
 lab_devices,Lab environment,sw-01;sw-02,lab;test
 ```
 
 **Sequences CSV Headers:**
+
 ```csv
 name,description,commands,tags
 system_info,Get system info,/system/identity/print;/system/clock/print,system;info
@@ -330,34 +341,38 @@ system_info,Get system info,/system/identity/print;/system/clock/print,system;in
 ### Configuration file structure
 
 **Main Configuration (`config/config.yml`):**
+
 ```yaml
 general:
   results_dir: "./results"
   timeout: 30
-  output_mode: "dark"  # default, light, dark, no-color, raw
+  output_mode: "dark" # default, light, dark, no-color, raw
 ```
 
 **Device Configuration (`config/devices/*.yml`):**
+
 ```yaml
 devices:
   device_name:
     host: "IP_ADDRESS"
-    device_type: "mikrotik_routeros"  # or cisco_iosxe, arista_eos, juniper_junos
+    device_type: "mikrotik_routeros" # or cisco_iosxe, arista_eos, juniper_junos
     description: "Device description"
     tags: ["tag1", "tag2"]
 ```
 
 **Group Configuration (`config/groups/*.yml`):**
+
 ```yaml
 groups:
   group_name:
     description: "Group description"
-    match_tags: ["tag1"]  # Include devices with these tags
+    match_tags: ["tag1"] # Include devices with these tags
     # OR
-    members: ["device1", "device2"]  # Explicit device list
+    members: ["device1", "device2"] # Explicit device list
 ```
 
 **Sequence Configuration (`config/sequences/*.yml`):**
+
 ```yaml
 sequences:
   sequence_name:
@@ -372,9 +387,9 @@ sequences:
 
 Configuration files are loaded from their respective subdirectories. All files in each subdirectory are combined (later files override earlier ones):
 
-1. **Device files**: All files in `config/devices/` (*.yml, *.yaml, *.csv)
-2. **Group files**: All files in `config/groups/` (*.yml, *.yaml, *.csv)
-3. **Sequence files**: All files in `config/sequences/` (*.yml, *.yaml, *.csv)
+1. **Device files**: All files in `config/devices/` (_.yml, _.yaml, \*.csv)
+2. **Group files**: All files in `config/groups/` (_.yml, _.yaml, \*.csv)
+3. **Sequence files**: All files in `config/sequences/` (_.yml, _.yaml, \*.csv)
 
 Within each directory, files are loaded alphabetically, so later files can override earlier ones.
 
@@ -396,10 +411,11 @@ Control colors and formatting with the `output_mode` setting:
 
 ```yaml
 general:
-  output_mode: "dark"  # default, light, dark, no-color, raw
+  output_mode: "dark" # default, light, dark, no-color, raw
 ```
 
 **Modes:**
+
 - `default` - Rich's built-in styling (adapts to terminal)
 - `light` - Dark colors optimized for light terminal themes
 - `dark` - Bright colors optimized for dark terminal themes
@@ -407,6 +423,7 @@ general:
 - `raw` - Machine-readable format for scripts/automation
 
 **Override precedence:**
+
 1. CLI flag: `nw info device1 --output-mode raw`
 2. Environment: `export NW_OUTPUT_MODE=light`
 3. Config file: `general.output_mode`
@@ -464,6 +481,32 @@ nw run sw-acc1 diagnostic --results-dir ./maintenance-2025-08
 nw run sw-acc1 system_info --store-results --results-format json
 ```
 
+### Vendor-specific backup operations
+
+Net-Worker provides vendor-specific backup operations that automatically use the correct commands and file formats for each platform:
+
+```bash
+# Configuration backup (text-only configuration export)
+nw config-backup sw-acc1                    # MikroTik: /export commands
+nw config-backup cisco-sw1                  # Cisco: show running-config
+nw config-backup --no-download sw-acc1      # Create but don't download files
+
+# Comprehensive backup (configuration + system data)
+nw backup sw-acc1                           # MikroTik: /export + /system/backup
+nw backup cisco-sw1                         # Cisco: show commands (running/startup/version/inventory)
+nw backup office_switches                   # Run on device group
+
+# Options for backup operations
+nw config-backup sw-acc1 --delete-remote    # Remove remote files after download
+nw backup sw-acc1 --verbose                 # Detailed operation logging
+```
+
+**Platform-specific behavior:**
+
+- **MikroTik RouterOS**: Creates .rsc (export) and .backup (system) files
+- **Cisco IOS/IOS-XE**: Displays configuration and system information (typically not saved to files)
+- **Download handling**: Automatically determines which files to download based on platform
+
 ## Community & support
 
 - Visit our [documentation](docs/) for detailed guides and examples
@@ -493,10 +536,12 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 ## Acknowledgments
 
 - [Scrapli](https://github.com/carlmontanari/scrapli) - Network device connections
+- [Nornir](https://github.com/nornir-automation/nornir) - Network automation framework
+- [Netmiko](https://github.com/ktbyers/netmiko) - Multi-vendor CLI connections to network devices
 - [Typer](https://github.com/tiangolo/typer) - CLI framework
 - [Pydantic](https://github.com/pydantic/pydantic) - Data validation
 - [Rich](https://github.com/Textualize/rich) - Terminal formatting
 
 ---
 
-*Built for network engineers who value clean, reliable automation*
+_Built for network engineers who value clean, reliable automation_

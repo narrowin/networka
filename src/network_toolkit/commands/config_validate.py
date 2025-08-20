@@ -16,19 +16,23 @@ from network_toolkit.exceptions import NetworkToolkitError
 def register(app: typer.Typer) -> None:
     @app.command("config-validate", rich_help_panel="Info & Configuration")
     def config_validate(
-        config_file: Annotated[Path, typer.Option("--config", "-c", help="Configuration file path")] = Path(
-            "devices.yml"
-        ),
+        config_file: Annotated[
+            Path, typer.Option("--config", "-c", help="Configuration file path")
+        ] = Path("devices.yml"),
         verbose: Annotated[
             bool,
-            typer.Option("--verbose", "-v", help="Show detailed validation information"),
+            typer.Option(
+                "--verbose", "-v", help="Show detailed validation information"
+            ),
         ] = False,
     ) -> None:
         """Validate the configuration file and show any issues."""
         setup_logging("DEBUG" if verbose else "INFO")
 
         try:
-            console.print(f"[bold blue]Validating Configuration: {config_file}[/bold blue]")
+            console.print(
+                f"[bold blue]Validating Configuration: {config_file}[/bold blue]"
+            )
             console.print()
 
             config = load_config(config_file)
@@ -38,7 +42,11 @@ def register(app: typer.Typer) -> None:
 
             device_count = len(config.devices) if config.devices else 0
             group_count = len(config.device_groups) if config.device_groups else 0
-            global_seq_count = len(config.global_command_sequences) if config.global_command_sequences else 0
+            global_seq_count = (
+                len(config.global_command_sequences)
+                if config.global_command_sequences
+                else 0
+            )
 
             console.print(f"📱 Devices: {device_count}")
             console.print(f"👥 Device Groups: {group_count}")

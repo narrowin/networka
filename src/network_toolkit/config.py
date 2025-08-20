@@ -15,11 +15,11 @@ import yaml
 from dotenv import load_dotenv
 from pydantic import BaseModel, field_validator
 
-from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.credentials import (
     ConnectionParameterBuilder,
     EnvironmentCredentialManager,
 )
+from network_toolkit.exceptions import NetworkToolkitError
 
 
 def load_dotenv_files(config_path: Path | None = None) -> None:
@@ -107,9 +107,7 @@ class GeneralConfig(BaseModel):
         """Get default username from environment variable."""
         user = EnvironmentCredentialManager.get_default("user")
         if not user:
-            msg = (
-                "Default username not found in environment. Please set NW_USER_DEFAULT environment variable."
-            )
+            msg = "Default username not found in environment. Please set NW_USER_DEFAULT environment variable."
             raise ValueError(msg)
         return user
 
@@ -118,9 +116,7 @@ class GeneralConfig(BaseModel):
         """Get default password from environment variable."""
         password = EnvironmentCredentialManager.get_default("password")
         if not password:
-            msg = (
-                "Default password not found in environment. Please set NW_PASSWORD_DEFAULT environment variable."
-            )
+            msg = "Default password not found in environment. Please set NW_PASSWORD_DEFAULT environment variable."
             raise ValueError(msg)
         return password
 
@@ -296,7 +292,9 @@ class NetworkConfig(BaseModel):
             If device is not found in configuration
         """
         builder = ConnectionParameterBuilder(self)
-        return builder.build_parameters(device_name, username_override, password_override)
+        return builder.build_parameters(
+            device_name, username_override, password_override
+        )
 
     def get_group_members(self, group_name: str) -> list[str]:
         """Get list of device names in a group."""
@@ -309,7 +307,9 @@ class NetworkConfig(BaseModel):
 
         # Direct members
         if group.members:
-            members.extend([m for m in group.members if self.devices and m in self.devices])
+            members.extend(
+                [m for m in group.members if self.devices and m in self.devices]
+            )
 
         # Tag-based members
         if group.match_tags and self.devices:
@@ -340,7 +340,9 @@ class NetworkConfig(BaseModel):
         device = self.devices[device_name]
         return device.transport_type or self.general.default_transport_type
 
-    def get_command_sequences_by_tags(self, tags: list[str]) -> dict[str, CommandSequence]:
+    def get_command_sequences_by_tags(
+        self, tags: list[str]
+    ) -> dict[str, CommandSequence]:
         """
         Get command sequences that match any of the specified tags.
 
@@ -375,7 +377,9 @@ class NetworkConfig(BaseModel):
         """
         return self.command_sequence_groups or {}
 
-    def get_command_sequences_by_group(self, group_name: str) -> dict[str, CommandSequence]:
+    def get_command_sequences_by_group(
+        self, group_name: str
+    ) -> dict[str, CommandSequence]:
         """
         Get command sequences that match a specific group's tags.
 
@@ -394,7 +398,10 @@ class NetworkConfig(BaseModel):
         ValueError
             If the group doesn't exist
         """
-        if not self.command_sequence_groups or group_name not in self.command_sequence_groups:
+        if (
+            not self.command_sequence_groups
+            or group_name not in self.command_sequence_groups
+        ):
             msg = f"Command sequence group '{group_name}' not found in configuration"
             raise ValueError(msg)
 
@@ -469,13 +476,18 @@ class NetworkConfig(BaseModel):
         3. Device-specific sequences (lowest priority)
         """
         # 1. Prefer global definition
-        if self.global_command_sequences and sequence_name in self.global_command_sequences:
+        if (
+            self.global_command_sequences
+            and sequence_name in self.global_command_sequences
+        ):
             return list(self.global_command_sequences[sequence_name].commands)
 
         # 2. Look for vendor-specific sequences
         if device_name and self.devices and device_name in self.devices:
             device = self.devices[device_name]
-            vendor_commands = self._resolve_vendor_sequence(sequence_name, device.device_type)
+            vendor_commands = self._resolve_vendor_sequence(
+                sequence_name, device.device_type
+            )
             if vendor_commands:
                 return vendor_commands
 
@@ -486,7 +498,9 @@ class NetworkConfig(BaseModel):
                     return list(dev.command_sequences[sequence_name])
         return None
 
-    def _resolve_vendor_sequence(self, sequence_name: str, device_type: str) -> list[str] | None:
+    def _resolve_vendor_sequence(
+        self, sequence_name: str, device_type: str
+    ) -> list[str] | None:
         """Resolve vendor-specific sequence commands.
 
         Parameters
@@ -576,8 +590,12 @@ class NetworkConfig(BaseModel):
                     return (group.credentials.user, group.credentials.password)
 
                 # Check for environment variables for this group
-                group_user = EnvironmentCredentialManager.get_group_specific(group_name, "user")
-                group_password = EnvironmentCredentialManager.get_group_specific(group_name, "password")
+                group_user = EnvironmentCredentialManager.get_group_specific(
+                    group_name, "user"
+                )
+                group_password = EnvironmentCredentialManager.get_group_specific(
+                    group_name, "password"
+                )
                 if group_user or group_password:
                     return (group_user, group_password)
 
@@ -585,6 +603,7 @@ class NetworkConfig(BaseModel):
 
 
 # CSV/Discovery/Merge helpers
+
 
 def _load_csv_devices(csv_path: Path) -> dict[str, DeviceConfig]:
     """
@@ -606,7 +625,11 @@ def _load_csv_devices(csv_path: Path) -> dict[str, DeviceConfig]:
 
                 # Parse tags from semicolon-separated string
                 tags_str = row.get("tags", "").strip()
-                tags = [tag.strip() for tag in tags_str.split(";") if tag.strip()] if tags_str else None
+                tags = (
+                    [tag.strip() for tag in tags_str.split(";") if tag.strip()]
+                    if tags_str
+                    else None
+                )
 
                 device_config = DeviceConfig(
                     host=row.get("host", "").strip(),
@@ -648,11 +671,19 @@ def _load_csv_groups(csv_path: Path) -> dict[str, DeviceGroup]:
 
                 # Parse members from semicolon-separated string
                 members_str = row.get("members", "").strip()
-                members = [m.strip() for m in members_str.split(";") if m.strip()] if members_str else None
+                members = (
+                    [m.strip() for m in members_str.split(";") if m.strip()]
+                    if members_str
+                    else None
+                )
 
                 # Parse match_tags from semicolon-separated string
                 tags_str = row.get("match_tags", "").strip()
-                match_tags = [tag.strip() for tag in tags_str.split(";") if tag.strip()] if tags_str else None
+                match_tags = (
+                    [tag.strip() for tag in tags_str.split(";") if tag.strip()]
+                    if tags_str
+                    else None
+                )
 
                 group_config = DeviceGroup(
                     description=row.get("description", "").strip(),
@@ -690,7 +721,9 @@ def _load_csv_sequences(csv_path: Path) -> dict[str, CommandSequence]:
 
                 # Parse commands from semicolon-separated string
                 commands_str = row.get("commands", "").strip()
-                commands = [cmd.strip() for cmd in commands_str.split(";") if cmd.strip()]
+                commands = [
+                    cmd.strip() for cmd in commands_str.split(";") if cmd.strip()
+                ]
 
                 if not commands:
                     logging.warning(f"Sequence '{name}' has no commands, skipping")
@@ -698,7 +731,11 @@ def _load_csv_sequences(csv_path: Path) -> dict[str, CommandSequence]:
 
                 # Parse tags from semicolon-separated string
                 tags_str = row.get("tags", "").strip()
-                tags = [tag.strip() for tag in tags_str.split(";") if tag.strip()] if tags_str else None
+                tags = (
+                    [tag.strip() for tag in tags_str.split(";") if tag.strip()]
+                    if tags_str
+                    else None
+                )
 
                 sequence_config = CommandSequence(
                     description=row.get("description", "").strip(),
@@ -760,7 +797,9 @@ def _discover_config_files(config_dir: Path, config_type: str) -> list[Path]:
     return unique_files
 
 
-def _merge_configs(base_config: dict[str, Any], override_config: dict[str, Any]) -> dict[str, Any]:
+def _merge_configs(
+    base_config: dict[str, Any], override_config: dict[str, Any]
+) -> dict[str, Any]:
     """
     Merge two configuration dictionaries with override precedence.
 
@@ -877,7 +916,9 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
                         defaults_config: dict[str, Any] = yaml.safe_load(f) or {}
                         device_defaults = defaults_config.get("defaults", {})
                 except yaml.YAMLError as e:
-                    logging.warning(f"Invalid YAML in defaults file {defaults_file}: {e}")
+                    logging.warning(
+                        f"Invalid YAML in defaults file {defaults_file}: {e}"
+                    )
 
         # Load device files
         for device_file in device_files:
@@ -1019,9 +1060,7 @@ def _load_vendor_sequences(
             vendor_file_path = sequence_path / sequence_file
 
             if not vendor_file_path.exists():
-                logging.debug(
-                    f"Vendor sequence file not found: {vendor_file_path}"
-                )
+                logging.debug(f"Vendor sequence file not found: {vendor_file_path}")
                 continue
 
             try:

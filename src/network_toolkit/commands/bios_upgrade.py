@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 """`nw bios-upgrade` command implementation (device or group).
 
-Runs '/system routerboard upgrade' and reboots the device to apply RouterBOOT/BIOS.
+Platform-agnostic BIOS/firmware upgrade using vendor-specific implementations.
 """
 
 from __future__ import annotations
@@ -15,12 +15,13 @@ import typer
 from network_toolkit.common.logging import console, setup_logging
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
+from network_toolkit.platforms import UnsupportedOperationError, get_platform_operations
 
 MAX_LIST_PREVIEW = 10
 
 
 def register(app: typer.Typer) -> None:
-    @app.command(rich_help_panel="Executing Operations")
+    @app.command(rich_help_panel="Vendor-Specific Operations")
     def bios_upgrade(  # pyright: ignore[reportUnusedFunction]
         target_name: Annotated[
             str,
@@ -51,9 +52,10 @@ def register(app: typer.Typer) -> None:
             bool, typer.Option("--verbose", "-v", help="Enable verbose output")
         ] = False,
     ) -> None:
-        """Upgrade RouterBOARD (RouterBOOT/BIOS) and reboot to apply.
+        """Upgrade device BIOS/RouterBOOT and reboot to apply.
 
-        This runs '/system routerboard upgrade' followed by an automatic reboot.
+        Uses platform-specific implementations to handle vendor differences
+        in BIOS upgrade procedures.
         """
         setup_logging("DEBUG" if verbose else "INFO")
 
@@ -90,6 +92,13 @@ def register(app: typer.Typer) -> None:
             def process_device(dev: str) -> bool:
                 try:
                     with device_session(dev, config) as session:
+                        # Get platform-specific operations
+                        try:
+                            platform_ops = get_platform_operations(session)
+                        except UnsupportedOperationError as e:
+                            console.print(f"[red]Error on {dev}: {e}[/red]")
+                            return False
+
                         if precheck_sequence and not skip_precheck:
                             console.print(
                                 "[cyan]Running precheck sequence '"
@@ -116,18 +125,22 @@ def register(app: typer.Typer) -> None:
                                 session.execute_command(cmd)
 
                         console.print(
-                            "[bold yellow]Upgrading RouterBOARD (RouterBOOT) on "
+                            "[bold yellow]Upgrading BIOS/RouterBOOT on "
                             f"{dev} and rebooting...[/bold yellow]"
                         )
-                        ok = session.routerboard_upgrade_and_reboot()
+                        platform_name = platform_ops.get_platform_name()
+                        console.print(f"[yellow]Platform:[/yellow] {platform_name}")
+
+                        # Use platform-specific BIOS upgrade
+                        ok = platform_ops.bios_upgrade()
                         if ok:
                             console.print(
-                                "[green]OK RouterBOARD upgrade scheduled; "
+                                "[green]OK BIOS upgrade scheduled; "
                                 f"device rebooting: {dev}[/green]"
                             )
                             return True
                         console.print(
-                            f"[red]FAIL RouterBOARD upgrade failed to start on {dev}[/red]"
+                            f"[red]FAIL BIOS upgrade failed to start on {dev}[/red]"
                         )
                         return False
                 except NetworkToolkitError as e:
