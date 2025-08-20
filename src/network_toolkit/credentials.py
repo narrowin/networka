@@ -63,14 +63,10 @@ class CredentialResolver:
         device = self.config.devices[device_name]
 
         # Resolve username
-        username = self._resolve_username(
-            device_name, device, username_override
-        )
+        username = self._resolve_username(device_name, device, username_override)
 
         # Resolve password
-        password = self._resolve_password(
-            device_name, device, password_override
-        )
+        password = self._resolve_password(device_name, device, password_override)
 
         return username, password
 
@@ -118,7 +114,9 @@ class CredentialResolver:
             return device.password
 
         # 3. Device-specific environment variable
-        device_env_password = os.getenv(f"NW_PASSWORD_{device_name.upper().replace('-', '_')}")
+        device_env_password = os.getenv(
+            f"NW_PASSWORD_{device_name.upper().replace('-', '_')}"
+        )
         if device_env_password:
             return device_env_password
 
@@ -162,7 +160,9 @@ class EnvironmentCredentialManager:
 
         # Try target-specific credential first
         if target_name:
-            target_env_var = f"NW_{credential_type}_{target_name.upper().replace('-', '_')}"
+            target_env_var = (
+                f"NW_{credential_type}_{target_name.upper().replace('-', '_')}"
+            )
             value = os.getenv(target_env_var)
             if value:
                 return value

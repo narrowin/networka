@@ -179,7 +179,9 @@ def register(app: typer.Typer) -> None:
                                 console.print(f"[red]FAIL {dev}: download failed[/red]")
                     except Exception as e:  # pragma: no cover - unexpected
                         results[dev] = False
-                        console.print(f"[red]FAIL {dev}: error during download: {e}[/red]")
+                        console.print(
+                            f"[red]FAIL {dev}: error during download: {e}[/red]"
+                        )
 
             total = len(members)
             console.print("[bold cyan]Group Download Results:[/bold cyan]")

@@ -29,7 +29,9 @@ def register(app: typer.Typer) -> None:
     def info(
         targets: Annotated[
             str,
-            typer.Argument(help="Comma-separated device/group names from configuration"),
+            typer.Argument(
+                help="Comma-separated device/group names from configuration"
+            ),
         ],
         config_file: Annotated[
             Path,
@@ -44,7 +46,9 @@ def register(app: typer.Typer) -> None:
                 show_default=False,
             ),
         ] = None,
-        verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose logging")] = False,
+        verbose: Annotated[
+            bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
+        ] = False,
         interactive_auth: Annotated[
             bool,
             typer.Option(
@@ -82,7 +86,9 @@ def register(app: typer.Typer) -> None:
                 output_manager = get_output_manager_with_config()
             else:
                 # Use config-based output mode
-                output_manager = get_output_manager_with_config(config.general.output_mode)
+                output_manager = get_output_manager_with_config(
+                    config.general.output_mode
+                )
 
             resolver = DeviceResolver(config)
 
@@ -98,7 +104,9 @@ def register(app: typer.Typer) -> None:
                     "Enter password for devices",
                     "admin",  # Default username suggestion
                 )
-                output_manager.print_credential_info(f"Will use username: {interactive_creds.username}")
+                output_manager.print_credential_info(
+                    f"Will use username: {interactive_creds.username}"
+                )
 
             # Resolve targets to device names
             devices, unknowns = resolver.resolve_targets(targets)
@@ -110,7 +118,9 @@ def register(app: typer.Typer) -> None:
                 output_manager.print_error("Error: No valid devices found in targets")
                 raise typer.Exit(1) from None
 
-            themed_console.print(f"[bold]Device Information ({len(devices)} devices)[/bold]")
+            themed_console.print(
+                f"[bold]Device Information ({len(devices)} devices)[/bold]"
+            )
 
             # Show info for each resolved device
             for i, device in enumerate(devices):
@@ -118,7 +128,9 @@ def register(app: typer.Typer) -> None:
                     themed_console.print()  # Blank line between devices
 
                 if not config.devices or device not in config.devices:
-                    output_manager.print_error(f"Error: Device '{device}' not found in configuration")
+                    output_manager.print_error(
+                        f"Error: Device '{device}' not found in configuration"
+                    )
                     continue
 
                 device_config = config.devices[device]
@@ -139,23 +151,35 @@ def register(app: typer.Typer) -> None:
                 )
 
                 # Get connection params with optional credential overrides
-                username_override = interactive_creds.username if interactive_creds else None
-                password_override = interactive_creds.password if interactive_creds else None
+                username_override = (
+                    interactive_creds.username if interactive_creds else None
+                )
+                password_override = (
+                    interactive_creds.password if interactive_creds else None
+                )
 
-                conn_params = config.get_device_connection_params(device, username_override, password_override)
+                conn_params = config.get_device_connection_params(
+                    device, username_override, password_override
+                )
                 table.add_row("SSH Port", str(conn_params["port"]))
                 table.add_row("Username", conn_params["auth_username"])
                 table.add_row("Timeout", f"{conn_params['timeout_socket']}s")
 
                 # Show transport type
                 transport_type = config.get_transport_type(device)
-                table.add_row("Transport Type", f"[transport]{transport_type}[/transport]")
+                table.add_row(
+                    "Transport Type", f"[transport]{transport_type}[/transport]"
+                )
 
                 # Show credential source
                 if interactive_auth:
-                    table.add_row("Credentials", "[credential]Interactive input[/credential]")
+                    table.add_row(
+                        "Credentials", "[credential]Interactive input[/credential]"
+                    )
                 else:
-                    table.add_row("Credentials", "[credential]Environment/Config[/credential]")
+                    table.add_row(
+                        "Credentials", "[credential]Environment/Config[/credential]"
+                    )
 
                 # Show group memberships
                 group_memberships = []

@@ -30,7 +30,9 @@ class TestTransportAbstraction:
         with pytest.raises(ValueError, match="Unknown transport type"):
             get_transport_factory("invalid_transport")
 
-    @patch.dict(os.environ, {"NW_USER_DEFAULT": "admin", "NW_PASSWORD_DEFAULT": "test_password"})
+    @patch.dict(
+        os.environ, {"NW_USER_DEFAULT": "admin", "NW_PASSWORD_DEFAULT": "test_password"}
+    )
     def test_scrapli_transport_creation(self):
         """Test creating a Scrapli transport instance."""
         # Set up environment variables for credential resolution
@@ -87,7 +89,9 @@ class TestTransportAbstraction:
         # Device2 should use device-specific
         assert config.get_transport_type("device2") == "nornir_netmiko"
 
-    @patch.dict(os.environ, {"NW_USER_DEFAULT": "admin", "NW_PASSWORD_DEFAULT": "test_password"})
+    @patch.dict(
+        os.environ, {"NW_USER_DEFAULT": "admin", "NW_PASSWORD_DEFAULT": "test_password"}
+    )
     def test_config_connection_params(self):
         """Test connection parameter generation."""
         # Set up environment variables for credential resolution
