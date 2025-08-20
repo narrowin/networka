@@ -139,9 +139,7 @@ class TestPlatformIntegration:
 
         # Should succeed
         assert result.exit_code == 0
-        mock_console.print.assert_any_call(
-            "[yellow]Platform:[/yellow] Cisco IOS"
-        )
+        mock_console.print.assert_any_call("[yellow]Platform:[/yellow] Cisco IOS")
 
     @patch("network_toolkit.commands.firmware_upgrade.setup_logging")
     @patch("network_toolkit.commands.firmware_upgrade.load_config")

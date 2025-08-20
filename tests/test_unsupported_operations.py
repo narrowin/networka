@@ -171,9 +171,7 @@ class TestCommandLineUnsupportedOperations:
         for platform in cisco_platforms:
             for operation in firmware_operations:
                 is_supported, error_msg = check_operation_support(platform, operation)
-                assert is_supported, (
-                    f"{operation} should be supported on {platform}"
-                )
+                assert is_supported, f"{operation} should be supported on {platform}"
                 assert error_msg == ""
 
     def test_mikrotik_operations_supported(self) -> None:
