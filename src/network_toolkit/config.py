@@ -44,7 +44,7 @@ def load_dotenv_files(config_path: Path | None = None) -> None:
     # Load .env from current working directory first (lowest priority)
     cwd_env = Path.cwd() / ".env"
     if cwd_env.exists():
-        logging.debug(f"Loading .env from current directory: {cwd_env}")
+        logging.debug(f"Loading .env from current directory: {cwd_env.resolve()}")
         load_dotenv(cwd_env, override=False)
 
     # Load .env from config directory (if config_path provided)
@@ -52,7 +52,7 @@ def load_dotenv_files(config_path: Path | None = None) -> None:
         config_dir = config_path.parent if config_path.is_file() else config_path
         config_env = config_dir / ".env"
         if config_env.exists():
-            logging.debug(f"Loading .env from config directory: {config_env}")
+            logging.debug(f"Loading .env from config directory: {config_env.resolve()}")
             # This will override any values loaded from cwd .env
             load_dotenv(config_env, override=True)
 
@@ -1035,7 +1035,7 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
             "vendor_sequences": vendor_sequences,
         }
 
-        logging.debug(f"Loaded modular configuration from {config_dir}")
+        logging.debug(f"Loaded modular configuration from {config_dir.resolve()}")
         logging.debug(f"  - Devices: {len(all_devices)}")
         logging.debug(f"  - Groups: {len(all_groups)}")
         logging.debug(f"  - Sequences: {len(all_sequences)}")

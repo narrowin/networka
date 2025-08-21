@@ -37,7 +37,7 @@ general:
   results_include_command: true
 
   # Output formatting - Controls colors and styling
-  output_mode: "light"  # default, light, dark, no-color, raw
+  output_mode: "default"  # default, light, dark, no-color, raw
 
 # Note:
 # - Devices are defined in config/devices/
