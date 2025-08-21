@@ -14,6 +14,7 @@ import typer
 
 from network_toolkit.common.logging import console, setup_logging
 from network_toolkit.common.output import OutputMode
+from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.config import DeviceConfig, NetworkConfig, load_config
 from network_toolkit.exceptions import NetworkToolkitError
@@ -84,7 +85,17 @@ def register(app: typer.Typer) -> None:
         Uses platform-specific implementations to handle vendor differences
         in backup procedures.
         """
-        setup_logging("DEBUG" if verbose else "INFO")
+        # Create command context with proper styling (respects global config theme)
+        # Create command context with proper styling
+        ctx = CommandContext(
+            output_mode=None,  # Use global config theme
+            verbose=verbose,
+            config_file=config_file,
+        )
+        
+        # Use themed console for all output
+        console = ctx.console
+        
         try:
             config = load_config(config_file)
 
@@ -228,13 +239,9 @@ def register(app: typer.Typer) -> None:
                 raise typer.Exit(1)
 
         except NetworkToolkitError as e:
-            console.print(f"[red]Error: {e.message}[/red]")
-            if verbose and e.details:
-                console.print(f"[red]Details: {e.details}[/red]")
-            raise typer.Exit(1) from None
+            ctx.handle_error(e)
         except Exception as e:  # pragma: no cover - unexpected
-            console.print(f"[red]Unexpected error: {e}[/red]")
-            raise typer.Exit(1) from None
+            ctx.handle_error(e)
 
     # Register the default hyphenated command
     @app.command(rich_help_panel="Executing Operations", name="config-backup")

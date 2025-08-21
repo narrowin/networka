@@ -33,6 +33,8 @@ from typing import Annotated
 import typer
 
 from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.output import OutputMode
+from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
@@ -152,6 +154,15 @@ def register(app: typer.Typer) -> None:
         config_file: Annotated[
             Path, typer.Option("--config", "-c", help="Configuration file path")
         ] = DEFAULT_CONFIG_PATH,
+        output_mode: Annotated[
+            OutputMode | None,
+            typer.Option(
+                "--output-mode",
+                "-o",
+                help="Output decoration mode: default, light, dark, no-color, raw",
+                show_default=False,
+            ),
+        ] = None,
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
         ] = False,
@@ -177,7 +188,12 @@ def register(app: typer.Typer) -> None:
           - nw diff sw-acc1,sw-acc2 "/system/resource/print"   # device-to-device
           - nw diff sw-acc1,sw-acc2 config                      # device-to-device
         """
-        setup_logging("DEBUG" if verbose else "INFO")
+        # Create command context with proper styling
+        ctx = CommandContext(
+            output_mode=output_mode,
+            verbose=verbose,
+            config_file=config_file,
+        )
 
         subj = subject.strip()
         is_config = subj.lower() == "config"
@@ -471,9 +487,8 @@ def register(app: typer.Typer) -> None:
                 )
                 raise typer.Exit(1)
             else:
-                console.print("[green]No differences detected.[/green]")
+                ctx.print_success("No differences detected.")
                 raise typer.Exit(0)
 
         except NetworkToolkitError as e:  # pragma: no cover - error path
-            console.print(f"[red]Error: {e.message}[/red]")
-            raise typer.Exit(1) from None
+            ctx.handle_error(e)
