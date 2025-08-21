@@ -67,16 +67,8 @@ def register(app: typer.Typer) -> None:
                     return
 
                 for name, group in config.device_groups.items():
-                    group_members: list[str] = []
-                    if group.members:
-                        group_members = group.members
-                    elif group.match_tags and config.devices:
-                        # Find devices matching tags
-                        for device_name, device_config in config.devices.items():
-                            if device_config.tags and any(
-                                tag in group.match_tags for tag in device_config.tags
-                            ):
-                                group_members.append(device_name)
+                    # Use the proven get_group_members method
+                    group_members = config.get_group_members(name)
 
                     members_str = ",".join(group_members) if group_members else "none"
                     tags_str = (
@@ -112,15 +104,8 @@ def register(app: typer.Typer) -> None:
             style_manager.add_column(table, "Members", StyleName.SUCCESS)
 
             for name, group in config.device_groups.items():
-                members: list[str] = []
-                if group.members:
-                    members = group.members
-                elif group.match_tags and config.devices:
-                    for device_name, device_config in config.devices.items():
-                        if device_config.tags and any(
-                            tag in device_config.tags for tag in group.match_tags
-                        ):
-                            members.append(device_name)
+                # Use the proven get_group_members method
+                members = config.get_group_members(name)
 
                 table.add_row(
                     name,
