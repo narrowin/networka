@@ -141,6 +141,12 @@ def sample_config(sample_config_data: dict[str, Any]) -> NetworkConfig:
 
 
 @pytest.fixture
+def mock_config(sample_config: NetworkConfig) -> NetworkConfig:
+    """Alias for sample_config to maintain compatibility with existing tests."""
+    return sample_config
+
+
+@pytest.fixture
 def config_file(temp_dir: Path, sample_config_data: dict[str, Any]) -> Path:
     """Create a temporary config file with sample data."""
     config_path = temp_dir / "test_config.yml"
