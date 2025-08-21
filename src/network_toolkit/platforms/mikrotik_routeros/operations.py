@@ -8,8 +8,14 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from network_toolkit.common.interactive_confirmation import create_confirmation_handler
 from network_toolkit.exceptions import DeviceConnectionError, DeviceExecutionError
 from network_toolkit.platforms.base import PlatformOperations
+from network_toolkit.platforms.mikrotik_routeros.confirmation_patterns import (
+    MIKROTIK_PACKAGE_DOWNGRADE,
+    MIKROTIK_REBOOT,
+    MIKROTIK_ROUTERBOARD_UPGRADE,
+)
 from network_toolkit.platforms.mikrotik_routeros.constants import (
     DEFAULT_BACKUP_DOWNLOADS,
     DEFAULT_BACKUP_SEQUENCE,
@@ -112,20 +118,21 @@ class MikroTikRouterOSOperations(PlatformOperations):
                 logger.info("Executing reboot command with automatic confirmation...")
                 try:
                     logger.debug("Sending reboot command: /system/reboot")
-                    response = self.session._transport.send_interactive(  # type: ignore[union-attr]
-                        interact_events=[
-                            (
-                                "/system/reboot",
-                                "Reboot? [y/N]:",
-                                True,
-                            ),
-                            (
-                                "y",
-                                "",
-                                False,
-                            ),  # Send 'y' and don't expect a response (device reboots)
-                        ],
+                    # Create confirmation handler - ensure transport is available
+                    if self.session._transport is None:
+                        msg = "Transport not available"
+                        raise DeviceConnectionError(msg)
+
+                    confirmation_handler = create_confirmation_handler(
+                        self.session._transport
+                    )
+
+                    # Use the standardized confirmation pattern for reboot
+                    response = confirmation_handler.execute_with_confirmation(
+                        command="/system/reboot",
+                        pattern=MIKROTIK_REBOOT,
                         timeout_ops=confirmation_timeout,
+                        description="firmware upgrade reboot",
                     )
 
                     logger.info(
@@ -295,16 +302,21 @@ class MikroTikRouterOSOperations(PlatformOperations):
                 )
                 try:
                     logger.debug("Sending downgrade command: /system/package/downgrade")
-                    response = self.session._transport.send_interactive(  # type: ignore[union-attr]
-                        interact_events=[
-                            (
-                                "/system/package/downgrade",
-                                "Router will be rebooted. Continue? [y/N]:",
-                                True,
-                            ),
-                            ("y", "", False),
-                        ],
+                    # Create confirmation handler - ensure transport is available
+                    if self.session._transport is None:
+                        msg = "Transport not available"
+                        raise DeviceConnectionError(msg)
+
+                    confirmation_handler = create_confirmation_handler(
+                        self.session._transport
+                    )
+
+                    # Use the standardized confirmation pattern for package downgrade
+                    response = confirmation_handler.execute_with_confirmation(
+                        command="/system/package/downgrade",
+                        pattern=MIKROTIK_PACKAGE_DOWNGRADE,
                         timeout_ops=confirmation_timeout,
+                        description="package downgrade",
                     )
 
                     logger.info(f"Downgrade command response: {response!r}")
@@ -397,16 +409,21 @@ class MikroTikRouterOSOperations(PlatformOperations):
             # This command requires interactive confirmation
             try:
                 logger.debug("Sending upgrade command with automatic confirmation...")
-                upgrade_resp = self.session._transport.send_interactive(  # type: ignore[union-attr]
-                    interact_events=[
-                        (
-                            "/system/routerboard/upgrade",
-                            "Do you really want to upgrade firmware? [y/n]",
-                            True,
-                        ),
-                        ("y", "", False),
-                    ],
+                # Create confirmation handler - ensure transport is available
+                if self.session._transport is None:
+                    msg = "Transport not available"
+                    raise DeviceConnectionError(msg)
+
+                confirmation_handler = create_confirmation_handler(
+                    self.session._transport
+                )
+
+                # Use the standardized confirmation pattern for RouterBOARD upgrade
+                upgrade_resp = confirmation_handler.execute_with_confirmation(
+                    command="/system/routerboard/upgrade",
+                    pattern=MIKROTIK_ROUTERBOARD_UPGRADE,
                     timeout_ops=confirmation_timeout,
+                    description="RouterBOARD upgrade",
                 )
                 logger.debug(f"RouterBOARD upgrade response: {upgrade_resp}")
                 logger.info("✅ RouterBOARD upgrade scheduled (requires reboot)")
@@ -426,16 +443,21 @@ class MikroTikRouterOSOperations(PlatformOperations):
                 logger.info("Executing reboot command with automatic confirmation...")
                 try:
                     logger.debug("Sending reboot command: /system/reboot")
-                    response = self.session._transport.send_interactive(  # type: ignore[union-attr]
-                        interact_events=[
-                            (
-                                "/system/reboot",
-                                "Reboot? [y/N]:",
-                                True,
-                            ),
-                            ("y", "", False),
-                        ],
+                    # Create confirmation handler - ensure transport is available
+                    if self.session._transport is None:
+                        msg = "Transport not available"
+                        raise DeviceConnectionError(msg)
+
+                    confirmation_handler = create_confirmation_handler(
+                        self.session._transport
+                    )
+
+                    # Use the correct confirmation pattern for MikroTik reboot
+                    response = confirmation_handler.execute_with_confirmation(
+                        command="/system/reboot",
+                        pattern=MIKROTIK_REBOOT,
                         timeout_ops=confirmation_timeout,
+                        description="RouterBOARD upgrade reboot",
                     )
 
                     logger.info(f"Reboot response: {response!r}")
