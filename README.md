@@ -23,8 +23,9 @@ Networka is a modern async CLI tool for automating network devices across multip
 
 - **Cross-platform**: Full support for Linux, macOS, and Windows
 - **Multi-vendor support**: MikroTik RouterOS, Cisco IOS-XE/NX-OS, Arista EOS, Juniper JunOS, and more
-- **Modern async architecture**: Built with async/await for high performance
 - **Device/Group operations**: Execute commands across devices or groups concurrently
+- **Flexible config options**: Device and group configs can be done in yaml or csv with powerful tag and group options
+- **Modern async architecture**: Built with async/await for high performance
 - **Command sequences**: Vendor-aware predefined command sets
 - **Results management**: Organized storage with multiple output formats
 - **Type safety**: Full type checking with mypy for reliability
@@ -54,7 +55,7 @@ pip install --user git+https://github.com/narrowin/networka.git
 nw --help
 ```
 
-### Upgrade & Remove
+### Upgrade
 
 ```bash
 # Upgrade to latest version
@@ -63,13 +64,6 @@ uv tool upgrade networka
 pipx upgrade networka
 # or
 pip install --user --upgrade git+https://github.com/narrowin/networka.git
-
-# Remove installation
-uv tool uninstall networka
-# or
-pipx uninstall networka
-# or
-pip uninstall networka
 ```
 
 ### Platform-Specific Notes
@@ -78,38 +72,9 @@ pip uninstall networka
 
 **Windows**: All dependencies include pre-built wheels for seamless installation
 
-### Development Installation
-
-```bash
-# Clone repository
-git clone https://github.com/narrowin/networka.git
-cd networka
-
-# Install with uv (recommended)
-uv sync --all-extras
-
-# Or with pip
-pip install -e ".[dev]"
-
-# Verify installation
-nw --help
-```
-
-### Alternative Installation Methods
-
-```bash
-# Install specific version
-pip install git+https://github.com/narrowin/networka.git@v0.1.0
-
-# Install from local clone
-git clone https://github.com/narrowin/networka.git
-cd networka
-uv pip install .
-```
-
 ## Quick Start
 
-Get up and running in 2 steps:
+Get up and running with config-init command:
 
 ```bash
 # 1. Initialize your configuration environment
@@ -130,61 +95,50 @@ nw run office_switches "/system/identity/print"
 ```
 Usage: nw [OPTIONS] COMMAND [ARGS]...
 
-🌐 Networka (nw)
+ Networka (nw)
 
-A powerful multi-vendor CLI tool for automating network devices based on ssh protocol.
-Built with async/await support and type safety in mind.
+ A powerful multi-vendor CLI tool for automating network devices based on ssh protocol.
+ Built with async/await support and type safety in mind.
 
-📋 QUICK START:
-  nw run sw-acc1 '/system/clock/print'  # Execute command
-  nw run office_switches system_info    # Run sequence on group
+ QUICK START:
+   nw run sw-acc1 '/system/clock/print'  # Execute command
+   nw run office_switches system_info    # Run sequence on group
 
-📖 For detailed help on any command: nw <command> --help
-📁 Default config directory: config/ (use --config to override)
+ For detailed help on any command: nw <command> --help
+ Default config directory: config/ (use --config to override)
 
-╭─ Options ──────────────────────────────────────────────────────────────────╮
-│ --help               Show this message and exit.                           │
-╰────────────────────────────────────────────────────────────────────────────╯
-╭─ Commands ─────────────────────────────────────────────────────────────────╮
-│ ssh                  Open tmux with SSH panes for a device or group.       │
-╰────────────────────────────────────────────────────────────────────────────╯
-╭─ Info & Configuration ─────────────────────────────────────────────────────╮
-│ info                 Show comprehensive device information and connection  │
-│                      status.                                               │
-│ list-devices         List all configured network devices.                  │
-│ list-groups          List all configured device groups and their members.  │
-│ list-sequences       List all available command sequences, optionally      │
-│                      filtered by vendor or category.                       │
-│ config-init          Initialize a minimal working configuration            │
-│                      environment with examples.                            │
-│ config-validate      Validate the configuration file and show any issues.  │
-│ diff                 Diff config, a command, or a sequence.               │
-╰────────────────────────────────────────────────────────────────────────────╯
-╭─ Executing Operations ─────────────────────────────────────────────────────╮
-│ run                  Execute a single command or a sequence on a device or │
-│                      a group.                                              │
-│ upload               Upload a file to a device or to all devices in a      │
-│                      group.                                                │
-│ download             Download a file from a device or all devices in a     │
-│                      group.                                                │
-╰────────────────────────────────────────────────────────────────────────────╯
-╭─ Vendor-Specific Operations ───────────────────────────────────────────────╮
-│ config-backup        Create vendor-specific configuration backup (text     │
-│                      configuration export).                                │
-│ backup               Create comprehensive vendor-specific backup (text +   │
-│                      binary system backup).                                │
-│ firmware-upgrade     Upload firmware package and reboot device to apply    │
-│                      it.                                                   │
-│ firmware-downgrade   Upload older firmware package, schedule downgrade,    │
-│                      and reboot to apply.                                  │
-│ bios-upgrade         Upgrade RouterBOARD (RouterBOOT/BIOS) and reboot to   │
-│                      apply.                                                │
-╰────────────────────────────────────────────────────────────────────────────╯
+Options:
+  --version            Show version information
+  --help     -h        Show this message and exit.
+
+Commands:
+  ssh                  Open tmux with SSH panes for a device or group.
+
+Info & Configuration:
+  info                 Show comprehensive device information and connection status.
+  list-devices         List all configured network devices.
+  list-groups          List all configured device groups and their members.
+  list-sequences       List all available command sequences, optionally filtered by vendor or category.
+  config-init          Initialize a minimal working configuration environment.
+  config-validate      Validate the configuration file and show any issues.
+  diff                 Diff config, a command, or a sequence.
+
+Executing Operations:
+  run                  Execute a single command or a sequence on a device or a group.
+  upload               Upload a file to a device or to all devices in a group.
+  download             Download a file from a device or all devices in a group.
+
+Vendor-Specific Operations:
+  config-backup        Create device configuration backup using vendor-specific commands.
+  backup               Create comprehensive device backup using vendor-specific commands.
+  firmware-upgrade     Upload firmware package and reboot device to apply it.
+  firmware-downgrade   Upload older firmware package, schedule downgrade, and reboot to apply.
+  bios-upgrade         Upgrade device BIOS/RouterBOOT and reboot to apply.
 ```
 
-## Quick Start
+## networka environment
 
-### 1. Set up credentials
+### 1. Set up credentials for network device logins
 
 **Option A: Use .env file (Recommended)**
 
