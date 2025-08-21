@@ -63,16 +63,8 @@ def register(app: typer.Typer) -> None:
                     return
 
                 for name, group in config.device_groups.items():
-                    group_members: list[str] = []
-                    if group.members:
-                        group_members = group.members
-                    elif group.match_tags and config.devices:
-                        # Find devices matching tags
-                        for device_name, device_config in config.devices.items():
-                            if device_config.tags and any(
-                                tag in group.match_tags for tag in device_config.tags
-                            ):
-                                group_members.append(device_name)
+                    # Use the proven get_group_members method
+                    group_members = config.get_group_members(name)
 
                     members_str = ",".join(group_members) if group_members else "none"
                     tags_str = (
@@ -101,15 +93,8 @@ def register(app: typer.Typer) -> None:
             table.add_column("Members", style="success")  # Use theme color
 
             for name, group in config.device_groups.items():
-                members: list[str] = []
-                if group.members:
-                    members = group.members
-                elif group.match_tags and config.devices:
-                    for device_name, device_config in config.devices.items():
-                        if device_config.tags and any(
-                            tag in device_config.tags for tag in group.match_tags
-                        ):
-                            members.append(device_name)
+                # Use the proven get_group_members method
+                members = config.get_group_members(name)
 
                 table.add_row(
                     name,
@@ -129,10 +114,19 @@ def register(app: typer.Typer) -> None:
                     themed_console.print(f"  nw group-run {group_name} health_check")
 
         except NetworkToolkitError as e:
-            output_manager.print_error(f"Error: {e.message}")
-            if verbose and e.details:
-                output_manager.print_error(f"Details: {e.details}")
+            # Fallback to console if output_manager not available
+            if "output_manager" in locals():
+                output_manager.print_error(f"Error: {e.message}")
+                if verbose and e.details:
+                    output_manager.print_error(f"Details: {e.details}")
+            else:
+                console.print(f"[red]Error: {e.message}[/red]")
+                if verbose and e.details:
+                    console.print(f"[red]Details: {e.details}[/red]")
             raise typer.Exit(1) from None
         except Exception as e:  # pragma: no cover - unexpected
-            output_manager.print_error(f"Unexpected error: {e}")
+            if "output_manager" in locals():
+                output_manager.print_error(f"Unexpected error: {e}")
+            else:
+                console.print(f"[red]Unexpected error: {e}[/red]")
             raise typer.Exit(1) from None
