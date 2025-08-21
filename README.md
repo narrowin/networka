@@ -1,10 +1,12 @@
-# Networka (nw)
-
 <div align="center">
-  <img src="docs/images/networka.png" alt="Networka Logo" width="200"/>
+  <img src="docs/images/networka.png" alt="Networka Logo" width="320"/>
 </div>
 
+<br/>
+
 **The `Eierlegende Wollmilchsau` of network operations — optimized for your daily workflows.**
+
+<br/>
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](https://github.com/narrowin/networka)
