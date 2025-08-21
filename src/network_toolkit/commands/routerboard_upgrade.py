@@ -14,6 +14,7 @@ import typer
 
 from network_toolkit.common.logging import console, setup_logging
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
+from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.platforms import UnsupportedOperationError, get_platform_operations
@@ -59,6 +60,13 @@ def register(app: typer.Typer) -> None:
         in BIOS upgrade procedures.
         """
         setup_logging("DEBUG" if verbose else "INFO")
+        
+        # ACTION command - use global config theme
+        ctx = CommandContext(
+            config_file=config_file,
+            verbose=verbose,
+            output_mode=None  # Use global config theme
+        )
 
         try:
             config = load_config(config_file)
@@ -81,13 +89,13 @@ def register(app: typer.Typer) -> None:
                     preview = ", ".join(dev_names[:MAX_LIST_PREVIEW])
                     if len(dev_names) > MAX_LIST_PREVIEW:
                         preview += " ..."
-                    console.print("[yellow]Known devices:[/yellow] " + preview)
+                    ctx.print_info("Known devices: " + preview)
                 if groups:
                     grp_names = sorted(groups.keys())
                     preview = ", ".join(grp_names[:MAX_LIST_PREVIEW])
                     if len(grp_names) > MAX_LIST_PREVIEW:
                         preview += " ..."
-                    console.print("[yellow]Known groups:[/yellow] " + preview)
+                    ctx.print_info("Known groups: " + preview)
                 raise typer.Exit(1)
 
             def process_device(dev: str) -> bool:
@@ -97,15 +105,11 @@ def register(app: typer.Typer) -> None:
                         try:
                             platform_ops = get_platform_operations(session)
                         except UnsupportedOperationError as e:
-                            console.print(f"[red]Error on {dev}: {e}[/red]")
+                            ctx.print_error(f"Error on {dev}: {e}")
                             return False
 
                         if precheck_sequence and not skip_precheck:
-                            console.print(
-                                "[cyan]Running precheck sequence '"
-                                + precheck_sequence
-                                + f"' on {dev}[/cyan]"
-                            )
+                            ctx.print_info(f"Running precheck sequence '{precheck_sequence}' on {dev}")
                             seq_cmds: list[str] = []
                             dcfg = (config.devices or {}).get(dev)
                             if (
@@ -130,27 +134,24 @@ def register(app: typer.Typer) -> None:
                             f"{dev} and rebooting...[/bold yellow]"
                         )
                         platform_name = platform_ops.get_platform_name()
-                        console.print(f"[yellow]Platform:[/yellow] {platform_name}")
+                        ctx.print_info(f"Platform: {platform_name}")
 
                         # Use platform-specific BIOS upgrade
                         ok = platform_ops.bios_upgrade()
                         if ok:
-                            console.print(
-                                "[green]OK BIOS upgrade scheduled; "
-                                f"device rebooting: {dev}[/green]"
-                            )
+                            ctx.print_success(f"OK BIOS upgrade scheduled; device rebooting: {dev}")
                             return True
                         console.print(
                             f"[red]FAIL BIOS upgrade failed to start on {dev}[/red]"
                         )
                         return False
                 except NetworkToolkitError as e:
-                    console.print(f"[red]Error on {dev}: {e.message}[/red]")
+                    ctx.print_error(f"Error on {dev}: {e.message}")
                     if verbose and e.details:
-                        console.print(f"[red]Details: {e.details}[/red]")
+                        ctx.print_error(f"Details: {e.details}")
                     return False
                 except Exception as e:  # pragma: no cover - unexpected
-                    console.print(f"[red]Unexpected error on {dev}: {e}[/red]")
+                    ctx.print_error(f"Unexpected error on {dev}: {e}")
                     return False
 
             if is_device:
@@ -193,10 +194,10 @@ def register(app: typer.Typer) -> None:
                 raise typer.Exit(1)
 
         except NetworkToolkitError as e:
-            console.print(f"[red]Error: {e.message}[/red]")
+            ctx.print_error(f"Error: {e.message}")
             if verbose and e.details:
-                console.print(f"[red]Details: {e.details}[/red]")
+                ctx.print_error(f"Details: {e.details}")
             raise typer.Exit(1) from None
         except Exception as e:  # pragma: no cover - unexpected
-            console.print(f"[red]Unexpected error: {e}[/red]")
+            ctx.print_error(f"Unexpected error: {e}")
             raise typer.Exit(1) from None

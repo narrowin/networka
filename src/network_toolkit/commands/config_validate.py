@@ -10,6 +10,7 @@ import typer
 
 from network_toolkit.common.logging import console, setup_logging
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
+from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 
@@ -29,6 +30,13 @@ def register(app: typer.Typer) -> None:
     ) -> None:
         """Validate the configuration file and show any issues."""
         setup_logging("DEBUG" if verbose else "INFO")
+        
+        # ACTION command - use global config theme
+        ctx = CommandContext(
+            config_file=config_file,
+            verbose=verbose,
+            output_mode=None  # Use global config theme
+        )
 
         try:
             console.print(
@@ -59,11 +67,11 @@ def register(app: typer.Typer) -> None:
                     console.print(f"  • {name} ({device.host}) - {device.device_type}")
 
         except NetworkToolkitError as e:
-            console.print("[red]FAIL Configuration validation failed![/red]")
-            console.print(f"[red]Error: {e.message}[/red]")
+            ctx.print_error("FAIL Configuration validation failed!")
+            ctx.print_error(f"Error: {e.message}")
             if verbose and e.details:
-                console.print(f"[red]Details: {e.details}[/red]")
+                ctx.print_error(f"Details: {e.details}")
             raise typer.Exit(1) from None
         except Exception as e:  # pragma: no cover - unexpected
-            console.print(f"[red]FAIL Unexpected error during validation: {e}[/red]")
+            ctx.print_error(f"FAIL Unexpected error during validation: {e}")
             raise typer.Exit(1) from None

@@ -14,13 +14,33 @@ from typing import Annotated, Any
 
 import typer
 
+from network_toolkit.common.command import CommandContext
 from network_toolkit.common.errors import print_error, print_success
 from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.output import OutputMode
 from network_toolkit.common.resolver import DeviceResolver
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.results_enhanced import ResultsManager
 from network_toolkit.sequence_manager import SequenceManager
+
+
+def _print_info(text: str) -> None:
+    """Print info message using default theme."""
+    from network_toolkit.common.styles import StyleManager, StyleName
+
+    style_manager = StyleManager(mode=OutputMode.DEFAULT)
+    style = style_manager.get_style(StyleName.INFO)
+    console.print(f"[{style}]{text}[/{style}]")
+
+
+def _print_success(text: str) -> None:
+    """Print success message using default theme."""
+    from network_toolkit.common.styles import StyleManager, StyleName
+
+    style_manager = StyleManager(mode=OutputMode.DEFAULT)
+    style = style_manager.get_style(StyleName.SUCCESS)
+    console.print(f"[{style}]{text}[/{style}]")
 
 
 class OutputFormat(str, Enum):
@@ -278,7 +298,7 @@ def _execute_sequence_single_device(
         console.print(
             f"[bold blue]Executing sequence '{sequence_name}' on device {target_label}[/bold blue]"
         )
-        console.print(f"[yellow]Transport:[/yellow] {transport_type}")
+        _print_info(f"Transport: {transport_type}")
         console.print()
 
     results_map, error = executor.execute_sequence_on_device(device_name, sequence_name)
@@ -345,8 +365,8 @@ def _execute_command_single_device(
         console.print(
             f"[bold blue]Executing command on device {target_label}[/bold blue]"
         )
-        console.print(f"[cyan]Command:[/cyan] {command}")
-        console.print(f"[yellow]Transport:[/yellow] {transport_type}")
+        _print_info(f"Command: {command}")
+        _print_info(f"Transport: {transport_type}")
         console.print()
 
     result, error = executor.execute_command_on_device(device_name, command)
@@ -376,7 +396,7 @@ def _execute_command_multiple_devices(
             f"[bold blue]Executing command on group {target_label} "
             f"({len(devices)} devices)[/bold blue]"
         )
-        console.print(f"[cyan]Command:[/cyan] {command}")
+        _print_info(f"Command: {command}")
         console.print()
 
     success_count = 0

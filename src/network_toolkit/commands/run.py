@@ -274,11 +274,8 @@ def register(app: typer.Typer) -> None:
                         [f"  {k}: {v}" for k, v in supported_platforms.items()]
                     )
                     if raw is None:
-                        console.print(
-                            "[red]Error: When using IP addresses, "
-                            "--platform is required[/red]\n"
-                            f"[yellow]Supported platforms:[/yellow]\n{platform_list}"
-                        )
+                        ctx.print_error("When using IP addresses, --platform is required")
+                        ctx.print_info(f"Supported platforms:\n{platform_list}")
                     raise typer.Exit(1)
 
                 if not validate_platform(platform):
@@ -287,10 +284,8 @@ def register(app: typer.Typer) -> None:
                         [f"  {k}: {v}" for k, v in supported_platforms.items()]
                     )
                     if raw is None:
-                        console.print(
-                            f"[red]Error: Invalid platform '{platform}'[/red]\n"
-                            f"[yellow]Supported platforms:[/yellow]\n{platform_list}"
-                        )
+                        ctx.print_error(f"Invalid platform '{platform}'")
+                        ctx.print_info(f"Supported platforms:\n{platform_list}")
                     raise typer.Exit(1)
 
                 # Extract IP addresses and create dynamic config
@@ -298,10 +293,7 @@ def register(app: typer.Typer) -> None:
                 config = create_ip_based_config(ips, platform, config, port=port)
 
                 if raw is None:
-                    console.print(
-                        f"[cyan]Using IP addresses with platform '{platform}': "
-                        f"{', '.join(ips)}[/cyan]"
-                    )
+                    ctx.print_info(f"Using IP addresses with platform '{platform}': {', '.join(ips)}")
 
             sm = SequenceManager(config)
             # Provide command context for better results folder naming
@@ -404,7 +396,7 @@ def register(app: typer.Typer) -> None:
 
                     if error:
                         if raw is None:
-                            console.print(f"[red]Error: {error}[/red]")
+                            ctx.print_error(f"Error: {error}")
                         raise typer.Exit(1)
 
                     if results_map:
@@ -474,10 +466,7 @@ def register(app: typer.Typer) -> None:
                     group_members = resolved_devices
                     if not group_members:
                         if raw is None:
-                            console.print(
-                                "[yellow]Warning: No devices resolved for "
-                                f"'{target}'.[/yellow]"
-                            )
+                            ctx.print_warning(f"No devices resolved for '{target}'.")
                         return
 
                     if raw is None:
@@ -486,9 +475,7 @@ def register(app: typer.Typer) -> None:
                             f"'{command_or_sequence}' on targets '{target}' "
                             f"({len(group_members)} devices)[/bold blue]"
                         )
-                        console.print(
-                            f"[cyan]Members:[/cyan] {', '.join(group_members)}"
-                        )
+                        ctx.print_info(f"Members: {', '.join(group_members)}")
                         console.print()
 
                     with ThreadPoolExecutor(max_workers=len(group_members)) as executor:
@@ -565,7 +552,7 @@ def register(app: typer.Typer) -> None:
                                 if device_results:
                                     table.add_row(
                                         "[bold cyan]Commands[/bold cyan]",
-                                        f"[cyan]{len(device_results)} executed[/cyan]",
+                                        f"{len(device_results)} executed",
                                     )
                                     first_output = next(
                                         iter(device_results.values()),
@@ -635,7 +622,7 @@ def register(app: typer.Typer) -> None:
                         "[bold blue]Executing command on device "
                         f"{device_target}[/bold blue]"
                     )
-                    console.print(f"[cyan]Command:[/cyan] {command_or_sequence}")
+                    ctx.print_info(f"Command: {command_or_sequence}")
                     console.print()
 
                 device_target = resolved_devices[0]
@@ -710,10 +697,7 @@ def register(app: typer.Typer) -> None:
                 members = resolved_devices
                 if not members:
                     if raw is None:
-                        console.print(
-                            f"[yellow]Warning: No devices resolved for "
-                            f"'{target}'.[/yellow]"
-                        )
+                        ctx.print_warning(f"No devices resolved for '{target}'.")
                     return
 
                 if raw is None:
@@ -721,8 +705,8 @@ def register(app: typer.Typer) -> None:
                         f"[bold blue]Executing command on targets '{target}' "
                         f"({len(members)} devices)[/bold blue]"
                     )
-                    console.print(f"[cyan]Command:[/cyan] {command_or_sequence}")
-                    console.print(f"[cyan]Members:[/cyan] {', '.join(members)}")
+                    ctx.print_info(f"Command: {command_or_sequence}")
+                    ctx.print_info(f"Members: {', '.join(members)}")
                     console.print()
 
                 with ThreadPoolExecutor(max_workers=len(members)) as executor:

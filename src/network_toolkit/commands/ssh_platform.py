@@ -7,6 +7,8 @@ import shutil
 from typing import Any
 
 from network_toolkit.common.logging import console
+from network_toolkit.common.styles import StyleManager, StyleName
+from network_toolkit.common.output import OutputMode
 
 
 class PlatformCapabilities:
@@ -72,16 +74,22 @@ class PlatformCapabilities:
 
     def suggest_alternatives(self) -> None:
         """Print platform-specific installation suggestions."""
+        style_manager = StyleManager(mode=OutputMode.DEFAULT)
+        
         if not self.supports_tmux:
             if self.system == "Windows":
-                console.print(
-                    "[yellow]tmux not available on Windows. Consider:[/yellow]"
+                warning_msg = style_manager.format_message(
+                    "tmux not available on Windows. Consider:", StyleName.WARNING
                 )
+                console.print(warning_msg)
                 console.print("• Install WSL2 and use: wsl -d Ubuntu")
                 console.print("• Use Windows Terminal with multiple tabs")
                 console.print("• Use ConEmu or similar terminal multiplexer")
             else:
-                console.print("[yellow]tmux not found. Install with:[/yellow]")
+                warning_msg = style_manager.format_message(
+                    "tmux not found. Install with:", StyleName.WARNING
+                )
+                console.print(warning_msg)
                 if self.system == "Darwin":
                     console.print("• brew install tmux")
                 else:
@@ -90,14 +98,18 @@ class PlatformCapabilities:
 
         if self.ssh_client_type == "none":
             if self.system == "Windows":
-                console.print("[yellow]No SSH client found. Install:[/yellow]")
+                warning_msg = style_manager.format_message(
+                    "No SSH client found. Install:", StyleName.WARNING
+                )
+                console.print(warning_msg)
                 console.print("• Windows OpenSSH: Settings > Apps > Optional Features")
                 console.print("• PuTTY: https://www.putty.org/")
                 console.print("• Git Bash (includes OpenSSH)")
             else:
-                console.print(
-                    "[yellow]SSH client not found. Install openssh-client[/yellow]"
+                warning_msg = style_manager.format_message(
+                    "SSH client not found. Install openssh-client", StyleName.WARNING
                 )
+                console.print(warning_msg)
 
 
 # Global instance

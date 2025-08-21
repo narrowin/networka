@@ -5,8 +5,7 @@
 
 Creates a complete starter configuration with:
 - .env file with credential templates
-- config/config.yml with core settings
-- config/devices/ with MikroTik and Cisco examples
+- config/config.yml with core settin                _print_info(f"Using OS-appropriate configuration directory: {target_path}")- config/devices/ with MikroTik and Cisco examples
 - config/groups/ with tag-based and explicit groups
 - config/sequences/ with global and vendor-specific sequences
 """
@@ -20,6 +19,23 @@ import typer
 
 from network_toolkit.common.logging import console, setup_logging
 from network_toolkit.common.paths import default_config_root
+from network_toolkit.common.command_helpers import CommandContext
+from network_toolkit.common.output import OutputMode
+from network_toolkit.common.styles import StyleManager, StyleName
+
+
+def _print_success(message: str) -> None:
+    """Print success message using default theme."""
+    style_manager = StyleManager(mode=OutputMode.DEFAULT)
+    styled_message = style_manager.format_message(message, StyleName.SUCCESS)
+    console.print(styled_message)
+
+
+def _print_info(message: str) -> None:
+    """Print info message using default theme."""
+    style_manager = StyleManager(mode=OutputMode.DEFAULT) 
+    styled_message = style_manager.format_message(message, StyleName.INFO)
+    console.print(styled_message)
 
 
 def create_env_file(target_dir: Path) -> None:
@@ -43,7 +59,7 @@ NW_PASSWORD_DEFAULT=changeme123
 """
     env_file = target_dir / ".env"
     env_file.write_text(env_content.strip() + "\n")
-    console.print(f"[green]Created .env file: {env_file}[/green]")
+    _print_success(f"Created .env file: {env_file}")
 
 
 def create_config_yml(config_dir: Path) -> None:
@@ -67,7 +83,7 @@ general:
 """
     config_file = config_dir / "config.yml"
     config_file.write_text(config_content.strip() + "\n")
-    console.print(f"[green]Created config file: {config_file}[/green]")
+    _print_success(f"Created config file: {config_file}")
 
 
 def create_example_devices(devices_dir: Path) -> None:
@@ -123,11 +139,11 @@ devices:
 
     mikrotik_file = devices_dir / "mikrotik.yml"
     mikrotik_file.write_text(mikrotik_content.strip() + "\n")
-    console.print(f"[green]Created MikroTik devices: {mikrotik_file}[/green]")
+    _print_success(f"Created MikroTik devices: {mikrotik_file}")
 
     cisco_file = devices_dir / "cisco.yml"
     cisco_file.write_text(cisco_content.strip() + "\n")
-    console.print(f"[green]Created Cisco devices: {cisco_file}[/green]")
+    _print_success(f"Created Cisco devices: {cisco_file}")
 
 
 def create_example_groups(groups_dir: Path) -> None:
@@ -157,7 +173,7 @@ groups:
 
     groups_file = groups_dir / "main.yml"
     groups_file.write_text(groups_content.strip() + "\n")
-    console.print(f"[green]Created device groups: {groups_file}[/green]")
+    _print_success(f"Created device groups: {groups_file}")
 
 
 def create_example_sequences(sequences_dir: Path) -> None:
@@ -191,7 +207,7 @@ sequences:
 
     sequences_file = sequences_dir / "basic.yml"
     sequences_file.write_text(sequences_content.strip() + "\n")
-    console.print(f"[green]Created command sequences: {sequences_file}[/green]")
+    _print_success(f"Created command sequences: {sequences_file}")
 
 
 def create_vendor_sequences(sequences_dir: Path) -> None:
@@ -210,7 +226,7 @@ vendor_platforms:
 """
     vendor_map_file = sequences_dir / "vendor.yml"
     vendor_map_file.write_text(vendor_map_content.strip() + "\n")
-    console.print(f"[green]Created vendor mapping: {vendor_map_file}[/green]")
+    _print_success(f"Created vendor mapping: {vendor_map_file}")
 
     mik_dir = sequences_dir / "mikrotik_routeros"
     mik_dir.mkdir(exist_ok=True)
@@ -225,7 +241,7 @@ sequences:
     tags: ["vendor", "mikrotik"]
 """
     (mik_dir / "common.yml").write_text(mik_common.strip() + "\n")
-    console.print(f"[green]Created vendor sequences: {mik_dir / 'common.yml'}[/green]")
+    _print_success(f"Created vendor sequences: {mik_dir / 'common.yml'}")
 
     cisco_dir = sequences_dir / "cisco_ios"
     cisco_dir.mkdir(exist_ok=True)
@@ -291,14 +307,11 @@ def register(app: typer.Typer) -> None:
             )
         else:
             target_path = Path(target_dir)
-            console.print(
-                f"[cyan]Using custom configuration directory: {target_path}[/cyan]"
-            )
-
+            _print_info(f"Using custom configuration directory: {target_path}")
         target_path = target_path.expanduser().resolve()
         if not target_path.exists():
             target_path.mkdir(parents=True, exist_ok=True)
-            console.print(f"[cyan]Created directory: {target_path}[/cyan]")
+            _print_info(f"Created directory: {target_path}")
 
         # Configuration will be placed directly in target_path (not in a config/ subdirectory)
         config_dir = target_path  # Files go directly in the app root
@@ -351,16 +364,12 @@ def register(app: typer.Typer) -> None:
         create_vendor_sequences(sequences_dir)
 
         console.print()
-        console.print(
-            "[bold green]✓ Configuration initialization complete![/bold green]"
-        )
+        _print_success("Configuration initialization complete!")
         console.print()
-        console.print(f"[cyan]Configuration installed to: {target_path}[/cyan]")
-        console.print(
-            "[cyan]The 'nw' command will automatically find this configuration.[/cyan]"
-        )
+        _print_info(f"Configuration installed to: {target_path}")
+        _print_info("The 'nw' command will automatically find this configuration.")
         console.print()
-        console.print("[cyan]Next steps:[/cyan]")
+        _print_info("Next steps:")
         console.print(f"  1. Edit {target_path}/.env with your actual credentials")
         console.print(f"  2. Update {target_path}/devices/ with your actual devices")
         console.print(
