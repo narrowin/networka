@@ -13,6 +13,7 @@ from typing import Annotated, Any, cast
 import typer
 
 from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.output import OutputMode
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.config import DeviceConfig, NetworkConfig, load_config
 from network_toolkit.exceptions import NetworkToolkitError

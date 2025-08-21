@@ -15,6 +15,7 @@ import typer
 from rich.table import Table
 
 from network_toolkit.common.credentials import prompt_for_credentials
+from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import (
@@ -123,45 +124,37 @@ def register(app: typer.Typer) -> None:
         ] = None,
     ) -> None:
         """Execute a single command or a sequence on a device or a group."""
-        # Handle output mode configuration
+        # Handle legacy raw mode mapping
         if raw is not None:
-            # Legacy raw mode support - map to new output mode
             output_mode = OutputMode.RAW
-        elif output_mode is None:
-            # Default to normal mode if nothing specified
-            output_mode = OutputMode.DEFAULT
-
-        # Set the global output mode for this command
-        set_output_mode(output_mode)
-
-        # Get the console from the output manager
-        console = get_output_manager().console
-
-        # Raw mode suppresses all logging setup
-        if output_mode != OutputMode.RAW:
-            setup_logging("DEBUG" if verbose else "INFO")
+        
+        # Create command context with proper styling
+        ctx = CommandContext(
+            output_mode=output_mode,
+            verbose=verbose,
+            config_file=config_file,
+        )
+        
+        # Expose console for backward compatibility with existing code
+        console = ctx.console
 
         # Handle interactive authentication if requested
         interactive_creds = None
         if interactive_auth:
-            if raw is None:
-                console.print(
-                    "[yellow]Interactive authentication mode enabled[/yellow]"
-                )
+            if not ctx.is_raw_mode():
+                ctx.print_info("Interactive authentication mode enabled")
             interactive_creds = prompt_for_credentials(
                 "Enter username for devices",
                 "Enter password for devices",
                 "admin",  # Default username suggestion
             )
-            if raw is None:
-                console.print(
-                    f"[green]Will use username: {interactive_creds.username}[/green]"
-                )
+            if not ctx.is_raw_mode():
+                ctx.print_success(f"Will use username: {interactive_creds.username}")
 
         # Track run timing & reporting state
         started_at = perf_counter()
         printed_results_dir = False
-        output_mgr = get_output_manager()
+        output_mgr = ctx.output_manager  # Use context's output manager
 
         def _print_results_dir_once(results_mgr: ResultsManager) -> None:
             """Print the results directory once if storing is enabled."""
@@ -359,15 +352,13 @@ def register(app: typer.Typer) -> None:
 
             if unknown_targets and not resolved_devices:
                 if raw is None:
-                    console.print(
-                        "[red]Error: target(s) not found: "
-                        f"{', '.join(unknown_targets)}[/red]"
+                    output_mgr.print_error(
+                        f"target(s) not found: {', '.join(unknown_targets)}"
                     )
                 raise typer.Exit(1)
             elif unknown_targets and raw is None:
-                console.print(
-                    "[yellow]Warning: ignoring unknown target(s): "
-                    f"{', '.join(unknown_targets)}[/yellow]"
+                ctx.print_warning(
+                    f"Warning: ignoring unknown target(s): {', '.join(unknown_targets)}"
                 )
 
             # Determine target mode
@@ -849,15 +840,14 @@ def register(app: typer.Typer) -> None:
 
         except NetworkToolkitError as e:
             if raw is None:
-                console.print(f"[red]Error: {e.message}[/red]")
+                output_mgr.print_error(f"Error: {e.message}")
                 if verbose and e.details:
-                    console.print(f"[red]Details: {e.details}[/red]")
+                    output_mgr.print_error(f"Details: {e.details}")
             raise typer.Exit(1) from None
+        except typer.Exit:
+            # Re-raise typer.Exit without catching it as an unexpected error
+            raise
         except Exception as e:  # pragma: no cover - unexpected
             if raw is None:
-                console.print(f"[red]Unexpected error: {e}[/red]")
-            raise typer.Exit(1) from None
-        except Exception as e:  # pragma: no cover - unexpected
-            if raw is None:
-                console.print(f"[red]Unexpected error: {e}[/red]")
+                output_mgr.print_error(f"Unexpected error: {e}")
             raise typer.Exit(1) from None
