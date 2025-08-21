@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 import typer
-from rich.table import Table
 
 from network_toolkit.common.credentials import prompt_for_credentials
 from network_toolkit.common.logging import setup_logging
@@ -17,6 +16,7 @@ from network_toolkit.common.output import (
     set_output_mode,
 )
 from network_toolkit.common.resolver import DeviceResolver
+from network_toolkit.common.styles import StyleManager, StyleName
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 
@@ -97,6 +97,9 @@ def register(app: typer.Typer) -> None:
                     config.general.output_mode
                 )
 
+            # Create style manager for consistent theming
+            style_manager = StyleManager(output_manager.mode)
+
             resolver = DeviceResolver(config)
 
             # Get themed console
@@ -142,9 +145,9 @@ def register(app: typer.Typer) -> None:
 
                 device_config = config.devices[device]
 
-                table = Table(title=f"Device: {device}")
-                table.add_column("Property", style="device")
-                table.add_column("Value", style="output")
+                table = style_manager.create_table(title=f"Device: {device}")
+                style_manager.add_column(table, "Property", StyleName.DEVICE)
+                style_manager.add_column(table, "Value", StyleName.OUTPUT)
 
                 table.add_row("Host", device_config.host)
                 table.add_row("Description", device_config.description or "N/A")
