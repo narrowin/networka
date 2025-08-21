@@ -47,7 +47,7 @@ def load_dotenv_files(config_path: Path | None = None) -> None:
         logging.debug(f"Loading .env from current directory: {cwd_env}")
         load_dotenv(cwd_env, override=False)
 
-    # Load .env from config directory (higher priority than cwd)
+    # Load .env from config directory (if config_path provided)
     if config_path:
         config_dir = config_path.parent if config_path.is_file() else config_path
         config_env = config_dir / ".env"
@@ -837,13 +837,12 @@ def load_config(config_path: str | Path) -> NetworkConfig:
     load_dotenv_files(config_path)
 
     # Check for new modular configuration structure
+    # Handle default path "config" - check current directory first, then fall back to platform default
     if config_path.name in ["config", "config/"]:
-        # Direct config directory path
-        config_dir = config_path
-        if not config_dir.exists():
-            msg = f"Configuration directory not found: {config_dir}"
-            raise FileNotFoundError(msg)
-        return load_modular_config(config_dir)
+        # First try current directory
+        if config_path.exists():
+            return load_modular_config(config_path)
+        # Fall through to platform default logic below
 
     # If user provided an explicit file path that doesn't exist, fail immediately
     if not config_path.exists() and str(original_path) not in ["config", "devices.yml"]:
@@ -887,8 +886,15 @@ def load_config(config_path: str | Path) -> NetworkConfig:
 
         for path in possible_paths:
             if path.exists():
-                if path.name == "config.yml" and path.parent.name == "config":
-                    return load_modular_config(path.parent)
+                if path.name == "config.yml":
+                    # Check if this is a modular config by looking for devices/ or groups/ directories
+                    parent_dir = path.parent
+                    if (parent_dir / "devices").exists() or (
+                        parent_dir / "groups"
+                    ).exists():
+                        return load_modular_config(parent_dir)
+                    # Fall back to legacy loading
+                    return load_legacy_config(path)
                 else:
                     return load_legacy_config(path)
 

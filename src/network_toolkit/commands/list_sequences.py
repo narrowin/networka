@@ -9,6 +9,7 @@ from typing import Annotated
 import typer
 from rich.table import Table
 
+from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.logging import console, setup_logging
 from network_toolkit.config import CommandSequence, load_config
 from network_toolkit.sequence_manager import SequenceManager, SequenceRecord
@@ -20,7 +21,7 @@ def register(app: typer.Typer) -> None:
         *,
         config_file: Annotated[
             Path, typer.Option("--config", "-c", help="Configuration file path")
-        ] = Path("devices.yml"),
+        ] = DEFAULT_CONFIG_PATH,
         vendor: Annotated[
             str | None,
             typer.Option("--vendor", "-v", help="Filter by vendor platform"),

@@ -19,7 +19,7 @@ from typing import Annotated
 import typer
 
 from network_toolkit.common.logging import console, setup_logging
-from network_toolkit.common.paths import default_modular_config_dir
+from network_toolkit.common.paths import default_config_root
 
 
 def create_env_file(target_dir: Path) -> None:
@@ -253,7 +253,7 @@ def register(app: typer.Typer) -> None:
         target_dir: Annotated[
             Path | None,
             typer.Argument(
-                help="Directory to initialize (default: system config location)",
+                help="Directory to initialize (default: system config location for your OS)",
             ),
         ] = None,
         force: Annotated[
@@ -265,54 +265,62 @@ def register(app: typer.Typer) -> None:
             typer.Option("--verbose", "-v", help="Enable verbose logging"),
         ] = False,
     ) -> None:
-        """Initialize a minimal working configuration environment.
+        """Initialize a network toolkit configuration in OS-appropriate location.
 
-        Creates a complete starter configuration.
+        Creates a complete starter configuration with:
+        - .env file with credential templates
+        - config.yml with core settings
+        - devices/ with MikroTik and Cisco examples
+        - groups/ with tag-based and explicit groups
+        - sequences/ with global and vendor-specific sequences
+
+        Default locations by OS:
+        - Linux: ~/.config/networka/
+        - macOS: ~/Library/Application Support/networka/
+        - Windows: %APPDATA%/networka/
+
+        The 'nw' command will automatically find configurations in these locations.
         """
-
         setup_logging("DEBUG" if verbose else "INFO")
 
-        # Determine target directory
-        target_path = (
-            default_modular_config_dir() if target_dir is None else Path(target_dir)
-        )
+        # Determine target directory - use OS-appropriate default if not specified
+        if target_dir is None:
+            target_path = default_config_root()  # This gives us the app root directory
+            console.print(
+                f"[cyan]Using OS-appropriate configuration directory: {target_path}[/cyan]"
+            )
+        else:
+            target_path = Path(target_dir)
+            console.print(
+                f"[cyan]Using custom configuration directory: {target_path}[/cyan]"
+            )
+
         target_path = target_path.expanduser().resolve()
         if not target_path.exists():
             target_path.mkdir(parents=True, exist_ok=True)
             console.print(f"[cyan]Created directory: {target_path}[/cyan]")
 
-        # Decide layout
-        is_modular_target = target_path.name.lower() == "config"
-        is_default_location = (
-            target_dir is None
-            or target_path == default_modular_config_dir().resolve()
-        )
-        config_dir = (
-            target_path
-            if (is_default_location or is_modular_target)
-            else (target_path / "config")
-        )
-        env_dir = target_path if not is_modular_target else config_dir
-        env_file = env_dir / ".env"
+        # Configuration will be placed directly in target_path (not in a config/ subdirectory)
+        config_dir = target_path  # Files go directly in the app root
+        env_file = target_path / ".env"
 
         if not force:
-            existing_paths: list[str] = []
+            existing_files: list[str] = []
             if env_file.exists():
-                existing_paths.append(str(env_file))
-            key_paths = [
-                config_dir / "config.yml",
-                config_dir / "devices",
-                config_dir / "groups",
-                config_dir / "sequences",
-            ]
-            for p in key_paths:
-                if p.exists():
-                    existing_paths.append(str(p))
-            if existing_paths:
+                existing_files.append(str(env_file))
+            # Check for key config files that would indicate an existing installation
+            config_yml = config_dir / "config.yml"
+            if config_yml.exists():
+                existing_files.append(str(config_yml))
+            devices_dir = config_dir / "devices"
+            if devices_dir.exists():
+                existing_files.append(str(devices_dir))
+
+            if existing_files:
                 console.print(
                     "[yellow]Warning: The following files/directories already exist:[/yellow]"
                 )
-                for path in existing_paths:
+                for path in existing_files:
                     console.print(f"  - {path}")
                 console.print(
                     "\n[yellow]Use --force to overwrite existing files.[/yellow]"
@@ -324,11 +332,10 @@ def register(app: typer.Typer) -> None:
         )
         console.print()
 
-        # Create .env file
-        create_env_file(env_dir)
+        # Create .env file in the root app directory
+        create_env_file(target_path)
 
-        # Create config directory structure
-        config_dir.mkdir(parents=True, exist_ok=True)
+        # Create subdirectories for modular config
         devices_dir = config_dir / "devices"
         devices_dir.mkdir(exist_ok=True)
         groups_dir = config_dir / "groups"
@@ -344,23 +351,27 @@ def register(app: typer.Typer) -> None:
         create_vendor_sequences(sequences_dir)
 
         console.print()
-        console.print("[bold green]✓ Configuration initialization complete![/bold green]")
+        console.print(
+            "[bold green]✓ Configuration initialization complete![/bold green]"
+        )
+        console.print()
+        console.print(f"[cyan]Configuration installed to: {target_path}[/cyan]")
+        console.print(
+            "[cyan]The 'nw' command will automatically find this configuration.[/cyan]"
+        )
         console.print()
         console.print("[cyan]Next steps:[/cyan]")
-        console.print("  1. Edit .env with your actual credentials")
+        console.print(f"  1. Edit {target_path}/.env with your actual credentials")
+        console.print(f"  2. Update {target_path}/devices/ with your actual devices")
         console.print(
-            "  2. Update devices/ with your actual devices (or config/devices/ if you provided a custom target)"
-        )
-        console.print(
-            "  3. Customize groups/ for your network structure (or config/groups/ in a custom target)"
+            f"  3. Customize {target_path}/groups/ for your network structure"
         )
         console.print("  4. Test connectivity: [bold]nw info sw-office-01[/bold]")
-        console.print("  5. Run a command: [bold]nw run sw-office-01 system_info[/bold]")
         console.print(
-            "  6. Try vendor sequences: [bold]nw run sw-core-01 system_info[/bold] (Cisco)"
+            "  5. Run a command: [bold]nw run sw-office-01 system_info[/bold]"
         )
         console.print(
-            "  7. Explore more sequences in this repo: [bold]docs/multi-vendor-support.md[/bold] and [bold]docs/examples/user_sequences/[/bold]"
+            "  6. Try vendor sequences: [bold]nw run sw-core-01 system_info[/bold] (Cisco)"
         )
         console.print()
         console.print("[dim]For more help: nw --help[/dim]")

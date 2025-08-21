@@ -15,6 +15,7 @@ import typer
 from rich.table import Table
 
 from network_toolkit.common.credentials import prompt_for_credentials
+from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import (
     OutputMode,
@@ -64,8 +65,9 @@ def register(app: typer.Typer) -> None:
         ],
         *,
         config_file: Annotated[
-            Path, typer.Option("--config", "-c", help="Configuration file path")
-        ] = Path("devices.yml"),
+            Path,
+            typer.Option("--config", "-c", help="Configuration directory or file path"),
+        ] = DEFAULT_CONFIG_PATH,
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
         ] = False,

@@ -13,6 +13,7 @@ from typing import Annotated, Any, cast
 import typer
 
 from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.config import DeviceConfig, NetworkConfig, load_config
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.platforms import UnsupportedOperationError, get_platform_operations
@@ -72,7 +73,7 @@ def register(app: typer.Typer) -> None:
         ] = False,
         config_file: Annotated[
             Path, typer.Option("--config", "-c", help="Configuration file path")
-        ] = Path("devices.yml"),
+        ] = DEFAULT_CONFIG_PATH,
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose output")
         ] = False,
@@ -262,7 +263,7 @@ def register(app: typer.Typer) -> None:
         ] = False,
         config_file: Annotated[
             Path, typer.Option("--config", "-c", help="Configuration file path")
-        ] = Path("devices.yml"),
+        ] = DEFAULT_CONFIG_PATH,
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose output")
         ] = False,
@@ -303,7 +304,7 @@ def register(app: typer.Typer) -> None:
         ] = False,
         config_file: Annotated[
             Path, typer.Option("--config", "-c", help="Configuration file path")
-        ] = Path("devices.yml"),
+        ] = DEFAULT_CONFIG_PATH,
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose output")
         ] = False,

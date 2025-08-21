@@ -3,10 +3,15 @@
 Provides best-practice user directories using platform-native locations:
 - Linux: ~/.config/networka
 - macOS: ~/Library/Application Support/networka
-- Windows: %APPDATA%/networka (roaming) or %LOCALAPPDATA%/networka
+- Windows: %APPDATA%/networka (roaming)
 
 We rely on `platformdirs` for correct behavior across platforms,
-fallbacking to simple heuristics if not available.
+with sensible fallbacks for environments where it's not available.
+
+The networka configuration follows these conventions:
+- App root: OS-specific user config directory + '/networka'
+- Config files: App root + '/config/' (contains config.yml, devices/, groups/, sequences/)
+- Environment file: App root + '/.env'
 """
 
 from __future__ import annotations
@@ -30,6 +35,8 @@ def default_config_root() -> Path:
     Uses platform-appropriate directories (XDG on Linux, AppData on Windows,
     Application Support on macOS). Ensures the base app directory name is
     'networka'. The directory is not created implicitly.
+
+    Returns the app root directory where both config/ and .env will be stored.
     """
     if _PlatformDirs is not None:  # pragma: no branch
         dirs: Any = _PlatformDirs(appname=APP_NAME, appauthor=APP_AUTHOR, roaming=True)
@@ -50,17 +57,27 @@ def default_config_root() -> Path:
     return home / f".{APP_NAME}"
 
 
+def default_app_root() -> Path:
+    """Return the user-level app root directory for networka.
+
+    This is the same as default_config_root() but provided for clarity.
+    Contains both config/ subdirectory and .env file.
+    """
+    return default_config_root()
+
+
 def default_modular_config_dir() -> Path:
     """Return the directory that contains the modular config files.
 
-    By convention we use `<config_root>/config` for YAML files and subfolders.
+    This returns the app root directory where config.yml, devices/, groups/,
+    and sequences/ are stored directly (not in a nested config/ subdirectory).
     """
-    return default_config_root() / "config"
+    return default_config_root()
 
 
 def user_sequences_dir() -> Path:
     """Return the directory to look for user-defined vendor sequences.
 
-    By convention we use `<config_root>/config/sequences`.
+    This is the sequences/ directory within the app root.
     """
     return default_modular_config_dir() / "sequences"

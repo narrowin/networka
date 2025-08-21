@@ -10,6 +10,7 @@ from typing import Annotated, Any, cast
 import typer
 
 from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 
@@ -53,7 +54,7 @@ def register(app: typer.Typer) -> None:
         ] = True,
         config_file: Annotated[
             Path, typer.Option("--config", "-c", help="Configuration file path")
-        ] = Path("devices.yml"),
+        ] = DEFAULT_CONFIG_PATH,
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose output")
         ] = False,
