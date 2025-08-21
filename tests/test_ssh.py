@@ -33,6 +33,10 @@ class FakeWindow:
     def attached_pane(self) -> FakePane:
         return self._panes[0]
 
+    @property
+    def active_pane(self) -> FakePane:
+        return self._panes[0]
+
     def split_window(
         self, *, attach: bool = False, vertical: bool | None = None
     ) -> FakePane:
@@ -58,6 +62,10 @@ class FakeSession:
 
     @property
     def attached_window(self) -> FakeWindow:
+        return self._window
+
+    @property
+    def active_window(self) -> FakeWindow:
         return self._window
 
     def new_window(

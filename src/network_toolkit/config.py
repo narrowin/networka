@@ -314,7 +314,7 @@ class NetworkConfig(BaseModel):
         # Tag-based members
         if group.match_tags and self.devices:
             for device_name, device in self.devices.items():
-                if device.tags and any(tag in device.tags for tag in group.match_tags):
+                if device.tags and all(tag in device.tags for tag in group.match_tags):
                     if device_name not in members:
                         members.append(device_name)
 
