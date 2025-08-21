@@ -80,7 +80,7 @@ pip install --user git+https://github.com/narrowin/networka.git
 nw --help
 ```
 
-### Upgrade
+### Upgrade & Remove
 
 ```bash
 # Upgrade to latest version
@@ -89,6 +89,13 @@ uv tool upgrade networka
 pipx upgrade networka
 # or
 pip install --user --upgrade git+https://github.com/narrowin/networka.git
+
+# Remove installation
+uv tool uninstall net-worker
+# or
+pipx uninstall net-worker
+# or
+pip uninstall net-worker
 ```
 
 ### Platform-Specific Notes
