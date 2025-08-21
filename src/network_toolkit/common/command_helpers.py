@@ -25,12 +25,7 @@ def create_standard_options() -> dict[str, object]:
     """Create standard CLI options that most commands need."""
     return {
         "config_file": Annotated[
-            Path,
-            typer.Option(
-                "--config",
-                "-c",
-                help="Configuration file path"
-            )
+            Path, typer.Option("--config", "-c", help="Configuration file path")
         ],
         "output_mode": Annotated[
             OutputMode | None,
@@ -42,19 +37,14 @@ def create_standard_options() -> dict[str, object]:
             ),
         ],
         "verbose": Annotated[
-            bool,
-            typer.Option(
-                "--verbose",
-                "-v",
-                help="Enable verbose logging"
-            )
+            bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
         ],
     }
 
 
 class CommandContext:
     """Context object that provides styled output and error handling for commands."""
-    
+
     def __init__(
         self,
         output_mode: OutputMode | None = None,
@@ -89,29 +79,32 @@ class CommandContext:
         # Expose commonly used objects
         self.console = self.style_manager.console
         self.mode = self.output_manager.mode
-    
+
     def print_error(self, message: str, device_name: str | None = None) -> None:
         """Print an error message with proper styling."""
         self.output_manager.print_error(message, device_name)
-    
+
     def print_warning(self, message: str, device_name: str | None = None) -> None:
         """Print a warning message with proper styling."""
         from network_toolkit.common.styles import StyleName
+
         styled_message = self.style_manager.format_message(message, StyleName.WARNING)
         self.console.print(styled_message)
-    
+
     def print_success(self, message: str, device_name: str | None = None) -> None:
         """Print a success message with proper styling."""
         from network_toolkit.common.styles import StyleName
+
         styled_message = self.style_manager.format_message(message, StyleName.SUCCESS)
         self.console.print(styled_message)
-    
+
     def print_info(self, message: str, device_name: str | None = None) -> None:
         """Print an info message with proper styling."""
         from network_toolkit.common.styles import StyleName
+
         styled_message = self.style_manager.format_message(message, StyleName.INFO)
         self.console.print(styled_message)
-    
+
     def handle_error(self, error: Exception) -> None:
         """Handle exceptions with proper styled output and exit."""
         if isinstance(error, NetworkToolkitError):
@@ -121,11 +114,11 @@ class CommandContext:
         else:
             self.print_error(f"Unexpected error: {error}")
         raise typer.Exit(1) from None
-    
+
     def is_raw_mode(self) -> bool:
         """Check if we're in raw output mode."""
         return self.mode == OutputMode.RAW
-    
+
     def should_suppress_colors(self) -> bool:
         """Check if colors should be suppressed."""
         return self.mode in [OutputMode.RAW, OutputMode.NO_COLOR]
