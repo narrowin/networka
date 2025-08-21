@@ -4,9 +4,7 @@
 
 <br/>
 
-**The `Eierlegende Wollmilchsau` of network operations — optimized for your daily workflows.**
-
-<br/>
+**Networka: `Eierlegende Wollmilchsau` of network operations — optimized for your daily workflows.**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](https://github.com/narrowin/networka)
@@ -15,6 +13,26 @@
 [![Type checked with mypy](https://img.shields.io/badge/mypy-checked-blue.svg)](http://mypy-lang.org/)
 
 Networka is a modern async CLI tool for automating network devices across multiple vendors. Built with async/await patterns for high performance and reliability. Designed for network engineers who want fast, scalable automation with full cross-platform support.
+
+---
+
+## _The Networka Monologue_
+
+_“People ask the question…_ <br>
+**what’s a Networka?** <br>
+
+And I tell 'em — <br>
+it's **not** about cables, configs, and pings. <br>
+_Oh no._ <br>
+There’s more to it than that, my friend. <br>
+
+We all like a bit of the good life — <br>
+some the uptime, some the security, <br>
+others the automation, the visibility, or the compliance. <br>
+
+But a **Networka**, oh, they're different. <br>
+Why? <br>
+Because a real **Networka** wants the f\*ing lot.”
 
 ## Getting Started
 
