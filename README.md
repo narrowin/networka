@@ -32,7 +32,8 @@ others the automation, the visibility, or the compliance. <br>
 
 But a **Networka**, oh, they're different. <br>
 Why? <br>
-Because a real **Networka** wants the f\*ing lot.”
+Because a real **Networka** wants the f\*ing lot.”<br><br>
+(inspired by: [RockNRolla](https://www.youtube.com/watch?v=s4YLBqMJYOo))
 
 ## Getting Started
 
