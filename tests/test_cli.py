@@ -27,7 +27,7 @@ class TestCLI:
         runner = CliRunner()
         result = runner.invoke(app, ["--help"])
         assert result.exit_code == 0
-        assert "Network Worker" in result.output
+        assert "Networka" in result.output
         assert "nw" in result.output
 
     @pytest.mark.skip(reason="CLI test has exit code issues, needs investigation")

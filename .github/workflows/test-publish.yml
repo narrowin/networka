@@ -35,7 +35,7 @@ jobs:
     - name: Test direct Git installation
       run: |
         python -m pip install --upgrade pip
-        python -m pip install git+https://github.com/narrowin/net-worker.git@${{ github.sha }}
+        python -m pip install git+https://github.com/narrowin/networka.git@${{ github.sha }}
 
     - name: Test installed package
       run: |
@@ -44,7 +44,7 @@ jobs:
         nw --version || echo "Version command not available"
 
     - name: Uninstall for next test
-      run: python -m pip uninstall -y net-worker
+      run: python -m pip uninstall -y networka
 
   test-local-build-install:
     name: Test local build and install
@@ -77,7 +77,7 @@ jobs:
 
     - name: Test source distribution installation
       run: |
-        python -m pip uninstall -y net-worker
+        python -m pip uninstall -y networka
         # Find and install the source distribution
         tar_file=$(find dist/ -name "*.tar.gz" | head -1)
         python -m pip install "$tar_file"

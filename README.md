@@ -1,14 +1,14 @@
-# Net-Worker (nw)
+# Networka (nw)
 
 **The `Eierlegende Wollmilchsau` of network operations — optimized for your daily workflows.**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
-[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](https://github.com/narrowin/net-worker)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](https://github.com/narrowin/networka)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Type checked with mypy](https://img.shields.io/badge/mypy-checked-blue.svg)](http://mypy-lang.org/)
 
-Net-Worker is a modern async CLI tool for automating network devices across multiple vendors. Built with async/await patterns for high performance and reliability. Designed for network engineers who want fast, scalable automation with full cross-platform support.
+Networka is a modern async CLI tool for automating network devices across multiple vendors. Built with async/await patterns for high performance and reliability. Designed for network engineers who want fast, scalable automation with full cross-platform support.
 
 ## Getting Started
 
@@ -42,12 +42,12 @@ Net-Worker is a modern async CLI tool for automating network devices across mult
 
 ```bash
 # Easiest (user-wide, isolated)
-uv tool install git+https://github.com/narrowin/net-worker.git
+uv tool install git+https://github.com/narrowin/networka.git
 # or
-pipx install git+https://github.com/narrowin/net-worker.git
+pipx install git+https://github.com/narrowin/networka.git
 
 # If you prefer plain pip (user-wide, no sudo)
-pip install --user git+https://github.com/narrowin/net-worker.git
+pip install --user git+https://github.com/narrowin/networka.git
 # ensure ~/.local/bin (or platform-specific bin) is on PATH
 
 # Verify installation works
@@ -58,18 +58,18 @@ nw --help
 
 ```bash
 # Upgrade to latest version
-uv tool upgrade net-worker
+uv tool upgrade networka
 # or
-pipx upgrade net-worker
+pipx upgrade networka
 # or
-pip install --user --upgrade git+https://github.com/narrowin/net-worker.git
+pip install --user --upgrade git+https://github.com/narrowin/networka.git
 
 # Remove installation
-uv tool uninstall net-worker
+uv tool uninstall networka
 # or
-pipx uninstall net-worker
+pipx uninstall networka
 # or
-pip uninstall net-worker
+pip uninstall networka
 ```
 
 ### Platform-Specific Notes
@@ -82,8 +82,8 @@ pip uninstall net-worker
 
 ```bash
 # Clone repository
-git clone https://github.com/narrowin/net-worker.git
-cd net-worker
+git clone https://github.com/narrowin/networka.git
+cd networka
 
 # Install with uv (recommended)
 uv sync --all-extras
@@ -99,11 +99,11 @@ nw --help
 
 ```bash
 # Install specific version
-pip install git+https://github.com/narrowin/net-worker.git@v0.1.0
+pip install git+https://github.com/narrowin/networka.git@v0.1.0
 
 # Install from local clone
-git clone https://github.com/narrowin/net-worker.git
-cd net-worker
+git clone https://github.com/narrowin/networka.git
+cd networka
 uv pip install .
 ```
 
@@ -130,7 +130,7 @@ nw run office_switches "/system/identity/print"
 ```
 Usage: nw [OPTIONS] COMMAND [ARGS]...
 
-🌐 Network Worker (nw)
+🌐 Networka (nw)
 
 A powerful multi-vendor CLI tool for automating network devices based on ssh protocol.
 Built with async/await support and type safety in mind.
@@ -256,7 +256,7 @@ nw run sw-acc1 health_check --store-results
 
 ## Configuration
 
-Net-Worker uses a flexible configuration system supporting both YAML and CSV formats, with hierarchical loading from directories and subdirectories.
+Networka uses a flexible configuration system supporting both YAML and CSV formats, with hierarchical loading from directories and subdirectories.
 
 ### Enhanced Configuration Features
 
@@ -483,7 +483,7 @@ nw run sw-acc1 system_info --store-results --results-format json
 
 ### Vendor-specific backup operations
 
-Net-Worker provides vendor-specific backup operations that automatically use the correct commands and file formats for each platform:
+Networka provides vendor-specific backup operations that automatically use the correct commands and file formats for each platform:
 
 ```bash
 # Configuration backup (text-only configuration export)
@@ -510,13 +510,13 @@ nw backup sw-acc1 --verbose                 # Detailed operation logging
 ## Community & support
 
 - Visit our [documentation](docs/) for detailed guides and examples
-- Create [GitHub Issues](https://github.com/narrowin/net-worker/issues) for bug reports and feature requests
+- Create [GitHub Issues](https://github.com/narrowin/networka/issues) for bug reports and feature requests
 - See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines
 - Check [SECURITY.md](SECURITY.md) for security policy and reporting vulnerabilities
 
 ## Contributing
 
-Have a look through existing [Issues](https://github.com/narrowin/net-worker/issues) and [Pull Requests](https://github.com/narrowin/net-worker/pulls) that you could help with. If you'd like to request a feature or report a bug, please create a GitHub Issue using one of the templates provided.
+Have a look through existing [Issues](https://github.com/narrowin/networka/issues) and [Pull Requests](https://github.com/narrowin/networka/pulls) that you could help with. If you'd like to request a feature or report a bug, please create a GitHub Issue using one of the templates provided.
 
 [See contribution guide →](CONTRIBUTING.md)
 

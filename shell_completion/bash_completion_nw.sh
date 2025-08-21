@@ -299,5 +299,5 @@ _nw() {
 
 # Register the completion function for nw and common aliases
 complete -F _nw nw 2>/dev/null || true
-complete -F _nw net-worker 2>/dev/null || true
+complete -F _nw networka 2>/dev/null || true
 complete -F _nw network-toolkit 2>/dev/null || true

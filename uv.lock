@@ -832,7 +832,7 @@ wheels = [
 ]
 
 [[package]]
-name = "net-worker"
+name = "networka"
 source = { editable = "." }
 dependencies = [
     { name = "asyncssh" },

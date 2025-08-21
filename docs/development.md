@@ -1,10 +1,11 @@
 # Development Guide
 
-This guide is for contributors and maintainers working on the Net-Worker codebase.
+This guide is for contributors and maintainers working on the Networka codebase.
 
 ## Quick start
 
 ### Prerequisites
+
 - Python 3.11+
 - [uv](https://docs.astral.sh/uv/) package manager
 - git
@@ -13,8 +14,8 @@ This guide is for contributors and maintainers working on the Net-Worker codebas
 
 ```bash
 # Clone the repository
-git clone https://github.com/narrowin/net-worker.git
-cd net-worker
+git clone https://github.com/narrowin/networka.git
+cd networka
 
 # Install dependencies with development tools
 uv sync
@@ -50,6 +51,7 @@ task build                       # Build package
 ## Code standards
 
 ### Style guidelines
+
 - **Type hints**: All functions must have type annotations
 - **Docstrings**: Use NumPy-style docstrings for public functions
 - **Async patterns**: Use async/await for all I/O operations
@@ -57,6 +59,7 @@ task build                       # Build package
 - **Testing**: Write tests for all new features
 
 ### Code quality tools
+
 - **Linting**: ruff (replaces flake8, isort, black)
 - **Type checking**: mypy with strict settings
 - **Testing**: pytest with async support
@@ -67,12 +70,12 @@ task build                       # Build package
 ```python
 # Async function with proper typing
 async def execute_command(
-    device_name: str, 
-    command: str, 
+    device_name: str,
+    command: str,
     config: NetworkConfig
 ) -> CommandResult:
     """Execute a command on a network device.
-    
+
     Parameters
     ----------
     device_name : str
@@ -81,12 +84,12 @@ async def execute_command(
         Command to execute
     config : NetworkConfig
         Device configuration
-        
+
     Returns
     -------
     CommandResult
         Result of command execution
-        
+
     Raises
     ------
     DeviceConnectionError
@@ -137,7 +140,7 @@ async def test_device_connection(mock_config: NetworkConfig):
         mock_scrapli.return_value.__aenter__.return_value.send_command = AsyncMock(
             return_value=MockResponse(result="test output")
         )
-        
+
         async with DeviceSession("test_device", mock_config) as session:
             result = await session.execute_command("/system/identity/print")
             assert result.output == "test output"
@@ -170,6 +173,7 @@ nw --help
 ### Release process
 
 1. **Prepare release**
+
    ```bash
    # Update version in pyproject.toml
    # Update CHANGELOG.md
@@ -179,6 +183,7 @@ nw --help
    ```
 
 2. **Create release tag**
+
    ```bash
    git tag v1.0.0
    git push origin v1.0.0
@@ -192,7 +197,7 @@ nw --help
 ## Project structure
 
 ```
-net-worker/
+networka/
 ├── src/network_toolkit/     # Main package
 │   ├── cli.py              # CLI interface
 │   ├── config.py           # Configuration models
@@ -209,28 +214,33 @@ net-worker/
 ## Adding new features
 
 ### 1. Plan the feature
+
 - Create or discuss GitHub issue
 - Design API and data models
 - Consider backward compatibility
 
 ### 2. Implement the feature
+
 - Follow existing code patterns
 - Add proper type annotations
 - Include comprehensive error handling
 - Write docstrings
 
 ### 3. Add tests
+
 - Unit tests for core functionality
 - Integration tests for CLI commands
 - Mock external dependencies (network calls)
 - Aim for >90% coverage
 
 ### 4. Update documentation
+
 - Update relevant docs in `docs/`
 - Add examples if applicable
 - Update CLI help text
 
 ### 5. Submit pull request
+
 - Run all quality checks locally
 - Write clear commit messages
 - Include tests and documentation
@@ -248,7 +258,7 @@ def new_command(
 ) -> None:
     """Description of the new command."""
     setup_logging("DEBUG" if verbose else "INFO")
-    
+
     try:
         config = load_config()
         # Implementation here
@@ -308,6 +318,7 @@ task ci
 ## Code review guidelines
 
 ### For contributors
+
 - Keep PRs focused and small
 - Write clear commit messages
 - Include tests for new functionality
@@ -315,9 +326,9 @@ task ci
 - Be responsive to feedback
 
 ### For reviewers
+
 - Focus on code correctness and maintainability
 - Check that tests adequately cover new code
 - Verify documentation updates
 - Ensure adherence to coding standards
 - Be constructive and helpful in feedback
-

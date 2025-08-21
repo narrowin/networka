@@ -5,17 +5,20 @@ Thank you for your interest in contributing to the Network Toolkit!
 ## Development Setup
 
 1. Clone the repository:
+
 ```bash
-git clone https://github.com/narrowin/net-worker.git
-cd net-worker
+git clone https://github.com/narrowin/networka.git
+cd networka
 ```
 
 2. Install development dependencies:
+
 ```bash
 uv sync --dev
 ```
 
 3. Install pre-commit hooks:
+
 ```bash
 pre-commit install
 ```
@@ -31,6 +34,7 @@ pre-commit install
 ## Testing
 
 Run tests using VS Code test feature or:
+
 ```bash
 pytest
 ```
@@ -38,11 +42,13 @@ pytest
 ## Code Quality
 
 We use several tools to maintain code quality:
+
 - **Ruff**: Linting and formatting
 - **mypy**: Type checking
 - **pytest**: Testing framework
 
 Run quality checks:
+
 ```bash
 ruff check .
 ruff format .
@@ -60,6 +66,7 @@ mypy src/
 ## Reporting Issues
 
 Please use GitHub Issues to report bugs or request features. Include:
+
 - Clear description of the issue
 - Steps to reproduce
 - Expected vs actual behavior

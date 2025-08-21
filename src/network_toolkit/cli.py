@@ -110,7 +110,7 @@ class CategorizedHelpGroup(TyperGroup):
 
 # Typer application instance
 help_text = (
-    "\n    Network Worker (nw)\n\n"
+    "\n    Networka (nw)\n\n"
     "    A powerful multi-vendor CLI tool for automating network devices based on ssh protocol.\n"
     "    Built with async/await support and type safety in mind.\n\n"
     "    QUICK START:\n"
@@ -140,7 +140,7 @@ def main(
 ) -> None:
     """Configure global settings for the network toolkit."""
     if version:
-        console.print(f"Network Worker (nw) version {__version__}")
+        console.print(f"Networka (nw) version {__version__}")
         raise typer.Exit()
 
     # If no command is invoked and no version flag, show help
