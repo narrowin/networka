@@ -22,6 +22,7 @@ from typing import Any, cast
 
 import yaml
 
+from network_toolkit.common.paths import user_sequences_dir
 from network_toolkit.config import NetworkConfig, VendorSequence
 
 
@@ -172,8 +173,8 @@ class SequenceManager:
         return None
 
     def _user_sequences_root(self) -> Path | None:
-        # XDG-style config: ~/.config/nw/sequences
-        root = Path.home() / ".config" / "nw" / "sequences"
+        # Use OS-appropriate user config directory
+        root = user_sequences_dir()
         return root if root.exists() else None
 
     def _load_from_root(

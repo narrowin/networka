@@ -19,6 +19,7 @@ from typing import Annotated
 import typer
 
 from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.paths import default_modular_config_dir
 
 
 def create_env_file(target_dir: Path) -> None:
@@ -245,101 +246,121 @@ sequences:
 
 
 def register(app: typer.Typer) -> None:
-  """Register the config-init command."""
+    """Register the config-init command."""
 
-  @app.command("config-init", rich_help_panel="Info & Configuration")
-  def config_init(
-    target_dir: Annotated[
-      Path,
-      typer.Argument(
-        help="Directory to initialize (default: current directory)"
-      ),
-    ] = Path("."),
-    force: Annotated[
-      bool,
-      typer.Option("--force", "-f", help="Overwrite existing files"),
-    ] = False,
-    verbose: Annotated[
-      bool,
-      typer.Option("--verbose", "-v", help="Enable verbose logging"),
-    ] = False,
-  ) -> None:
-    """Initialize a minimal working configuration environment.
+    @app.command("config-init", rich_help_panel="Info & Configuration")
+    def config_init(
+        target_dir: Annotated[
+            Path | None,
+            typer.Argument(
+                help="Directory to initialize (default: system config location)",
+            ),
+        ] = None,
+        force: Annotated[
+            bool,
+            typer.Option("--force", "-f", help="Overwrite existing files"),
+        ] = False,
+        verbose: Annotated[
+            bool,
+            typer.Option("--verbose", "-v", help="Enable verbose logging"),
+        ] = False,
+    ) -> None:
+        """Initialize a minimal working configuration environment.
 
-    Creates a complete starter configuration with:
-    - .env file with credential templates
-    - config/config.yml with core settings
-    - config/devices/ with MikroTik and Cisco examples
-    - config/groups/ with tag-based and explicit groups
-    - config/sequences/ with global and vendor-specific sequences
-    """
-    setup_logging("DEBUG" if verbose else "INFO")
+        Creates a complete starter configuration.
+        """
 
-    target_path = Path(target_dir).resolve()
-    if not target_path.exists():
-      target_path.mkdir(parents=True, exist_ok=True)
-      console.print(f"[cyan]Created directory: {target_path}[/cyan]")
+        setup_logging("DEBUG" if verbose else "INFO")
 
-    # Check for existing files unless force is used
-    env_file = target_path / ".env"
-    config_dir = target_path / "config"
-
-    if not force:
-      existing_files: list[str] = []
-      if env_file.exists():
-        existing_files.append(str(env_file))
-      if config_dir.exists():
-        existing_files.append(str(config_dir))
-
-      if existing_files:
-        console.print(
-          "[yellow]Warning: The following files/directories already exist:[/yellow]"
+        # Determine target directory
+        target_path = (
+            default_modular_config_dir() if target_dir is None else Path(target_dir)
         )
-        for path in existing_files:
-          console.print(f"  - {path}")
-        console.print(
-          "\n[yellow]Use --force to overwrite existing files.[/yellow]"
+        target_path = target_path.expanduser().resolve()
+        if not target_path.exists():
+            target_path.mkdir(parents=True, exist_ok=True)
+            console.print(f"[cyan]Created directory: {target_path}[/cyan]")
+
+        # Decide layout
+        is_modular_target = target_path.name.lower() == "config"
+        is_default_location = (
+            target_dir is None
+            or target_path == default_modular_config_dir().resolve()
         )
-        raise typer.Exit(1)
+        config_dir = (
+            target_path
+            if (is_default_location or is_modular_target)
+            else (target_path / "config")
+        )
+        env_dir = target_path if not is_modular_target else config_dir
+        env_file = env_dir / ".env"
 
-    console.print(
-      f"[bold cyan]Initializing network toolkit configuration in: {target_path}[/bold cyan]"
-    )
-    console.print()
+        if not force:
+            existing_paths: list[str] = []
+            if env_file.exists():
+                existing_paths.append(str(env_file))
+            key_paths = [
+                config_dir / "config.yml",
+                config_dir / "devices",
+                config_dir / "groups",
+                config_dir / "sequences",
+            ]
+            for p in key_paths:
+                if p.exists():
+                    existing_paths.append(str(p))
+            if existing_paths:
+                console.print(
+                    "[yellow]Warning: The following files/directories already exist:[/yellow]"
+                )
+                for path in existing_paths:
+                    console.print(f"  - {path}")
+                console.print(
+                    "\n[yellow]Use --force to overwrite existing files.[/yellow]"
+                )
+                raise typer.Exit(1)
 
-    # Create .env file
-    create_env_file(target_path)
+        console.print(
+            f"[bold cyan]Initializing network toolkit configuration in: {target_path}[/bold cyan]"
+        )
+        console.print()
 
-    # Create config directory structure
-    config_dir.mkdir(exist_ok=True)
-    devices_dir = config_dir / "devices"
-    devices_dir.mkdir(exist_ok=True)
-    groups_dir = config_dir / "groups"
-    groups_dir.mkdir(exist_ok=True)
-    sequences_dir = config_dir / "sequences"
-    sequences_dir.mkdir(exist_ok=True)
+        # Create .env file
+        create_env_file(env_dir)
 
-    # Create configuration files
-    create_config_yml(config_dir)
-    create_example_devices(devices_dir)
-    create_example_groups(groups_dir)
-    create_example_sequences(sequences_dir)
-    create_vendor_sequences(sequences_dir)
+        # Create config directory structure
+        config_dir.mkdir(parents=True, exist_ok=True)
+        devices_dir = config_dir / "devices"
+        devices_dir.mkdir(exist_ok=True)
+        groups_dir = config_dir / "groups"
+        groups_dir.mkdir(exist_ok=True)
+        sequences_dir = config_dir / "sequences"
+        sequences_dir.mkdir(exist_ok=True)
 
-    console.print()
-    console.print("[bold green]✓ Configuration initialization complete![/bold green]")
-    console.print()
-    console.print("[cyan]Next steps:[/cyan]")
-    console.print("  1. Edit .env with your actual credentials")
-    console.print("  2. Update config/devices/ with your actual devices")
-    console.print("  3. Customize config/groups/ for your network structure")
-    console.print("  4. Test connectivity: [bold]nw info sw-office-01[/bold]")
-    console.print("  5. Run a command: [bold]nw run sw-office-01 system_info[/bold]")
-    console.print(
-      "  6. Try vendor sequences: [bold]nw run sw-core-01 system_info[/bold] (Cisco)"
-    )
-    console.print(
-      "  7. Explore more sequences in this repo: [bold]docs/multi-vendor-support.md[/bold] and [bold]docs/examples/user_sequences/[/bold]"
-    )
-    console.print()
-    console.print("[dim]For more help: nw --help[/dim]")
+        # Create configuration files
+        create_config_yml(config_dir)
+        create_example_devices(devices_dir)
+        create_example_groups(groups_dir)
+        create_example_sequences(sequences_dir)
+        create_vendor_sequences(sequences_dir)
+
+        console.print()
+        console.print("[bold green]✓ Configuration initialization complete![/bold green]")
+        console.print()
+        console.print("[cyan]Next steps:[/cyan]")
+        console.print("  1. Edit .env with your actual credentials")
+        console.print(
+            "  2. Update devices/ with your actual devices (or config/devices/ if you provided a custom target)"
+        )
+        console.print(
+            "  3. Customize groups/ for your network structure (or config/groups/ in a custom target)"
+        )
+        console.print("  4. Test connectivity: [bold]nw info sw-office-01[/bold]")
+        console.print("  5. Run a command: [bold]nw run sw-office-01 system_info[/bold]")
+        console.print(
+            "  6. Try vendor sequences: [bold]nw run sw-core-01 system_info[/bold] (Cisco)"
+        )
+        console.print(
+            "  7. Explore more sequences in this repo: [bold]docs/multi-vendor-support.md[/bold] and [bold]docs/examples/user_sequences/[/bold]"
+        )
+        console.print()
+        console.print("[dim]For more help: nw --help[/dim]")

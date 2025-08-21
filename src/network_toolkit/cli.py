@@ -117,7 +117,7 @@ help_text = (
     "      nw run sw-acc1 '/system/clock/print'  # Execute command\n"
     "      nw run office_switches system_info    # Run sequence on group\n\n"
     "    For detailed help on any command: nw <command> --help\n"
-    "    Default config directory: config/ (use --config to override)\n    "
+    "    Default config directory: system app config (use --config to override)\n    "
 )
 app = typer.Typer(
     name="nw",

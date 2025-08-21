@@ -15,6 +15,7 @@ import yaml
 from dotenv import load_dotenv
 from pydantic import BaseModel, field_validator
 
+from network_toolkit.common.paths import default_modular_config_dir
 from network_toolkit.credentials import (
     ConnectionParameterBuilder,
     EnvironmentCredentialManager,
@@ -872,10 +873,17 @@ def load_config(config_path: str | Path) -> NetworkConfig:
 
     # Only try fallback paths for default config names
     if str(original_path) in ["config", "devices.yml"]:
-        possible_paths = [
-            Path("config/config.yml"),  # Modular config
-            Path("devices.yml"),  # Legacy config in root
-        ]
+        # Prefer platform default location first
+        platform_default = default_modular_config_dir()
+        possible_paths: list[Path] = []
+        if (platform_default / "config.yml").exists():
+            possible_paths.append(platform_default / "config.yml")
+        possible_paths.extend(
+            [
+                Path("config/config.yml"),  # Modular config in CWD
+                Path("devices.yml"),  # Legacy config in root
+            ]
+        )
 
         for path in possible_paths:
             if path.exists():
@@ -883,6 +891,11 @@ def load_config(config_path: str | Path) -> NetworkConfig:
                     return load_modular_config(path.parent)
                 else:
                     return load_legacy_config(path)
+
+    # Final attempt: platform default modular path
+    platform_default_dir = default_modular_config_dir()
+    if (platform_default_dir / "config.yml").exists():
+        return load_modular_config(platform_default_dir)
 
     # If we get here, nothing was found
     msg = f"Configuration file not found: {config_path}"

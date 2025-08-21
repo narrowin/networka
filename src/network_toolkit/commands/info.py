@@ -77,7 +77,14 @@ def register(app: typer.Typer) -> None:
         set_output_mode(output_mode)
 
         try:
-            config = load_config(config_file)
+            # Resolve default config path: if user passed the literal default 'config'
+            # and it doesn't exist, fall back to the OS default config dir.
+            cfg_path = Path(config_file)
+            if str(cfg_path) == "config" and not cfg_path.exists():
+                from network_toolkit.common.paths import default_modular_config_dir
+
+                cfg_path = default_modular_config_dir()
+            config = load_config(cfg_path)
 
             # Handle output mode configuration - check config first, then CLI override
             if output_mode is not None:
