@@ -1,5 +1,9 @@
 # Networka (nw)
 
+<div align="center">
+  <img src="docs/images/networka.png" alt="Networka Logo" width="200"/>
+</div>
+
 **The `Eierlegende Wollmilchsau` of network operations — optimized for your daily workflows.**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
