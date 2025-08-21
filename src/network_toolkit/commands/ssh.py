@@ -38,14 +38,14 @@ from network_toolkit.ip_device import (
 
 app_help = (
     "Open tmux with SSH panes for a device or group.\n\n"
-    "Quick tmux keys (defaults):\n"
-    "- Prefix: Ctrl-b\n"
-    "- Pane navigation: Prefix + Arrow keys\n"
-    '- Split pane: Prefix + % (vertical), Prefix + " (horizontal)\n'
-    "- Cycle layouts: Prefix + Space\n"
-    "- Synchronize panes: Prefix + : then 'set synchronize-panes on|off'\n"
-    "- Detach: Ctrl-b then d\n\n"
-    "Tip: Use --sync/--no-sync to control synchronized typing from nw."
+    "Synchronized typing is ENABLED by default - keystrokes go to all panes.\n"
+    "Use --no-sync to disable at startup.\n\n"
+    "Quick controls:\n"
+    "- Ctrl+b, z: Zoom/unzoom focused pane (exits/enters sync mode)\n"
+    "- Ctrl+b + Arrow keys: Navigate panes\n"
+    "- Click any pane to focus it\n"
+    "- Ctrl+b, d: Detach session\n\n"
+    "When sync is on, all panes show red borders."
 )
 
 
@@ -213,12 +213,11 @@ def register(app: typer.Typer) -> None:
         window_name: Annotated[
             str | None, typer.Option("--window-name", help="Custom window name")
         ] = None,
-        reuse: Annotated[
-            bool, typer.Option("--reuse", help="Reuse existing session if it exists")
-        ] = False,
         sync: Annotated[
             bool,
-            typer.Option("--sync/--no-sync", help="Enable tmux synchronize-panes"),
+            typer.Option(
+                "--sync/--no-sync", help="Enable synchronized typing (default: on)"
+            ),
         ] = True,
         use_sshpass: Annotated[
             bool,
@@ -376,24 +375,18 @@ def register(app: typer.Typer) -> None:
             )
             raise typer.Exit(1)
 
-        # Create or reuse tmux session
+        # Always create a new tmux session for clean behavior
         server = libtmux.Server()
         sname = session_name or _session_name(tgt.name)
         sname = _sanitize_session_name(sname)
 
-        session = server.find_where({"session_name": sname})
-        if session is None:
-            session = server.new_session(session_name=sname, attach=False)
-        elif not reuse:
-            # Create a new unique session to avoid clobber
-            sname = _sanitize_session_name(_session_name(tgt.name))
-            session = server.new_session(session_name=sname, attach=False)
+        # Always create a new unique session name to avoid conflicts
+        sname = _sanitize_session_name(_session_name(tgt.name))
+        session = server.new_session(session_name=sname, attach=False)
 
         wname = window_name or tgt.name
-        window = getattr(session, "attached_window", None)
-        if window is None:
-            window = session.new_window(attach=True, window_name=wname)
-        else:
+        window = session.active_window
+        if wname != window.name:
             try:
                 window.rename_window(wname)
             except Exception as exc:  # pragma: no cover - rename failure is non-fatal
@@ -406,7 +399,7 @@ def register(app: typer.Typer) -> None:
             pane0 = window.split_window(attach=False)
             panes.append(pane0)
         else:
-            panes.append(window.attached_pane)
+            panes.append(window.active_pane)
 
         for idx in range(1, len(device_cmds)):
             vertical = idx % 2 == 1
@@ -416,16 +409,23 @@ def register(app: typer.Typer) -> None:
         if layout in LAYOUT_CHOICES:
             window.select_layout(layout)
 
-        # Send ssh commands
+        # Send ssh commands to all panes first
         for (dev_name, cmd), pane in zip(device_cmds, window.panes, strict=True):
             _ = dev_name  # name not used but kept for future labels
             pane.send_keys(cmd, enter=True)
 
-        # Synchronize panes if requested
+        # Simple sync setup using direct tmux commands
+        if sync:
+            try:
+                window.cmd("set-window-option", "synchronize-panes", "on")
+            except Exception as exc:
+                console.log(f"Could not enable sync: {exc}")
+
+        # Enable mouse support using direct command
         try:
-            window.set_option("synchronize-panes", bool(sync))
-        except Exception as exc:  # pragma: no cover - non-critical
-            console.log(f"Could not set synchronize-panes: {exc}")
+            session.cmd("set-option", "mouse", "on")
+        except Exception as exc:
+            console.log(f"Could not enable mouse: {exc}")
 
         console.print(
             "[green]Created tmux session[/green] "
