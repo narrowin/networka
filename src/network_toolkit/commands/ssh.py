@@ -428,7 +428,7 @@ def register(app: typer.Typer) -> None:
                     mode = AuthMode.KEY_FIRST
                 if use_sshpass:
                     mode = AuthMode.PASSWORD
-                
+
                 # Note: We no longer strictly require sshpass since we have pexpect fallback
 
                 ssh_cmd = _build_ssh_cmd(

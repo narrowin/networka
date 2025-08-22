@@ -60,12 +60,12 @@ def register(app: typer.Typer) -> None:
         in BIOS upgrade procedures.
         """
         setup_logging("DEBUG" if verbose else "INFO")
-        
+
         # ACTION command - use global config theme
         ctx = CommandContext(
             config_file=config_file,
             verbose=verbose,
-            output_mode=None  # Use global config theme
+            output_mode=None,  # Use global config theme
         )
 
         try:
@@ -109,7 +109,9 @@ def register(app: typer.Typer) -> None:
                             return False
 
                         if precheck_sequence and not skip_precheck:
-                            ctx.print_info(f"Running precheck sequence '{precheck_sequence}' on {dev}")
+                            ctx.print_info(
+                                f"Running precheck sequence '{precheck_sequence}' on {dev}"
+                            )
                             seq_cmds: list[str] = []
                             dcfg = (config.devices or {}).get(dev)
                             if (
@@ -139,7 +141,9 @@ def register(app: typer.Typer) -> None:
                         # Use platform-specific BIOS upgrade
                         ok = platform_ops.bios_upgrade()
                         if ok:
-                            ctx.print_success(f"OK BIOS upgrade scheduled; device rebooting: {dev}")
+                            ctx.print_success(
+                                f"OK BIOS upgrade scheduled; device rebooting: {dev}"
+                            )
                             return True
                         console.print(
                             f"[red]FAIL BIOS upgrade failed to start on {dev}[/red]"

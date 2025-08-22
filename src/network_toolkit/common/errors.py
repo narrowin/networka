@@ -98,7 +98,9 @@ def print_warning(
     message = format_error_message(warning, details, context)
     # Use default theme for warning display in legacy functions
     style_manager = StyleManager(mode=OutputMode.DEFAULT)
-    styled_message = style_manager.format_message(f"Warning: {message}", StyleName.WARNING)
+    styled_message = style_manager.format_message(
+        f"Warning: {message}", StyleName.WARNING
+    )
     console.print(styled_message)
 
 

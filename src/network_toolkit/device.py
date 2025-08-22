@@ -127,7 +127,8 @@ class DeviceSession:
                 auth_username=self._connection_params["auth_username"],
                 auth_password=self._connection_params["auth_password"],
                 port=self._connection_params["port"],
-                platform="mikrotik.routeros",
+                # Use platform from connection params (derived from CLI/config) as a definite string
+                platform=str(self._connection_params["platform"]),
                 timeout_socket=self._connection_params["timeout_socket"],
                 timeout_transport=self._connection_params["timeout_transport"],
                 auth_strict_key=False,  # Don't enforce strict host key checking

@@ -75,7 +75,7 @@ class PlatformCapabilities:
     def suggest_alternatives(self) -> None:
         """Print platform-specific installation suggestions."""
         style_manager = StyleManager(mode=OutputMode.DEFAULT)
-        
+
         if not self.supports_tmux:
             if self.system == "Windows":
                 warning_msg = style_manager.format_message(

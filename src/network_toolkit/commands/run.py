@@ -127,14 +127,14 @@ def register(app: typer.Typer) -> None:
         # Handle legacy raw mode mapping
         if raw is not None:
             output_mode = OutputMode.RAW
-        
+
         # Create command context with proper styling
         ctx = CommandContext(
             output_mode=output_mode,
             verbose=verbose,
             config_file=config_file,
         )
-        
+
         # Expose console for backward compatibility with existing code
         console = ctx.console
 
@@ -274,7 +274,9 @@ def register(app: typer.Typer) -> None:
                         [f"  {k}: {v}" for k, v in supported_platforms.items()]
                     )
                     if raw is None:
-                        ctx.print_error("When using IP addresses, --platform is required")
+                        ctx.print_error(
+                            "When using IP addresses, --platform is required"
+                        )
                         ctx.print_info(f"Supported platforms:\n{platform_list}")
                     raise typer.Exit(1)
 
@@ -293,7 +295,9 @@ def register(app: typer.Typer) -> None:
                 config = create_ip_based_config(ips, platform, config, port=port)
 
                 if raw is None:
-                    ctx.print_info(f"Using IP addresses with platform '{platform}': {', '.join(ips)}")
+                    ctx.print_info(
+                        f"Using IP addresses with platform '{platform}': {', '.join(ips)}"
+                    )
 
             sm = SequenceManager(config)
             # Provide command context for better results folder naming

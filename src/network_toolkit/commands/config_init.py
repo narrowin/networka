@@ -33,7 +33,7 @@ def _print_success(message: str) -> None:
 
 def _print_info(message: str) -> None:
     """Print info message using default theme."""
-    style_manager = StyleManager(mode=OutputMode.DEFAULT) 
+    style_manager = StyleManager(mode=OutputMode.DEFAULT)
     styled_message = style_manager.format_message(message, StyleName.INFO)
     console.print(styled_message)
 
