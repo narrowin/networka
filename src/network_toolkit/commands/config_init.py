@@ -182,16 +182,28 @@ def register(app: typer.Typer) -> None:
                 help="Activate completions by updating shell rc file",
             ),
         ] = None,
+        install_schemas: Annotated[
+            bool | None,
+            typer.Option(
+                "--install-schemas/--no-install-schemas",
+                help="Install JSON schemas for YAML editor validation and auto-completion",
+            ),
+        ] = None,
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
         ] = False,
     ) -> None:
         """Initialize a network toolkit configuration in OS-appropriate location.
 
-        Creates a complete starter configuration. Steps:
-        - Choose config location
-        - Optionally install predefined sequences (from GitHub)
-        - Optionally install and activate shell completions
+        Creates a complete starter configuration with:
+        - .env file with credential templates
+        - config.yml with core settings
+        - devices/ with MikroTik and Cisco examples
+        - groups/ with tag-based and explicit groups
+        - sequences/ with global and vendor-specific sequences
+        - JSON schemas for YAML editor validation (optional)
+        - Shell completions (optional)
+        - Additional predefined sequences from GitHub (optional)
 
         Default locations by OS:
         - Linux: ~/.config/networka/
@@ -317,6 +329,46 @@ def register(app: typer.Typer) -> None:
             finally:
                 shutil.rmtree(tmp_root, ignore_errors=True)
 
+        # Schema installation helper
+        def _install_editor_schemas(config_root: Path) -> None:
+            """Install JSON schemas and VS Code settings for YAML editor validation."""
+            try:
+                # Import here to avoid circular imports
+                # Change to config directory temporarily to generate schemas there
+                import os
+
+                from network_toolkit.config import export_schemas_to_workspace
+
+                original_cwd = Path.cwd()
+                try:
+                    os.chdir(config_root)
+                    export_schemas_to_workspace()
+                    _print_success("Installed JSON schemas for YAML editor validation")
+                    console.print(
+                        "   - schemas/network-config.schema.json (full config)"
+                    )
+                    console.print(
+                        "   - schemas/device-config.schema.json (device files)"
+                    )
+                    console.print(
+                        "   - .vscode/settings.json (VS Code YAML validation)"
+                    )
+                    console.print()
+                    console.print("🎯 Your YAML files now have:")
+                    console.print(
+                        "   • Auto-completion for device_type and other fields"
+                    )
+                    console.print("   • Validation errors for invalid configurations")
+                    console.print("   • Hover tooltips with field descriptions")
+                finally:
+                    os.chdir(original_cwd)
+            except Exception as e:
+                _print_warn(f"Failed to install schemas: {e}")
+                console.print("   You can manually export schemas later with:")
+                console.print(
+                    "   cd your-config-dir && python -c 'from network_toolkit.config import export_schemas_to_workspace; export_schemas_to_workspace()'"
+                )
+
         # Shell completion helpers
         def _detect_shell() -> str | None:
             if shell in {"bash", "zsh"}:
@@ -378,9 +430,10 @@ def register(app: typer.Typer) -> None:
             _print_success(f"Activated shell completion in: {rc_file}")
 
         # Gather answers first when interactive
-        DEFAULT_SEQ_REPO = "https://github.com/narrowin/networka.git"
+        default_seq_repo = "https://github.com/narrowin/networka.git"
         do_install_sequences = False
         do_install_compl = False
+        do_install_schemas = False
         chosen_shell: str | None = None
         do_activate_compl = False
 
@@ -396,6 +449,14 @@ def register(app: typer.Typer) -> None:
             do_install_compl = install_completions
         elif interactive:
             do_install_compl = typer.confirm("Install shell completions?", default=True)
+
+        if install_schemas is not None:
+            do_install_schemas = install_schemas
+        elif interactive:
+            do_install_schemas = typer.confirm(
+                "Install JSON schemas for YAML editor validation and auto-completion?",
+                default=True,
+            )
 
         if do_install_compl:
             detected = (
@@ -444,7 +505,7 @@ def register(app: typer.Typer) -> None:
 
         # Sequences from GitHub
         if do_install_sequences:
-            chosen_seq_url = git_url or DEFAULT_SEQ_REPO
+            chosen_seq_url = git_url or default_seq_repo
             if dry_run:
                 _print_action(
                     f"[dry-run] Would download sequences from {chosen_seq_url}@{git_ref} into: {sequences_dir}"
@@ -474,6 +535,15 @@ def register(app: typer.Typer) -> None:
                     console.print(
                         "Activation skipped. You can manually source or add the snippet later."
                     )
+
+        # JSON Schemas for editor validation
+        if do_install_schemas:
+            if dry_run:
+                _print_action(
+                    "[dry-run] Would install JSON schemas and VS Code settings for YAML validation"
+                )
+            else:
+                _install_editor_schemas(target_path)
 
         console.print()
         _print_success("Configuration initialization complete!")
