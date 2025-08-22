@@ -271,5 +271,13 @@ config_local.py
 .task/
 bin/task
 
-# config dirs with sensitive data
-config/devices/
+# config dirs with sensitive data - ignore content but keep directories
+config/devices/*
+!config/devices/.gitkeep
+config/groups/*
+!config/groups/.gitkeep
+config/sequences/*
+!config/sequences/.gitkeep
+
+# Keep examples directory
+!config/examples/

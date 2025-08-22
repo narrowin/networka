@@ -74,7 +74,11 @@ class TestUploadCommand:
                 ],
             )
 
-        assert result.exit_code in [0, 1, 2]  # 0 for success, 1 for application errors, 2 for CLI errors
+        assert result.exit_code in [
+            0,
+            1,
+            2,
+        ]  # 0 for success, 1 for application errors, 2 for CLI errors
         # Only check method calls if the test succeeded (device was found)
         if result.exit_code == 0:
             sess.upload_file.assert_called_once()

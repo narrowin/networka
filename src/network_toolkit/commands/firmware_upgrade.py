@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 """`nw firmware-upgrade` command implementation (device or group).
 
-Uploads a RouterOS .npk package and triggers reboot to apply it.
+Platform-agnostic firmware upgrade using vendor-specific implementations.
 """
 
 from __future__ import annotations
@@ -13,14 +13,20 @@ from typing import Annotated, Any, cast
 import typer
 
 from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
+from network_toolkit.platforms import (
+    check_operation_support,
+    get_platform_file_extensions,
+    get_platform_operations,
+)
 
 MAX_LIST_PREVIEW = 10
 
 
 def register(app: typer.Typer) -> None:
-    @app.command(rich_help_panel="Executing Operations")
+    @app.command(rich_help_panel="Vendor-Specific Operations")
     def firmware_upgrade(  # pyright: ignore[reportUnusedFunction]
         target_name: Annotated[
             str,
@@ -31,7 +37,7 @@ def register(app: typer.Typer) -> None:
         ],
         firmware_file: Annotated[
             Path,
-            typer.Argument(help="Path to local RouterOS firmware package (.npk)"),
+            typer.Argument(help="Path to local firmware package"),
         ],
         *,
         precheck_sequence: Annotated[
@@ -50,15 +56,15 @@ def register(app: typer.Typer) -> None:
         ] = False,
         config_file: Annotated[
             Path, typer.Option("--config", "-c", help="Configuration file path")
-        ] = Path("devices.yml"),
+        ] = DEFAULT_CONFIG_PATH,
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose output")
         ] = False,
     ) -> None:
         """Upload firmware package and reboot device to apply it.
 
-        Uses DeviceSession.upload_firmware_and_reboot to ensure proper handling of
-        confirmation prompts and connection drops during reboot.
+        Uses platform-specific implementations to handle vendor differences
+        in firmware upgrade procedures.
         """
         setup_logging("DEBUG" if verbose else "INFO")
 
@@ -69,12 +75,7 @@ def register(app: typer.Typer) -> None:
                 )
                 raise typer.Exit(1)
 
-            if firmware_file.suffix.lower() != ".npk":
-                console.print(
-                    f"[red]Error: Firmware file must be a .npk: {firmware_file}[/red]"
-                )
-                raise typer.Exit(1)
-
+            # Validate firmware file extension using platform-specific logic
             config = load_config(config_file)
 
             module = import_module("network_toolkit.cli")
@@ -106,7 +107,45 @@ def register(app: typer.Typer) -> None:
 
             def process_device(dev: str) -> bool:
                 try:
+                    # Check device exists in configuration
+                    devices = config.devices or {}
+                    if dev not in devices:
+                        console.print(
+                            f"[red]Error: Device '{dev}' not found in configuration[/red]"
+                        )
+                        return False
+
+                    device_config = devices[dev]
+                    device_type = device_config.device_type
+
+                    # Check if platform supports firmware upgrade BEFORE connecting
+                    is_supported, error_msg = check_operation_support(
+                        device_type, "firmware_upgrade"
+                    )
+                    if not is_supported:
+                        console.print(f"[red]Error on {dev}: {error_msg}[/red]")
+                        return False
+
+                    # Check supported file extensions before connecting
+                    supported_exts = get_platform_file_extensions(device_type)
+                    if firmware_file.suffix.lower() not in supported_exts:
+                        ext_list = ", ".join(supported_exts)
+                        platform_name = {
+                            "mikrotik_routeros": "MikroTik RouterOS",
+                            "cisco_ios": "Cisco IOS",
+                            "cisco_iosxe": "Cisco IOS-XE",
+                        }.get(device_type, device_type)
+                        console.print(
+                            f"[red]Error: Invalid firmware file for {platform_name}. "
+                            f"Expected {ext_list}, got {firmware_file.suffix}[/red]"
+                        )
+                        return False
+
+                    # Now connect to device and proceed with actual operation
                     with device_session(dev, config) as session:
+                        # Get platform-specific operations (this should now always work)
+                        platform_ops = get_platform_operations(session)
+
                         if precheck_sequence and not skip_precheck:
                             console.print(
                                 "[cyan]Running precheck sequence '"
@@ -139,18 +178,22 @@ def register(app: typer.Typer) -> None:
                             f"{dev} and rebooting...[/bold yellow]"
                         )
                         transport_type = config.get_transport_type(dev)
+                        platform_name = platform_ops.get_platform_name()
+                        console.print(f"[yellow]Platform:[/yellow] {platform_name}")
                         console.print(f"[yellow]Transport:[/yellow] {transport_type}")
-                        ok = session.upload_firmware_and_reboot(
+
+                        # Use platform-specific firmware upgrade
+                        ok = platform_ops.firmware_upgrade(
                             local_firmware_path=firmware_file
                         )
                         if ok:
                             console.print(
-                                "[green]✓ Firmware upload initiated; device rebooting: "
+                                "[green]OK Firmware upload initiated; device rebooting: "
                                 f"{dev}[/green]"
                             )
                             return True
                         console.print(
-                            f"[red]✗ Firmware upgrade failed to start on {dev}[/red]"
+                            f"[red]FAIL Firmware upgrade failed to start on {dev}[/red]"
                         )
                         return False
                 except NetworkToolkitError as e:

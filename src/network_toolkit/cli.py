@@ -12,12 +12,14 @@ from typing import Annotated, Any
 import typer
 from typer.core import TyperGroup
 
+from network_toolkit import __version__
 from network_toolkit.commands.bios_upgrade import register as register_bios_upgrade
 from network_toolkit.commands.complete import register as register_complete
 
 # Command registration: import command factories that attach to `app`
 # Each module defines a `register(app)` function that adds its commands.
 from network_toolkit.commands.config_backup import register as register_config_backup
+from network_toolkit.commands.config_init import register as register_config_init
 from network_toolkit.commands.config_validate import (
     register as register_config_validate,
 )
@@ -36,8 +38,11 @@ from network_toolkit.commands.list_sequences import register as register_list_se
 from network_toolkit.commands.run import register as register_run
 from network_toolkit.commands.ssh import register as register_ssh
 from network_toolkit.commands.upload import register as register_upload
+from network_toolkit.commands.vendor_backup import register as register_vendor_backup
+from network_toolkit.commands.vendor_config_backup import (
+    register as register_vendor_config_backup,
+)
 from network_toolkit.common.logging import console, setup_logging
-from network_toolkit.common.output import OutputMode, set_output_mode
 
 # Keep this import here to preserve tests that patch `network_toolkit.cli.DeviceSession`
 from network_toolkit.device import DeviceSession as _DeviceSession
@@ -56,7 +61,10 @@ class CategorizedHelpGroup(TyperGroup):
             "ssh",
             "upload",
             "download",
+        ]
+        vendor_names = [
             "config-backup",
+            "backup",
             "firmware-upgrade",
             "firmware-downgrade",
             "bios-upgrade",
@@ -66,6 +74,7 @@ class CategorizedHelpGroup(TyperGroup):
             "list-devices",
             "list-groups",
             "list-sequences",
+            "config-init",
             "config-validate",
             "diff",
         ]
@@ -78,16 +87,22 @@ class CategorizedHelpGroup(TyperGroup):
                     continue
                 # Prefer short help if available
                 short_getter = getattr(cmd, "get_short_help_str", None)
-                short_text = short_getter() if callable(short_getter) else (cmd.help or "")
+                short_text = (
+                    short_getter() if callable(short_getter) else (cmd.help or "")
+                )
                 items.append((name, str(short_text)))
             return items
 
         exec_rows = rows(exec_names)
+        vendor_rows = rows(vendor_names)
         info_rows = rows(info_names)
 
         if exec_rows:
             formatter.write_text("\nExecuting Operations")
             formatter.write_dl(exec_rows)
+        if vendor_rows:
+            formatter.write_text("\nVendor-Specific Operations")
+            formatter.write_dl(vendor_rows)
         if info_rows:
             formatter.write_text("\nInfo & Configuration")
             formatter.write_dl(info_rows)
@@ -95,14 +110,14 @@ class CategorizedHelpGroup(TyperGroup):
 
 # Typer application instance
 help_text = (
-    "\n    🌐 Network Worker (nw)\n\n"
+    "\n    Networka (nw)\n\n"
     "    A powerful multi-vendor CLI tool for automating network devices based on ssh protocol.\n"
     "    Built with async/await support and type safety in mind.\n\n"
-    "    📋 QUICK START:\n"
+    "    QUICK START:\n"
     "      nw run sw-acc1 '/system/clock/print'  # Execute command\n"
     "      nw run office_switches system_info    # Run sequence on group\n\n"
-    "    📖 For detailed help on any command: nw <command> --help\n"
-    "    📁 Default config directory: config/ (use --config to override)\n    "
+    "    For detailed help on any command: nw <command> --help\n"
+    "    Default config directory: system app config (use --config to override)\n    "
 )
 app = typer.Typer(
     name="nw",
@@ -112,13 +127,26 @@ app = typer.Typer(
     add_completion=False,
     cls=CategorizedHelpGroup,
     context_settings={"help_option_names": ["-h", "--help"]},
+    invoke_without_command=True,
 )
 
 
 @app.callback()
-def main() -> None:
+def main(
+    ctx: typer.Context,
+    version: Annotated[
+        bool, typer.Option("--version", help="Show version information")
+    ] = False,
+) -> None:
     """Configure global settings for the network toolkit."""
-    pass
+    if version:
+        console.print(f"Networka (nw) version {__version__}")
+        raise typer.Exit()
+
+    # If no command is invoked and no version flag, show help
+    if ctx.invoked_subcommand is None:
+        console.print(ctx.get_help())
+        raise typer.Exit()
 
 
 # Expose DeviceSession symbol for tests to patch (`network_toolkit.cli.DeviceSession`)
@@ -201,13 +229,15 @@ def _handle_file_downloads(
                 delete_remote=delete_remote,
             )
             if success:
-                console.print(f"[green]✓ Downloaded {remote_file} to {destination}[/green]")
+                console.print(
+                    f"[green]OK Downloaded {remote_file} to {destination}[/green]"
+                )
                 results[remote_file] = f"Downloaded to {destination}"
             else:
-                console.print(f"[red]✗ Failed to download {remote_file}[/red]")
+                console.print(f"[red]FAIL Failed to download {remote_file}[/red]")
                 results[remote_file] = "Download failed"
         except Exception as e:  # DeviceExecutionError or unexpected
-            console.print(f"[red]✗ Error downloading {remote_file}: {e}[/red]")
+            console.print(f"[red]FAIL Error downloading {remote_file}: {e}[/red]")
             results[remote_file] = f"Download error: {e}"
 
     return results
@@ -219,10 +249,12 @@ register_run(app)
 register_list_devices(app)
 register_list_groups(app)
 register_list_sequences(app)
+register_config_init(app)
 register_config_validate(app)
 register_upload(app)
 register_download(app)
-register_config_backup(app)
+register_vendor_config_backup(app)
+register_vendor_backup(app)
 register_firmware_upgrade(app)
 register_firmware_downgrade(app)
 register_bios_upgrade(app)

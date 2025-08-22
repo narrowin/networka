@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Network Toolkit now supports interactive credential input through the `--interactive-auth` (or `-i`) flag, providing a secure way to enter credentials at runtime without storing them in environment variables or configuration files.
+The Network Toolkit now supports interactive credential input through the `--interactive-auth` (or `-i`) flag, providing a secure way to enter credentials at runtime without storing them in environment variables, .env files, or configuration files.
 
 ## Usage
 
@@ -40,7 +40,7 @@ nw run access_switches system_info --interactive-auth
 
 2. **Enhanced Configuration System** - `src/network_toolkit/config.py`:
    - `get_device_connection_params()` now accepts credential overrides
-   - Maintains backward compatibility with existing credential sources
+   - Maintains compatibility with existing credential sources
 
 3. **Updated Device Session** - `src/network_toolkit/device.py`:
    - `DeviceSession` constructor accepts username/password overrides
@@ -53,8 +53,8 @@ nw run access_switches system_info --interactive-auth
 ### Credential Resolution Priority
 
 1. **Interactive credentials** (highest priority) - When `--interactive-auth` is used
-2. **Environment variables** - `NT_DEFAULT_USER`, `NT_DEFAULT_PASSWORD`, device-specific overrides
-3. **Configuration file** - Default credentials in `devices.yml`
+2. **Environment variables** - `NW_USER_DEFAULT`, `NW_PASSWORD_DEFAULT`, device-specific overrides
+3. **Configuration file** - Default credentials in `devices.yml` (discouraged)
 
 ### Error Handling
 
@@ -68,7 +68,7 @@ nw run access_switches system_info --interactive-auth
 
 - **Unit tests**: `tests/test_credentials.py` - 14 tests covering all credential functionality
 - **Integration tests**: Existing CLI and config tests continue to pass
-- **Validation**: All 101 existing tests pass, ensuring no regressions
+- **Validation**: All tests pass, ensuring no regressions
 
 ### Test Categories
 

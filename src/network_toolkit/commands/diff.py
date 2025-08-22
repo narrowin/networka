@@ -33,6 +33,9 @@ from typing import Annotated
 import typer
 
 from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.output import OutputMode
+from network_toolkit.common.command_helpers import CommandContext
+from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.results_enhanced import ResultsManager
@@ -150,7 +153,16 @@ def register(app: typer.Typer) -> None:
         ] = None,
         config_file: Annotated[
             Path, typer.Option("--config", "-c", help="Configuration file path")
-        ] = Path("devices.yml"),
+        ] = DEFAULT_CONFIG_PATH,
+        output_mode: Annotated[
+            OutputMode | None,
+            typer.Option(
+                "--output-mode",
+                "-o",
+                help="Output decoration mode: default, light, dark, no-color, raw",
+                show_default=False,
+            ),
+        ] = None,
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
         ] = False,
@@ -176,7 +188,12 @@ def register(app: typer.Typer) -> None:
           - nw diff sw-acc1,sw-acc2 "/system/resource/print"   # device-to-device
           - nw diff sw-acc1,sw-acc2 config                      # device-to-device
         """
-        setup_logging("DEBUG" if verbose else "INFO")
+        # Create command context with proper styling
+        ctx = CommandContext(
+            output_mode=output_mode,
+            verbose=verbose,
+            config_file=config_file,
+        )
 
         subj = subject.strip()
         is_config = subj.lower() == "config"
@@ -185,7 +202,7 @@ def register(app: typer.Typer) -> None:
         try:
             config = load_config(config_file)
         except Exception as e:  # pragma: no cover - load errors covered elsewhere
-            console.print(f"[red]Failed to load config: {e}[/red]")
+            ctx.print_error(f"Failed to load config: {e}")
             raise typer.Exit(2) from None
 
         sm = SequenceManager(config)
@@ -227,11 +244,7 @@ def register(app: typer.Typer) -> None:
             )
             raise typer.Exit(2)
         if unknown:
-            console.print(
-                "[yellow]Warning: ignoring unknown target(s): "
-                + ", ".join(unknown)
-                + "[/yellow]"
-            )
+            ctx.print_warning("Ignoring unknown target(s): " + ", ".join(unknown))
 
         # Late import to preserve test patches of network_toolkit.cli.DeviceSession
         from network_toolkit.cli import DeviceSession
@@ -389,7 +402,7 @@ def register(app: typer.Typer) -> None:
                     )
                     raise typer.Exit(2)
                 if not baseline.exists() or not baseline.is_dir():
-                    console.print("[red]Baseline must be an existing directory.[/red]")
+                    ctx.print_error("Baseline must be an existing directory.")
                     raise typer.Exit(2)
 
                 for dev in devices:
@@ -446,11 +459,11 @@ def register(app: typer.Typer) -> None:
                 console.print(f"[bold blue]Device:[/bold blue] {dev}")
                 for name, res, note in rows:
                     if res is None:
-                        console.print(f"[yellow]- {name}: {note}[/yellow]")
+                        ctx.print_warning(f"- {name}: {note}")
                     elif not res.changed:
-                        console.print(f"[green]- {name}: no changes[/green]")
+                        ctx.print_success(f"- {name}: no changes")
                     else:
-                        console.print(f"[red]- {name}: differences[/red]")
+                        ctx.print_error(f"- {name}: differences")
                         if res.output:
                             sys.stdout.write(res.output)
                             sys.stdout.write("\n")
@@ -464,15 +477,13 @@ def register(app: typer.Typer) -> None:
                 console.print("-" * 80)
 
             if any_diffs:
-                console.print(
-                    "[yellow]Summary:[/yellow] diffs="
-                    f"{total_changed}, missing_baseline={total_missing}"
+                ctx.print_info(
+                    f"Summary: diffs={total_changed}, missing_baseline={total_missing}"
                 )
                 raise typer.Exit(1)
             else:
-                console.print("[green]No differences detected.[/green]")
+                ctx.print_success("No differences detected.")
                 raise typer.Exit(0)
 
         except NetworkToolkitError as e:  # pragma: no cover - error path
-            console.print(f"[red]Error: {e.message}[/red]")
-            raise typer.Exit(1) from None
+            ctx.handle_error(e)

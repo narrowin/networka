@@ -16,11 +16,18 @@ import paramiko
 from scrapli import Scrapli
 from scrapli.exceptions import ScrapliException
 
+from network_toolkit.common.interactive_confirmation import create_confirmation_handler
 from network_toolkit.device_transfers import calculate_file_checksum, verify_file_upload
 from network_toolkit.exceptions import (
     DeviceConnectionError,
     DeviceExecutionError,
     NetworkToolkitError,
+)
+from network_toolkit.platforms.mikrotik_routeros.confirmation_patterns import (
+    MIKROTIK_PACKAGE_DOWNGRADE,
+    MIKROTIK_REBOOT,
+    MIKROTIK_ROUTERBOARD_UPGRADE,
+    MIKROTIK_SYSTEM_RESET,
 )
 
 if TYPE_CHECKING:
@@ -82,7 +89,9 @@ class DeviceSession:
         self._connected = False
 
         # Get device connection parameters with optional credential overrides
-        self._connection_params = config.get_device_connection_params(device_name, username_override, password_override)
+        self._connection_params = config.get_device_connection_params(
+            device_name, username_override, password_override
+        )
 
         # Add SSH host key acceptance settings for first-time connections
         # https://scrapli.dev/user_guide/basic_usage/#ssh-key-verification
@@ -118,7 +127,8 @@ class DeviceSession:
                 auth_username=self._connection_params["auth_username"],
                 auth_password=self._connection_params["auth_password"],
                 port=self._connection_params["port"],
-                platform="mikrotik.routeros",
+                # Use platform from connection params (derived from CLI/config) as a definite string
+                platform=str(self._connection_params["platform"]),
                 timeout_socket=self._connection_params["timeout_socket"],
                 timeout_transport=self._connection_params["timeout_transport"],
                 auth_strict_key=False,  # Don't enforce strict host key checking
@@ -153,7 +163,9 @@ class DeviceSession:
                 return
 
             except ScrapliException as e:
-                logger.warning(f"Connection attempt {attempt + 1}/{retries} failed for {self.device_name}: {e}")
+                logger.warning(
+                    f"Connection attempt {attempt + 1}/{retries} failed for {self.device_name}: {e}"
+                )
                 if attempt < retries - 1:
                     time.sleep(retry_delay)
 
@@ -301,7 +313,9 @@ class DeviceSession:
         if verify_checksum is None:
             verify_checksum = getattr(self.config.general, "verify_checksums", False)
 
-        logger.info(f"Uploading file '{local_path}' to {self.device_name} as '{remote_filename}'")
+        logger.info(
+            f"Uploading file '{local_path}' to {self.device_name} as '{remote_filename}'"
+        )
 
         # Calculate local file checksum if verification is enabled
         local_checksum = None
@@ -336,7 +350,9 @@ class DeviceSession:
             # Upload the file
             sftp.put(str(local_path), remote_path)
 
-            logger.info(f"File '{local_path.name}' uploaded successfully as '{remote_filename}'")
+            logger.info(
+                f"File '{local_path.name}' uploaded successfully as '{remote_filename}'"
+            )
 
             # CRITICAL: Wait for device to finish processing the uploaded file
             # SFTP upload completes immediately but MikroTik may still be copying/processing
@@ -371,7 +387,9 @@ class DeviceSession:
             return True
 
         except paramiko.AuthenticationException as e:
-            logger.error(f"Authentication failed during file upload to {self.device_name}: {e}")
+            logger.error(
+                f"Authentication failed during file upload to {self.device_name}: {e}"
+            )
             msg = f"Authentication failed during file upload to {self.device_name}"
             raise DeviceExecutionError(
                 msg,
@@ -479,7 +497,9 @@ class DeviceSession:
                         verify_checksum=verify_checksum,
                     )
                     with upload_lock:
-                        logger.info(f"Upload to {device_name}: {'SUCCESS' if success else 'FAILED'}")
+                        logger.info(
+                            f"Upload to {device_name}: {'SUCCESS' if success else 'FAILED'}"
+                        )
                     return device_name, success
 
             except Exception as e:
@@ -492,7 +512,8 @@ class DeviceSession:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Submit all upload tasks
             future_to_device = {
-                executor.submit(upload_to_device, device_name): device_name for device_name in device_names
+                executor.submit(upload_to_device, device_name): device_name
+                for device_name in device_names
             }
 
             # Collect results as they complete
@@ -528,8 +549,8 @@ class DeviceSession:
         3. Execute system reset-configuration with the uploaded file
         4. Automatically answer 'yes' to the confirmation prompt
 
-        ⚠️  WARNING: This will completely reset the device configuration!
-        ⚠️  The device will lose connection and reboot after this operation!
+        WARNING: This will completely reset the device configuration!
+        WARNING: The device will lose connection and reboot after this operation!
 
         Parameters
         ----------
@@ -614,7 +635,7 @@ class DeviceSession:
                     details={"reason": "Upload verification failed"},
                 )
 
-            logger.info("✅ Config file uploaded successfully")
+            logger.info("OK Config file uploaded successfully")
 
             # Step 2: Prepare reset command with parameters
             reset_cmd_parts = ["/system", "reset-configuration"]
@@ -641,7 +662,9 @@ class DeviceSession:
             logger.info(f"Step 2/3: Preparing reset command: {reset_command}")
 
             # Step 3: Execute the nuclear reset with auto-confirmation
-            logger.warning(f"Step 3/3: Executing NUCLEAR RESET in {pre_reset_delay}s...")
+            logger.warning(
+                f"Step 3/3: Executing NUCLEAR RESET in {pre_reset_delay}s..."
+            )
             logger.warning("🚨 DEVICE WILL LOSE CONNECTION AND REBOOT! 🚨")
 
             # Give operator a moment to panic and Ctrl+C if needed
@@ -659,25 +682,28 @@ class DeviceSession:
                 try:
                     logger.debug(f"Sending reset command: {reset_command}")
 
-                    # Define the interactive pattern - RouterOS asks for confirmation
-                    # We'll use send_interactive with expected prompts and responses
-                    response = self._transport.send_interactive(  # type: ignore[union-attr]
-                        interact_events=[
-                            (reset_command, "Dangerous! Reset anyway? [y/N]:", True),
-                            (
-                                "y",
-                                "",
-                                False,
-                            ),  # Send 'y' and don't expect a response (device reboots)
-                        ],
+                    # Create confirmation handler
+                    if self._transport is None:
+                        msg = "Transport not available"
+                        raise DeviceConnectionError(msg)
+
+                    confirmation_handler = create_confirmation_handler(self._transport)
+
+                    # Use the standardized confirmation pattern for system reset
+                    response = confirmation_handler.execute_with_confirmation(
+                        command=reset_command,
+                        pattern=MIKROTIK_SYSTEM_RESET,
                         timeout_ops=confirmation_timeout,
+                        description="system reset",
                     )
 
-                    logger.info(f"Interactive command completed. Response: {response!r}")
+                    logger.info(
+                        f"Interactive command completed. Response: {response!r}"
+                    )
 
                     logger.warning("🚨 NUCLEAR RESET EXECUTED! Device is rebooting...")
                     logger.warning("🔄 Device will apply new configuration on startup")
-                    logger.info("✅ Config deployment command executed successfully")
+                    logger.info("OK Config deployment command executed successfully")
 
                     # Mark as disconnected since device is rebooting
                     self._connected = False
@@ -697,8 +723,12 @@ class DeviceSession:
                         ]
                     ):
                         logger.info(f"Device disconnected during reset (expected): {e}")
-                        logger.warning("🚨 NUCLEAR RESET EXECUTED! Device is rebooting...")
-                        logger.warning("🔄 Device will apply new configuration on startup")
+                        logger.warning(
+                            "🚨 NUCLEAR RESET EXECUTED! Device is rebooting..."
+                        )
+                        logger.warning(
+                            "🔄 Device will apply new configuration on startup"
+                        )
 
                         # Mark as disconnected
                         self._connected = False
@@ -710,9 +740,14 @@ class DeviceSession:
 
             except Exception as e:
                 # The device might disconnect immediately, which is expected
-                if any(phrase in str(e).lower() for phrase in ["connection", "disconnect", "timeout", "closed"]):
+                if any(
+                    phrase in str(e).lower()
+                    for phrase in ["connection", "disconnect", "timeout", "closed"]
+                ):
                     logger.info(f"Device disconnected during reset (expected): {e}")
-                    logger.warning("🚨 NUCLEAR RESET LIKELY EXECUTED! Device is rebooting...")
+                    logger.warning(
+                        "🚨 NUCLEAR RESET LIKELY EXECUTED! Device is rebooting..."
+                    )
                     logger.warning("🔄 Device will apply new configuration on startup")
 
                     # Mark as disconnected
@@ -731,7 +766,9 @@ class DeviceSession:
 
         except Exception as e:
             logger.error(f"Nuclear config deployment failed: {e}")
-            if isinstance(e, DeviceConnectionError | DeviceExecutionError | FileNotFoundError):
+            if isinstance(
+                e, DeviceConnectionError | DeviceExecutionError | FileNotFoundError
+            ):
                 raise
             else:
                 msg = f"Nuclear config deployment failed on {self.device_name}"
@@ -758,9 +795,9 @@ class DeviceSession:
         3. Execute system reboot to apply the new firmware
         4. Automatically answer 'yes' to the reboot confirmation prompt
 
-        ⚠️  WARNING: This will reboot the device and may change firmware version!
-        ⚠️  The device will lose connection and reboot after this operation!
-        ⚠️  Make sure your firmware file is CORRECT for this device model!
+        WARNING: This will reboot the device and may change firmware version!
+        WARNING: The device will lose connection and reboot after this operation!
+        WARNING: Make sure your firmware file is CORRECT for this device model!
 
         Parameters
         ----------
@@ -831,7 +868,9 @@ class DeviceSession:
         # Determine remote filename
         remote_name = remote_filename or local_firmware_path.name
 
-        logger.warning(f"🚨 NUCLEAR FIRMWARE DEPLOYMENT INITIATED on {self.device_name}!")
+        logger.warning(
+            f"🚨 NUCLEAR FIRMWARE DEPLOYMENT INITIATED on {self.device_name}!"
+        )
         logger.warning(f"   Firmware file: {local_firmware_path}")
         logger.warning(f"   Remote name: {remote_name}")
         logger.warning(f"   File size: {local_firmware_path.stat().st_size:,} bytes")
@@ -854,7 +893,7 @@ class DeviceSession:
                     details={"reason": "Upload verification failed"},
                 )
 
-            logger.info("✅ Firmware file uploaded successfully")
+            logger.info("OK Firmware file uploaded successfully")
 
             # Step 2: Verify firmware file is recognized by RouterOS
             logger.info("Step 2/3: Verifying firmware file compatibility")
@@ -865,14 +904,16 @@ class DeviceSession:
                 logger.debug(f"Current packages: {package_result}")
 
                 # The uploaded .npk will be automatically recognized on reboot
-                logger.info("✅ Firmware upload completed, ready for reboot")
+                logger.info("OK Firmware upload completed, ready for reboot")
 
             except DeviceExecutionError as e:
                 logger.warning(f"Could not verify packages (non-critical): {e}")
                 # Continue anyway - package verification is not critical
 
             # Step 3: Execute the reboot command with auto-confirmation
-            logger.warning(f"Step 3/3: Executing NUCLEAR REBOOT in {pre_reboot_delay}s...")
+            logger.warning(
+                f"Step 3/3: Executing NUCLEAR REBOOT in {pre_reboot_delay}s..."
+            )
             logger.warning("🚨 DEVICE WILL LOSE CONNECTION AND REBOOT! 🚨")
             logger.warning("🔄 FIRMWARE WILL BE APPLIED DURING BOOT PROCESS! 🔄")
 
@@ -889,26 +930,31 @@ class DeviceSession:
                 try:
                     logger.debug("Sending reboot command: /system/reboot")
 
-                    # Define the interactive pattern - RouterOS asks for reboot confirmation
-                    # "Reboot, yes? [y/N]: "
-                    response = self._transport.send_interactive(  # type: ignore[union-attr]
-                        interact_events=[
-                            ("/system/reboot", "Reboot, yes? [y/N]:", True),
-                            (
-                                "y",
-                                "",
-                                False,
-                            ),  # Send 'y' and don't expect a response (device reboots)
-                        ],
+                    # Create confirmation handler
+                    if self._transport is None:
+                        msg = "Transport not available"
+                        raise DeviceConnectionError(msg)
+
+                    confirmation_handler = create_confirmation_handler(self._transport)
+
+                    # Use the standardized confirmation pattern for reboot
+                    response = confirmation_handler.execute_with_confirmation(
+                        command="/system/reboot",
+                        pattern=MIKROTIK_REBOOT,
                         timeout_ops=confirmation_timeout,
+                        description="firmware upgrade reboot",
                     )
 
-                    logger.info(f"Interactive reboot command completed. Response: {response!r}")
+                    logger.info(
+                        f"Interactive reboot command completed. Response: {response!r}"
+                    )
 
                     logger.warning("🚨 NUCLEAR REBOOT EXECUTED! Device is rebooting...")
                     logger.warning("🔄 Firmware will be applied during boot process...")
-                    logger.warning("⏰ Boot process may take 2-5 minutes with firmware update")
-                    logger.info("✅ Firmware deployment command executed successfully")
+                    logger.warning(
+                        "⏰ Boot process may take 2-5 minutes with firmware update"
+                    )
+                    logger.info("OK Firmware deployment command executed successfully")
 
                     # Mark as disconnected since device is rebooting
                     self._connected = False
@@ -927,10 +973,18 @@ class DeviceSession:
                             "eof",
                         ]
                     ):
-                        logger.info(f"Device disconnected during reboot (expected): {e}")
-                        logger.warning("🚨 NUCLEAR REBOOT EXECUTED! Device is rebooting...")
-                        logger.warning("🔄 Firmware will be applied during boot process...")
-                        logger.warning("⏰ Boot process may take 2-5 minutes with firmware update")
+                        logger.info(
+                            f"Device disconnected during reboot (expected): {e}"
+                        )
+                        logger.warning(
+                            "🚨 NUCLEAR REBOOT EXECUTED! Device is rebooting..."
+                        )
+                        logger.warning(
+                            "🔄 Firmware will be applied during boot process..."
+                        )
+                        logger.warning(
+                            "⏰ Boot process may take 2-5 minutes with firmware update"
+                        )
 
                         # Mark as disconnected
                         self._connected = False
@@ -942,11 +996,18 @@ class DeviceSession:
 
             except Exception as e:
                 # The device might disconnect immediately, which is expected for reboot
-                if any(phrase in str(e).lower() for phrase in ["connection", "disconnect", "timeout", "closed"]):
+                if any(
+                    phrase in str(e).lower()
+                    for phrase in ["connection", "disconnect", "timeout", "closed"]
+                ):
                     logger.info(f"Device disconnected during reboot (expected): {e}")
-                    logger.warning("🚨 NUCLEAR REBOOT LIKELY EXECUTED! Device is rebooting...")
+                    logger.warning(
+                        "🚨 NUCLEAR REBOOT LIKELY EXECUTED! Device is rebooting..."
+                    )
                     logger.warning("🔄 Firmware will be applied during boot process...")
-                    logger.warning("⏰ Boot process may take 2-5 minutes with firmware update")
+                    logger.warning(
+                        "⏰ Boot process may take 2-5 minutes with firmware update"
+                    )
 
                     # Mark as disconnected
                     self._connected = False
@@ -960,7 +1021,10 @@ class DeviceSession:
             logger.error(f"Nuclear firmware deployment failed: {e}")
             if isinstance(
                 e,
-                DeviceConnectionError | DeviceExecutionError | FileNotFoundError | ValueError,
+                DeviceConnectionError
+                | DeviceExecutionError
+                | FileNotFoundError
+                | ValueError,
             ):
                 raise
             else:
@@ -1025,7 +1089,7 @@ class DeviceSession:
 
         remote_name = remote_filename or local_firmware_path.name
 
-        logger.warning(f"⬇️  FIRMWARE DOWNGRADE INITIATED on {self.device_name}!")
+        logger.warning(f"DOWNGRADE FIRMWARE DOWNGRADE INITIATED on {self.device_name}!")
         logger.warning(f"   Firmware file: {local_firmware_path}")
         logger.warning(f"   Remote name: {remote_name}")
         logger.warning(f"   File size: {local_firmware_path.stat().st_size:,} bytes")
@@ -1046,7 +1110,7 @@ class DeviceSession:
                     msg,
                     details={"reason": "Upload verification failed"},
                 )
-            logger.info("✅ Firmware file uploaded successfully")
+            logger.info("OK Firmware file uploaded successfully")
 
             # Step 2: Optional verification of packages
             logger.info("Step 2/4: Verifying firmware packages (optional)")
@@ -1057,25 +1121,37 @@ class DeviceSession:
                 logger.warning(f"Could not verify packages (non-critical): {e}")
 
             # Step 3: Schedule downgrade with interactive confirmation
-            logger.info("Step 3/4: Scheduling downgrade via '/system package downgrade'")
+            logger.info(
+                "Step 3/4: Scheduling downgrade via '/system package downgrade'"
+            )
             try:
-                logger.info("Executing downgrade command with automatic confirmation...")
+                logger.info(
+                    "Executing downgrade command with automatic confirmation..."
+                )
                 try:
                     logger.debug("Sending downgrade command: /system/package/downgrade")
-                    response = self._transport.send_interactive(  # type: ignore[union-attr]
-                        interact_events=[
-                            (
-                                "/system/package/downgrade",
-                                "Router will be rebooted. Continue? [y/N]:",
-                                True,
-                            ),
-                            ("y", "", False),
-                        ],
+
+                    # Create confirmation handler
+                    if self._transport is None:
+                        msg = "Transport not available"
+                        raise DeviceConnectionError(msg)
+
+                    confirmation_handler = create_confirmation_handler(self._transport)
+
+                    # Use the standardized confirmation pattern for package downgrade
+                    response = confirmation_handler.execute_with_confirmation(
+                        command="/system/package/downgrade",
+                        pattern=MIKROTIK_PACKAGE_DOWNGRADE,
                         timeout_ops=confirmation_timeout,
+                        description="package downgrade",
                     )
-                    logger.info(f"Interactive downgrade command completed. Response: {response!r}")
+                    logger.info(
+                        f"Interactive downgrade command completed. Response: {response!r}"
+                    )
                     logger.warning("🔁 DOWNGRADE INITIATED! Device is rebooting...")
-                    logger.warning("⏰ Boot process may take 2-5 minutes with firmware change")
+                    logger.warning(
+                        "⏰ Boot process may take 2-5 minutes with firmware change"
+                    )
                     self._connected = False
                     return True
                 except Exception as e:
@@ -1090,9 +1166,13 @@ class DeviceSession:
                             "eof",
                         ]
                     ):
-                        logger.info(f"Device disconnected during downgrade (expected): {e}")
+                        logger.info(
+                            f"Device disconnected during downgrade (expected): {e}"
+                        )
                         logger.warning("🔁 DOWNGRADE INITIATED! Device is rebooting...")
-                        logger.warning("⏰ Boot process may take 2-5 minutes with firmware change")
+                        logger.warning(
+                            "⏰ Boot process may take 2-5 minutes with firmware change"
+                        )
                         self._connected = False
                         return True
                     else:
@@ -1100,10 +1180,17 @@ class DeviceSession:
                         msg = f"Downgrade command failed: {e}"
                         raise DeviceConnectionError(msg) from e
             except Exception as e:
-                if any(phrase in str(e).lower() for phrase in ["connection", "disconnect", "timeout", "closed"]):
+                if any(
+                    phrase in str(e).lower()
+                    for phrase in ["connection", "disconnect", "timeout", "closed"]
+                ):
                     logger.info(f"Device disconnected during downgrade (expected): {e}")
-                    logger.warning("🔁 DOWNGRADE LIKELY EXECUTED! Device is rebooting...")
-                    logger.warning("⏰ Boot process may take 2-5 minutes with firmware change")
+                    logger.warning(
+                        "🔁 DOWNGRADE LIKELY EXECUTED! Device is rebooting..."
+                    )
+                    logger.warning(
+                        "⏰ Boot process may take 2-5 minutes with firmware change"
+                    )
                     self._connected = False
                     return True
                 else:
@@ -1114,7 +1201,10 @@ class DeviceSession:
             logger.error(f"Firmware downgrade deployment failed: {e}")
             if isinstance(
                 e,
-                DeviceConnectionError | DeviceExecutionError | FileNotFoundError | ValueError,
+                DeviceConnectionError
+                | DeviceExecutionError
+                | FileNotFoundError
+                | ValueError,
             ):
                 raise
             else:
@@ -1162,23 +1252,29 @@ class DeviceSession:
                     info = self.execute_command("/system/routerboard/print")
                     logger.debug(f"RouterBOARD status before upgrade: {info}")
                 except DeviceExecutionError as e:
-                    logger.warning(f"Could not fetch RouterBOARD status (non-critical): {e}")
+                    logger.warning(
+                        f"Could not fetch RouterBOARD status (non-critical): {e}"
+                    )
 
             logger.info("Issuing RouterBOARD upgrade command...")
             # RouterOS accepts both '/system routerboard upgrade' and with slashes
             # This command requires interactive confirmation
             try:
                 logger.debug("Sending upgrade command with automatic confirmation...")
-                upgrade_resp = self._transport.send_interactive(  # type: ignore[union-attr]
-                    interact_events=[
-                        (
-                            "/system/routerboard/upgrade",
-                            "Do you really want to upgrade firmware? [y/n]",
-                            True,
-                        ),
-                        ("y", "", False),
-                    ],
+
+                # Create confirmation handler
+                if self._transport is None:
+                    msg = "Transport not available"
+                    raise DeviceConnectionError(msg)
+
+                confirmation_handler = create_confirmation_handler(self._transport)
+
+                # Use the standardized confirmation pattern for RouterBOARD upgrade
+                upgrade_resp = confirmation_handler.execute_with_confirmation(
+                    command="/system/routerboard/upgrade",
+                    pattern=MIKROTIK_ROUTERBOARD_UPGRADE,
                     timeout_ops=confirmation_timeout,
+                    description="RouterBOARD upgrade",
                 )
                 logger.debug(f"RouterBOARD upgrade response: {upgrade_resp}")
                 logger.info("✅ RouterBOARD upgrade scheduled (requires reboot)")
@@ -1187,7 +1283,9 @@ class DeviceSession:
                 error_msg = f"RouterBOARD upgrade failed: {e}"
                 raise DeviceExecutionError(error_msg) from e
 
-            logger.warning(f"Rebooting in {pre_reboot_delay}s to apply RouterBOARD upgrade...")
+            logger.warning(
+                f"Rebooting in {pre_reboot_delay}s to apply RouterBOARD upgrade..."
+            )
             logger.warning("🚨 DEVICE WILL LOSE CONNECTION AND REBOOT! 🚨")
             time.sleep(pre_reboot_delay)
 
@@ -1196,14 +1294,24 @@ class DeviceSession:
                 logger.info("Executing reboot command with automatic confirmation...")
                 try:
                     logger.debug("Sending reboot command: /system/reboot")
-                    response = self._transport.send_interactive(  # type: ignore[union-attr]
-                        interact_events=[
-                            ("/system/reboot", "Reboot, yes? [y/N]:", True),
-                            ("y", "", False),
-                        ],
+
+                    # Create confirmation handler
+                    if self._transport is None:
+                        msg = "Transport not available"
+                        raise DeviceConnectionError(msg)
+
+                    confirmation_handler = create_confirmation_handler(self._transport)
+
+                    # Use the standardized confirmation pattern for reboot
+                    response = confirmation_handler.execute_with_confirmation(
+                        command="/system/reboot",
+                        pattern=MIKROTIK_REBOOT,
                         timeout_ops=confirmation_timeout,
+                        description="RouterBOARD upgrade reboot",
                     )
-                    logger.info(f"Interactive reboot command completed. Response: {response!r}")
+                    logger.info(
+                        f"Interactive reboot command completed. Response: {response!r}"
+                    )
                     logger.warning("🔁 REBOOT EXECUTED! Device is rebooting...")
                     self._connected = False
                     return True
@@ -1219,7 +1327,9 @@ class DeviceSession:
                             "eof",
                         ]
                     ):
-                        logger.info(f"Device disconnected during reboot (expected): {e}")
+                        logger.info(
+                            f"Device disconnected during reboot (expected): {e}"
+                        )
                         logger.warning("🔁 REBOOT EXECUTED! Device is rebooting...")
                         self._connected = False
                         return True
@@ -1228,7 +1338,10 @@ class DeviceSession:
                         msg = f"Reboot command failed: {e}"
                         raise DeviceConnectionError(msg) from e
             except Exception as e:
-                if any(phrase in str(e).lower() for phrase in ["connection", "disconnect", "timeout", "closed"]):
+                if any(
+                    phrase in str(e).lower()
+                    for phrase in ["connection", "disconnect", "timeout", "closed"]
+                ):
                     logger.info(f"Device disconnected during reboot (expected): {e}")
                     logger.warning("🔁 REBOOT LIKELY EXECUTED! Device is rebooting...")
                     self._connected = False
@@ -1291,7 +1404,9 @@ class DeviceSession:
         # Create parent directories if they don't exist
         local_path.parent.mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"Downloading file '{remote_filename}' from {self.device_name} to '{local_path}'")
+        logger.info(
+            f"Downloading file '{remote_filename}' from {self.device_name} to '{local_path}'"
+        )
 
         # Get connection parameters for SFTP
         host = self._connection_params["host"]
@@ -1325,7 +1440,9 @@ class DeviceSession:
             # Download the file
             sftp.get(remote_path, str(local_path))
 
-            logger.info(f"File '{remote_filename}' downloaded successfully to '{local_path}'")
+            logger.info(
+                f"File '{remote_filename}' downloaded successfully to '{local_path}'"
+            )
 
             # Verify download if requested
             if verify_download:
@@ -1342,15 +1459,21 @@ class DeviceSession:
             if delete_remote:
                 try:
                     # Use the device command to remove the file
-                    self.execute_command(f'/file/remove numbers=[find name="{remote_filename}"]')
+                    self.execute_command(
+                        f'/file/remove numbers=[find name="{remote_filename}"]'
+                    )
                     logger.info(f"Remote file '{remote_filename}' deleted")
                 except Exception as e:
-                    logger.warning(f"Failed to delete remote file '{remote_filename}': {e}")
+                    logger.warning(
+                        f"Failed to delete remote file '{remote_filename}': {e}"
+                    )
 
             return True
 
         except paramiko.AuthenticationException as e:
-            logger.error(f"Authentication failed during file download from {self.device_name}: {e}")
+            logger.error(
+                f"Authentication failed during file download from {self.device_name}: {e}"
+            )
             msg = f"Authentication failed during file download from {self.device_name}"
             raise DeviceExecutionError(
                 msg,

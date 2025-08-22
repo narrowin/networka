@@ -72,7 +72,7 @@ Optional parameters:
 
 IP-based connections use the same authentication mechanisms as predefined devices:
 
-1. Environment variables: `NT_DEFAULT_USER` and `NT_DEFAULT_PASSWORD`
+1. Environment variables: `NW_USER_DEFAULT` and `NW_PASSWORD_DEFAULT`
 2. Interactive mode: Use `--interactive-auth` flag to be prompted
 3. SSH keys: Standard SSH key authentication is supported
 

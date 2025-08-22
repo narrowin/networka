@@ -431,7 +431,7 @@ class TestHandleFileDownloads(unittest.TestCase):
         # Verify console.print was called with correct messages
         expected_calls = [
             call("[cyan]Downloading test.rsc from test-device...[/cyan]"),
-            call("[green]✓ Downloaded test.rsc to /srv/backups/test.rsc[/green]"),
+            call("[green]OK Downloaded test.rsc to /srv/backups/test.rsc[/green]"),
         ]
         mock_console.print.assert_has_calls(expected_calls)
 
@@ -452,7 +452,7 @@ class TestHandleFileDownloads(unittest.TestCase):
         # Verify console.print was called with correct messages
         expected_calls = [
             call("[cyan]Downloading missing.rsc from test-device...[/cyan]"),
-            call("[red]✗ Failed to download missing.rsc[/red]"),
+            call("[red]FAIL Failed to download missing.rsc[/red]"),
         ]
         mock_console.print.assert_has_calls(expected_calls)
 
@@ -473,7 +473,7 @@ class TestHandleFileDownloads(unittest.TestCase):
         # Verify console.print was called with correct messages
         expected_calls = [
             call("[cyan]Downloading error.rsc from test-device...[/cyan]"),
-            call("[red]✗ Error downloading error.rsc: Network timeout[/red]"),
+            call("[red]FAIL Error downloading error.rsc: Network timeout[/red]"),
         ]
         mock_console.print.assert_has_calls(expected_calls)
 

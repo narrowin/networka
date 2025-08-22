@@ -10,6 +10,8 @@ from typing import Annotated, Any, cast
 import typer
 
 from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
+from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 
@@ -53,13 +55,20 @@ def register(app: typer.Typer) -> None:
         ] = True,
         config_file: Annotated[
             Path, typer.Option("--config", "-c", help="Configuration file path")
-        ] = Path("devices.yml"),
+        ] = DEFAULT_CONFIG_PATH,
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose output")
         ] = False,
     ) -> None:
         """Download a file from a device or all devices in a group."""
         setup_logging("DEBUG" if verbose else "INFO")
+
+        # ACTION command - use global config theme
+        ctx = CommandContext(
+            config_file=config_file,
+            verbose=verbose,
+            output_mode=None,  # Use global config theme
+        )
 
         try:
             config = load_config(config_file)
@@ -85,9 +94,7 @@ def register(app: typer.Typer) -> None:
                 transport_type = config.get_transport_type(target_name)
                 console.print("[bold cyan]File Download Details:[/bold cyan]")
                 console.print(f"  [bold]Device:[/bold] {target_name}")
-                console.print(
-                    f"  [bold]Transport:[/bold] [yellow]{transport_type}[/yellow]"
-                )
+                console.print(f"  [bold]Transport:[/bold] {transport_type}")
                 console.print(f"  [bold]Remote file:[/bold] {remote_file}")
                 console.print(f"  [bold]Local path:[/bold] {local_path}")
                 console.print(
@@ -112,13 +119,12 @@ def register(app: typer.Typer) -> None:
                         )
 
                 if success:
-                    console.print("[bold green]✓ Download successful![/bold green]")
-                    console.print(
-                        f"[green]File '{remote_file}' downloaded to "
-                        f"'{local_path}'[/green]"
+                    console.print("[bold green]OK Download successful![/bold green]")
+                    ctx.print_success(
+                        f"File '{remote_file}' downloaded to '{local_path}'"
                     )
                 else:
-                    console.print("[bold red]✗ Download failed![/bold red]")
+                    console.print("[bold red]FAIL Download failed![/bold red]")
                     raise typer.Exit(1)
                 return
 
@@ -172,14 +178,14 @@ def register(app: typer.Typer) -> None:
                             results[dev] = ok
                             if ok:
                                 successes += 1
-                                console.print(
-                                    f"[green]✓ {dev}: downloaded to {dest}[/green]"
-                                )
+                                ctx.print_success(f"OK {dev}: downloaded to {dest}")
                             else:
-                                console.print(f"[red]✗ {dev}: download failed[/red]")
+                                ctx.print_error(f"FAIL {dev}: download failed")
                     except Exception as e:  # pragma: no cover - unexpected
                         results[dev] = False
-                        console.print(f"[red]✗ {dev}: error during download: {e}[/red]")
+                        console.print(
+                            f"[red]FAIL {dev}: error during download: {e}[/red]"
+                        )
 
             total = len(members)
             console.print("[bold cyan]Group Download Results:[/bold cyan]")
@@ -190,10 +196,10 @@ def register(app: typer.Typer) -> None:
                 raise typer.Exit(1)
 
         except NetworkToolkitError as e:
-            console.print(f"[red]Error: {e.message}[/red]")
+            ctx.print_error(f"Error: {e.message}")
             if verbose and getattr(e, "details", None):
-                console.print(f"[red]Details: {e.details}[/red]")
+                ctx.print_error(f"Details: {e.details}")
             raise typer.Exit(1) from None
         except Exception as e:  # pragma: no cover - unexpected
-            console.print(f"[red]Unexpected error: {e}[/red]")
+            ctx.print_error(f"Unexpected error: {e}")
             raise typer.Exit(1) from None

@@ -33,6 +33,10 @@ class FakeWindow:
     def attached_pane(self) -> FakePane:
         return self._panes[0]
 
+    @property
+    def active_pane(self) -> FakePane:
+        return self._panes[0]
+
     def split_window(
         self, *, attach: bool = False, vertical: bool | None = None
     ) -> FakePane:
@@ -60,18 +64,26 @@ class FakeSession:
     def attached_window(self) -> FakeWindow:
         return self._window
 
+    @property
+    def active_window(self) -> FakeWindow:
+        return self._window
+
     def new_window(
         self, *, _attach: bool = True, _window_name: str | None = None
     ) -> FakeWindow:
         self._window = FakeWindow()
         return self._window
 
+    def attach_session(self) -> None:
+        """Mock session attach - does nothing in tests."""
+        pass
+
 
 class FakeServer:
     def __init__(self) -> None:
         self.sessions: dict[str, FakeSession] = {}
         # expose last server instance for assertions
-        FakeLibtmux.last_server = self  # type: ignore[assignment]
+        FakeLibtmux.last_server = self
 
     def find_where(self, query: dict[str, str]) -> FakeSession | None:
         name = query.get("session_name", "")
@@ -89,6 +101,40 @@ class FakeLibtmux:
     last_server: FakeServer | None = None
 
 
+class FakePlatformCapabilities:
+    """Mock platform capabilities that always supports tmux."""
+
+    def get_fallback_options(self) -> dict[str, Any]:
+        return {
+            "tmux_available": True,
+            "ssh_client": "openssh_unix",
+            "sshpass_available": True,
+            "platform": "Linux",
+            "can_do_sequential_ssh": True,
+            "can_do_tmux_fanout": True,
+        }
+
+    def suggest_alternatives(self) -> None:
+        pass
+
+
+class FakePlatformCapabilitiesNoSshpass:
+    """Mock platform capabilities that supports tmux but no sshpass."""
+
+    def get_fallback_options(self) -> dict[str, Any]:
+        return {
+            "tmux_available": True,
+            "ssh_client": "openssh_unix",
+            "sshpass_available": False,  # No sshpass
+            "platform": "Linux",
+            "can_do_sequential_ssh": True,
+            "can_do_tmux_fanout": True,
+        }
+
+    def suggest_alternatives(self) -> None:
+        pass
+
+
 def _patch_tmux_env() -> tuple[Any, Any, Any]:
     return (
         patch(
@@ -99,7 +145,10 @@ def _patch_tmux_env() -> tuple[Any, Any, Any]:
             "network_toolkit.commands.ssh._ensure_libtmux",
             return_value=FakeLibtmux,
         ),
-        patch("network_toolkit.commands.ssh.subprocess.run", return_value=None),
+        patch(
+            "network_toolkit.commands.ssh.get_platform_capabilities",
+            return_value=FakePlatformCapabilities(),
+        ),
     )
 
 
@@ -146,12 +195,22 @@ def test_ssh_group_two_panes(config_file: Path) -> None:
     assert "2 pane(s)" in result.output
 
 
-def test_ssh_missing_tmux_binary(config_file: Path) -> None:  # noqa: ARG001
+def test_ssh_missing_tmux_server(config_file: Path) -> None:
+    """Test when libtmux cannot connect to tmux server."""
     runner = CliRunner()
-    with patch("network_toolkit.commands.ssh.shutil.which", return_value=None):
-        result = runner.invoke(app, ["ssh", "test_device1", "--no-attach"])
+
+    def mock_ensure_libtmux() -> None:
+        msg = "Cannot connect to tmux server. Please ensure tmux is installed."
+        raise RuntimeError(msg)
+
+    with patch(
+        "network_toolkit.commands.ssh._ensure_libtmux", side_effect=mock_ensure_libtmux
+    ):
+        result = runner.invoke(
+            app, ["ssh", "--config", str(config_file), "test_device1", "--no-attach"]
+        )
     assert result.exit_code == 1
-    assert "tmux not found" in result.output
+    assert "Cannot connect to tmux server" in result.output
 
 
 def _which_side_effect(prog: str) -> str | None:
@@ -169,7 +228,10 @@ def test_auth_key_first_uses_ssh_with_password_fallback(config_file: Path) -> No
             "network_toolkit.commands.ssh.shutil.which", side_effect=_which_side_effect
         ),
         patch("network_toolkit.commands.ssh._ensure_libtmux", return_value=FakeLibtmux),
-        patch("network_toolkit.commands.ssh.subprocess.run", return_value=None),
+        patch(
+            "network_toolkit.commands.ssh.get_platform_capabilities",
+            return_value=FakePlatformCapabilities(),
+        ),
     ):
         result = runner.invoke(
             app,
@@ -190,8 +252,8 @@ def test_auth_key_first_uses_ssh_with_password_fallback(config_file: Path) -> No
     panes = sess.attached_window.panes
     assert len(panes) >= 1
     sent = panes[0].sent[0]
-    # Should use native SSH with key-first authentication preference
-    assert sent.startswith("ssh ")
+    # With password present and sshpass available, key-first uses sshpass to allow auto password
+    assert sent.startswith("sshpass -f ")
     assert "admin@192.168.1.10" in sent
     assert "PreferredAuthentications=publickey,password" in sent
     assert "PasswordAuthentication=yes" in sent
@@ -213,7 +275,10 @@ def test_auth_key_forced_ignores_sshpass(config_file: Path) -> None:
             "network_toolkit.commands.ssh._ensure_libtmux",
             return_value=FakeLibtmux,
         ),
-        patch("network_toolkit.commands.ssh.subprocess.run", return_value=None),
+        patch(
+            "network_toolkit.commands.ssh.get_platform_capabilities",
+            return_value=FakePlatformCapabilities(),
+        ),
     ):
         result = runner.invoke(
             app,
@@ -250,6 +315,10 @@ def test_auth_password_requires_sshpass_missing_errors(config_file: Path) -> Non
             "network_toolkit.commands.ssh._ensure_libtmux",
             return_value=FakeLibtmux,
         ),
+        patch(
+            "network_toolkit.commands.ssh.get_platform_capabilities",
+            return_value=FakePlatformCapabilitiesNoSshpass(),
+        ),
     ):
         result = runner.invoke(
             app,
@@ -278,7 +347,10 @@ def test_user_password_overrides_use_ssh_with_key_first(config_file: Path) -> No
             "network_toolkit.commands.ssh._ensure_libtmux",
             return_value=FakeLibtmux,
         ),
-        patch("network_toolkit.commands.ssh.subprocess.run", return_value=None),
+        patch(
+            "network_toolkit.commands.ssh.get_platform_capabilities",
+            return_value=FakePlatformCapabilities(),
+        ),
     ):
         result = runner.invoke(
             app,
@@ -298,8 +370,9 @@ def test_user_password_overrides_use_ssh_with_key_first(config_file: Path) -> No
     assert FakeLibtmux.last_server is not None
     key = next(iter(FakeLibtmux.last_server.sessions))
     sent = FakeLibtmux.last_server.sessions[key].attached_window.panes[0].sent[0]
-    # Should use native SSH with key-first authentication preference
-    assert sent.startswith("ssh ")
+    # Should use sshpass (-f FIFO) with key-first authentication preference when password is provided
+    assert sent.startswith("sshpass -f ")
+    assert " ssh " in sent
     assert "other@192.168.1.10" in sent
     assert "PreferredAuthentications=publickey,password" in sent
     assert "PasswordAuthentication=yes" in sent
@@ -320,7 +393,10 @@ def test_auth_interactive_no_sshpass(config_file: Path) -> None:
             "network_toolkit.commands.ssh._ensure_libtmux",
             return_value=FakeLibtmux,
         ),
-        patch("network_toolkit.commands.ssh.subprocess.run", return_value=None),
+        patch(
+            "network_toolkit.commands.ssh.get_platform_capabilities",
+            return_value=FakePlatformCapabilities(),
+        ),
     ):
         result = runner.invoke(
             app,

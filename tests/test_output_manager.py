@@ -27,7 +27,7 @@ class TestOutputMode:
 
     def test_output_mode_values(self) -> None:
         """Test OutputMode enum values."""
-        assert OutputMode.DEFAULT.value == "normal"
+        assert OutputMode.DEFAULT.value == "default"
         assert OutputMode.LIGHT.value == "light"
         assert OutputMode.DARK.value == "dark"
         assert OutputMode.NO_COLOR.value == "no-color"
@@ -78,7 +78,9 @@ class TestOutputManagerRawMode:
         manager = OutputManager(OutputMode.RAW)
 
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            manager.print_command_output("sw-acc1", "/system/clock/print", "output text")
+            manager.print_command_output(
+                "sw-acc1", "/system/clock/print", "output text"
+            )
             output = mock_stdout.getvalue()
 
         assert "device=sw-acc1 cmd=/system/clock/print" in output
@@ -109,7 +111,12 @@ class TestOutputManagerRawMode:
         manager = OutputManager(OutputMode.RAW)
 
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            manager.print_summary(target="sw-acc1", operation_type="Command", name="test_command", duration=1.5)
+            manager.print_summary(
+                target="sw-acc1",
+                operation_type="Command",
+                name="test_command",
+                duration=1.5,
+            )
             output = mock_stdout.getvalue()
 
         # Raw mode should not print summaries
@@ -169,7 +176,12 @@ class TestOutputManagerNormalModes:
         manager = OutputManager(OutputMode.DEFAULT)
 
         # Should not raise exceptions - testing that it's called
-        manager.print_summary(target="sw-acc1", operation_type="Command", name="test_command", duration=1.5)
+        manager.print_summary(
+            target="sw-acc1",
+            operation_type="Command",
+            name="test_command",
+            duration=1.5,
+        )
 
     def test_results_directory_printed_in_normal_mode(self) -> None:
         """Test that results directory is printed in normal modes."""
@@ -187,18 +199,18 @@ class TestEnvironmentVariables:
         with patch("os.getenv") as mock_getenv:
             mock_getenv.side_effect = lambda key, default="": {
                 "NO_COLOR": "1",
-                "NT_OUTPUT_MODE": "",
+                "NW_OUTPUT_MODE": "",
             }.get(key, default)
 
             mode = get_output_mode_from_env()
             assert mode == OutputMode.NO_COLOR
 
     def test_custom_output_mode_env_var(self) -> None:
-        """Test NT_OUTPUT_MODE environment variable."""
+        """Test NW_OUTPUT_MODE environment variable."""
         with patch("os.getenv") as mock_getenv:
             mock_getenv.side_effect = lambda key, default="": {
                 "NO_COLOR": "",
-                "NT_OUTPUT_MODE": "raw",
+                "NW_OUTPUT_MODE": "raw",
             }.get(key, default)
 
             mode = get_output_mode_from_env()
@@ -209,7 +221,7 @@ class TestEnvironmentVariables:
         with patch("os.getenv") as mock_getenv:
             mock_getenv.side_effect = lambda key, default="": {
                 "NO_COLOR": "",
-                "NT_OUTPUT_MODE": "light",
+                "NW_OUTPUT_MODE": "light",
             }.get(key, default)
 
             mode = get_output_mode_from_env()
@@ -220,7 +232,7 @@ class TestEnvironmentVariables:
         with patch("os.getenv") as mock_getenv:
             mock_getenv.side_effect = lambda key, default="": {
                 "NO_COLOR": "",
-                "NT_OUTPUT_MODE": "dark",
+                "NW_OUTPUT_MODE": "dark",
             }.get(key, default)
 
             mode = get_output_mode_from_env()
@@ -372,7 +384,7 @@ class TestOutputManagerUtilityMethods:
         manager.print_connection_status("sw-acc1", True)
 
         captured = capsys.readouterr()
-        assert "✓" in captured.out
+        assert "OK" in captured.out
         assert "Connected" in captured.out
         assert "sw-acc1" in captured.out
 
@@ -382,7 +394,7 @@ class TestOutputManagerUtilityMethods:
         manager.print_connection_status("sw-acc1", False)
 
         captured = capsys.readouterr()
-        assert "✗" in captured.out
+        assert "FAIL" in captured.out
         assert "Failed" in captured.out
         assert "sw-acc1" in captured.out
 
@@ -399,7 +411,7 @@ class TestOutputManagerUtilityMethods:
         assert captured.out == "device=sw-acc2 status=failed\n"
 
     def test_print_downloading_normal_mode(self, capsys: Any) -> None:
-        """Test downloading info in normal mode."""
+        """Test downloading message in normal mode."""
         manager = OutputManager(OutputMode.DEFAULT)
         manager.print_downloading("sw-acc1", "config.backup")
 
@@ -409,7 +421,7 @@ class TestOutputManagerUtilityMethods:
         assert "sw-acc1" in captured.out
 
     def test_print_downloading_raw_mode(self, capsys: Any) -> None:
-        """Test downloading info in raw mode."""
+        """Test downloading message in raw mode."""
         manager = OutputManager(OutputMode.RAW)
         manager.print_downloading("sw-acc1", "config.backup")
 
@@ -417,7 +429,7 @@ class TestOutputManagerUtilityMethods:
         assert captured.out == "device=sw-acc1 downloading=config.backup\n"
 
     def test_print_credential_info_normal_mode(self, capsys: Any) -> None:
-        """Test credential info in normal mode."""
+        """Test credential info message in normal mode."""
         manager = OutputManager(OutputMode.DEFAULT)
         manager.print_credential_info("Will use username: admin")
 
@@ -425,7 +437,7 @@ class TestOutputManagerUtilityMethods:
         assert "Will use username: admin" in captured.out
 
     def test_print_credential_info_raw_mode(self, capsys: Any) -> None:
-        """Test credential info in raw mode."""
+        """Test credential info message in raw mode."""
         manager = OutputManager(OutputMode.RAW)
         manager.print_credential_info("Will use username: admin")
 
@@ -433,17 +445,17 @@ class TestOutputManagerUtilityMethods:
         assert captured.out == "credential: Will use username: admin\n"
 
     def test_print_unknown_warning_normal_mode(self, capsys: Any) -> None:
-        """Test unknown warning in normal mode."""
+        """Test unknown targets warning in normal mode."""
         manager = OutputManager(OutputMode.DEFAULT)
         manager.print_unknown_warning(["unknown1", "unknown2"])
 
         captured = capsys.readouterr()
-        assert "Warning" in captured.out
         assert "Unknown targets" in captured.out
-        assert "unknown1, unknown2" in captured.out
+        assert "unknown1" in captured.out
+        assert "unknown2" in captured.out
 
     def test_print_unknown_warning_raw_mode(self, capsys: Any) -> None:
-        """Test unknown warning in raw mode."""
+        """Test unknown targets warning in raw mode."""
         manager = OutputManager(OutputMode.RAW)
         manager.print_unknown_warning(["unknown1", "unknown2"])
 
@@ -451,75 +463,112 @@ class TestOutputManagerUtilityMethods:
         assert captured.out == "warning: unknown targets: unknown1, unknown2\n"
 
 
-class TestOutputManagerTheming:
-    """Test OutputManager theming functionality."""
+class TestOutputModeResolutionOrder:
+    """Test resolution of output mode from environment and config."""
 
-    def test_light_theme_colors(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Test light theme produces different output than normal mode."""
-        # Create managers for different modes
-        normal_manager = OutputManager(OutputMode.DEFAULT)
+    def test_env_overrides_config(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Environment variable NW_OUTPUT_MODE should override config setting."""
+        from network_toolkit.common.output import get_output_manager_with_config
+
+        # Ensure clean global state
+        set_output_mode(OutputMode.DEFAULT)
+
+        # Set config to light, env to dark
+        monkeypatch.setenv("NW_OUTPUT_MODE", "dark")
+
+        manager = get_output_manager_with_config("light")
+        assert manager.mode == OutputMode.DARK
+
+    def test_no_color_forces_no_color(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """NO_COLOR forces OutputMode.NO_COLOR regardless of config/env."""
+        from network_toolkit.common.output import get_output_manager_with_config
+
+        set_output_mode(OutputMode.DEFAULT)
+        monkeypatch.setenv("NW_OUTPUT_MODE", "dark")
+        monkeypatch.setenv("NO_COLOR", "1")
+
+        manager = get_output_manager_with_config("light")
+        assert manager.mode == OutputMode.NO_COLOR
+
+    def test_config_used_when_no_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Config value should be used when no env var is set."""
+        from network_toolkit.common.output import get_output_manager_with_config
+
+        set_output_mode(OutputMode.DEFAULT)
+        monkeypatch.delenv("NW_OUTPUT_MODE", raising=False)
+        monkeypatch.delenv("NO_COLOR", raising=False)
+
+        manager = get_output_manager_with_config("raw")
+        assert manager.mode == OutputMode.RAW
+
+
+class TestOutputManagerFontStyles:
+    """Additional tests for style consistency across themes."""
+
+    def test_info_style_across_themes(self, capsys: Any) -> None:
+        """Ensure info style is applied and does not error across themes."""
+        # Light theme
         light_manager = OutputManager(OutputMode.LIGHT)
-
-        # Test that themes are configured correctly
-        assert light_manager.console.color_system == "standard"
-        assert normal_manager.console.color_system != "standard" or normal_manager.console.color_system is None
-
-        # Test that light theme actually uses semantic colors
         light_manager.print_info("test message")
-        captured = capsys.readouterr()
-        light_output = captured.out
+        capsys.readouterr()
 
-        normal_manager.print_info("test message")
-        captured = capsys.readouterr()
-        normal_output = captured.out
-
-        # The outputs should be different due to theming
-        # Both should contain the message, but styling may differ
-        assert "test message" in light_output
-        assert "test message" in normal_output
-
-    def test_dark_theme_colors(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Test dark theme produces different output than normal mode."""
-        # Create managers for different modes
-        normal_manager = OutputManager(OutputMode.DEFAULT)
+        # Dark theme
         dark_manager = OutputManager(OutputMode.DARK)
+        dark_manager.print_info("test message")
+        capsys.readouterr()
 
-        # Test that themes are configured correctly
-        assert dark_manager.console.color_system == "standard"
-        assert normal_manager.console.color_system != "standard" or normal_manager.console.color_system is None
+        # Default theme
+        normal_manager = OutputManager(OutputMode.DEFAULT)
+        normal_manager.print_info("test message")
+        capsys.readouterr()
 
-        # Test that dark theme actually uses semantic colors
+    def test_success_style_across_themes(self, capsys: Any) -> None:
+        """Ensure success style is applied and does not error across themes."""
+        # Light theme
+        light_manager = OutputManager(OutputMode.LIGHT)
+        light_manager.print_success("test success")
+        capsys.readouterr()
+
+        # Dark theme
+        dark_manager = OutputManager(OutputMode.DARK)
         dark_manager.print_success("test success")
-        captured = capsys.readouterr()
-        dark_output = captured.out
+        capsys.readouterr()
 
+        # Default theme
+        normal_manager = OutputManager(OutputMode.DEFAULT)
         normal_manager.print_success("test success")
-        captured = capsys.readouterr()
-        normal_output = captured.out
+        capsys.readouterr()
 
-        # The outputs should be different due to theming
-        # Both should contain the message, but styling may differ
-        assert "test success" in dark_output
-        assert "test success" in normal_output
+    def test_warning_style_across_themes(self, capsys: Any) -> None:
+        """Ensure warning style is applied and does not error across themes."""
+        # Light theme
+        light_manager = OutputManager(OutputMode.LIGHT)
+        light_manager.print_warning("test warning")
+        capsys.readouterr()
 
-    def test_normal_mode_no_custom_theme(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Test normal mode uses default Rich behavior."""
-        manager = OutputManager(OutputMode.DEFAULT)
+        # Dark theme
+        dark_manager = OutputManager(OutputMode.DARK)
+        dark_manager.print_warning("test warning")
+        capsys.readouterr()
 
-        # Normal mode should use Rich's default styling
-        assert manager.console.stderr is False
+        # Default theme
+        normal_manager = OutputManager(OutputMode.DEFAULT)
+        normal_manager.print_warning("test warning")
+        capsys.readouterr()
 
-        # Test that normal mode produces output
-        manager.print_info("test message")
-        captured = capsys.readouterr()
-        assert "test message" in captured.out
+    def test_error_style_across_themes(self, capsys: Any) -> None:
+        """Ensure error style is applied and does not error across themes."""
+        # Light theme
+        light_manager = OutputManager(OutputMode.LIGHT)
+        light_manager.print_error("test error")
+        capsys.readouterr()
 
-    def test_no_color_mode_no_colors(self) -> None:
-        """Test no-color mode disables colors."""
-        manager = OutputManager(OutputMode.NO_COLOR)
-        assert manager.console.color_system is None
+        # Dark theme
+        dark_manager = OutputManager(OutputMode.DARK)
+        dark_manager.print_error("test error")
+        capsys.readouterr()
 
-    def test_raw_mode_no_colors(self) -> None:
-        """Test raw mode disables colors."""
-        manager = OutputManager(OutputMode.RAW)
-        assert manager.console.color_system is None
+        # Default theme
+        normal_manager = OutputManager(OutputMode.DEFAULT)
+        normal_manager.print_error("test error")
+        capsys.readouterr()

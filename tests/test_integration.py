@@ -211,13 +211,18 @@ class TestModuleStructure:
         # Check for new modular config structure
         config_dir = project_root / "config"
         if config_dir.exists():
-            config_files = [
-                config_dir / "config.yml",
-                config_dir / "devices.yml",
-            ]
-            for config_file in config_files:
-                assert config_file.exists(), (
-                    f"Required config file not found: {config_file}"
+            # Check main config file
+            main_config = config_dir / "config.yml"
+            assert main_config.exists(), (
+                f"Required config file not found: {main_config}"
+            )
+
+            # Check that subdirectories exist (they may be empty but should exist)
+            subdirs = ["devices", "groups", "sequences", "examples"]
+            for subdir in subdirs:
+                subdir_path = config_dir / subdir
+                assert subdir_path.exists(), (
+                    f"Required config subdirectory not found: {subdir_path}"
                 )
             return
 

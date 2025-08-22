@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build script for net-worker
+# Build script for networka
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -7,7 +7,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 cd "$PROJECT_ROOT"
 
-echo "🏗️  Building net-worker..."
+echo "🏗️  Building networka..."
 echo "Project root: $PROJECT_ROOT"
 
 # Check if uv is installed
@@ -64,8 +64,8 @@ echo ""
 echo "✅ Build completed successfully!"
 echo ""
 echo "� Ready for GitHub release!"
-echo "   1. Create a new release at: https://github.com/narrowin/net-worker/releases/new"
+echo "   1. Create a new release at: https://github.com/narrowin/networka/releases/new"
 echo "   2. Attach the files from dist/ directory"
 echo "   3. Users can install with:"
-echo "      pip install git+https://github.com/narrowin/net-worker.git"
+echo "      pip install git+https://github.com/narrowin/networka.git"
 echo "   4. Or download and install the wheel file"

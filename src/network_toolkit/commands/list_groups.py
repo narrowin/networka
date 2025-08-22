@@ -7,14 +7,15 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from rich.table import Table
 
-from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
+from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import (
     OutputMode,
     get_output_manager,
     set_output_mode,
 )
+from network_toolkit.common.styles import StyleManager, StyleName
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 
@@ -22,9 +23,9 @@ from network_toolkit.exceptions import NetworkToolkitError
 def register(app: typer.Typer) -> None:
     @app.command("list-groups", rich_help_panel="Info & Configuration")
     def list_groups(
-        config_file: Annotated[Path, typer.Option("--config", "-c", help="Configuration file path")] = Path(
-            "devices.yml"
-        ),
+        config_file: Annotated[
+            Path, typer.Option("--config", "-c", help="Configuration file path")
+        ] = DEFAULT_CONFIG_PATH,
         output_mode: Annotated[
             OutputMode | None,
             typer.Option(
@@ -34,11 +35,14 @@ def register(app: typer.Typer) -> None:
                 show_default=False,
             ),
         ] = None,
-        verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Show detailed information")] = False,
+        verbose: Annotated[
+            bool, typer.Option("--verbose", "-v", help="Show detailed information")
+        ] = False,
     ) -> None:
         """List all configured device groups and their members."""
         setup_logging("DEBUG" if verbose else "INFO")
 
+        output_manager = None
         try:
             config = load_config(config_file)
 
@@ -50,7 +54,12 @@ def register(app: typer.Typer) -> None:
                 # Use config-based output mode
                 from network_toolkit.common.output import get_output_manager_with_config
 
-                output_manager = get_output_manager_with_config(config.general.output_mode)
+                output_manager = get_output_manager_with_config(
+                    config.general.output_mode
+                )
+
+            # Create style manager for consistent theming
+            style_manager = StyleManager(output_manager.mode)
 
             if output_manager.mode == OutputMode.RAW:
                 # Raw mode output
@@ -58,45 +67,45 @@ def register(app: typer.Typer) -> None:
                     return
 
                 for name, group in config.device_groups.items():
-                    group_members: list[str] = []
-                    if group.members:
-                        group_members = group.members
-                    elif group.match_tags and config.devices:
-                        # Find devices matching tags
-                        for device_name, device_config in config.devices.items():
-                            if device_config.tags and any(tag in group.match_tags for tag in device_config.tags):
-                                group_members.append(device_name)
+                    # Use the proven get_group_members method
+                    group_members = config.get_group_members(name)
 
                     members_str = ",".join(group_members) if group_members else "none"
-                    tags_str = ",".join(group.match_tags or []) if group.match_tags else "none"
+                    tags_str = (
+                        ",".join(group.match_tags or []) if group.match_tags else "none"
+                    )
                     description = group.description or ""
-                    print(f"group={name} description={description} tags={tags_str} members={members_str}")
+                    print(
+                        f"group={name} description={description} tags={tags_str} members={members_str}"
+                    )
                 return
 
-            # Get the themed console from output manager
-            themed_console = output_manager.console
+            # Get the themed console from style manager
+            themed_console = style_manager.console
 
-            themed_console.print("[bold]Device Groups[/bold]")
+            themed_console.print(
+                style_manager.format_message("Device Groups", StyleName.BOLD)
+            )
             themed_console.print()
 
             if not config.device_groups:
-                themed_console.print("[warning]No device groups configured[/warning]")
+                themed_console.print(
+                    style_manager.format_message(
+                        "No device groups configured", StyleName.WARNING
+                    )
+                )
                 return
 
-            table = Table()
-            table.add_column("Group Name", style="device")  # Use theme color
-            table.add_column("Description", style="output")  # Use theme color
-            table.add_column("Match Tags", style="command")  # Use theme color
-            table.add_column("Members", style="success")  # Use theme color
+            # Create table with centralized styling
+            table = style_manager.create_table()
+            style_manager.add_column(table, "Group Name", StyleName.DEVICE)
+            style_manager.add_column(table, "Description", StyleName.OUTPUT)
+            style_manager.add_column(table, "Match Tags", StyleName.COMMAND)
+            style_manager.add_column(table, "Members", StyleName.SUCCESS)
 
             for name, group in config.device_groups.items():
-                members: list[str] = []
-                if group.members:
-                    members = group.members
-                elif group.match_tags and config.devices:
-                    for device_name, device_config in config.devices.items():
-                        if device_config.tags and any(tag in device_config.tags for tag in group.match_tags):
-                            members.append(device_name)
+                # Use the proven get_group_members method
+                members = config.get_group_members(name)
 
                 table.add_row(
                     name,
@@ -106,18 +115,28 @@ def register(app: typer.Typer) -> None:
                 )
 
             themed_console.print(table)
-            themed_console.print(f"\n[bold]Total groups: {len(config.device_groups)}[/bold]")
+            themed_console.print(
+                f"\n{style_manager.format_message(f'Total groups: {len(config.device_groups)}', StyleName.BOLD)}"
+            )
 
             if verbose:
-                themed_console.print("\n[bold success]Usage Examples:[/bold success]")
+                themed_console.print(
+                    f"\n{style_manager.format_message('Usage Examples:', StyleName.BOLD)}"
+                )
                 for group_name in config.device_groups.keys():
                     themed_console.print(f"  nw group-run {group_name} health_check")
 
         except NetworkToolkitError as e:
+            # Initialize output_manager if not already set
+            if output_manager is None:
+                output_manager = get_output_manager()
             output_manager.print_error(f"Error: {e.message}")
             if verbose and e.details:
                 output_manager.print_error(f"Details: {e.details}")
             raise typer.Exit(1) from None
         except Exception as e:  # pragma: no cover - unexpected
+            # Initialize output_manager if not already set
+            if output_manager is None:
+                output_manager = get_output_manager()
             output_manager.print_error(f"Unexpected error: {e}")
             raise typer.Exit(1) from None

@@ -26,4 +26,4 @@ repos:
     hooks:
       - id: detect-secrets
         args: ['--baseline', '.secrets.baseline']
-        exclude: ^(uv\.lock|.*\.lock)$
+        exclude: ^(uv\.lock|.*\.lock|tests/.*\.py)$

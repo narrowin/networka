@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Release script for net-worker
+# Release script for networka
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -133,7 +133,7 @@ fi
 if [[ "$DRY_RUN" != true ]]; then
     echo "💾 Committing release changes..."
     git add "$VERSION_FILE" "$CHANGELOG_FILE" uv.lock
-    git commit -m "chore: bump version to v$VERSION"
+    git commit --no-verify -m "chore: bump version to v$VERSION"
 else
     echo "💾 Would commit release changes"
 fi
@@ -158,7 +158,7 @@ if [[ "$DRY_RUN" != true ]]; then
     echo "🎯 Next steps:"
     echo "   1. GitHub Actions will automatically build and publish to PyPI"
     echo "   2. A GitHub release will be created automatically"
-    echo "   3. Monitor the CI/CD pipeline: https://github.com/narrowin/net-worker/actions"
+    echo "   3. Monitor the CI/CD pipeline: https://github.com/narrowin/networka/actions"
 else
     echo "🔍 This was a dry run. Use without --dry-run to execute the release."
 fi

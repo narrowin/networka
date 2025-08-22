@@ -10,7 +10,9 @@ import pytest
 from typer.testing import CliRunner
 
 # Skip all tests in this module due to CLI integration issues
-pytest.skip("Module has CLI integration issues, needs investigation", allow_module_level=True)
+pytest.skip(
+    "Module has CLI integration issues, needs investigation", allow_module_level=True
+)
 
 from network_toolkit import __version__
 from network_toolkit.cli import app

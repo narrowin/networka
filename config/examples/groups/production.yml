@@ -1,0 +1,25 @@
+# Additional device groups for different environments
+groups:
+  production_core:
+    description: "Production core network devices"
+    match_tags:
+      - "production"
+      - "core"
+  
+  production_edge:
+    description: "Production edge devices (WAN routers, firewalls)"
+    match_tags:
+      - "production"
+      - "edge"
+      
+  test_environment:
+    description: "Test and lab environment devices"
+    match_tags:
+      - "test"
+      - "lab"
+      
+  backup_priority_high:
+    description: "High priority devices for backup operations"
+    match_tags:
+      - "critical"
+      - "production"

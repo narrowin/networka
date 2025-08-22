@@ -1,7 +1,7 @@
 version: '3'
 
 vars:
-  PROJECT_NAME: net-worker
+  PROJECT_NAME: networka
   PACKAGE_NAME: network_toolkit
   PYTHON_VERSION: "3.11"
 
@@ -206,7 +206,7 @@ tasks:
           echo "✅ Assets built. Create GitHub release manually and attach:"
           ls -la dist/
           echo "📌 Instructions:"
-          echo "1. Go to https://github.com/narrowin/net-worker/releases/new"
+          echo "1. Go to https://github.com/narrowin/networka/releases/new"
           echo "2. Tag: v$version"
           echo "3. Attach files from dist/ directory"
           echo "4. Write release notes"
@@ -251,7 +251,7 @@ tasks:
   run:
     desc: Run the CLI tool (nw --help)
     cmds:
-      - echo "🚀 Running net-worker CLI..."
+      - echo "🚀 Running networka CLI..."
       - uv run nw --help
 
   run:info:

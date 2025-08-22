@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "net-worker"
+name = "networka"
 dynamic = ["version"]
 description = "Modern async Python toolkit for network device automation"
 readme = "README.md"
@@ -48,6 +48,7 @@ dependencies = [
     "asyncssh>=2.21.0",
     "scrapli-community>=2025.1.30",
     "libtmux>=0.46.2",
+    "python-dotenv>=1.0.0",
 ]
 
 [project.optional-dependencies]
@@ -62,6 +63,7 @@ dev = [
     "detect-secrets>=1.4.0",
     "bandit>=1.7.0",
     "build>=0.10.0",
+    "twine>=4.0.0",
     "types-PyYAML>=6.0.0",
     "types-paramiko>=3.0.0",
 ]
@@ -75,13 +77,13 @@ tmux = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/narrowin/net-worker"
-Documentation = "https://github.com/narrowin/net-worker#readme"
-Repository = "https://github.com/narrowin/net-worker.git"
-"Bug Tracker" = "https://github.com/narrowin/net-worker/issues"
-Changelog = "https://github.com/narrowin/net-worker/blob/main/CHANGELOG.md"
-"Source Code" = "https://github.com/narrowin/net-worker"
-"CI/CD" = "https://github.com/narrowin/net-worker/actions"
+Homepage = "https://github.com/narrowin/networka"
+Documentation = "https://github.com/narrowin/networka#readme"
+Repository = "https://github.com/narrowin/networka.git"
+"Bug Tracker" = "https://github.com/narrowin/networka/issues"
+Changelog = "https://github.com/narrowin/networka/blob/main/CHANGELOG.md"
+"Source Code" = "https://github.com/narrowin/networka"
+"CI/CD" = "https://github.com/narrowin/networka/actions"
 
 [project.scripts]
 nw = "network_toolkit.cli:app"
@@ -126,8 +128,8 @@ omit = [
 ]
 
 [tool.coverage.paths]
-network_toolkit = ["src/network_toolkit", "*/net-worker/src/network_toolkit"]
-tests = ["tests", "*/net-worker/tests"]
+network_toolkit = ["src/network_toolkit", "*/networka/src/network_toolkit"]
+tests = ["tests", "*/networka/tests"]
 
 [tool.coverage.report]
 exclude_lines = [

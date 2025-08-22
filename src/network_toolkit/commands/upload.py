@@ -9,6 +9,8 @@ from typing import Annotated
 import typer
 
 from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
+from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 
@@ -64,7 +66,7 @@ def register(app: typer.Typer) -> None:
         ] = 5,
         config_file: Annotated[
             Path, typer.Option("--config", "-c", help="Configuration file path")
-        ] = Path("devices.yml"),
+        ] = DEFAULT_CONFIG_PATH,
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose output")
         ] = False,
@@ -72,14 +74,21 @@ def register(app: typer.Typer) -> None:
         """Upload a file to a device or to all devices in a group."""
         setup_logging("DEBUG" if verbose else "INFO")
 
+        # ACTION command - use global config theme
+        ctx = CommandContext(
+            config_file=config_file,
+            verbose=verbose,
+            output_mode=None,  # Use global config theme
+        )
+
         try:
             config = load_config(config_file)
 
             if not local_file.exists():
-                console.print(f"[red]Error: Local file not found: {local_file}[/red]")
+                ctx.print_error(f"Local file not found: {local_file}")
                 raise typer.Exit(1)
             if not local_file.is_file():
-                console.print(f"[red]Error: Path is not a file: {local_file}[/red]")
+                ctx.print_error(f"Path is not a file: {local_file}")
                 raise typer.Exit(1)
 
             file_size = local_file.stat().st_size
@@ -98,31 +107,28 @@ def register(app: typer.Typer) -> None:
             is_group = target_name in groups
 
             if not (is_device or is_group):
-                console.print(
-                    f"[red]Error: '{target_name}' not found as device or group in "
-                    "configuration[/red]"
+                ctx.print_error(
+                    f"'{target_name}' not found as device or group in configuration"
                 )
                 if devices:
                     dev_names = sorted(devices.keys())
                     preview = ", ".join(dev_names[:MAX_LIST_PREVIEW])
                     if len(dev_names) > MAX_LIST_PREVIEW:
                         preview += " ..."
-                    console.print("[yellow]Known devices:[/yellow] " + preview)
+                    ctx.print_info("Known devices: " + preview)
                 if groups:
                     grp_names = sorted(groups.keys())
                     preview = ", ".join(grp_names[:MAX_LIST_PREVIEW])
                     if len(grp_names) > MAX_LIST_PREVIEW:
                         preview += " ..."
-                    console.print("[yellow]Known groups:[/yellow] " + preview)
+                    ctx.print_info("Known groups: " + preview)
                 raise typer.Exit(1)
 
             if is_device:
                 transport_type = config.get_transport_type(target_name)
                 console.print("[bold cyan]File Upload Details:[/bold cyan]")
                 console.print(f"  [bold]Device:[/bold] {target_name}")
-                console.print(
-                    f"  [bold]Transport:[/bold] [yellow]{transport_type}[/yellow]"
-                )
+                console.print(f"  [bold]Transport:[/bold] {transport_type}")
                 console.print(f"  [bold]Local file:[/bold] {local_file}")
                 console.print(f"  [bold]Remote name:[/bold] {remote_name}")
                 console.print(f"  [bold]File size:[/bold] {file_size:,} bytes")
@@ -148,9 +154,8 @@ def register(app: typer.Typer) -> None:
 
                 if success:
                     console.print("[bold green]Upload successful[/bold green]")
-                    console.print(
-                        f"[green]File '{local_file.name}' uploaded to {target_name} as "
-                        f"'{remote_name}'[/green]"
+                    ctx.print_success(
+                        f"File '{local_file.name}' uploaded to {target_name} as '{remote_name}'"
                     )
                 else:
                     console.print("[bold red]Upload failed[/bold red]")
@@ -222,10 +227,8 @@ def register(app: typer.Typer) -> None:
                 )
 
             if successful < total:
-                console.print("\n[yellow]Warning:[/yellow]")
-                console.print(
-                    f"  [yellow]{total - successful} device(s) failed[/yellow]",
-                )
+                ctx.print_warning("Warning:")
+                ctx.print_warning(f"{total - successful} device(s) failed")
                 raise typer.Exit(1)
             else:
                 console.print(
@@ -233,13 +236,13 @@ def register(app: typer.Typer) -> None:
                 )
 
         except NetworkToolkitError as e:
-            console.print(f"[red]Error: {e.message}[/red]")
+            ctx.print_error(f"Error: {e.message}")
             if verbose and e.details:
-                console.print(f"[red]Details: {e.details}[/red]")
+                ctx.print_error(f"Details: {e.details}")
             raise typer.Exit(1) from None
         except FileNotFoundError as e:  # pragma: no cover
-            console.print(f"[red]File not found: {e}[/red]")
+            ctx.print_error(f"File not found: {e}")
             raise typer.Exit(1) from None
         except Exception as e:  # pragma: no cover - unexpected
-            console.print(f"[red]Unexpected error: {e}[/red]")
+            ctx.print_error(f"Unexpected error: {e}")
             raise typer.Exit(1) from None

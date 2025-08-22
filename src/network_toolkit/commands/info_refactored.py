@@ -25,13 +25,17 @@ def register(app: typer.Typer) -> None:
     def info(
         targets: Annotated[
             str,
-            typer.Argument(help="Comma-separated device/group names from configuration"),
+            typer.Argument(
+                help="Comma-separated device/group names from configuration"
+            ),
         ],
         config_file: Annotated[
             Path,
             typer.Option("--config", "-c", help="Configuration directory or file path"),
         ] = Path("config"),
-        verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose logging")] = False,
+        verbose: Annotated[
+            bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
+        ] = False,
         output_mode: Annotated[
             OutputMode | None,
             typer.Option(
@@ -90,7 +94,9 @@ def register(app: typer.Typer) -> None:
             ctx.print_error("No valid devices found in targets")
             raise typer.Exit(1) from None
 
-        ctx.console.print(f"[bold blue]Device Information ({len(devices)} devices)[/bold blue]")
+        ctx.console.print(
+            f"[bold blue]Device Information ({len(devices)} devices)[/bold blue]"
+        )
 
         # Show info for each resolved device
         for i, device in enumerate(devices):
@@ -116,10 +122,14 @@ def register(app: typer.Typer) -> None:
             table.add_row("[bold cyan]Type[/bold cyan]", device_config.device_type)
 
             if device_config.description:
-                table.add_row("[bold cyan]Description[/bold cyan]", device_config.description)
+                table.add_row(
+                    "[bold cyan]Description[/bold cyan]", device_config.description
+                )
 
             if device_config.tags:
-                table.add_row("[bold cyan]Tags[/bold cyan]", ", ".join(device_config.tags))
+                table.add_row(
+                    "[bold cyan]Tags[/bold cyan]", ", ".join(device_config.tags)
+                )
 
             if hasattr(device_config, "platform") and device_config.platform:
                 table.add_row("[bold cyan]Platform[/bold cyan]", device_config.platform)
@@ -136,12 +146,20 @@ def register(app: typer.Typer) -> None:
                 from network_toolkit.cli import DeviceSession
 
                 # Get credential overrides if in interactive mode
-                username_override = interactive_creds.username if interactive_creds else None
-                password_override = interactive_creds.password if interactive_creds else None
+                username_override = (
+                    interactive_creds.username if interactive_creds else None
+                )
+                password_override = (
+                    interactive_creds.password if interactive_creds else None
+                )
 
-                with DeviceSession(device, ctx.config, username_override, password_override) as session:
+                with DeviceSession(
+                    device, ctx.config, username_override, password_override
+                ) as session:
                     identity_result = session.execute_command("/system/identity/print")
-                    table.add_row("[bold green]Status[/bold green]", "[green]Connected ✓[/green]")
+                    table.add_row(
+                        "[bold green]Status[/bold green]", "[green]Connected OK[/green]"
+                    )
                     if identity_result:
                         lines = identity_result.strip().split("\n")
                         if lines:
@@ -149,12 +167,14 @@ def register(app: typer.Typer) -> None:
                             table.add_row("[bold cyan]Identity[/bold cyan]", identity)
 
             except NetworkToolkitError as e:
-                table.add_row("[bold red]Status[/bold red]", "[red]Failed ✗[/red]")
+                table.add_row("[bold red]Status[/bold red]", "[red]Failed FAIL[/red]")
                 table.add_row("[bold red]Error[/bold red]", f"[red]{e.message}[/red]")
                 if ctx.verbose and e.details:
-                    table.add_row("[bold red]Details[/bold red]", f"[red]{e.details}[/red]")
+                    table.add_row(
+                        "[bold red]Details[/bold red]", f"[red]{e.details}[/red]"
+                    )
             except Exception as e:
-                table.add_row("[bold red]Status[/bold red]", "[red]Failed ✗[/red]")
-                table.add_row("[bold red]Error[/bold red]", f"[red]{str(e)}[/red]")
+                table.add_row("[bold red]Status[/bold red]", "[red]Failed FAIL[/red]")
+                table.add_row("[bold red]Error[/bold red]", f"[red]{e!s}[/red]")
 
             ctx.console.print(table)
