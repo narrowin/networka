@@ -14,8 +14,8 @@ from typing import Annotated, Any
 import typer
 from rich.table import Table
 
+from network_toolkit.common.command import CommandContext, handle_toolkit_errors
 from network_toolkit.common.credentials import prompt_for_credentials
-from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import (
@@ -23,6 +23,7 @@ from network_toolkit.common.output import (
     get_output_manager,
     set_output_mode,
 )
+from network_toolkit.common.styles import StyleManager, StyleName
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.ip_device import (
@@ -134,6 +135,9 @@ def register(app: typer.Typer) -> None:
             verbose=verbose,
             config_file=config_file,
         )
+
+        # Create style manager for consistent theming
+        style_manager = StyleManager(ctx.output_mode)
 
         # Expose console for backward compatibility with existing code
         console = ctx.console
@@ -374,9 +378,8 @@ def register(app: typer.Typer) -> None:
             if is_sequence:
                 if is_single_device:
                     if raw is None:
-                        console.print(
-                            f"[bold blue]Executing sequence "
-                            f"'{command_or_sequence}' on device {target}[/bold blue]"
+                        ctx.print_info(
+                            f"Executing sequence '{command_or_sequence}' on device {target}"
                         )
                         console.print()
 
@@ -422,16 +425,22 @@ def register(app: typer.Typer) -> None:
                                     )
                                     sys.stdout.write(f"{output}\n")
                         else:
-                            console.print(
-                                "[bold green]Sequence Results "
-                                f"({len(results_map)} commands):[/bold green]"
+                            ctx.print_success(
+                                f"Sequence Results ({len(results_map)} commands):"
                             )
                             console.print()
                             for i, (cmd, output) in enumerate(results_map.items(), 1):
                                 console.print(
-                                    f"[bold cyan]Command {i}:[/bold cyan] {cmd}"
+                                    style_manager.format_message(
+                                        f"Command {i}:", StyleName.COMMAND
+                                    )
+                                    + f" {cmd}"
                                 )
-                                console.print(f"[white]{output}[/white]")
+                                console.print(
+                                    style_manager.format_message(
+                                        output, StyleName.OUTPUT
+                                    )
+                                )
                                 console.print("-" * 80)
 
                             if results_mgr.store_results:
@@ -440,8 +449,11 @@ def register(app: typer.Typer) -> None:
                                 )
                                 if stored_paths:
                                     console.print(
-                                        "\n[dim]Results stored: "
-                                        f"{stored_paths[-1]}[/dim]"
+                                        "\n"
+                                        + style_manager.format_message(
+                                            f"Results stored: {stored_paths[-1]}",
+                                            StyleName.DIM,
+                                        )
                                     )
                                     _print_results_dir_once(results_mgr)
 
@@ -474,10 +486,9 @@ def register(app: typer.Typer) -> None:
                         return
 
                     if raw is None:
-                        console.print(
-                            f"[bold blue]Executing sequence "
-                            f"'{command_or_sequence}' on targets '{target}' "
-                            f"({len(group_members)} devices)[/bold blue]"
+                        ctx.print_info(
+                            f"Executing sequence '{command_or_sequence}' on targets '{target}' "
+                            f"({len(group_members)} devices)"
                         )
                         ctx.print_info(f"Members: {', '.join(group_members)}")
                         console.print()
@@ -534,7 +545,7 @@ def register(app: typer.Typer) -> None:
                                     )
                                     sys.stdout.write(f"{output}\n")
                     else:
-                        console.print("[bold green]Group Sequence Results[/bold green]")
+                        ctx.print_success("Group Sequence Results")
                         for device_name, device_results, error in all_results:
                             table = Table(
                                 title=f"Device: {device_name}",
@@ -543,19 +554,35 @@ def register(app: typer.Typer) -> None:
                             )
                             if error:
                                 table.add_row(
-                                    "[bold red]Status[/bold red]", "[red]Failed[/red]"
+                                    style_manager.format_message(
+                                        "Status", StyleName.ERROR
+                                    ),
+                                    style_manager.format_message(
+                                        "Failed", StyleName.FAILED
+                                    ),
                                 )
                                 table.add_row(
-                                    "[bold red]Error[/bold red]", f"[red]{error}[/red]"
+                                    style_manager.format_message(
+                                        "Error", StyleName.ERROR
+                                    ),
+                                    style_manager.format_message(
+                                        error, StyleName.FAILED
+                                    ),
                                 )
                             else:
                                 table.add_row(
-                                    "[bold green]Status[/bold green]",
-                                    "[green]Success[/green]",
+                                    style_manager.format_message(
+                                        "Status", StyleName.SUCCESS
+                                    ),
+                                    style_manager.format_message(
+                                        "Success", StyleName.CONNECTED
+                                    ),
                                 )
                                 if device_results:
                                     table.add_row(
-                                        "[bold cyan]Commands[/bold cyan]",
+                                        style_manager.format_message(
+                                            "Commands", StyleName.COMMAND
+                                        ),
                                         f"{len(device_results)} executed",
                                     )
                                     first_output = next(
@@ -566,8 +593,12 @@ def register(app: typer.Typer) -> None:
                                         "..." if len(first_output) > PREVIEW_LEN else ""
                                     )
                                     table.add_row(
-                                        "[bold cyan]Preview[/bold cyan]",
-                                        f"[white]{preview}[/white]",
+                                        style_manager.format_message(
+                                            "Preview", StyleName.COMMAND
+                                        ),
+                                        style_manager.format_message(
+                                            preview, StyleName.OUTPUT
+                                        ),
                                     )
                             console.print(table)
                             console.print("-" * 80)
@@ -622,10 +653,7 @@ def register(app: typer.Typer) -> None:
             if is_single_device:
                 if raw is None:
                     device_target = resolved_devices[0]
-                    console.print(
-                        "[bold blue]Executing command on device "
-                        f"{device_target}[/bold blue]"
-                    )
+                    ctx.print_info(f"Executing command on device {device_target}")
                     ctx.print_info(f"Command: {command_or_sequence}")
                     console.print()
 
@@ -672,7 +700,12 @@ def register(app: typer.Typer) -> None:
                         device_target, command_or_sequence, result
                     )
                     if stored_path:
-                        console.print(f"\n[dim]Results stored: {stored_path}[/dim]")
+                        console.print(
+                            "\n"
+                            + style_manager.format_message(
+                                f"Results stored: {stored_path}", StyleName.DIM
+                            )
+                        )
                         _print_results_dir_once(results_mgr)
 
                 duration = perf_counter() - started_at
@@ -705,9 +738,9 @@ def register(app: typer.Typer) -> None:
                     return
 
                 if raw is None:
-                    console.print(
-                        f"[bold blue]Executing command on targets '{target}' "
-                        f"({len(members)} devices)[/bold blue]"
+                    ctx.print_info(
+                        f"Executing command on targets '{target}' "
+                        f"({len(members)} devices)"
                     )
                     ctx.print_info(f"Command: {command_or_sequence}")
                     ctx.print_info(f"Members: {', '.join(members)}")
@@ -758,26 +791,38 @@ def register(app: typer.Typer) -> None:
                             )
                             sys.stdout.write(f"{out_text}\n")
                 else:
-                    console.print("[bold green]Group Command Results:[/bold green]")
+                    ctx.print_success("Group Command Results:")
                     for device_name, out_text, error in group_results:
                         table = Table(
                             title=f"Device: {device_name}", box=None, show_header=False
                         )
                         if error:
                             table.add_row(
-                                "[bold red]Status[/bold red]", "[red]Failed[/red]"
+                                style_manager.format_message("Status", StyleName.ERROR),
+                                style_manager.format_message(
+                                    "Failed", StyleName.FAILED
+                                ),
                             )
                             table.add_row(
-                                "[bold red]Error[/bold red]", f"[red]{error}[/red]"
+                                style_manager.format_message("Error", StyleName.ERROR),
+                                style_manager.format_message(error, StyleName.FAILED),
                             )
                         else:
                             table.add_row(
-                                "[bold green]Status[/bold green]",
-                                "[green]Success[/green]",
+                                style_manager.format_message(
+                                    "Status", StyleName.SUCCESS
+                                ),
+                                style_manager.format_message(
+                                    "Success", StyleName.CONNECTED
+                                ),
                             )
                             table.add_row(
-                                "[bold cyan]Output[/bold cyan]",
-                                f"[white]{out_text}[/white]",
+                                style_manager.format_message(
+                                    "Output", StyleName.COMMAND
+                                ),
+                                style_manager.format_message(
+                                    out_text or "", StyleName.OUTPUT
+                                ),
                             )
                         console.print(table)
                         console.print("-" * 80)

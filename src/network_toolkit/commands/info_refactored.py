@@ -13,6 +13,7 @@ from network_toolkit.common.command import CommandContext, handle_toolkit_errors
 from network_toolkit.common.credentials import prompt_for_credentials
 from network_toolkit.common.output import OutputMode
 from network_toolkit.common.resolver import DeviceResolver
+from network_toolkit.common.styles import StyleManager, StyleName
 from network_toolkit.exceptions import NetworkToolkitError
 
 if TYPE_CHECKING:
@@ -72,6 +73,18 @@ def register(app: typer.Typer) -> None:
             output_mode=output_mode,
         )
 
+        # Create style manager for consistent theming
+        style_manager = StyleManager(ctx.output_mode)
+
+        def add_table_row(
+            table: Table,
+            label: str,
+            value: str,
+            label_style: StyleName = StyleName.COMMAND,
+        ) -> None:
+            """Helper to add consistently styled table rows."""
+            table.add_row(style_manager.format_message(label, label_style), value)
+
         # Handle interactive authentication if requested
         interactive_creds = None
         if interactive_auth:
@@ -95,7 +108,9 @@ def register(app: typer.Typer) -> None:
             raise typer.Exit(1) from None
 
         ctx.console.print(
-            f"[bold blue]Device Information ({len(devices)} devices)[/bold blue]"
+            style_manager.format_message(
+                f"Device Information ({len(devices)} devices)", StyleName.INFO
+            )
         )
 
         # Show info for each resolved device
@@ -118,28 +133,24 @@ def register(app: typer.Typer) -> None:
             )
 
             # Basic device information
-            table.add_row("[bold cyan]Host[/bold cyan]", str(device_config.host))
-            table.add_row("[bold cyan]Type[/bold cyan]", device_config.device_type)
+            add_table_row(table, "Host", str(device_config.host))
+            add_table_row(table, "Type", device_config.device_type)
 
             if device_config.description:
-                table.add_row(
-                    "[bold cyan]Description[/bold cyan]", device_config.description
-                )
+                add_table_row(table, "Description", device_config.description)
 
             if device_config.tags:
-                table.add_row(
-                    "[bold cyan]Tags[/bold cyan]", ", ".join(device_config.tags)
-                )
+                add_table_row(table, "Tags", ", ".join(device_config.tags))
 
-            if hasattr(device_config, "platform") and device_config.platform:
-                table.add_row("[bold cyan]Platform[/bold cyan]", device_config.platform)
+            if device_config.platform:
+                add_table_row(table, "Platform", device_config.platform)
 
-            if hasattr(device_config, "model") and device_config.model:
-                table.add_row("[bold cyan]Model[/bold cyan]", device_config.model)
+            if device_config.model:
+                add_table_row(table, "Model", device_config.model)
 
             # Transport information
             transport_type = getattr(device_config, "transport_type", "scrapli")
-            table.add_row("[bold cyan]Transport[/bold cyan]", transport_type)
+            add_table_row(table, "Transport", transport_type)
 
             # Connection test
             try:
@@ -157,24 +168,52 @@ def register(app: typer.Typer) -> None:
                     device, ctx.config, username_override, password_override
                 ) as session:
                     identity_result = session.execute_command("/system/identity/print")
-                    table.add_row(
-                        "[bold green]Status[/bold green]", "[green]Connected OK[/green]"
+                    add_table_row(
+                        table,
+                        "Status",
+                        style_manager.format_message(
+                            "Connected OK", StyleName.CONNECTED
+                        ),
+                        StyleName.SUCCESS,
                     )
                     if identity_result:
                         lines = identity_result.strip().split("\n")
                         if lines:
                             identity = lines[0].strip()
-                            table.add_row("[bold cyan]Identity[/bold cyan]", identity)
+                            add_table_row(table, "Identity", identity)
 
             except NetworkToolkitError as e:
-                table.add_row("[bold red]Status[/bold red]", "[red]Failed FAIL[/red]")
-                table.add_row("[bold red]Error[/bold red]", f"[red]{e.message}[/red]")
+                add_table_row(
+                    table,
+                    "Status",
+                    style_manager.format_message("Failed FAIL", StyleName.FAILED),
+                    StyleName.ERROR,
+                )
+                add_table_row(
+                    table,
+                    "Error",
+                    style_manager.format_message(e.message, StyleName.FAILED),
+                    StyleName.ERROR,
+                )
                 if ctx.verbose and e.details:
-                    table.add_row(
-                        "[bold red]Details[/bold red]", f"[red]{e.details}[/red]"
+                    add_table_row(
+                        table,
+                        "Details",
+                        style_manager.format_message(str(e.details), StyleName.FAILED),
+                        StyleName.ERROR,
                     )
             except Exception as e:
-                table.add_row("[bold red]Status[/bold red]", "[red]Failed FAIL[/red]")
-                table.add_row("[bold red]Error[/bold red]", f"[red]{e!s}[/red]")
+                add_table_row(
+                    table,
+                    "Status",
+                    style_manager.format_message("Failed FAIL", StyleName.FAILED),
+                    StyleName.ERROR,
+                )
+                add_table_row(
+                    table,
+                    "Error",
+                    style_manager.format_message(str(e), StyleName.FAILED),
+                    StyleName.ERROR,
+                )
 
             ctx.console.print(table)

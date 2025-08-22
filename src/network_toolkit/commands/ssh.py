@@ -31,8 +31,10 @@ import typer
 # Local application imports
 from network_toolkit.commands.ssh_fallback import open_sequential_ssh_sessions
 from network_toolkit.commands.ssh_platform import get_platform_capabilities
-from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.logging import setup_logging
+from network_toolkit.common.output import OutputMode
 from network_toolkit.common.resolver import DeviceResolver
+from network_toolkit.common.styles import StyleManager, StyleName
 from network_toolkit.config import NetworkConfig, load_config
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.ip_device import (
@@ -97,7 +99,9 @@ def _ensure_libtmux() -> Any:
     return libtmux
 
 
-def _resolve_targets(config: NetworkConfig, targets: str) -> Target:
+def _resolve_targets(
+    config: NetworkConfig, targets: str, style_manager: StyleManager
+) -> Target:
     """Resolve comma-separated targets to a list of devices."""
     resolver = DeviceResolver(config)
     devices, unknowns = resolver.resolve_targets(targets)
@@ -105,7 +109,11 @@ def _resolve_targets(config: NetworkConfig, targets: str) -> Target:
     if unknowns:
         # Be tolerant and warn about unknowns but continue
         unknowns_str = ", ".join(unknowns)
-        console.print(f"[yellow]Warning: Unknown targets: {unknowns_str}[/yellow]")
+        style_manager.console.print(
+            style_manager.format_message(
+                f"Warning: Unknown targets: {unknowns_str}", StyleName.WARNING
+            )
+        )
 
     if not devices:
         msg = f"No valid devices found in targets: {targets}"
@@ -187,6 +195,7 @@ def _build_ssh_cmd(
     port: int = 22,
     auth: AuthMode = AuthMode.KEY_FIRST,
     password: str | None = None,
+    style_manager: StyleManager,
 ) -> str:
     base = [
         "ssh",
@@ -229,13 +238,19 @@ def _build_ssh_cmd(
             return sshpass_cmd + " ".join(shlex.quote(p) for p in base)
         else:
             # If sshpass not available, provide helpful message
-            console.print(
-                "[yellow]Warning: sshpass not found. SSH will prompt for password interactively.[/yellow]"
+            style_manager.console.print(
+                style_manager.format_message(
+                    "Warning: sshpass not found. SSH will prompt for password interactively.",
+                    StyleName.WARNING,
+                )
             )
-            console.print(
-                "[cyan]To automate password entry, install sshpass: "
-                "sudo apt install sshpass (Ubuntu/Debian) or "
-                "brew install hudochenkov/sshpass/sshpass (macOS)[/cyan]"
+            style_manager.console.print(
+                style_manager.format_message(
+                    "To automate password entry, install sshpass: "
+                    "sudo apt install sshpass (Ubuntu/Debian) or "
+                    "brew install hudochenkov/sshpass/sshpass (macOS)",
+                    StyleName.INFO,
+                )
             )
 
     return " ".join(shlex.quote(p) for p in base)
@@ -343,10 +358,16 @@ def register(app: typer.Typer) -> None:
 
         setup_logging("DEBUG" if verbose else "INFO")
 
+        # Create style manager for consistent theming
+        style_manager = StyleManager(mode=OutputMode.DEFAULT)
+        console = style_manager.console
+
         try:
             libtmux = _ensure_libtmux()
         except Exception as e:  # pragma: no cover - trivial failures
-            console.print(f"[red]{e}[/red]")
+            style_manager.console.print(
+                style_manager.format_message(str(e), StyleName.ERROR)
+            )
             raise typer.Exit(1) from None
 
         try:
@@ -360,17 +381,25 @@ def register(app: typer.Typer) -> None:
                         [f"  {k}: {v}" for k, v in supported_platforms.items()]
                     )
                     console.print(
-                        "[red]Error: When using IP addresses, "
-                        "--platform is required[/red]\n"
-                        f"[yellow]Supported platforms:[/yellow]\n{platform_list}"
+                        style_manager.format_message(
+                            "Error: When using IP addresses, --platform is required",
+                            StyleName.ERROR,
+                        )
+                    )
+                    console.print(
+                        style_manager.format_message(
+                            f"Supported platforms:\n{platform_list}", StyleName.WARNING
+                        )
                     )
                     raise typer.Exit(1)
 
                 ips = extract_ips_from_target(target)
                 config = create_ip_based_config(ips, platform, config, port=port)
                 console.print(
-                    f"[cyan]Using IP addresses with platform '{platform}': "
-                    f"{', '.join(ips)}[/cyan]"
+                    style_manager.format_message(
+                        f"Using IP addresses with platform '{platform}': {', '.join(ips)}",
+                        StyleName.INFO,
+                    )
                 )
 
             resolver = DeviceResolver(config, platform, port)
@@ -382,26 +411,44 @@ def register(app: typer.Typer) -> None:
 
             if not capabilities["can_do_tmux_fanout"]:
                 console.print(
-                    "[yellow]tmux-based SSH fanout not available on this platform.[/yellow]"
+                    style_manager.format_message(
+                        "tmux-based SSH fanout not available on this platform.",
+                        StyleName.WARNING,
+                    )
                 )
 
                 if not capabilities["tmux_available"]:
-                    console.print("[yellow]Reason: tmux not available[/yellow]")
+                    console.print(
+                        style_manager.format_message(
+                            "Reason: tmux not available", StyleName.WARNING
+                        )
+                    )
                     platform_caps.suggest_alternatives()
 
                 if capabilities["can_do_sequential_ssh"]:
                     console.print(
-                        "[cyan]Falling back to sequential SSH connections...[/cyan]"
+                        style_manager.format_message(
+                            "Falling back to sequential SSH connections...",
+                            StyleName.INFO,
+                        )
                     )
                     # Use fallback implementation
                     open_sequential_ssh_sessions(tgt.devices, config)
                     return
                 else:
-                    console.print("[red]No SSH client available[/red]")
+                    console.print(
+                        style_manager.format_message(
+                            "No SSH client available", StyleName.ERROR
+                        )
+                    )
                     platform_caps.suggest_alternatives()
                     raise typer.Exit(1)
         except Exception as e:
-            console.print(f"[red]Failed to load config or resolve target: {e}[/red]")
+            console.print(
+                style_manager.format_message(
+                    f"Failed to load config or resolve target: {e}", StyleName.ERROR
+                )
+            )
             raise typer.Exit(1) from None
 
         # Resolve effective auth mode with legacy flag support
@@ -437,14 +484,23 @@ def register(app: typer.Typer) -> None:
                     port=port,
                     auth=mode,
                     password=str(pw) if pw is not None else None,
+                    style_manager=style_manager,
                 )
             except Exception as e:
-                console.print(f"[red]Skipping {dev}: {e}[/red]")
+                console.print(
+                    style_manager.format_message(
+                        f"Skipping {dev}: {e}", StyleName.ERROR
+                    )
+                )
                 continue
             device_cmds.append((dev, ssh_cmd))
 
         if not device_cmds:
-            console.print("[red]No valid devices to connect to.[/red]")
+            console.print(
+                style_manager.format_message(
+                    "No valid devices to connect to.", StyleName.ERROR
+                )
+            )
             raise typer.Exit(1)
 
         # Always create a new tmux session for clean behavior
@@ -500,8 +556,10 @@ def register(app: typer.Typer) -> None:
             console.log(f"Could not enable mouse: {exc}")
 
         console.print(
-            "[green]Created tmux session[/green] "
-            f"[bold]{sname}[/bold] with {len(device_cmds)} pane(s)."
+            style_manager.format_message("Created tmux session", StyleName.SUCCESS)
+            + " "
+            + style_manager.format_message(sname, StyleName.BOLD)
+            + f" with {len(device_cmds)} pane(s)."
         )
         console.print("Use tmux to navigate. Press Ctrl-b d to detach.")
 
@@ -512,6 +570,8 @@ def register(app: typer.Typer) -> None:
                 session.attach_session()
             except Exception:
                 console.print(
-                    "[yellow]Failed to attach automatically. "
-                    f"Run: tmux attach -t {sname}[/yellow]"
+                    style_manager.format_message(
+                        f"Failed to attach automatically. Run: tmux attach -t {sname}",
+                        StyleName.WARNING,
+                    )
                 )

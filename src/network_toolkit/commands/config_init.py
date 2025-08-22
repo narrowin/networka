@@ -24,7 +24,7 @@ from typing import Annotated
 
 import typer
 
-from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import OutputMode
 from network_toolkit.common.paths import default_config_root
 from network_toolkit.common.styles import StyleManager, StyleName
@@ -34,26 +34,26 @@ def _print_success(message: str) -> None:
     """Print success message using default theme."""
     style_manager = StyleManager(mode=OutputMode.DEFAULT)
     styled_message = style_manager.format_message(message, StyleName.SUCCESS)
-    console.print(styled_message)
+    style_manager.console.print(styled_message)
 
 
 def _print_info(message: str) -> None:
     """Print info message using default theme."""
     style_manager = StyleManager(mode=OutputMode.DEFAULT)
     styled_message = style_manager.format_message(message, StyleName.INFO)
-    console.print(styled_message)
+    style_manager.console.print(styled_message)
 
 
 def _print_warn(message: str) -> None:
     style_manager = StyleManager(mode=OutputMode.DEFAULT)
     styled_message = style_manager.format_message(message, StyleName.WARNING)
-    console.print(styled_message)
+    style_manager.console.print(styled_message)
 
 
 def _print_action(message: str) -> None:
     style_manager = StyleManager(mode=OutputMode.DEFAULT)
     styled_message = style_manager.format_message(message, StyleName.INFO)
-    console.print(styled_message)
+    style_manager.console.print(styled_message)
 
 
 def create_env_file(target_dir: Path) -> None:
@@ -215,6 +215,10 @@ def register(app: typer.Typer) -> None:
 
         setup_logging("DEBUG" if verbose else "INFO")
 
+        # Create style manager for consistent theming
+        style_manager = StyleManager(mode=OutputMode.DEFAULT)
+        console = style_manager.console
+
         # Determine whether we prompt (interactive) or not
         interactive = target_dir is None and not yes
 
@@ -227,7 +231,11 @@ def register(app: typer.Typer) -> None:
                 target_path = default_path
             else:
                 console.print("\nWhere should Networka store its configuration?")
-                console.print(f"[dim]Default:[/dim] {default_path}")
+                console.print(
+                    style_manager.format_message(
+                        f"Default: {default_path}", StyleName.DIM
+                    )
+                )
                 if typer.confirm("Use default location?", default=True):
                     target_path = default_path
                 else:
@@ -257,23 +265,35 @@ def register(app: typer.Typer) -> None:
             if existing:
                 if not interactive:
                     console.print(
-                        "[yellow]Warning: The following files/directories already exist:[/yellow]"
+                        style_manager.format_message(
+                            "Warning: The following files/directories already exist:",
+                            StyleName.WARNING,
+                        )
                     )
                     for p in existing:
                         console.print(f"  - {p}")
                     console.print(
-                        "\n[yellow]Use --force to overwrite existing files.[/yellow]"
+                        style_manager.format_message(
+                            "Use --force to overwrite existing files.",
+                            StyleName.WARNING,
+                        )
                     )
                     raise typer.Exit(1)
                 else:
                     console.print(
-                        "[yellow]Existing configuration detected in the default location.[/yellow]"
+                        style_manager.format_message(
+                            "Existing configuration detected in the default location.",
+                            StyleName.WARNING,
+                        )
                     )
                     if not typer.confirm("Overwrite existing files?", default=False):
                         raise typer.Exit(1)
 
         console.print(
-            f"[bold cyan]Initializing network toolkit configuration in: {target_path}[/bold cyan]"
+            style_manager.format_message(
+                f"Initializing network toolkit configuration in: {target_path}",
+                StyleName.INFO,
+            )
         )
         console.print()
 

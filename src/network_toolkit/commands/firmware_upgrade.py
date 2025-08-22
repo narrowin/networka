@@ -12,8 +12,10 @@ from typing import Annotated, Any, cast
 
 import typer
 
-from network_toolkit.common.logging import console, setup_logging
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
+from network_toolkit.common.logging import setup_logging
+from network_toolkit.common.output import OutputMode
+from network_toolkit.common.styles import StyleManager, StyleName
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.platforms import (
@@ -68,10 +70,16 @@ def register(app: typer.Typer) -> None:
         """
         setup_logging("DEBUG" if verbose else "INFO")
 
+        # Create style manager for consistent theming
+        style_manager = StyleManager(mode=OutputMode.DEFAULT)
+
         try:
             if not firmware_file.exists() or not firmware_file.is_file():
-                console.print(
-                    f"[red]Error: Firmware file not found: {firmware_file}[/red]"
+                style_manager.console.print(
+                    style_manager.format_message(
+                        f"Error: Firmware file not found: {firmware_file}",
+                        StyleName.ERROR,
+                    )
                 )
                 raise typer.Exit(1)
 
@@ -87,16 +95,22 @@ def register(app: typer.Typer) -> None:
             is_group = target_name in groups
 
             if not (is_device or is_group):
-                console.print(
-                    f"[red]Error: '{target_name}' not found as device or group in "
-                    "configuration[/red]"
+                style_manager.console.print(
+                    style_manager.format_message(
+                        f"Error: '{target_name}' not found as device or group in configuration",
+                        StyleName.ERROR,
+                    )
                 )
                 if devices:
                     dev_names = sorted(devices.keys())
                     preview = ", ".join(dev_names[:MAX_LIST_PREVIEW])
                     if len(dev_names) > MAX_LIST_PREVIEW:
                         preview += " ..."
-                    console.print("[yellow]Known devices:[/yellow] " + preview)
+                    style_manager.console.print(
+                        style_manager.format_message("Known devices:", StyleName.INFO)
+                        + " "
+                        + preview
+                    )
                 if groups:
                     grp_names = sorted(groups.keys())
                     preview = ", ".join(grp_names[:MAX_LIST_PREVIEW])

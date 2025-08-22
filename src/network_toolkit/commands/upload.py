@@ -8,9 +8,10 @@ from typing import Annotated
 
 import typer
 
-from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.command import CommandContext, handle_toolkit_errors
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
-from network_toolkit.common.command_helpers import CommandContext
+from network_toolkit.common.logging import setup_logging
+from network_toolkit.common.styles import StyleManager, StyleName
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 
@@ -81,6 +82,10 @@ def register(app: typer.Typer) -> None:
             output_mode=None,  # Use global config theme
         )
 
+        # Create style manager for consistent theming
+        style_manager = StyleManager(ctx.output_mode)
+        console = ctx.console
+
         try:
             config = load_config(config_file)
 
@@ -126,24 +131,19 @@ def register(app: typer.Typer) -> None:
 
             if is_device:
                 transport_type = config.get_transport_type(target_name)
-                console.print("[bold cyan]File Upload Details:[/bold cyan]")
-                console.print(f"  [bold]Device:[/bold] {target_name}")
-                console.print(f"  [bold]Transport:[/bold] {transport_type}")
-                console.print(f"  [bold]Local file:[/bold] {local_file}")
-                console.print(f"  [bold]Remote name:[/bold] {remote_name}")
-                console.print(f"  [bold]File size:[/bold] {file_size:,} bytes")
-                console.print(
-                    f"  [bold]Verify upload:[/bold] {'Yes' if verify else 'No'}"
-                )
-                console.print(
-                    f"  [bold]Checksum verify:[/bold] "
-                    f"{'Yes' if checksum_verify else 'No'}"
+                ctx.print_info("File Upload Details:")
+                ctx.print_info(f"  Device: {target_name}")
+                ctx.print_info(f"  Transport: {transport_type}")
+                ctx.print_info(f"  Local file: {local_file}")
+                ctx.print_info(f"  Remote name: {remote_name}")
+                ctx.print_info(f"  File size: {file_size:,} bytes")
+                ctx.print_info(f"  Verify upload: {'Yes' if verify else 'No'}")
+                ctx.print_info(
+                    f"  Checksum verify: {'Yes' if checksum_verify else 'No'}"
                 )
                 console.print()
 
-                with console.status(
-                    f"[bold green]Uploading {local_file.name} to {target_name}..."
-                ):
+                with console.status(f"Uploading {local_file.name} to {target_name}..."):
                     with device_session(target_name, config) as session:
                         success = session.upload_file(
                             local_path=local_file,
@@ -153,12 +153,12 @@ def register(app: typer.Typer) -> None:
                         )
 
                 if success:
-                    console.print("[bold green]Upload successful[/bold green]")
+                    ctx.print_success("Upload successful")
                     ctx.print_success(
                         f"File '{local_file.name}' uploaded to {target_name} as '{remote_name}'"
                     )
                 else:
-                    console.print("[bold red]Upload failed[/bold red]")
+                    ctx.print_error("Upload failed")
                     raise typer.Exit(1)
                 return
 
@@ -173,27 +173,22 @@ def register(app: typer.Typer) -> None:
                     members = group_obj.members or []
 
             if not members:
-                console.print(
-                    f"[red]Error: No devices found in group '{target_name}'[/red]",
-                )
+                ctx.print_error(f"No devices found in group '{target_name}'")
                 raise typer.Exit(1)
 
-            console.print("[bold cyan]Group File Upload Details:[/bold cyan]")
-            console.print(f"  [bold]Group:[/bold] {target_name}")
-            console.print("  [bold]Devices:[/bold] " + str(len(members)) + " (")
-            console.print(", ".join(members) + ")")
-            console.print(f"  [bold]Local file:[/bold] {local_file}")
-            console.print(f"  [bold]Remote name:[/bold] {remote_name}")
-            console.print(f"  [bold]File size:[/bold] {file_size:,} bytes")
-            console.print(f"  [bold]Max concurrent:[/bold] {max_concurrent}")
-            console.print(f"  [bold]Verify upload:[/bold] {'Yes' if verify else 'No'}")
-            console.print(
-                f"  [bold]Checksum verify:[/bold] {'Yes' if checksum_verify else 'No'}",
-            )
+            ctx.print_info("Group File Upload Details:")
+            ctx.print_info(f"  Group: {target_name}")
+            ctx.print_info(f"  Devices: {len(members)} ({', '.join(members)})")
+            ctx.print_info(f"  Local file: {local_file}")
+            ctx.print_info(f"  Remote name: {remote_name}")
+            ctx.print_info(f"  File size: {file_size:,} bytes")
+            ctx.print_info(f"  Max concurrent: {max_concurrent}")
+            ctx.print_info(f"  Verify upload: {'Yes' if verify else 'No'}")
+            ctx.print_info(f"  Checksum verify: {'Yes' if checksum_verify else 'No'}")
             console.print()
 
             with console.status(
-                f"[bold green]Uploading {local_file.name} to {len(members)} devices...",
+                f"Uploading {local_file.name} to {len(members)} devices...",
             ):
                 results = device_session.upload_file_to_devices(
                     device_names=members,
@@ -208,32 +203,26 @@ def register(app: typer.Typer) -> None:
             successful = sum(results.values())
             total = len(members)
 
-            console.print("[bold cyan]Group Upload Results:[/bold cyan]")
-            console.print(
-                f"  [bold green]Successful:[/bold green] {successful}/{total}",
-            )
-            console.print(
-                f"  [bold red]Failed:[/bold red] {total - successful}/{total}",
-            )
+            ctx.print_info("Group Upload Results:")
+            ctx.print_success(f"  Successful: {successful}/{total}")
+            if total - successful > 0:
+                ctx.print_error(f"  Failed: {total - successful}/{total}")
             console.print()
 
-            console.print("[bold yellow]Per-Device Results:[/bold yellow]")
+            ctx.print_info("Per-Device Results:")
             for dev in members:
                 ok = results.get(dev, False)
-                status_color = "green" if ok else "red"
-                label = "OK" if ok else "FAILED"
-                console.print(
-                    f"  [{status_color}]{label} {dev}[/{status_color}]",
-                )
+                if ok:
+                    ctx.print_success(f"  {dev}")
+                else:
+                    ctx.print_error(f"  {dev}")
 
             if successful < total:
                 ctx.print_warning("Warning:")
                 ctx.print_warning(f"{total - successful} device(s) failed")
                 raise typer.Exit(1)
             else:
-                console.print(
-                    "\n[bold green]All uploads completed successfully![/bold green]",
-                )
+                ctx.print_success("All uploads completed successfully!")
 
         except NetworkToolkitError as e:
             ctx.print_error(f"Error: {e.message}")
