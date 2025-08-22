@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import json
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from enum import Enum
@@ -14,8 +13,8 @@ from typing import Annotated, Any
 import typer
 from rich.table import Table
 
-from network_toolkit.common.credentials import prompt_for_credentials
 from network_toolkit.common.command_helpers import CommandContext
+from network_toolkit.common.credentials import prompt_for_credentials
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import (
@@ -107,12 +106,12 @@ def register(app: typer.Typer) -> None:
                 help="Prompt for username and password interactively",
             ),
         ] = False,
-        platform: Annotated[
+        device_type: Annotated[
             str | None,
             typer.Option(
                 "--platform",
                 "-p",
-                help="Platform type when using IP addresses (e.g., mikrotik_routeros)",
+                help="Device type when using IP addresses (e.g., mikrotik_routeros). Note: This specifies the network driver type, not hardware platform.",
             ),
         ] = None,
         port: Annotated[
@@ -120,6 +119,14 @@ def register(app: typer.Typer) -> None:
             typer.Option(
                 "--port",
                 help="SSH port when using IP addresses (default: 22)",
+            ),
+        ] = None,
+        transport_type: Annotated[
+            str | None,
+            typer.Option(
+                "--transport",
+                "-t",
+                help="Transport type to use for connections (scrapli, nornir_netmiko). Defaults to configuration or scrapli.",
             ),
         ] = None,
     ) -> None:
@@ -268,7 +275,7 @@ def register(app: typer.Typer) -> None:
 
             # Check if target is IP addresses and handle accordingly
             if is_ip_list(target):
-                if platform is None:
+                if device_type is None:
                     supported_platforms = get_supported_platforms()
                     platform_list = "\n".join(
                         [f"  {k}: {v}" for k, v in supported_platforms.items()]
@@ -280,23 +287,25 @@ def register(app: typer.Typer) -> None:
                         ctx.print_info(f"Supported platforms:\n{platform_list}")
                     raise typer.Exit(1)
 
-                if not validate_platform(platform):
+                if not validate_platform(device_type):
                     supported_platforms = get_supported_platforms()
                     platform_list = "\n".join(
                         [f"  {k}: {v}" for k, v in supported_platforms.items()]
                     )
                     if raw is None:
-                        ctx.print_error(f"Invalid platform '{platform}'")
+                        ctx.print_error(f"Invalid device type '{device_type}'")
                         ctx.print_info(f"Supported platforms:\n{platform_list}")
                     raise typer.Exit(1)
 
                 # Extract IP addresses and create dynamic config
                 ips = extract_ips_from_target(target)
-                config = create_ip_based_config(ips, platform, config, port=port)
+                config = create_ip_based_config(
+                    ips, device_type, config, port=port, transport_type=transport_type
+                )
 
                 if raw is None:
                     ctx.print_info(
-                        f"Using IP addresses with platform '{platform}': {', '.join(ips)}"
+                        f"Using IP addresses with device type '{device_type}': {', '.join(ips)}"
                     )
 
             sm = SequenceManager(config)

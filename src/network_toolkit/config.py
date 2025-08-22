@@ -185,11 +185,27 @@ SupportedDeviceType = Literal[
 
 
 class DeviceConfig(BaseModel):
-    """Configuration for a single network device."""
+    """Configuration for a single network device.
+
+    Attributes
+    ----------
+    device_type : SupportedDeviceType
+        Network driver type for connection establishment and command execution.
+        Determines which Scrapli/Netmiko platform driver to use for network operations.
+        Examples: 'mikrotik_routeros', 'cisco_iosxe', 'juniper_junos'
+
+    platform : str | None
+        Hardware architecture platform for firmware operations.
+        Used to select correct firmware images for upgrades and hardware-specific operations.
+        Examples: 'x86', 'x86_64', 'arm', 'tile', 'mipsbe'
+        Optional - only required for firmware upgrade operations.
+    """
 
     host: str
     description: str | None = None
-    device_type: SupportedDeviceType  # Pydantic validates this automatically
+    device_type: SupportedDeviceType = (
+        "mikrotik_routeros"  # Default to most common type
+    )
     model: str | None = None
     platform: str | None = None
     location: str | None = None

@@ -107,20 +107,22 @@ class TestIPDeviceConfig:
         config = create_ip_device_config("192.168.1.1", "mikrotik_routeros")
 
         assert config.host == "192.168.1.1"
-        assert config.platform == "mikrotik_routeros"
+        assert (
+            config.platform is None
+        )  # platform is hardware architecture, not device type
         assert config.device_type == "mikrotik_routeros"
         assert config.port == 22
         assert config.description is not None
         assert "192.168.1.1" in config.description
 
     def test_create_ip_device_config_with_custom_type(self) -> None:
-        """Test IP device config with custom device type."""
+        """Test IP device config with custom hardware platform."""
         config = create_ip_device_config(
-            "192.168.1.1", "mikrotik_routeros", device_type="custom_type"
+            "192.168.1.1", "mikrotik_routeros", hardware_platform="arm"
         )
 
-        assert config.device_type == "custom_type"
-        assert config.platform == "mikrotik_routeros"
+        assert config.device_type == "mikrotik_routeros"
+        assert config.platform == "arm"
 
     def test_create_ip_device_config_with_custom_port(self) -> None:
         """Test IP device config with custom port."""
@@ -138,7 +140,9 @@ class TestIPDeviceConfig:
         config = create_ip_device_config("2001:db8::1", "mikrotik_routeros")
 
         assert config.host == "2001:db8::1"
-        assert config.platform == "mikrotik_routeros"
+        assert (
+            config.platform is None
+        )  # platform is hardware architecture, not device type
 
 
 class TestIPBasedConfig:
@@ -160,7 +164,10 @@ class TestIPBasedConfig:
 
         ip_device = config.devices["ip_192_168_1_1"]
         assert ip_device.host == "192.168.1.1"
-        assert ip_device.platform == "mikrotik_routeros"
+        assert (
+            ip_device.platform is None
+        )  # platform is hardware architecture, not device type
+        assert ip_device.device_type == "mikrotik_routeros"
 
     def test_create_ip_based_config_multiple_ips(
         self, base_config: NetworkConfig

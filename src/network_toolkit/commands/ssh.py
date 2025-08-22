@@ -313,12 +313,12 @@ def register(app: typer.Typer) -> None:
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable debug logging")
         ] = False,
-        platform: Annotated[
+        device_type: Annotated[
             str | None,
             typer.Option(
                 "--platform",
                 "-p",
-                help="Platform type when using IP addresses (e.g., mikrotik_routeros)",
+                help="Device type when using IP addresses (e.g., mikrotik_routeros). Note: This specifies the network driver type, not hardware platform.",
             ),
         ] = None,
         port: Annotated[
@@ -326,6 +326,14 @@ def register(app: typer.Typer) -> None:
             typer.Option(
                 "--port",
                 help="SSH port when using IP addresses (default: 22)",
+            ),
+        ] = None,
+        transport_type: Annotated[
+            str | None,
+            typer.Option(
+                "--transport",
+                "-t",
+                help="Transport type for connections (scrapli, nornir_netmiko). Defaults to configuration or scrapli.",
             ),
         ] = None,
     ) -> None:
@@ -354,7 +362,7 @@ def register(app: typer.Typer) -> None:
 
             # Handle IP addresses if platform is provided
             if is_ip_list(target):
-                if platform is None:
+                if device_type is None:
                     supported_platforms = get_supported_platforms()
                     platform_list = "\n".join(
                         [f"  {k}: {v}" for k, v in supported_platforms.items()]
@@ -367,13 +375,15 @@ def register(app: typer.Typer) -> None:
                     raise typer.Exit(1)
 
                 ips = extract_ips_from_target(target)
-                config = create_ip_based_config(ips, platform, config, port=port)
+                config = create_ip_based_config(
+                    ips, device_type, config, port=port, transport_type=transport_type
+                )
                 console.print(
-                    f"[cyan]Using IP addresses with platform '{platform}': "
+                    f"[cyan]Using IP addresses with device type '{device_type}': "
                     f"{', '.join(ips)}[/cyan]"
                 )
 
-            resolver = DeviceResolver(config, platform, port)
+            resolver = DeviceResolver(config, device_type, port, transport_type)
             tgt = Target(name=target, devices=resolver.resolve_targets(target)[0])
 
             # Check platform capabilities after we have config and targets
