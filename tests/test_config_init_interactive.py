@@ -11,10 +11,11 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 from typing import Any
+
 from typer.testing import CliRunner
 
-from network_toolkit.cli import app
 import network_toolkit.commands.config_init as config_init_mod
+from network_toolkit.cli import app
 
 
 def test_config_init_yes_uses_default_location(monkeypatch: Any) -> None:
@@ -68,8 +69,10 @@ def test_config_init_install_sequences_triggers_git_clone(monkeypatch: Any) -> N
 
     def fake_run(*args: Any, **kwargs: Any):
         calls.append((args, kwargs))
+
         class _Result:
             returncode = 0
+
         return _Result()
 
     # Patch the subprocess.run used inside the module under test
@@ -122,4 +125,7 @@ def test_config_init_install_completions_install_and_activate(monkeypatch: Any) 
         # Should report installation and rc update under our temp HOME
         assert "Installed bash completion script to:" in result.stdout
         assert str(test_dir) in result.stdout
-        assert "Updated rc file:" in result.stdout or "Activated shell completion in:" in result.stdout
+        assert (
+            "Updated rc file:" in result.stdout
+            or "Activated shell completion in:" in result.stdout
+        )
