@@ -53,7 +53,9 @@ class TestErrorFormatting:
 
         print_error(console, "Test error", context="device1")
 
-        console.print.assert_called_once_with("[error]Error: [device1] Test error[/error]")
+        console.print.assert_called_once_with(
+            "[error]Error: [device1] Test error[/error]"
+        )
 
     def test_print_error_with_details(self) -> None:
         """Test print_error function with details."""
@@ -72,7 +74,9 @@ class TestErrorFormatting:
 
         print_warning(console, "Test warning")
 
-        console.print.assert_called_once_with("[warning]Warning: Test warning[/warning]")
+        console.print.assert_called_once_with(
+            "[warning]Warning: Test warning[/warning]"
+        )
 
     def test_print_warning_with_context(self) -> None:
         """Test print_warning function with context."""
@@ -109,7 +113,9 @@ class TestErrorFormatting:
 
         print_success(console, "Test success", context="device1")
 
-        console.print.assert_called_once_with("[success][device1] Test success[/success]")
+        console.print.assert_called_once_with(
+            "[success][device1] Test success[/success]"
+        )
 
     def test_print_success_with_details(self) -> None:
         """Test print_success function with details."""
@@ -118,7 +124,9 @@ class TestErrorFormatting:
 
         print_success(console, "Test success", details=details)
 
-        console.print.assert_called_once_with("[success]Test success (files=3)[/success]")
+        console.print.assert_called_once_with(
+            "[success]Test success (files=3)[/success]"
+        )
 
     def test_format_error_message_empty_details(self) -> None:
         """Test error message formatting with empty details."""
@@ -137,9 +145,7 @@ class TestErrorFormatting:
 
         print_error(console, "Connection failed", details=details, context="device1")
 
-        expected_message = (
-            "[error]Error: [device1] Connection failed (host=192.168.1.1, port=22)[/error]"
-        )
+        expected_message = "[error]Error: [device1] Connection failed (host=192.168.1.1, port=22)[/error]"
         console.print.assert_called_once_with(expected_message)
 
     def test_print_warning_with_all_parameters(self) -> None:

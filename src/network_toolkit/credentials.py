@@ -259,7 +259,9 @@ class ConnectionParameterBuilder:
             "timeout_socket": self.config.general.timeout,
             "timeout_transport": self.config.general.timeout,
             "transport": self.config.general.transport,
-            "platform": device.platform or "mikrotik_routeros",
+            # Prefer explicit platform, otherwise fall back to device_type
+            # This keeps platform consistent with CLI/config-provided values
+            "platform": device.platform or device.device_type,
         }
 
     def _apply_device_overrides(

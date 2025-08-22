@@ -5,7 +5,6 @@ Supported shells:
 
 - Bash (Linux/macOS)
 - Zsh (Linux/macOS)
-- fish (Linux/macOS)
 
 ## Features
 
@@ -24,7 +23,7 @@ The completions provide intelligent suggestions powered by the CLI itself:
 
 ### Automatic Installation (Recommended)
 
-Use the provided installation script (supports bash/zsh/fish):
+Use the provided installation script (supports bash/zsh):
 
 ```bash
 # Install system-wide (requires sudo)
@@ -57,13 +56,6 @@ mkdir -p ~/.zsh/completions
 cp zsh_completion_nw.zsh ~/.zsh/completions/_nw
 echo 'fpath+=$HOME/.zsh/completions' >> ~/.zshrc
 echo 'autoload -Uz compinit && compinit' >> ~/.zshrc
-```
-
-For fish, copy `fish_completion_nw.fish`:
-
-```bash
-mkdir -p ~/.config/fish/completions
-cp fish_completion_nw.fish ~/.config/fish/completions/nw.fish
 ```
 
 #### Option 2: System-wide installation (bash)

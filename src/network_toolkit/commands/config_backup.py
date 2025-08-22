@@ -92,10 +92,10 @@ def register(app: typer.Typer) -> None:
             verbose=verbose,
             config_file=config_file,
         )
-        
+
         # Use themed console for all output
         console = ctx.console
-        
+
         try:
             config = load_config(config_file)
 

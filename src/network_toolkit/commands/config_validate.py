@@ -30,12 +30,12 @@ def register(app: typer.Typer) -> None:
     ) -> None:
         """Validate the configuration file and show any issues."""
         setup_logging("DEBUG" if verbose else "INFO")
-        
+
         # ACTION command - use global config theme
         ctx = CommandContext(
             config_file=config_file,
             verbose=verbose,
-            output_mode=None  # Use global config theme
+            output_mode=None,  # Use global config theme
         )
 
         try:

@@ -62,12 +62,12 @@ def register(app: typer.Typer) -> None:
     ) -> None:
         """Download a file from a device or all devices in a group."""
         setup_logging("DEBUG" if verbose else "INFO")
-        
+
         # ACTION command - use global config theme
         ctx = CommandContext(
             config_file=config_file,
             verbose=verbose,
-            output_mode=None  # Use global config theme
+            output_mode=None,  # Use global config theme
         )
 
         try:
@@ -120,7 +120,9 @@ def register(app: typer.Typer) -> None:
 
                 if success:
                     console.print("[bold green]OK Download successful![/bold green]")
-                    ctx.print_success(f"File '{remote_file}' downloaded to '{local_path}'")
+                    ctx.print_success(
+                        f"File '{remote_file}' downloaded to '{local_path}'"
+                    )
                 else:
                     console.print("[bold red]FAIL Download failed![/bold red]")
                     raise typer.Exit(1)

@@ -13,16 +13,22 @@ Design goals:
 
 from __future__ import annotations
 
+# Standard library imports
 import datetime
+import os
 import shlex
 import shutil
+import tempfile
+import threading
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Annotated, Any
 
+# Third-party imports
 import typer
 
+# Local application imports
 from network_toolkit.commands.ssh_fallback import open_sequential_ssh_sessions
 from network_toolkit.commands.ssh_platform import get_platform_capabilities
 from network_toolkit.common.logging import console, setup_logging
@@ -118,6 +124,62 @@ class AuthMode(str, Enum):
     INTERACTIVE = "interactive"  # let ssh prompt per-pane
 
 
+def _secure_tmpdir() -> Path:
+    """Return a secure, user-only temp directory for transient secrets.
+
+    Prefers XDG_RUNTIME_DIR (0700 tmpfs) else ~/.cache/networka/sshpass (0700),
+    else a namespaced dir under system temp (0700).
+    """
+    xdg = os.environ.get("XDG_RUNTIME_DIR")
+    if xdg:
+        p = Path(xdg) / "networka"
+    else:
+        p = Path.home() / ".cache" / "networka" / "sshpass"
+    try:
+        p.mkdir(parents=True, exist_ok=True)
+        p.chmod(0o700)
+    except Exception:
+        p = Path(tempfile.gettempdir()) / "networka_sshpass"
+        p.mkdir(parents=True, exist_ok=True)
+        try:
+            p.chmod(0o700)
+        except Exception:
+            pass
+    return p
+
+
+def _prepare_sshpass_fifo(password: str) -> str:
+    """Create a secure FIFO and start a writer thread to feed sshpass.
+
+    No plaintext is stored at rest; the FIFO node is removed after writing.
+    Returns the FIFO path.
+    """
+    dirpath = _secure_tmpdir()
+    ts_ms = int(datetime.datetime.now(tz=datetime.UTC).timestamp() * 1000)
+    fifo_path = dirpath / f"pw_{os.getpid()}_{ts_ms}.fifo"
+    try:
+        os.mkfifo(fifo_path, 0o600)
+    except FileExistsError:
+        ts_ms += 1
+        fifo_path = dirpath / f"pw_{os.getpid()}_{ts_ms}.fifo"
+        os.mkfifo(fifo_path, 0o600)
+
+    def _writer() -> None:
+        try:
+            with open(fifo_path, "w", encoding="utf-8", buffering=1) as f:
+                f.write(password)
+        except Exception:
+            pass
+        finally:
+            try:
+                os.remove(fifo_path)
+            except Exception:
+                pass
+
+    threading.Thread(target=_writer, daemon=True).start()
+    return str(fifo_path)
+
+
 def _build_ssh_cmd(
     *,
     host: str,
@@ -147,15 +209,34 @@ def _build_ssh_cmd(
                 "use env/config credentials."
             )
             raise NetworkToolkitError(msg)
-        # Use SSHPASS environment variable to avoid password in command line/history
-        # This requires setting the environment variable before executing the command
-        sshpass_cmd = f"SSHPASS={shlex.quote(str(password))} sshpass -e "
+        # Use sshpass reading from a secure FIFO to avoid env/cmdline/plain files
+        if not shutil.which("sshpass"):
+            msg = (
+                "sshpass is required for password authentication but was not found.\n"
+                "Install it with: sudo apt install sshpass (Ubuntu/Debian) or "
+                "brew install hudochenkov/sshpass/sshpass (macOS)"
+            )
+            raise NetworkToolkitError(msg)
+        fifo = _prepare_sshpass_fifo(password)
+        sshpass_cmd = f"sshpass -f {shlex.quote(fifo)} "
         return sshpass_cmd + " ".join(shlex.quote(p) for p in base)
 
     if auth == AuthMode.KEY_FIRST and password:
-        # For key-first mode with password available, we still try keys first
-        # but SSH will naturally fall back to password if keys fail
-        return " ".join(shlex.quote(p) for p in base)
+        # For key-first mode with password available, use sshpass if available
+        if shutil.which("sshpass"):
+            fifo = _prepare_sshpass_fifo(password)
+            sshpass_cmd = f"sshpass -f {shlex.quote(fifo)} "
+            return sshpass_cmd + " ".join(shlex.quote(p) for p in base)
+        else:
+            # If sshpass not available, provide helpful message
+            console.print(
+                "[yellow]Warning: sshpass not found. SSH will prompt for password interactively.[/yellow]"
+            )
+            console.print(
+                "[cyan]To automate password entry, install sshpass: "
+                "sudo apt install sshpass (Ubuntu/Debian) or "
+                "brew install hudochenkov/sshpass/sshpass (macOS)[/cyan]"
+            )
 
     return " ".join(shlex.quote(p) for p in base)
 
@@ -328,15 +409,16 @@ def register(app: typer.Typer) -> None:
 
         # Prepare connection params and SSH commands per device
         device_cmds: list[tuple[str, str]] = []  # (device_name, ssh_cmd)
-        sshpass_required = False
         for dev in tgt.devices:
-            params = config.get_device_connection_params(dev)
+            params = config.get_device_connection_params(
+                dev, user_override, password_override
+            )
             try:
                 # Determine credentials
-                user = user_override or str(params.get("auth_username"))
+                user = str(params.get("auth_username"))
                 host = str(params.get("host"))
                 port = int(params.get("port", 22))
-                pw = password_override or params.get("auth_password")
+                pw = params.get("auth_password")
 
                 # Decide auth mode if KEY_FIRST or legacy flag set
                 mode = effective_auth
@@ -346,8 +428,8 @@ def register(app: typer.Typer) -> None:
                     mode = AuthMode.KEY_FIRST
                 if use_sshpass:
                     mode = AuthMode.PASSWORD
-                if mode == AuthMode.PASSWORD:
-                    sshpass_required = True
+
+                # Note: We no longer strictly require sshpass since we have pexpect fallback
 
                 ssh_cmd = _build_ssh_cmd(
                     host=host,
@@ -363,16 +445,6 @@ def register(app: typer.Typer) -> None:
 
         if not device_cmds:
             console.print("[red]No valid devices to connect to.[/red]")
-            raise typer.Exit(1)
-
-        # If any pane needs password mode, ensure sshpass exists
-        if sshpass_required and not shutil.which("sshpass"):
-            console.print(
-                "[red]sshpass is required for password authentication "
-                "but was not found.\n"
-                "Install it (e.g., apt install sshpass) or use --auth key "
-                "/ --auth interactive, or provide SSH keys.[/red]"
-            )
             raise typer.Exit(1)
 
         # Always create a new tmux session for clean behavior
