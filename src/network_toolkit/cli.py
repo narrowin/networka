@@ -36,6 +36,7 @@ from network_toolkit.commands.list_devices import register as register_list_devi
 from network_toolkit.commands.list_groups import register as register_list_groups
 from network_toolkit.commands.list_sequences import register as register_list_sequences
 from network_toolkit.commands.run import register as register_run
+from network_toolkit.commands.schema import register as register_schema
 from network_toolkit.commands.ssh import register as register_ssh
 from network_toolkit.commands.upload import register as register_upload
 from network_toolkit.commands.vendor_backup import register as register_vendor_backup
@@ -277,6 +278,7 @@ register_firmware_downgrade(app)
 register_bios_upgrade(app)
 register_complete(app)
 register_diff(app)
+register_schema(app)
 register_ssh(app)
 
 

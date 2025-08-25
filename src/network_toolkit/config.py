@@ -1320,16 +1320,48 @@ def export_schemas_to_workspace() -> None:
         json.dump(full_schema, f, indent=2)
 
     # Extract DeviceConfig schema for standalone device files
-    device_schema: dict[str, Any] = {
+    # Device files contain a "devices" object with multiple DeviceConfig entries
+    device_collection_schema: dict[str, Any] = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "title": "Device Configuration",
-        "description": "Schema for individual device configuration files",
-        **full_schema["$defs"]["DeviceConfig"],
+        "title": "Device Collection Configuration",
+        "description": "Schema for device collection files (config/devices/*.yml)",
+        "type": "object",
+        "properties": {
+            "devices": {
+                "type": "object",
+                "additionalProperties": {"$ref": "#/$defs/DeviceConfig"},
+                "description": "Dictionary of device configurations keyed by device name",
+            }
+        },
+        "required": ["devices"],
+        "$defs": full_schema["$defs"],  # Include all definitions for references
     }
 
     device_schema_path = schema_dir / "device-config.schema.json"
     with device_schema_path.open("w", encoding="utf-8") as f:
-        json.dump(device_schema, f, indent=2)
+        json.dump(device_collection_schema, f, indent=2)
+
+    # Create groups collection schema for standalone group files
+    # Group files contain a "groups" object with multiple DeviceGroup entries
+    groups_collection_schema: dict[str, Any] = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Groups Collection Configuration",
+        "description": "Schema for group collection files (config/groups/*.yml)",
+        "type": "object",
+        "properties": {
+            "groups": {
+                "type": "object",
+                "additionalProperties": {"$ref": "#/$defs/DeviceGroup"},
+                "description": "Dictionary of device group configurations keyed by group name",
+            }
+        },
+        "required": ["groups"],
+        "$defs": full_schema["$defs"],  # Include all definitions for references
+    }
+
+    groups_schema_path = schema_dir / "groups-config.schema.json"
+    with groups_schema_path.open("w", encoding="utf-8") as f:
+        json.dump(groups_collection_schema, f, indent=2)
 
     # Create/update VS Code settings for YAML validation
     vscode_dir = Path(".vscode")
@@ -1345,6 +1377,10 @@ def export_schemas_to_workspace() -> None:
             "./schemas/device-config.schema.json": [
                 "config/devices/*.yml",
                 "config/devices.yml",
+            ],
+            "./schemas/groups-config.schema.json": [
+                "config/groups/*.yml",
+                "config/groups.yml",
             ],
         }
     }
