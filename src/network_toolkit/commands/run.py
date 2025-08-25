@@ -14,16 +14,15 @@ from typing import Annotated, Any
 import typer
 from rich.table import Table
 
-from network_toolkit.common.command import CommandContext, handle_toolkit_errors
+from network_toolkit.common.command import CommandContext
 from network_toolkit.common.credentials import prompt_for_credentials
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import (
     OutputMode,
-    get_output_manager,
+    get_output_mode_from_config,
     set_output_mode,
 )
-from network_toolkit.common.styles import StyleManager, StyleName
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.ip_device import (
@@ -129,37 +128,32 @@ def register(app: typer.Typer) -> None:
         if raw is not None:
             output_mode = OutputMode.RAW
 
-        # Create command context with proper styling
+        # Create command context with proper styling/logging
         ctx = CommandContext(
             output_mode=output_mode,
             verbose=verbose,
             config_file=config_file,
         )
 
-        # Create style manager for consistent theming
-        # Use the original output_mode parameter directly to ensure correct theming
-        style_manager = StyleManager(output_mode or OutputMode.DEFAULT)
-
-        # Use console from style manager to ensure consistent theming
-        console = style_manager.console
-
         # Handle interactive authentication if requested
         interactive_creds = None
         if interactive_auth:
-            if not ctx.is_raw_mode():
+            if ctx.output.mode != OutputMode.RAW:
                 ctx.print_info("Interactive authentication mode enabled")
             interactive_creds = prompt_for_credentials(
                 "Enter username for devices",
                 "Enter password for devices",
                 "admin",  # Default username suggestion
             )
-            if not ctx.is_raw_mode():
+            if ctx.output.mode != OutputMode.RAW:
                 ctx.print_success(f"Will use username: {interactive_creds.username}")
 
         # Track run timing & reporting state
         started_at = perf_counter()
         printed_results_dir = False
-        output_mgr = ctx.output  # Use context's output manager
+        output_mgr = (
+            ctx.output
+        )  # Use context's output manager (may update after config)
 
         def _print_results_dir_once(results_mgr: ResultsManager) -> None:
             """Print the results directory once if storing is enabled."""
@@ -270,6 +264,17 @@ def register(app: typer.Typer) -> None:
 
         try:
             config = load_config(config_file)
+
+            # If no CLI output mode given, honor config/general output mode
+            # Keep OutputManager as the single source of truth for theming
+            if output_mode is None:
+                chosen_mode = get_output_mode_from_config(
+                    getattr(getattr(config, "general", None), "output_mode", None)
+                )
+                output_mgr = set_output_mode(chosen_mode)
+
+            # Use console from centralized OutputManager
+            console = output_mgr.console
 
             # Check if target is IP addresses and handle accordingly
             if is_ip_list(target):
@@ -429,32 +434,20 @@ def register(app: typer.Typer) -> None:
                             ctx.print_success(
                                 f"Sequence Results ({len(results_map)} commands):"
                             )
-                            console.print()
+                            output_mgr.print_blank_line()
                             for i, (cmd, output) in enumerate(results_map.items(), 1):
-                                console.print(
-                                    style_manager.format_message(
-                                        f"Command {i}:", StyleName.COMMAND
-                                    )
-                                    + f" {cmd}"
-                                )
-                                console.print(
-                                    style_manager.format_message(
-                                        output, StyleName.OUTPUT
-                                    )
-                                )
-                                console.print("-" * 80)
+                                output_mgr.print_info(f"Command {i}: {cmd}")
+                                output_mgr.console.print(f"[output]{output}[/output]")
+                                output_mgr.print_separator()
 
                             if results_mgr.store_results:
                                 stored_paths = results_mgr.store_sequence_results(
                                     device_target, command_or_sequence, results_map
                                 )
                                 if stored_paths:
-                                    console.print(
-                                        "\n"
-                                        + style_manager.format_message(
-                                            f"Results stored: {stored_paths[-1]}",
-                                            StyleName.DIM,
-                                        )
+                                    output_mgr.print_blank_line()
+                                    output_mgr.print_info(
+                                        f"Results stored: {stored_paths[-1]}"
                                     )
                                     _print_results_dir_once(results_mgr)
 
@@ -555,35 +548,21 @@ def register(app: typer.Typer) -> None:
                             )
                             if error:
                                 table.add_row(
-                                    style_manager.format_message(
-                                        "Status", StyleName.ERROR
-                                    ),
-                                    style_manager.format_message(
-                                        "Failed", StyleName.FAILED
-                                    ),
+                                    "[error]Status[/error]",
+                                    "[failed]Failed[/failed]",
                                 )
                                 table.add_row(
-                                    style_manager.format_message(
-                                        "Error", StyleName.ERROR
-                                    ),
-                                    style_manager.format_message(
-                                        error, StyleName.FAILED
-                                    ),
+                                    "[error]Error[/error]",
+                                    f"[failed]{error}[/failed]",
                                 )
                             else:
                                 table.add_row(
-                                    style_manager.format_message(
-                                        "Status", StyleName.SUCCESS
-                                    ),
-                                    style_manager.format_message(
-                                        "Success", StyleName.CONNECTED
-                                    ),
+                                    "[success]Status[/success]",
+                                    "[connected]Success[/connected]",
                                 )
                                 if device_results:
                                     table.add_row(
-                                        style_manager.format_message(
-                                            "Commands", StyleName.COMMAND
-                                        ),
+                                        "[command]Commands[/command]",
                                         f"{len(device_results)} executed",
                                     )
                                     first_output = next(
@@ -594,15 +573,11 @@ def register(app: typer.Typer) -> None:
                                         "..." if len(first_output) > PREVIEW_LEN else ""
                                     )
                                     table.add_row(
-                                        style_manager.format_message(
-                                            "Preview", StyleName.COMMAND
-                                        ),
-                                        style_manager.format_message(
-                                            preview, StyleName.OUTPUT
-                                        ),
+                                        "[command]Preview[/command]",
+                                        f"[output]{preview}[/output]",
                                     )
                             console.print(table)
-                            console.print("-" * 80)
+                            output_mgr.print_separator()
 
                     if results_mgr.store_results:
                         # Store per-device results and a group summary file
@@ -689,11 +664,11 @@ def register(app: typer.Typer) -> None:
                         )
                     else:
                         output_mgr.print_command_output(
-                            device_target, command_or_sequence, result
+                            device_target, command_or_sequence, result or ""
                         )
                 else:
                     output_mgr.print_command_output(
-                        device_target, command_or_sequence, result
+                        device_target, command_or_sequence, result or ""
                     )
 
                 if results_mgr.store_results and raw is None and result:
@@ -701,12 +676,7 @@ def register(app: typer.Typer) -> None:
                         device_target, command_or_sequence, result
                     )
                     if stored_path:
-                        console.print(
-                            "\n"
-                            + style_manager.format_message(
-                                f"Results stored: {stored_path}", StyleName.DIM
-                            )
-                        )
+                        console.print(f"\n[dim]Results stored: {stored_path}[/dim]")
                         _print_results_dir_once(results_mgr)
 
                 duration = perf_counter() - started_at
@@ -799,34 +769,24 @@ def register(app: typer.Typer) -> None:
                         )
                         if error:
                             table.add_row(
-                                style_manager.format_message("Status", StyleName.ERROR),
-                                style_manager.format_message(
-                                    "Failed", StyleName.FAILED
-                                ),
+                                "[error]Status[/error]",
+                                "[failed]Failed[/failed]",
                             )
                             table.add_row(
-                                style_manager.format_message("Error", StyleName.ERROR),
-                                style_manager.format_message(error, StyleName.FAILED),
+                                "[error]Error[/error]",
+                                f"[failed]{error}[/failed]",
                             )
                         else:
                             table.add_row(
-                                style_manager.format_message(
-                                    "Status", StyleName.SUCCESS
-                                ),
-                                style_manager.format_message(
-                                    "Success", StyleName.CONNECTED
-                                ),
+                                "[success]Status[/success]",
+                                "[connected]Success[/connected]",
                             )
                             table.add_row(
-                                style_manager.format_message(
-                                    "Output", StyleName.COMMAND
-                                ),
-                                style_manager.format_message(
-                                    out_text or "", StyleName.OUTPUT
-                                ),
+                                "[command]Output[/command]",
+                                f"[output]{out_text or ''}[/output]",
                             )
                         console.print(table)
-                        console.print("-" * 80)
+                        output_mgr.print_separator()
 
                 if results_mgr.store_results:
                     # Store per-device results and a group summary file

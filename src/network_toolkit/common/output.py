@@ -11,6 +11,7 @@ from enum import Enum
 from typing import Any
 
 from rich.console import Console
+from rich.table import Table
 from rich.theme import Theme
 
 
@@ -59,7 +60,7 @@ class OutputManager:
             # No color mode disables colors but keeps other formatting
             return Console(color_system=None, force_terminal=True, stderr=False)
         elif self.mode == OutputMode.LIGHT:
-            # Light theme with more dramatic differences for testing
+            # Light theme with strong contrast intended for light backgrounds
             light_theme = Theme(
                 {
                     "info": "blue",
@@ -68,10 +69,12 @@ class OutputManager:
                     "success": "green",
                     "device": "cyan",
                     "command": "magenta",
-                    "output": "black",  # Dark text for light background
+                    # Use explicit white background to ensure visible difference
+                    # and readability regardless of terminal background.
+                    "output": "black on white",
                     "summary": "blue",
                     "dim": "dim",
-                    "bold": "bold blue",  # Make bold blue for light theme
+                    "bold": "bold blue",  # Bold blue in light theme
                     # Additional semantic colors for all use cases
                     "transport": "purple",
                     "running": "blue",
@@ -85,11 +88,13 @@ class OutputManager:
             return Console(
                 theme=light_theme,
                 stderr=False,
+                # Let Rich auto-detect color capabilities; keep colors in non-TTY via force_terminal
                 force_terminal=True,
-                color_system="standard",
+                # Apply a global default style so all text inherits the light background
+                style="black on white",
             )
         elif self.mode == OutputMode.DARK:
-            # Dark theme with more dramatic differences for testing
+            # Dark theme with strong contrast intended for dark backgrounds
             dark_theme = Theme(
                 {
                     "info": "bright_blue",
@@ -98,10 +103,11 @@ class OutputManager:
                     "success": "bright_green",
                     "device": "bright_cyan",
                     "command": "bright_magenta",
-                    "output": "white",  # Light text for dark background
+                    # Explicit black background for clear differentiation
+                    "output": "white on black",
                     "summary": "bright_blue",
                     "dim": "dim",
-                    "bold": "bold bright_white",  # Make bold bright white for dark theme
+                    "bold": "bold bright_white",  # Bold bright white in dark theme
                     # Additional semantic colors for all use cases
                     "transport": "bright_magenta",
                     "running": "bright_blue",
@@ -115,8 +121,10 @@ class OutputManager:
             return Console(
                 theme=dark_theme,
                 stderr=False,
+                # Auto-detect color capability; keep colors in non-TTY via force_terminal
                 force_terminal=True,
-                color_system="standard",
+                # Apply a global default style so all text inherits the dark background
+                style="white on black",
             )
         else:
             # Default mode uses Rich's default styling with our semantic colors
@@ -288,6 +296,35 @@ class OutputManager:
             self._console.print("-" * 80)
         else:
             self._console.rule()
+
+    def print_blank_line(self) -> None:
+        """Print a single blank line (no-op in raw mode)."""
+        if self.mode == OutputMode.RAW:
+            return
+        self._console.print()
+
+    def create_table(
+        self, *, title: str = "", show_header: bool = False, box: Any | None = None
+    ) -> Table:
+        """Create a Rich Table consistent with the current output mode.
+
+        Parameters
+        ----------
+        title : str
+            Optional title to display above the table.
+        show_header : bool
+            Whether to show a header row.
+        box : Any | None
+            The box style to use (e.g., box.SIMPLE). Defaults to None (no box),
+            mirroring existing usage in commands.
+        """
+        return Table(title=title, show_header=show_header, box=box)
+
+    def print_table(self, table: Table) -> None:
+        """Print a Rich Table (no-op in raw mode)."""
+        if self.mode == OutputMode.RAW:
+            return
+        self._console.print(table)
 
     def print_transport_info(self, transport_type: str) -> None:
         """Print transport information."""

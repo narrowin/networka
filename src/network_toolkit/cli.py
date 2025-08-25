@@ -43,15 +43,25 @@ from network_toolkit.commands.vendor_config_backup import (
     register as register_vendor_config_backup,
 )
 from network_toolkit.common.logging import setup_logging
-from network_toolkit.common.output import OutputMode
-from network_toolkit.common.styles import StyleManager, StyleName
+from network_toolkit.common.output import get_output_manager
 
-# Create a default console for CLI operations
-_style_manager = StyleManager(mode=OutputMode.DEFAULT)
-console = _style_manager.console
+
+class _DynamicConsoleProxy:
+    """Proxy that forwards attribute access to the current OutputManager console.
+
+    This avoids capturing a stale Console at import time so that changes to the
+    output mode (e.g., via --output-mode or config) are reflected everywhere.
+    """
+
+    def __getattr__(self, name: str):  # type: ignore[override]
+        return getattr(get_output_manager().console, name)
+
+
+# Dynamic console that always reflects the active OutputManager
+console = _DynamicConsoleProxy()
 
 # Keep this import here to preserve tests that patch `network_toolkit.cli.DeviceSession`
-from network_toolkit.device import DeviceSession as _DeviceSession
+from network_toolkit.device import DeviceSession as _DeviceSession  # noqa: E402
 
 
 # Preserve insertion order and group commands under a single Commands section
@@ -226,11 +236,8 @@ def _handle_file_downloads(
         filename = replace_placeholders(local_filename_str)
         destination = local_dir / filename
 
-        console.print(
-            _style_manager.format_message(
-                f"Downloading {remote_file} from {device_name}...",
-                StyleName.INFO,
-            )
+        get_output_manager().print_info(
+            f"Downloading {remote_file} from {device_name}..."
         )
 
         try:
@@ -240,28 +247,15 @@ def _handle_file_downloads(
                 delete_remote=delete_remote,
             )
             if success:
-                console.print(
-                    _style_manager.format_message(
-                        f"OK Downloaded {remote_file} to {destination}",
-                        StyleName.SUCCESS,
-                    )
+                get_output_manager().print_success(
+                    f"Downloaded {remote_file} to {destination}"
                 )
                 results[remote_file] = f"Downloaded to {destination}"
             else:
-                console.print(
-                    _style_manager.format_message(
-                        f"FAIL Failed to download {remote_file}",
-                        StyleName.ERROR,
-                    )
-                )
+                get_output_manager().print_error(f"Failed to download {remote_file}")
                 results[remote_file] = "Download failed"
         except Exception as e:  # DeviceExecutionError or unexpected
-            console.print(
-                _style_manager.format_message(
-                    f"FAIL Error downloading {remote_file}: {e}",
-                    StyleName.ERROR,
-                )
-            )
+            get_output_manager().print_error(f"Error downloading {remote_file}: {e}")
             results[remote_file] = f"Download error: {e}"
 
     return results
