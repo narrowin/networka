@@ -151,9 +151,7 @@ class StyleManager:
                 theme=theme,
                 stderr=False,
                 force_terminal=True,
-                color_system="standard"
-                if self.mode in [OutputMode.LIGHT, OutputMode.DARK]
-                else None,
+                color_system="standard",
             )
 
     @property

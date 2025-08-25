@@ -26,6 +26,7 @@ class DeviceResolver:
         config: NetworkConfig,
         platform: str | None = None,
         port: int | None = None,
+        transport_type: str | None = None,
     ) -> None:
         """Initialize resolver with configuration.
 
@@ -37,10 +38,13 @@ class DeviceResolver:
             Platform type to use for IP-based devices
         port : int | None
             Port to use for IP-based devices
+        transport_type : str | None
+            Transport type to use for IP-based devices
         """
         self.config = config
         self.platform = platform
         self.port = port
+        self.transport_type = transport_type
         self._ip_config_cache: NetworkConfig | None = None
 
     def _get_ip_enhanced_config(self, target_expr: str) -> NetworkConfig:
@@ -56,7 +60,11 @@ class DeviceResolver:
         if self._ip_config_cache is None:
             ips = extract_ips_from_target(target_expr)
             self._ip_config_cache = create_ip_based_config(
-                ips, self.platform, self.config, port=self.port
+                ips,
+                self.platform,
+                self.config,
+                port=self.port,
+                transport_type=self.transport_type,
             )
 
         return self._ip_config_cache

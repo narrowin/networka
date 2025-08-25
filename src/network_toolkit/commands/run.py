@@ -107,12 +107,12 @@ def register(app: typer.Typer) -> None:
                 help="Prompt for username and password interactively",
             ),
         ] = False,
-        platform: Annotated[
+        device_type: Annotated[
             str | None,
             typer.Option(
                 "--platform",
                 "-p",
-                help="Platform type when using IP addresses (e.g., mikrotik_routeros)",
+                help="Device type when using IP addresses (e.g., mikrotik_routeros). Note: This specifies the network driver type, not hardware platform.",
             ),
         ] = None,
         port: Annotated[
@@ -122,8 +122,27 @@ def register(app: typer.Typer) -> None:
                 help="SSH port when using IP addresses (default: 22)",
             ),
         ] = None,
+        transport_type: Annotated[
+            str | None,
+            typer.Option(
+                "--transport",
+                "-t",
+                help="Transport type to use for connections (scrapli, nornir_netmiko). Defaults to configuration or scrapli.",
+            ),
+        ] = None,
     ) -> None:
         """Execute a single command or a sequence on a device or a group."""
+        # Validate transport type if provided
+        if transport_type is not None:
+            from network_toolkit.transport.factory import get_transport_factory
+
+            try:
+                # This will raise ValueError if transport_type is invalid
+                get_transport_factory(transport_type)
+            except ValueError as e:
+                print(f"Error: {e}")
+                raise typer.Exit(1)
+
         # Handle legacy raw mode mapping
         if raw is not None:
             output_mode = OutputMode.RAW
@@ -204,13 +223,18 @@ def register(app: typer.Typer) -> None:
             cmd: str,
             username_override: str | None = None,
             password_override: str | None = None,
+            transport_override: str | None = None,
         ) -> tuple[str, str | None, str | None]:
             # Late import to allow tests to patch `network_toolkit.cli.DeviceSession`
             from network_toolkit.cli import DeviceSession
 
             try:
                 with DeviceSession(
-                    device_name, config, username_override, password_override
+                    device_name,
+                    config,
+                    username_override,
+                    password_override,
+                    transport_override,
                 ) as session:
                     result = session.execute_command(cmd)
                     return (device_name, result, None)
@@ -233,13 +257,18 @@ def register(app: typer.Typer) -> None:
             seq_name: str,
             username_override: str | None = None,
             password_override: str | None = None,
+            transport_override: str | None = None,
         ) -> tuple[str, dict[str, str] | None, str | None]:
             # Import DeviceSession from cli to preserve tests' patch path
             from network_toolkit.cli import DeviceSession
 
             try:
                 with DeviceSession(
-                    device_name, config, username_override, password_override
+                    device_name,
+                    config,
+                    username_override,
+                    password_override,
+                    transport_override,
                 ) as session:
                     # Use vendor-aware sequence resolution
                     sm = SequenceManager(config)
@@ -277,7 +306,7 @@ def register(app: typer.Typer) -> None:
 
             # Check if target is IP addresses and handle accordingly
             if is_ip_list(target):
-                if platform is None:
+                if device_type is None:
                     supported_platforms = get_supported_platforms()
                     platform_list = "\n".join(
                         [f"  {k}: {v}" for k, v in supported_platforms.items()]
@@ -289,23 +318,25 @@ def register(app: typer.Typer) -> None:
                         ctx.print_info(f"Supported platforms:\n{platform_list}")
                     raise typer.Exit(1)
 
-                if not validate_platform(platform):
+                if not validate_platform(device_type):
                     supported_platforms = get_supported_platforms()
                     platform_list = "\n".join(
                         [f"  {k}: {v}" for k, v in supported_platforms.items()]
                     )
                     if raw is None:
-                        ctx.print_error(f"Invalid platform '{platform}'")
+                        ctx.print_error(f"Invalid device type '{device_type}'")
                         ctx.print_info(f"Supported platforms:\n{platform_list}")
                     raise typer.Exit(1)
 
                 # Extract IP addresses and create dynamic config
                 ips = extract_ips_from_target(target)
-                config = create_ip_based_config(ips, platform, config, port=port)
+                config = create_ip_based_config(
+                    ips, device_type, config, port=port, transport_type=transport_type
+                )
 
                 if raw is None:
                     ctx.print_info(
-                        f"Using IP addresses with platform '{platform}': {', '.join(ips)}"
+                        f"Using IP addresses with device type '{device_type}': {', '.join(ips)}"
                     )
 
             sm = SequenceManager(config)
@@ -404,6 +435,7 @@ def register(app: typer.Typer) -> None:
                         command_or_sequence,
                         username_override,
                         password_override,
+                        transport_type,
                     )
 
                     if error:
@@ -503,6 +535,7 @@ def register(app: typer.Typer) -> None:
                                 command_or_sequence,
                                 username_override,
                                 password_override,
+                                transport_type,
                             ): device
                             for device in group_members
                         }
@@ -624,6 +657,7 @@ def register(app: typer.Typer) -> None:
                     command_or_sequence,
                     username_override,
                     password_override,
+                    transport_type,
                 )
                 if error:
                     raise typer.Exit(1)
@@ -711,6 +745,7 @@ def register(app: typer.Typer) -> None:
                             command_or_sequence,
                             username_override,
                             password_override,
+                            transport_type,
                         ): device
                         for device in members
                     }

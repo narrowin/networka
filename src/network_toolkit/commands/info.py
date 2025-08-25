@@ -213,3 +213,101 @@ def register(app: typer.Typer) -> None:
         except Exception as e:  # pragma: no cover - unexpected
             output_manager.print_error(f"Unexpected error: {e}")
             raise typer.Exit(1) from None
+
+    @app.command("supported-types", rich_help_panel="Info & Configuration")
+    def supported_types(
+        verbose: Annotated[
+            bool, typer.Option("--verbose", "-v", help="Show detailed information")
+        ] = False,
+    ) -> None:
+        """Show supported device types and platform information."""
+        setup_logging("DEBUG" if verbose else "INFO")
+
+        from rich.console import Console
+        from rich.table import Table
+
+        from network_toolkit.config import get_supported_device_types
+        from network_toolkit.ip_device import (
+            get_supported_device_types as get_device_descriptions,
+        )
+        from network_toolkit.platforms.factory import (
+            get_supported_platforms as get_platform_ops,
+        )
+
+        console = Console()
+
+        # Display available transports first
+        console.print("[bold blue]Network Toolkit - Transport Types[/bold blue]\n")
+
+        transport_table = Table(title="Available Transport Types")
+        transport_table.add_column("Transport", style="cyan", no_wrap=True)
+        transport_table.add_column("Description", style="white")
+        transport_table.add_column("Device Type Mapping", style="yellow")
+
+        # Add known transports
+        transport_table.add_row(
+            "scrapli",
+            "Async SSH/Telnet library with device-specific drivers",
+            "Direct (uses device_type as-is)",
+        )
+        transport_table.add_row(
+            "nornir_netmiko",
+            "Netmiko library via Nornir framework",
+            "Mapped (device_type → netmiko platform)",
+        )
+
+        console.print(transport_table)
+        console.print()
+
+        # Display device types
+        console.print("[bold blue]Supported Device Types[/bold blue]\n")
+
+        # Get all supported device types
+        device_types = get_supported_device_types()
+        device_descriptions = get_device_descriptions()
+        platform_ops = get_platform_ops()
+
+        # Create table
+        table = Table(title="Device Types")
+        table.add_column("Device Type", style="cyan", no_wrap=True)
+        table.add_column("Description", style="white")
+        table.add_column("Platform Ops", style="green")
+        table.add_column("Transport Support", style="magenta")
+
+        for device_type in sorted(device_types):
+            description = device_descriptions.get(device_type, "No description")
+            has_platform_ops = "✓" if device_type in platform_ops else "✗"
+
+            # Show specific supported transports
+            transport_support = "scrapli, nornir_netmiko"
+
+            table.add_row(device_type, description, has_platform_ops, transport_support)
+
+        console.print(table)
+
+        if verbose:
+            console.print(f"\n[bold]Total device types:[/bold] {len(device_types)}")
+            console.print(f"[bold]With platform operations:[/bold] {len(platform_ops)}")
+            console.print(
+                "[bold]Available transports:[/bold] scrapli (default), nornir_netmiko"
+            )
+
+            # Show usage examples
+            console.print("\n[bold yellow]Usage Examples:[/bold yellow]")
+            console.print("  # Use in device configuration:")
+            console.print("  devices:")
+            console.print("    my_device:")
+            console.print("      host: 192.168.1.1")
+            console.print("      device_type: mikrotik_routeros")
+            console.print(
+                "      transport_type: scrapli  # Optional, defaults to scrapli"
+            )
+            console.print("")
+            console.print("  # Use with IP addresses:")
+            console.print(
+                '  nw run 192.168.1.1 "/system/identity/print" --platform mikrotik_routeros'
+            )
+            console.print("")
+            console.print("  # Transport selection via config:")
+            console.print("  general:")
+            console.print("    default_transport_type: nornir_netmiko")

@@ -250,7 +250,11 @@ class ConnectionParameterBuilder:
     def _build_base_parameters(
         self, device: DeviceConfig, username: str, password: str
     ) -> dict[str, Any]:
-        """Build base connection parameters."""
+        """Build base connection parameters.
+
+        Uses device_type for Scrapli platform parameter since device_type
+        defines the network driver/protocol, while platform defines hardware architecture.
+        """
         return {
             "host": device.host,
             "auth_username": username,
@@ -259,9 +263,9 @@ class ConnectionParameterBuilder:
             "timeout_socket": self.config.general.timeout,
             "timeout_transport": self.config.general.timeout,
             "transport": self.config.general.transport,
-            # Prefer explicit platform, otherwise fall back to device_type
-            # This keeps platform consistent with CLI/config-provided values
-            "platform": device.platform or device.device_type,
+            # Use device_type for Scrapli platform - this determines the network driver
+            # The platform field is reserved for hardware architecture (x86, arm, etc.)
+            "platform": device.device_type,
         }
 
     def _apply_device_overrides(

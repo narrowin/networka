@@ -328,12 +328,12 @@ def register(app: typer.Typer) -> None:
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable debug logging")
         ] = False,
-        platform: Annotated[
+        device_type: Annotated[
             str | None,
             typer.Option(
                 "--platform",
                 "-p",
-                help="Platform type when using IP addresses (e.g., mikrotik_routeros)",
+                help="Device type when using IP addresses (e.g., mikrotik_routeros). Note: This specifies the network driver type, not hardware platform.",
             ),
         ] = None,
         port: Annotated[
@@ -341,6 +341,14 @@ def register(app: typer.Typer) -> None:
             typer.Option(
                 "--port",
                 help="SSH port when using IP addresses (default: 22)",
+            ),
+        ] = None,
+        transport_type: Annotated[
+            str | None,
+            typer.Option(
+                "--transport",
+                "-t",
+                help="Transport type for connections (scrapli, nornir_netmiko). Defaults to configuration or scrapli.",
             ),
         ] = None,
     ) -> None:
@@ -355,6 +363,17 @@ def register(app: typer.Typer) -> None:
         - nw ssh access_switches
         - nw ssh sw-acc1,access_switches
         """
+
+        # Validate transport type if provided
+        if transport_type is not None:
+            from network_toolkit.transport.factory import get_transport_factory
+
+            try:
+                # This will raise ValueError if transport_type is invalid
+                get_transport_factory(transport_type)
+            except ValueError as e:
+                console.print(f"[red]Error:[/red] {e}")
+                raise typer.Exit(1) from e
 
         setup_logging("DEBUG" if verbose else "INFO")
 
@@ -375,7 +394,7 @@ def register(app: typer.Typer) -> None:
 
             # Handle IP addresses if platform is provided
             if is_ip_list(target):
-                if platform is None:
+                if device_type is None:
                     supported_platforms = get_supported_platforms()
                     platform_list = "\n".join(
                         [f"  {k}: {v}" for k, v in supported_platforms.items()]
@@ -394,7 +413,9 @@ def register(app: typer.Typer) -> None:
                     raise typer.Exit(1)
 
                 ips = extract_ips_from_target(target)
-                config = create_ip_based_config(ips, platform, config, port=port)
+                config = create_ip_based_config(
+                    ips, device_type, config, port=port, transport_type=transport_type
+                )
                 console.print(
                     style_manager.format_message(
                         f"Using IP addresses with platform '{platform}': {', '.join(ips)}",
@@ -402,7 +423,7 @@ def register(app: typer.Typer) -> None:
                     )
                 )
 
-            resolver = DeviceResolver(config, platform, port)
+            resolver = DeviceResolver(config, device_type, port, transport_type)
             tgt = Target(name=target, devices=resolver.resolve_targets(target)[0])
 
             # Check platform capabilities after we have config and targets
