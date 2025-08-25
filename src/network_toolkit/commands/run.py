@@ -12,7 +12,7 @@ from time import perf_counter
 from typing import Annotated, Any
 
 import typer
-from rich.table import Table
+# Tables and printing routed via OutputManager helpers
 
 from network_toolkit.common.command import CommandContext
 from network_toolkit.common.credentials import prompt_for_credentials
@@ -273,8 +273,7 @@ def register(app: typer.Typer) -> None:
                 )
                 output_mgr = set_output_mode(chosen_mode)
 
-            # Use console from centralized OutputManager
-            console = output_mgr.console
+            # Use output manager for all prints
 
             # Check if target is IP addresses and handle accordingly
             if is_ip_list(target):
@@ -387,7 +386,7 @@ def register(app: typer.Typer) -> None:
                         ctx.print_info(
                             f"Executing sequence '{command_or_sequence}' on device {target}"
                         )
-                        console.print()
+                        output_mgr.print_blank_line()
 
                     # Single concrete device
                     device_target = resolved_devices[0]
@@ -437,7 +436,7 @@ def register(app: typer.Typer) -> None:
                             output_mgr.print_blank_line()
                             for i, (cmd, output) in enumerate(results_map.items(), 1):
                                 output_mgr.print_info(f"Command {i}: {cmd}")
-                                output_mgr.console.print(f"[output]{output}[/output]")
+                                output_mgr.print_output(output)
                                 output_mgr.print_separator()
 
                             if results_mgr.store_results:
@@ -485,7 +484,7 @@ def register(app: typer.Typer) -> None:
                             f"({len(group_members)} devices)"
                         )
                         ctx.print_info(f"Members: {', '.join(group_members)}")
-                        console.print()
+                        output_mgr.print_blank_line()
 
                     with ThreadPoolExecutor(max_workers=len(group_members)) as executor:
                         # Get credential overrides if in interactive mode
@@ -541,7 +540,7 @@ def register(app: typer.Typer) -> None:
                     else:
                         ctx.print_success("Group Sequence Results")
                         for device_name, device_results, error in all_results:
-                            table = Table(
+                            table = output_mgr.create_table(
                                 title=f"Device: {device_name}",
                                 box=None,
                                 show_header=False,
@@ -576,7 +575,7 @@ def register(app: typer.Typer) -> None:
                                         "[command]Preview[/command]",
                                         f"[output]{preview}[/output]",
                                     )
-                            console.print(table)
+                            output_mgr.print_table(table)
                             output_mgr.print_separator()
 
                     if results_mgr.store_results:
@@ -631,7 +630,7 @@ def register(app: typer.Typer) -> None:
                     device_target = resolved_devices[0]
                     ctx.print_info(f"Executing command on device {device_target}")
                     ctx.print_info(f"Command: {command_or_sequence}")
-                    console.print()
+                    output_mgr.print_blank_line()
 
                 device_target = resolved_devices[0]
                 # Get credential overrides if in interactive mode
@@ -676,7 +675,8 @@ def register(app: typer.Typer) -> None:
                         device_target, command_or_sequence, result
                     )
                     if stored_path:
-                        console.print(f"\n[dim]Results stored: {stored_path}[/dim]")
+                        output_mgr.print_blank_line()
+                        output_mgr.print_info(f"Results stored: {stored_path}")
                         _print_results_dir_once(results_mgr)
 
                 duration = perf_counter() - started_at
@@ -715,7 +715,7 @@ def register(app: typer.Typer) -> None:
                     )
                     ctx.print_info(f"Command: {command_or_sequence}")
                     ctx.print_info(f"Members: {', '.join(members)}")
-                    console.print()
+                    output_mgr.print_blank_line()
 
                 with ThreadPoolExecutor(max_workers=len(members)) as executor:
                     # Get credential overrides if in interactive mode
@@ -764,7 +764,7 @@ def register(app: typer.Typer) -> None:
                 else:
                     ctx.print_success("Group Command Results:")
                     for device_name, out_text, error in group_results:
-                        table = Table(
+                        table = output_mgr.create_table(
                             title=f"Device: {device_name}", box=None, show_header=False
                         )
                         if error:
@@ -785,7 +785,7 @@ def register(app: typer.Typer) -> None:
                                 "[command]Output[/command]",
                                 f"[output]{out_text or ''}[/output]",
                             )
-                        console.print(table)
+                        output_mgr.print_table(table)
                         output_mgr.print_separator()
 
                 if results_mgr.store_results:

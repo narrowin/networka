@@ -60,23 +60,22 @@ class OutputManager:
             # No color mode disables colors but keeps other formatting
             return Console(color_system=None, force_terminal=True, stderr=False)
         elif self.mode == OutputMode.LIGHT:
-            # Light theme with strong contrast intended for light backgrounds
+            # Light-optimized: stronger contrast on light terminals
             light_theme = Theme(
                 {
                     "info": "blue",
-                    "warning": "dark_orange",
+                    "warning": "yellow",
                     "error": "red",
                     "success": "green",
                     "device": "cyan",
                     "command": "magenta",
-                    # Use explicit white background to ensure visible difference
-                    # and readability regardless of terminal background.
-                    "output": "black on white",
+                    # Ensure readable plain output on light backgrounds
+                    "output": "black",
                     "summary": "blue",
-                    "dim": "dim",
-                    "bold": "bold blue",  # Bold blue in light theme
-                    # Additional semantic colors for all use cases
-                    "transport": "purple",
+                    # Avoid washed-out text on light themes
+                    "dim": "default",
+                    "bold": "bold",
+                    "transport": "magenta",
                     "running": "blue",
                     "connected": "green",
                     "failed": "red",
@@ -85,47 +84,31 @@ class OutputManager:
                     "unknown": "yellow",
                 }
             )
-            return Console(
-                theme=light_theme,
-                stderr=False,
-                # Let Rich auto-detect color capabilities; keep colors in non-TTY via force_terminal
-                force_terminal=True,
-                # Apply a global default style so all text inherits the light background
-                style="black on white",
-            )
+            return Console(theme=light_theme, stderr=False)
         elif self.mode == OutputMode.DARK:
-            # Dark theme with strong contrast intended for dark backgrounds
+            # Dark uses defaults; also avoid dim to keep consistency
             dark_theme = Theme(
                 {
-                    "info": "bright_blue",
+                    "info": "blue",
                     "warning": "yellow",
-                    "error": "bright_red",
-                    "success": "bright_green",
-                    "device": "bright_cyan",
-                    "command": "bright_magenta",
-                    # Explicit black background for clear differentiation
-                    "output": "white on black",
-                    "summary": "bright_blue",
-                    "dim": "dim",
-                    "bold": "bold bright_white",  # Bold bright white in dark theme
-                    # Additional semantic colors for all use cases
-                    "transport": "bright_magenta",
-                    "running": "bright_blue",
-                    "connected": "bright_green",
-                    "failed": "bright_red",
-                    "downloading": "bright_cyan",
-                    "credential": "bright_cyan",
-                    "unknown": "bright_yellow",
+                    "error": "red",
+                    "success": "green",
+                    "device": "cyan",
+                    "command": "magenta",
+                    "output": "default",
+                    "summary": "blue",
+                    "dim": "default",
+                    "bold": "bold",
+                    "transport": "magenta",
+                    "running": "blue",
+                    "connected": "green",
+                    "failed": "red",
+                    "downloading": "cyan",
+                    "credential": "cyan",
+                    "unknown": "yellow",
                 }
             )
-            return Console(
-                theme=dark_theme,
-                stderr=False,
-                # Auto-detect color capability; keep colors in non-TTY via force_terminal
-                force_terminal=True,
-                # Apply a global default style so all text inherits the dark background
-                style="white on black",
-            )
+            return Console(theme=dark_theme, stderr=False)
         else:
             # Default mode uses Rich's default styling with our semantic colors
             default_theme = Theme(
@@ -138,7 +121,8 @@ class OutputManager:
                     "command": "magenta",
                     "output": "default",
                     "summary": "blue",
-                    "dim": "dim",
+                    # Avoid dim across themes for readability on light backgrounds
+                    "dim": "default",
                     "bold": "bold",
                     # Additional semantic colors for all use cases
                     "transport": "magenta",
@@ -302,6 +286,16 @@ class OutputManager:
         if self.mode == OutputMode.RAW:
             return
         self._console.print()
+
+    def print_output(self, text: str) -> None:
+        """Print plain command output using the standardized 'output' style.
+
+        In RAW mode, prints the text as-is to stdout without styling.
+        """
+        if self.mode == OutputMode.RAW:
+            sys.stdout.write(f"{text}\n")
+        else:
+            self._console.print(f"[output]{text}[/output]")
 
     def create_table(
         self, *, title: str = "", show_header: bool = False, box: Any | None = None
