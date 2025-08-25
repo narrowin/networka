@@ -12,8 +12,13 @@ from typing import Annotated, Any, cast
 
 import typer
 
-from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
+from network_toolkit.common.logging import (
+    console,  # noqa: F401
+    setup_logging,
+)
+from network_toolkit.common.styles import StyleName
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.platforms import (
@@ -68,10 +73,17 @@ def register(app: typer.Typer) -> None:
         """
         setup_logging("DEBUG" if verbose else "INFO")
 
+        # Use standard command context for consistent theming/output
+        ctx = CommandContext(config_file=config_file, verbose=verbose, output_mode=None)
+        style_manager = ctx.style_manager
+
         try:
             if not firmware_file.exists() or not firmware_file.is_file():
-                console.print(
-                    f"[red]Error: Firmware file not found: {firmware_file}[/red]"
+                ctx.output_manager.print_text(
+                    style_manager.format_message(
+                        f"Error: Firmware file not found: {firmware_file}",
+                        StyleName.ERROR,
+                    )
                 )
                 raise typer.Exit(1)
 
@@ -87,22 +99,32 @@ def register(app: typer.Typer) -> None:
             is_group = target_name in groups
 
             if not (is_device or is_group):
-                console.print(
-                    f"[red]Error: '{target_name}' not found as device or group in "
-                    "configuration[/red]"
+                ctx.output_manager.print_text(
+                    style_manager.format_message(
+                        f"Error: '{target_name}' not found as device or group in configuration",
+                        StyleName.ERROR,
+                    )
                 )
                 if devices:
                     dev_names = sorted(devices.keys())
                     preview = ", ".join(dev_names[:MAX_LIST_PREVIEW])
                     if len(dev_names) > MAX_LIST_PREVIEW:
                         preview += " ..."
-                    console.print("[yellow]Known devices:[/yellow] " + preview)
+                    ctx.output_manager.print_text(
+                        style_manager.format_message("Known devices:", StyleName.INFO)
+                        + " "
+                        + preview
+                    )
                 if groups:
                     grp_names = sorted(groups.keys())
                     preview = ", ".join(grp_names[:MAX_LIST_PREVIEW])
                     if len(grp_names) > MAX_LIST_PREVIEW:
                         preview += " ..."
-                    console.print("[yellow]Known groups:[/yellow] " + preview)
+                    ctx.output_manager.print_text(
+                        style_manager.format_message("Known groups:", StyleName.WARNING)
+                        + " "
+                        + preview
+                    )
                 raise typer.Exit(1)
 
             def process_device(dev: str) -> bool:
@@ -110,8 +132,11 @@ def register(app: typer.Typer) -> None:
                     # Check device exists in configuration
                     devices = config.devices or {}
                     if dev not in devices:
-                        console.print(
-                            f"[red]Error: Device '{dev}' not found in configuration[/red]"
+                        ctx.output_manager.print_text(
+                            style_manager.format_message(
+                                f"Error: Device '{dev}' not found in configuration",
+                                StyleName.ERROR,
+                            )
                         )
                         return False
 
@@ -123,7 +148,12 @@ def register(app: typer.Typer) -> None:
                         device_type, "firmware_upgrade"
                     )
                     if not is_supported:
-                        console.print(f"[red]Error on {dev}: {error_msg}[/red]")
+                        ctx.output_manager.print_text(
+                            style_manager.format_message(
+                                f"Error on {dev}: {error_msg}",
+                                StyleName.ERROR,
+                            )
+                        )
                         return False
 
                     # Check supported file extensions before connecting
@@ -135,9 +165,12 @@ def register(app: typer.Typer) -> None:
                             "cisco_ios": "Cisco IOS",
                             "cisco_iosxe": "Cisco IOS-XE",
                         }.get(device_type, device_type)
-                        console.print(
-                            f"[red]Error: Invalid firmware file for {platform_name}. "
-                            f"Expected {ext_list}, got {firmware_file.suffix}[/red]"
+                        ctx.output_manager.print_text(
+                            style_manager.format_message(
+                                f"Error: Invalid firmware file for {platform_name}. "
+                                f"Expected {ext_list}, got {firmware_file.suffix}",
+                                StyleName.ERROR,
+                            )
                         )
                         return False
 
@@ -147,10 +180,11 @@ def register(app: typer.Typer) -> None:
                         platform_ops = get_platform_operations(session)
 
                         if precheck_sequence and not skip_precheck:
-                            console.print(
-                                "[cyan]Running precheck sequence '"
-                                + precheck_sequence
-                                + f"' on {dev}[/cyan]"
+                            ctx.output_manager.print_text(
+                                style_manager.format_message(
+                                    f"Running precheck sequence '{precheck_sequence}' on {dev}...",
+                                    StyleName.INFO,
+                                )
                             )
                             # Run sequence via CLI sequence resolver logic
                             # Keep simple: resolve from global or device sequences
@@ -173,36 +207,68 @@ def register(app: typer.Typer) -> None:
                             for cmd in seq_cmds:
                                 session.execute_command(cmd)
 
-                        console.print(
-                            "[bold yellow]Uploading firmware to "
-                            f"{dev} and rebooting...[/bold yellow]"
+                        ctx.output_manager.print_text(
+                            style_manager.format_message(
+                                f"Uploading firmware to {dev} and rebooting...",
+                                StyleName.WARNING,
+                            )
                         )
                         transport_type = config.get_transport_type(dev)
-                        platform_name = platform_ops.get_platform_name()
-                        console.print(f"[yellow]Platform:[/yellow] {platform_name}")
-                        console.print(f"[yellow]Transport:[/yellow] {transport_type}")
+                        # Defensive conversion for mocks
+                        try:
+                            platform_name_obj = platform_ops.get_platform_name()
+                            platform_name = str(platform_name_obj)
+                        except Exception:  # pragma: no cover - defensive
+                            platform_name = "unknown"
+                        ctx.output_manager.print_text(
+                            style_manager.format_message("Platform:", StyleName.WARNING)
+                            + f" {platform_name}"
+                        )
+                        ctx.output_manager.print_text(
+                            style_manager.format_message(
+                                "Transport:", StyleName.WARNING
+                            )
+                            + f" {transport_type}"
+                        )
 
                         # Use platform-specific firmware upgrade
                         ok = platform_ops.firmware_upgrade(
                             local_firmware_path=firmware_file
                         )
                         if ok:
-                            console.print(
-                                "[green]OK Firmware upload initiated; device rebooting: "
-                                f"{dev}[/green]"
+                            ctx.output_manager.print_text(
+                                style_manager.format_message(
+                                    f"OK Firmware upload initiated; device rebooting: {dev}",
+                                    StyleName.SUCCESS,
+                                )
                             )
                             return True
-                        console.print(
-                            f"[red]FAIL Firmware upgrade failed to start on {dev}[/red]"
+                        ctx.output_manager.print_text(
+                            style_manager.format_message(
+                                f"FAIL Firmware upgrade failed to start on {dev}",
+                                StyleName.ERROR,
+                            )
                         )
                         return False
                 except NetworkToolkitError as e:
-                    console.print(f"[red]Error on {dev}: {e.message}[/red]")
+                    ctx.output_manager.print_text(
+                        style_manager.format_message(
+                            f"Error on {dev}: {e.message}", StyleName.ERROR
+                        )
+                    )
                     if verbose and e.details:
-                        console.print(f"[red]Details: {e.details}[/red]")
+                        ctx.output_manager.print_text(
+                            style_manager.format_message(
+                                f"Details: {e.details}", StyleName.ERROR
+                            )
+                        )
                     return False
                 except Exception as e:  # pragma: no cover - unexpected
-                    console.print(f"[red]Unexpected error on {dev}: {e}[/red]")
+                    ctx.output_manager.print_text(
+                        style_manager.format_message(
+                            f"Unexpected error on {dev}: {e}", StyleName.ERROR
+                        )
+                    )
                     return False
 
             if is_device:
@@ -220,17 +286,19 @@ def register(app: typer.Typer) -> None:
                     members = grp.members or []
 
             if not members:
-                console.print(
-                    f"[red]Error: No devices found in group '{target_name}'[/red]",
+                ctx.output_manager.print_text(
+                    style_manager.format_message(
+                        f"Error: No devices found in group '{target_name}'",
+                        StyleName.ERROR,
+                    )
                 )
                 raise typer.Exit(1)
 
-            console.print(
-                "[bold cyan]Starting firmware upgrade for group '"
-                + target_name
-                + "' ("
-                + str(len(members))
-                + ") devices)[/bold cyan]"
+            ctx.output_manager.print_text(
+                style_manager.format_message(
+                    f"Starting firmware upgrade for group '{target_name}' ({len(members)} devices)",
+                    StyleName.INFO,
+                )
             )
             failures = 0
             for dev in members:
@@ -238,17 +306,26 @@ def register(app: typer.Typer) -> None:
                 failures += 0 if ok else 1
 
             total = len(members)
-            console.print(
-                f"[bold]Completed:[/bold] {total - failures}/{total} initiated"
+            ctx.output_manager.print_text(
+                style_manager.format_message("Completed:", StyleName.BOLD)
+                + f" {total - failures}/{total} initiated"
             )
             if failures:
                 raise typer.Exit(1)
 
         except NetworkToolkitError as e:
-            console.print(f"[red]Error: {e.message}[/red]")
+            ctx.output_manager.print_text(
+                style_manager.format_message(f"Error: {e.message}", StyleName.ERROR)
+            )
             if verbose and e.details:
-                console.print(f"[red]Details: {e.details}[/red]")
+                ctx.output_manager.print_text(
+                    style_manager.format_message(
+                        f"Details: {e.details}", StyleName.ERROR
+                    )
+                )
             raise typer.Exit(1) from None
         except Exception as e:  # pragma: no cover - unexpected
-            console.print(f"[red]Unexpected error: {e}[/red]")
+            ctx.output_manager.print_text(
+                style_manager.format_message(f"Unexpected error: {e}", StyleName.ERROR)
+            )
             raise typer.Exit(1) from None

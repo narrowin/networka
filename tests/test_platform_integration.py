@@ -24,14 +24,12 @@ class TestPlatformIntegration:
     @patch("network_toolkit.commands.firmware_upgrade.setup_logging")
     @patch("network_toolkit.commands.firmware_upgrade.load_config")
     @patch("network_toolkit.commands.firmware_upgrade.import_module")
-    @patch("network_toolkit.commands.firmware_upgrade.console")
     @patch("pathlib.Path.exists")
     @patch("pathlib.Path.is_file")
     def test_firmware_upgrade_mikrotik_success(
         self,
         mock_is_file: MagicMock,
         mock_exists: MagicMock,
-        mock_console: MagicMock,
         mock_import: MagicMock,
         mock_load_config: MagicMock,
         mock_setup_logging: MagicMock,
@@ -79,21 +77,19 @@ class TestPlatformIntegration:
 
         # Should succeed
         assert result.exit_code == 0
-        mock_console.print.assert_any_call(
-            "[yellow]Platform:[/yellow] MikroTik RouterOS"
-        )
+        # Check that platform information is displayed (format may vary with styling)
+        assert "Platform:" in result.output
+        assert "MikroTik RouterOS" in result.output
 
     @patch("network_toolkit.commands.firmware_upgrade.setup_logging")
     @patch("network_toolkit.commands.firmware_upgrade.load_config")
     @patch("network_toolkit.commands.firmware_upgrade.import_module")
-    @patch("network_toolkit.commands.firmware_upgrade.console")
     @patch("pathlib.Path.exists")
     @patch("pathlib.Path.is_file")
     def test_firmware_upgrade_cisco_success(
         self,
         mock_is_file: MagicMock,
         mock_exists: MagicMock,
-        mock_console: MagicMock,
         mock_import: MagicMock,
         mock_load_config: MagicMock,
         mock_setup_logging: MagicMock,
@@ -141,7 +137,9 @@ class TestPlatformIntegration:
 
         # Should succeed
         assert result.exit_code == 0
-        mock_console.print.assert_any_call("[yellow]Platform:[/yellow] Cisco IOS")
+        # Check that platform information is displayed (format may vary with styling)
+        assert "Platform:" in result.output
+        assert "Cisco IOS" in result.output
 
     @patch("network_toolkit.commands.firmware_upgrade.setup_logging")
     @patch("network_toolkit.commands.firmware_upgrade.load_config")
@@ -234,14 +232,12 @@ class TestPlatformIntegration:
     @patch("network_toolkit.commands.firmware_upgrade.setup_logging")
     @patch("network_toolkit.commands.firmware_upgrade.load_config")
     @patch("network_toolkit.commands.firmware_upgrade.import_module")
-    @patch("network_toolkit.commands.firmware_upgrade.console")
     @patch("pathlib.Path.exists")
     @patch("pathlib.Path.is_file")
     def test_firmware_upgrade_invalid_extension(
         self,
         mock_is_file: MagicMock,
         mock_exists: MagicMock,
-        mock_console: MagicMock,
         mock_import: MagicMock,
         mock_load_config: MagicMock,
         mock_setup_logging: MagicMock,
@@ -279,20 +275,21 @@ class TestPlatformIntegration:
         register_firmware_upgrade(app)
 
         # Test firmware upgrade command with wrong extension (.bin instead of .npk)
-        self.runner.invoke(app, ["test_router", "firmware.bin"])
+        result = self.runner.invoke(app, ["test_router", "firmware.bin"])
 
         # Should show error about wrong file extension
-        mock_console.print.assert_any_call(
-            "[red]Error: Invalid firmware file for MikroTik RouterOS. Expected .npk, got .bin[/red]"
-        )
+        assert result.exit_code == 1
+        assert "Error:" in result.output
+        assert "Invalid firmware file" in result.output
+        assert "MikroTik RouterOS" in result.output
+        assert ".npk" in result.output
+        assert ".bin" in result.output
 
     @patch("network_toolkit.commands.bios_upgrade.setup_logging")
     @patch("network_toolkit.commands.bios_upgrade.load_config")
     @patch("network_toolkit.commands.bios_upgrade.import_module")
-    @patch("network_toolkit.commands.bios_upgrade.console")
     def test_bios_upgrade_mikrotik_success(
         self,
-        mock_console: MagicMock,
         mock_import: MagicMock,
         mock_load_config: MagicMock,
         mock_setup_logging: MagicMock,
@@ -337,12 +334,12 @@ class TestPlatformIntegration:
 
         # Should succeed
         assert result.exit_code == 0
-        mock_console.print.assert_any_call(
-            "[yellow]Platform:[/yellow] MikroTik RouterOS"
-        )
-        mock_console.print.assert_any_call(
-            "[green]OK BIOS upgrade scheduled; device rebooting: test_router[/green]"
-        )
+        # Check that platform and success information is displayed
+        assert "Platform:" in result.output
+        assert "MikroTik RouterOS" in result.output
+        assert "BIOS upgrade scheduled" in result.output
+        assert "device rebooting" in result.output
+        assert "test_router" in result.output
 
     @patch("network_toolkit.commands.config_backup.setup_logging")
     @patch("network_toolkit.commands.config_backup.load_config")

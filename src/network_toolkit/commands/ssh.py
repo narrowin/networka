@@ -28,10 +28,15 @@ from typing import Annotated, Any
 # Third-party imports
 import typer
 
+# For test compatibility
+from rich.console import Console
+
 # Local application imports
 from network_toolkit.commands.ssh_fallback import open_sequential_ssh_sessions
 from network_toolkit.commands.ssh_platform import get_platform_capabilities
-from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.command_helpers import CommandContext
+from network_toolkit.common.logging import setup_logging
+from network_toolkit.common.output import OutputMode
 from network_toolkit.common.resolver import DeviceResolver
 from network_toolkit.config import NetworkConfig, load_config
 from network_toolkit.exceptions import NetworkToolkitError
@@ -41,6 +46,8 @@ from network_toolkit.ip_device import (
     get_supported_platforms,
     is_ip_list,
 )
+
+console = Console()
 
 app_help = (
     "Open tmux with SSH panes for a device or group.\n\n"
@@ -97,7 +104,9 @@ def _ensure_libtmux() -> Any:
     return libtmux
 
 
-def _resolve_targets(config: NetworkConfig, targets: str) -> Target:
+def _resolve_targets(
+    config: NetworkConfig, targets: str, ctx: CommandContext
+) -> Target:
     """Resolve comma-separated targets to a list of devices."""
     resolver = DeviceResolver(config)
     devices, unknowns = resolver.resolve_targets(targets)
@@ -105,7 +114,7 @@ def _resolve_targets(config: NetworkConfig, targets: str) -> Target:
     if unknowns:
         # Be tolerant and warn about unknowns but continue
         unknowns_str = ", ".join(unknowns)
-        console.print(f"[yellow]Warning: Unknown targets: {unknowns_str}[/yellow]")
+        ctx.print_warning(f"Unknown targets: {unknowns_str}")
 
     if not devices:
         msg = f"No valid devices found in targets: {targets}"
@@ -187,6 +196,7 @@ def _build_ssh_cmd(
     port: int = 22,
     auth: AuthMode = AuthMode.KEY_FIRST,
     password: str | None = None,
+    ctx: CommandContext,
 ) -> str:
     base = [
         "ssh",
@@ -229,13 +239,13 @@ def _build_ssh_cmd(
             return sshpass_cmd + " ".join(shlex.quote(p) for p in base)
         else:
             # If sshpass not available, provide helpful message
-            console.print(
-                "[yellow]Warning: sshpass not found. SSH will prompt for password interactively.[/yellow]"
+            ctx.print_warning(
+                "sshpass not found. SSH will prompt for password interactively."
             )
-            console.print(
-                "[cyan]To automate password entry, install sshpass: "
+            ctx.print_info(
+                "To automate password entry, install sshpass: "
                 "sudo apt install sshpass (Ubuntu/Debian) or "
-                "brew install hudochenkov/sshpass/sshpass (macOS)[/cyan]"
+                "brew install hudochenkov/sshpass/sshpass (macOS)"
             )
 
     return " ".join(shlex.quote(p) for p in base)
@@ -357,15 +367,23 @@ def register(app: typer.Typer) -> None:
                 # This will raise ValueError if transport_type is invalid
                 get_transport_factory(transport_type)
             except ValueError as e:
-                console.print(f"[red]Error:[/red] {e}")
+                # Use module-level console before style_manager is created
+                from rich.console import Console
+
+                Console().print(f"[red]Error:[/red] {e}")
                 raise typer.Exit(1) from e
 
         setup_logging("DEBUG" if verbose else "INFO")
 
+        # Create command context for centralized output management
+        ctx = CommandContext(
+            output_mode=OutputMode.DEFAULT, verbose=verbose, config_file=config_file
+        )
+
         try:
             libtmux = _ensure_libtmux()
         except Exception as e:  # pragma: no cover - trivial failures
-            console.print(f"[red]{e}[/red]")
+            ctx.print_error(str(e))
             raise typer.Exit(1) from None
 
         try:
@@ -378,20 +396,16 @@ def register(app: typer.Typer) -> None:
                     platform_list = "\n".join(
                         [f"  {k}: {v}" for k, v in supported_platforms.items()]
                     )
-                    console.print(
-                        "[red]Error: When using IP addresses, "
-                        "--platform is required[/red]\n"
-                        f"[yellow]Supported platforms:[/yellow]\n{platform_list}"
-                    )
+                    ctx.print_error("When using IP addresses, --platform is required")
+                    ctx.print_warning(f"Supported platforms:\n{platform_list}")
                     raise typer.Exit(1)
 
                 ips = extract_ips_from_target(target)
                 config = create_ip_based_config(
                     ips, device_type, config, port=port, transport_type=transport_type
                 )
-                console.print(
-                    f"[cyan]Using IP addresses with device type '{device_type}': "
-                    f"{', '.join(ips)}[/cyan]"
+                ctx.print_info(
+                    f"Using IP addresses with platform '{device_type}': {', '.join(ips)}"
                 )
 
             resolver = DeviceResolver(config, device_type, port, transport_type)
@@ -402,27 +416,25 @@ def register(app: typer.Typer) -> None:
             capabilities = platform_caps.get_fallback_options()
 
             if not capabilities["can_do_tmux_fanout"]:
-                console.print(
-                    "[yellow]tmux-based SSH fanout not available on this platform.[/yellow]"
+                ctx.print_warning(
+                    "tmux-based SSH fanout not available on this platform."
                 )
 
                 if not capabilities["tmux_available"]:
-                    console.print("[yellow]Reason: tmux not available[/yellow]")
+                    ctx.print_warning("Reason: tmux not available")
                     platform_caps.suggest_alternatives()
 
                 if capabilities["can_do_sequential_ssh"]:
-                    console.print(
-                        "[cyan]Falling back to sequential SSH connections...[/cyan]"
-                    )
+                    ctx.print_info("Falling back to sequential SSH connections...")
                     # Use fallback implementation
                     open_sequential_ssh_sessions(tgt.devices, config)
                     return
                 else:
-                    console.print("[red]No SSH client available[/red]")
+                    ctx.print_error("No SSH client available")
                     platform_caps.suggest_alternatives()
                     raise typer.Exit(1)
         except Exception as e:
-            console.print(f"[red]Failed to load config or resolve target: {e}[/red]")
+            ctx.print_error(f"Failed to load config or resolve target: {e}")
             raise typer.Exit(1) from None
 
         # Resolve effective auth mode with legacy flag support
@@ -458,14 +470,15 @@ def register(app: typer.Typer) -> None:
                     port=port,
                     auth=mode,
                     password=str(pw) if pw is not None else None,
+                    ctx=ctx,
                 )
             except Exception as e:
-                console.print(f"[red]Skipping {dev}: {e}[/red]")
+                ctx.print_error(f"Skipping {dev}: {e}")
                 continue
             device_cmds.append((dev, ssh_cmd))
 
         if not device_cmds:
-            console.print("[red]No valid devices to connect to.[/red]")
+            ctx.print_error("No valid devices to connect to.")
             raise typer.Exit(1)
 
         # Always create a new tmux session for clean behavior
@@ -483,7 +496,7 @@ def register(app: typer.Typer) -> None:
             try:
                 window.rename_window(wname)
             except Exception as exc:  # pragma: no cover - rename failure is non-fatal
-                console.log(f"Could not rename tmux window: {exc}")
+                ctx.console.log(f"Could not rename tmux window: {exc}")
 
         # Ensure we start with a single pane
         # Create panes for each device
@@ -512,19 +525,17 @@ def register(app: typer.Typer) -> None:
             try:
                 window.cmd("set-window-option", "synchronize-panes", "on")
             except Exception as exc:
-                console.log(f"Could not enable sync: {exc}")
+                ctx.console.log(f"Could not enable sync: {exc}")
 
         # Enable mouse support using direct command
         try:
             session.cmd("set-option", "mouse", "on")
         except Exception as exc:
-            console.log(f"Could not enable mouse: {exc}")
+            ctx.console.log(f"Could not enable mouse: {exc}")
 
-        console.print(
-            "[green]Created tmux session[/green] "
-            f"[bold]{sname}[/bold] with {len(device_cmds)} pane(s)."
-        )
-        console.print("Use tmux to navigate. Press Ctrl-b d to detach.")
+        print("Created tmux session")
+        print(f"Session: {sname} with {len(device_cmds)} pane(s).")
+        print("Use tmux to navigate. Press Ctrl-b d to detach.")
 
         if attach:
             # Use libtmux to attach directly instead of subprocess
@@ -532,7 +543,6 @@ def register(app: typer.Typer) -> None:
                 # Attach using libtmux server
                 session.attach_session()
             except Exception:
-                console.print(
-                    "[yellow]Failed to attach automatically. "
-                    f"Run: tmux attach -t {sname}[/yellow]"
+                ctx.print_warning(
+                    f"Failed to attach automatically. Run: tmux attach -t {sname}"
                 )

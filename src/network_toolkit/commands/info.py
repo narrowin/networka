@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Annotated
 
 import typer
 
+from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.common.credentials import prompt_for_credentials
 from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import (
@@ -134,7 +135,9 @@ def register(app: typer.Typer) -> None:
                 raise typer.Exit(1) from None
 
             themed_console.print(
-                f"[bold]Device Information ({len(devices)} devices)[/bold]"
+                style_manager.format_message(
+                    f"Device Information ({len(devices)} devices)", StyleName.BOLD
+                )
             )
 
             # Helper function to check if environment variable is truthy
@@ -303,7 +306,8 @@ def register(app: typer.Typer) -> None:
         """Show supported device types and platform information."""
         setup_logging("DEBUG" if verbose else "INFO")
 
-        from rich.console import Console
+        ctx = CommandContext()
+
         from rich.table import Table
 
         from network_toolkit.config import get_supported_device_types
@@ -314,10 +318,10 @@ def register(app: typer.Typer) -> None:
             get_supported_platforms as get_platform_ops,
         )
 
-        console = Console()
-
         # Display available transports first
-        console.print("[bold blue]Network Toolkit - Transport Types[/bold blue]\n")
+        ctx.output_manager.print_text(
+            "[bold blue]Network Toolkit - Transport Types[/bold blue]\n"
+        )
 
         transport_table = Table(title="Available Transport Types")
         transport_table.add_column("Transport", style="cyan", no_wrap=True)
@@ -336,11 +340,11 @@ def register(app: typer.Typer) -> None:
             "Mapped (device_type → netmiko platform)",
         )
 
-        console.print(transport_table)
-        console.print()
+        ctx.output_manager.console.print(transport_table)
+        ctx.output_manager.print_blank_line()
 
         # Display device types
-        console.print("[bold blue]Supported Device Types[/bold blue]\n")
+        ctx.output_manager.print_text("[bold blue]Supported Device Types[/bold blue]\n")
 
         # Get all supported device types
         device_types = get_supported_device_types()
@@ -363,31 +367,37 @@ def register(app: typer.Typer) -> None:
 
             table.add_row(device_type, description, has_platform_ops, transport_support)
 
-        console.print(table)
+        ctx.output_manager.console.print(table)
 
         if verbose:
-            console.print(f"\n[bold]Total device types:[/bold] {len(device_types)}")
-            console.print(f"[bold]With platform operations:[/bold] {len(platform_ops)}")
-            console.print(
+            ctx.output_manager.print_text(
+                f"\n[bold]Total device types:[/bold] {len(device_types)}"
+            )
+            ctx.output_manager.print_text(
+                f"[bold]With platform operations:[/bold] {len(platform_ops)}"
+            )
+            ctx.output_manager.print_text(
                 "[bold]Available transports:[/bold] scrapli (default), nornir_netmiko"
             )
 
             # Show usage examples
-            console.print("\n[bold yellow]Usage Examples:[/bold yellow]")
-            console.print("  # Use in device configuration:")
-            console.print("  devices:")
-            console.print("    my_device:")
-            console.print("      host: 192.168.1.1")
-            console.print("      device_type: mikrotik_routeros")
-            console.print(
+            ctx.output_manager.print_text(
+                "\n[bold yellow]Usage Examples:[/bold yellow]"
+            )
+            ctx.output_manager.print_text("  # Use in device configuration:")
+            ctx.output_manager.print_text("  devices:")
+            ctx.output_manager.print_text("    my_device:")
+            ctx.output_manager.print_text("      host: 192.168.1.1")
+            ctx.output_manager.print_text("      device_type: mikrotik_routeros")
+            ctx.output_manager.print_text(
                 "      transport_type: scrapli  # Optional, defaults to scrapli"
             )
-            console.print("")
-            console.print("  # Use with IP addresses:")
-            console.print(
+            ctx.output_manager.print_text("")
+            ctx.output_manager.print_text("  # Use with IP addresses:")
+            ctx.output_manager.print_text(
                 '  nw run 192.168.1.1 "/system/identity/print" --platform mikrotik_routeros'
             )
-            console.print("")
-            console.print("  # Transport selection via config:")
-            console.print("  general:")
-            console.print("    default_transport_type: nornir_netmiko")
+            ctx.output_manager.print_text("")
+            ctx.output_manager.print_text("  # Transport selection via config:")
+            ctx.output_manager.print_text("  general:")
+            ctx.output_manager.print_text("    default_transport_type: nornir_netmiko")

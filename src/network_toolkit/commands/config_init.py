@@ -24,36 +24,41 @@ from typing import Annotated
 
 import typer
 
-from network_toolkit.common.logging import console, setup_logging
-from network_toolkit.common.output import OutputMode
+from network_toolkit.common.command_helpers import CommandContext
+from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.paths import default_config_root
-from network_toolkit.common.styles import StyleManager, StyleName
 
 
 def _print_success(message: str) -> None:
-    """Print success message using default theme."""
-    style_manager = StyleManager(mode=OutputMode.DEFAULT)
-    styled_message = style_manager.format_message(message, StyleName.SUCCESS)
-    console.print(styled_message)
+    """Print success message using rich console."""
+    from rich.console import Console
+
+    console = Console()
+    console.print(f"[green]{message}[/green]")
 
 
 def _print_info(message: str) -> None:
-    """Print info message using default theme."""
-    style_manager = StyleManager(mode=OutputMode.DEFAULT)
-    styled_message = style_manager.format_message(message, StyleName.INFO)
-    console.print(styled_message)
+    """Print info message using rich console."""
+    from rich.console import Console
+
+    console = Console()
+    console.print(f"[blue]{message}[/blue]")
 
 
 def _print_warn(message: str) -> None:
-    style_manager = StyleManager(mode=OutputMode.DEFAULT)
-    styled_message = style_manager.format_message(message, StyleName.WARNING)
-    console.print(styled_message)
+    """Print warning message using rich console."""
+    from rich.console import Console
+
+    console = Console()
+    console.print(f"[yellow]Warning:[/yellow] {message}")
 
 
 def _print_action(message: str) -> None:
-    style_manager = StyleManager(mode=OutputMode.DEFAULT)
-    styled_message = style_manager.format_message(message, StyleName.INFO)
-    console.print(styled_message)
+    """Print action message using rich console."""
+    from rich.console import Console
+
+    console = Console()
+    console.print(f"[blue]{message}[/blue]")
 
 
 def create_env_file(target_dir: Path) -> None:
@@ -215,6 +220,9 @@ def register(app: typer.Typer) -> None:
 
         setup_logging("DEBUG" if verbose else "INFO")
 
+        # Create command context for consistent output
+        ctx = CommandContext()
+
         # Determine whether we prompt (interactive) or not
         interactive = target_dir is None and not yes
 
@@ -226,8 +234,10 @@ def register(app: typer.Typer) -> None:
             if yes:
                 target_path = default_path
             else:
-                console.print("\nWhere should Networka store its configuration?")
-                console.print(f"[dim]Default:[/dim] {default_path}")
+                ctx.output_manager.print_text(
+                    "\nWhere should Networka store its configuration?"
+                )
+                ctx.output_manager.print_text(f"[dim]Default: {default_path}[/dim]")
                 if typer.confirm("Use default location?", default=True):
                     target_path = default_path
                 else:
@@ -256,26 +266,20 @@ def register(app: typer.Typer) -> None:
                 existing.append(str(devices_dir))
             if existing:
                 if not interactive:
-                    console.print(
-                        "[yellow]Warning: The following files/directories already exist:[/yellow]"
-                    )
+                    ctx.print_warning("The following files/directories already exist:")
                     for p in existing:
-                        console.print(f"  - {p}")
-                    console.print(
-                        "\n[yellow]Use --force to overwrite existing files.[/yellow]"
-                    )
+                        ctx.output_manager.print_text(f"  - {p}")
+                    ctx.print_warning("Use --force to overwrite existing files.")
                     raise typer.Exit(1)
                 else:
-                    console.print(
-                        "[yellow]Existing configuration detected in the default location.[/yellow]"
+                    ctx.print_warning(
+                        "Existing configuration detected in the default location."
                     )
                     if not typer.confirm("Overwrite existing files?", default=False):
                         raise typer.Exit(1)
 
-        console.print(
-            f"[bold cyan]Initializing network toolkit configuration in: {target_path}[/bold cyan]"
-        )
-        console.print()
+        ctx.print_info(f"Initializing network toolkit configuration in: {target_path}")
+        ctx.output_manager.print_blank_line()
 
         # Helper: locate repo root (for completion scripts)
         def _detect_repo_root() -> Path | None:
@@ -344,28 +348,34 @@ def register(app: typer.Typer) -> None:
                     os.chdir(config_root)
                     export_schemas_to_workspace()
                     _print_success("Installed JSON schemas for YAML editor validation")
-                    console.print(
+                    ctx.output_manager.print_text(
                         "   - schemas/network-config.schema.json (full config)"
                     )
-                    console.print(
+                    ctx.output_manager.print_text(
                         "   - schemas/device-config.schema.json (device files)"
                     )
-                    console.print(
+                    ctx.output_manager.print_text(
                         "   - .vscode/settings.json (VS Code YAML validation)"
                     )
-                    console.print()
-                    console.print("🎯 Your YAML files now have:")
-                    console.print(
+                    ctx.output_manager.print_blank_line()
+                    ctx.output_manager.print_text("🎯 Your YAML files now have:")
+                    ctx.output_manager.print_text(
                         "   • Auto-completion for device_type and other fields"
                     )
-                    console.print("   • Validation errors for invalid configurations")
-                    console.print("   • Hover tooltips with field descriptions")
+                    ctx.output_manager.print_text(
+                        "   • Validation errors for invalid configurations"
+                    )
+                    ctx.output_manager.print_text(
+                        "   • Hover tooltips with field descriptions"
+                    )
                 finally:
                     os.chdir(original_cwd)
             except Exception as e:
                 _print_warn(f"Failed to install schemas: {e}")
-                console.print("   You can manually export schemas later with:")
-                console.print(
+                ctx.output_manager.print_text(
+                    "   You can manually export schemas later with:"
+                )
+                ctx.output_manager.print_text(
                     "   cd your-config-dir && python -c 'from network_toolkit.config import export_schemas_to_workspace; export_schemas_to_workspace()'"
                 )
 
@@ -523,18 +533,18 @@ def register(app: typer.Typer) -> None:
                 )
             else:
                 installed_path, rc_file = _install_shell_for(chosen_shell)
-                console.print(
+                ctx.output_manager.print_text(
                     f"Installed {chosen_shell} completion script to: {installed_path}"
                 )
                 if rc_file:
-                    console.print(f"Shell rc file detected: {rc_file}")
+                    ctx.output_manager.print_text(f"Shell rc file detected: {rc_file}")
                 if do_activate_compl:
                     _activate_shell(chosen_shell, installed_path, rc_file)
-                    console.print(
+                    ctx.output_manager.print_text(
                         "Activation snippet appended. Open a new shell to use completions."
                     )
                 else:
-                    console.print(
+                    ctx.output_manager.print_text(
                         "Activation skipped. You can manually source or add the snippet later."
                     )
 
@@ -547,5 +557,5 @@ def register(app: typer.Typer) -> None:
             else:
                 _install_editor_schemas(target_path)
 
-        console.print()
+        ctx.output_manager.print_blank_line()
         _print_success("Configuration initialization complete!")

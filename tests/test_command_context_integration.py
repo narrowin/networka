@@ -4,11 +4,9 @@ from __future__ import annotations
 
 from unittest.mock import Mock, patch
 
-import pytest
 from typer.testing import CliRunner
 
 from network_toolkit.cli import app
-from network_toolkit.common.command import CommandContext
 from network_toolkit.common.output import OutputMode
 
 
@@ -104,7 +102,7 @@ class TestCommandContextIntegration:
         # Test the pattern we established with StyleManager helper functions
         from network_toolkit.common.styles import StyleManager, StyleName
 
-        # This pattern is used in run_simplified.py and config_init.py
+        # This pattern is used in config_init.py
         style_manager = StyleManager(mode=OutputMode.DEFAULT)
 
         # Test INFO style formatting
@@ -134,7 +132,6 @@ class TestCommandContextIntegration:
             download,
             routerboard_upgrade,
             run,
-            run_simplified,
             upload,
         )
 
@@ -148,7 +145,6 @@ class TestCommandContextIntegration:
             routerboard_upgrade,
             run,
             config_init,
-            run_simplified,
         ]:
             source = inspect.getsource(module)
 

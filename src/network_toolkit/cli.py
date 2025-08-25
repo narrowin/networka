@@ -42,10 +42,26 @@ from network_toolkit.commands.vendor_backup import register as register_vendor_b
 from network_toolkit.commands.vendor_config_backup import (
     register as register_vendor_config_backup,
 )
-from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.logging import setup_logging
+from network_toolkit.common.output import get_output_manager
+
+
+class _DynamicConsoleProxy:
+    """Proxy that forwards attribute access to the current OutputManager console.
+
+    This avoids capturing a stale Console at import time so that changes to the
+    output mode (e.g., via --output-mode or config) are reflected everywhere.
+    """
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(get_output_manager().console, name)
+
+
+# Dynamic console that always reflects the active OutputManager
+console = _DynamicConsoleProxy()
 
 # Keep this import here to preserve tests that patch `network_toolkit.cli.DeviceSession`
-from network_toolkit.device import DeviceSession as _DeviceSession
+from network_toolkit.device import DeviceSession as _DeviceSession  # noqa: E402
 
 
 # Preserve insertion order and group commands under a single Commands section
@@ -220,6 +236,7 @@ def _handle_file_downloads(
         filename = replace_placeholders(local_filename_str)
         destination = local_dir / filename
 
+        # Keep console.print here for backward-compatible tests expecting direct console output
         console.print(f"[cyan]Downloading {remote_file} from {device_name}...[/cyan]")
 
         try:

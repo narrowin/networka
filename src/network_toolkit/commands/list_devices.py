@@ -15,7 +15,6 @@ from network_toolkit.common.output import (
     get_output_manager,
     set_output_mode,
 )
-from network_toolkit.common.styles import StyleManager, StyleName
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 
@@ -58,9 +57,6 @@ def register(app: typer.Typer) -> None:
                     config.general.output_mode
                 )
 
-            # Create style manager for consistent theming
-            style_manager = StyleManager(output_manager.mode)
-
             if output_manager.mode == OutputMode.RAW:
                 # Raw mode output
                 if not config.devices:
@@ -74,29 +70,23 @@ def register(app: typer.Typer) -> None:
                     )
                 return
 
-            # Get the themed console from style manager
-            themed_console = style_manager.console
-
-            themed_console.print(
-                style_manager.format_message("Configured Devices", StyleName.BOLD)
-            )
-            themed_console.print()
+            # Headline
+            output_manager.print_info("Configured Devices")
+            output_manager.print_blank_line()
 
             if not config.devices:
-                themed_console.print(
-                    style_manager.format_message(
-                        "No devices configured", StyleName.WARNING
-                    )
-                )
+                output_manager.print_warning("No devices configured")
                 return
 
             # Create table with centralized styling
-            table = style_manager.create_table()
-            style_manager.add_column(table, "Name", StyleName.DEVICE)
-            style_manager.add_column(table, "Host", StyleName.HOST)
-            style_manager.add_column(table, "Type", StyleName.PLATFORM)
-            style_manager.add_column(table, "Description", StyleName.OUTPUT)
-            style_manager.add_column(table, "Tags", StyleName.SUCCESS)
+            table = output_manager.create_table(
+                title="Devices", show_header=True, box=None
+            )
+            table.add_column("Name")
+            table.add_column("Host")
+            table.add_column("Type")
+            table.add_column("Description")
+            table.add_column("Tags")
 
             for name, device_config in config.devices.items():
                 table.add_row(
@@ -107,10 +97,9 @@ def register(app: typer.Typer) -> None:
                     ", ".join(device_config.tags) if device_config.tags else "None",
                 )
 
-            themed_console.print(table)
-            themed_console.print(
-                f"\n{style_manager.format_message(f'Total devices: {len(config.devices)}', StyleName.BOLD)}"
-            )
+            output_manager.print_table(table)
+            output_manager.print_blank_line()
+            output_manager.print_info(f"Total devices: {len(config.devices)}")
 
         except NetworkToolkitError as e:
             # Initialize output_manager if not already set

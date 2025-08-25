@@ -32,10 +32,9 @@ from typing import Annotated
 
 import typer
 
-from network_toolkit.common.logging import console, setup_logging
-from network_toolkit.common.output import OutputMode
-from network_toolkit.common.command_helpers import CommandContext
+from network_toolkit.common.command import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
+from network_toolkit.common.output import OutputMode
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.results_enhanced import ResultsManager
@@ -239,9 +238,7 @@ def register(app: typer.Typer) -> None:
 
         devices, unknown = resolve_targets(target)
         if unknown and not devices:
-            console.print(
-                "[red]Error: target(s) not found: " + ", ".join(unknown) + "[/red]"
-            )
+            ctx.print_error("Error: target(s) not found: " + ", ".join(unknown))
             raise typer.Exit(2)
         if unknown:
             ctx.print_warning("Ignoring unknown target(s): " + ", ".join(unknown))
@@ -349,9 +346,9 @@ def register(app: typer.Typer) -> None:
 
             elif is_config:
                 if baseline is None:
-                    console.print(
-                        "[red]--baseline FILE is required for 'config' diffs when "
-                        "not comparing two devices.[/red]"
+                    ctx.print_error(
+                        "--baseline FILE is required for 'config' diffs when "
+                        "not comparing two devices."
                     )
                     raise typer.Exit(2)
 
@@ -372,10 +369,10 @@ def register(app: typer.Typer) -> None:
 
             elif is_command:
                 if baseline is None:
-                    console.print(
-                        "[red]--baseline FILE is required for single-device command "
+                    ctx.print_error(
+                        "--baseline FILE is required for single-device command "
                         "diffs. Use two devices (comma-separated) to diff "
-                        "device-to-device.[/red]"
+                        "device-to-device."
                     )
                     raise typer.Exit(2)
                 for dev in devices:
@@ -395,10 +392,10 @@ def register(app: typer.Typer) -> None:
 
             else:  # sequence
                 if baseline is None:
-                    console.print(
-                        "[red]--baseline DIR is required for single-device sequence "
+                    ctx.print_error(
+                        "--baseline DIR is required for single-device sequence "
                         "diffs. Use two devices (comma-separated) to diff "
-                        "device-to-device.[/red]"
+                        "device-to-device."
                     )
                     raise typer.Exit(2)
                 if not baseline.exists() or not baseline.is_dir():
@@ -456,7 +453,7 @@ def register(app: typer.Typer) -> None:
             any_diffs = total_changed > 0 or total_missing > 0
 
             for dev, rows in per_device_reports:
-                console.print(f"[bold blue]Device:[/bold blue] {dev}")
+                ctx.print_info(f"Device: {dev}")
                 for name, res, note in rows:
                     if res is None:
                         ctx.print_warning(f"- {name}: {note}")
@@ -474,7 +471,7 @@ def register(app: typer.Typer) -> None:
                                 dev, f"DIFF {name}", res.output or "(no diff)"
                             )
 
-                console.print("-" * 80)
+                ctx.output.print_separator()
 
             if any_diffs:
                 ctx.print_info(
@@ -486,4 +483,5 @@ def register(app: typer.Typer) -> None:
                 raise typer.Exit(0)
 
         except NetworkToolkitError as e:  # pragma: no cover - error path
-            ctx.handle_error(e)
+            ctx.print_error(str(e))
+            raise typer.Exit(1) from None
