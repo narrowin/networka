@@ -16,9 +16,11 @@ and install shell completions in an idempotent manner.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
+import urllib.request
 from pathlib import Path
 from typing import Annotated
 
@@ -337,46 +339,121 @@ def register(app: typer.Typer) -> None:
         def _install_editor_schemas(config_root: Path) -> None:
             """Install JSON schemas and VS Code settings for YAML editor validation."""
             try:
-                # Import here to avoid circular imports
-                # Change to config directory temporarily to generate schemas there
-                import os
+                # Create schemas directory
+                schemas_dir = config_root / "schemas"
+                schemas_dir.mkdir(exist_ok=True)
 
-                from network_toolkit.config import export_schemas_to_workspace
+                # Schema files to download from GitHub
+                schema_files = [
+                    "network-config.schema.json",
+                    "device-config.schema.json",
+                    "groups-config.schema.json",
+                ]
 
-                original_cwd = Path.cwd()
-                try:
-                    os.chdir(config_root)
-                    export_schemas_to_workspace()
-                    _print_success("Installed JSON schemas for YAML editor validation")
-                    ctx.output_manager.print_text(
-                        "   - schemas/network-config.schema.json (full config)"
+                github_base_url = (
+                    f"{git_url or 'https://github.com/narrowin/networka.git'}".replace(
+                        ".git", ""
                     )
-                    ctx.output_manager.print_text(
-                        "   - schemas/device-config.schema.json (device files)"
-                    )
-                    ctx.output_manager.print_text(
-                        "   - .vscode/settings.json (VS Code YAML validation)"
-                    )
-                    ctx.output_manager.print_blank_line()
-                    ctx.output_manager.print_text("🎯 Your YAML files now have:")
-                    ctx.output_manager.print_text(
-                        "   • Auto-completion for device_type and other fields"
-                    )
-                    ctx.output_manager.print_text(
-                        "   • Validation errors for invalid configurations"
-                    )
-                    ctx.output_manager.print_text(
-                        "   • Hover tooltips with field descriptions"
-                    )
-                finally:
-                    os.chdir(original_cwd)
-            except Exception as e:
-                _print_warn(f"Failed to install schemas: {e}")
+                    + f"/raw/{git_ref}/schemas"
+                )
+
+                # Download each schema file
+                for schema_file in schema_files:
+                    try:
+                        schema_url = f"{github_base_url}/{schema_file}"
+                        schema_path = schemas_dir / schema_file
+
+                        # Validate URL scheme for security
+                        if not schema_url.startswith(("http:", "https:")):
+                            msg = "URL must start with 'http:' or 'https:'"
+                            raise ValueError(msg)
+
+                        with urllib.request.urlopen(schema_url) as response:  # noqa: S310
+                            schema_content = response.read().decode("utf-8")
+                            schema_path.write_text(schema_content, encoding="utf-8")
+
+                        ctx.output_manager.print_text(f"   Downloaded {schema_file}")
+                    except Exception as e:
+                        _print_warn(f"Failed to download {schema_file}: {e}")
+
+                # Create VS Code settings for YAML validation
+                vscode_dir = config_root / ".vscode"
+                vscode_dir.mkdir(exist_ok=True)
+
+                settings_path = vscode_dir / "settings.json"
+                yaml_schema_config = {
+                    "yaml.schemas": {
+                        "./schemas/network-config.schema.json": [
+                            "config/config.yml",
+                            "devices.yml",
+                        ],
+                        "./schemas/device-config.schema.json": [
+                            "config/devices/*.yml",
+                            "config/devices.yml",
+                        ],
+                        "./schemas/groups-config.schema.json": [
+                            "config/groups/*.yml",
+                            "config/groups.yml",
+                        ],
+                    }
+                }
+
+                # Merge with existing settings if they exist
+                if settings_path.exists():
+                    try:
+                        with settings_path.open("r", encoding="utf-8") as f:
+                            existing_settings = json.load(f)
+                        # Only update yaml.schemas, preserve other settings
+                        existing_settings.update(yaml_schema_config)
+                        yaml_schema_config = existing_settings
+                    except (json.JSONDecodeError, KeyError):
+                        # If existing settings are malformed, just use our config
+                        pass
+
+                with settings_path.open("w", encoding="utf-8") as f:
+                    json.dump(yaml_schema_config, f, indent=2)
+
+                _print_success("Installed JSON schemas for YAML editor validation")
                 ctx.output_manager.print_text(
-                    "   You can manually export schemas later with:"
+                    "   - schemas/network-config.schema.json (full config)"
                 )
                 ctx.output_manager.print_text(
-                    "   cd your-config-dir && python -c 'from network_toolkit.config import export_schemas_to_workspace; export_schemas_to_workspace()'"
+                    "   - schemas/device-config.schema.json (device files)"
+                )
+                ctx.output_manager.print_text(
+                    "   - schemas/groups-config.schema.json (group files)"
+                )
+                ctx.output_manager.print_text(
+                    "   - .vscode/settings.json (VS Code YAML validation)"
+                )
+                ctx.output_manager.print_blank_line()
+                ctx.output_manager.print_text("🎯 Your YAML files now have:")
+                ctx.output_manager.print_text(
+                    "   • Auto-completion for device_type and other fields"
+                )
+                ctx.output_manager.print_text(
+                    "   • Validation errors for invalid configurations"
+                )
+                ctx.output_manager.print_text(
+                    "   • Hover tooltips with field descriptions"
+                )
+            except Exception as e:
+                # Define fallback URL for error message
+                fallback_url = (
+                    f"https://github.com/narrowin/networka/raw/{git_ref}/schemas"
+                )
+                _print_warn(f"Failed to install schemas: {e}")
+                ctx.output_manager.print_text(
+                    "   You can manually download schemas later with:"
+                )
+                ctx.output_manager.print_text(
+                    f"   wget {fallback_url}/network-config.schema.json -O schemas/network-config.schema.json"
+                )
+                ctx.output_manager.print_text(
+                    f"   wget {fallback_url}/device-config.schema.json -O schemas/device-config.schema.json"
+                )
+                ctx.output_manager.print_text(
+                    f"   wget {fallback_url}/groups-config.schema.json -O schemas/groups-config.schema.json"
                 )
 
         # Shell completion helpers
