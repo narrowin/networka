@@ -349,6 +349,17 @@ def register(app: typer.Typer) -> None:
         - nw ssh sw-acc1,access_switches
         """
 
+        # Validate transport type if provided
+        if transport_type is not None:
+            from network_toolkit.transport.factory import get_transport_factory
+
+            try:
+                # This will raise ValueError if transport_type is invalid
+                get_transport_factory(transport_type)
+            except ValueError as e:
+                console.print(f"[red]Error:[/red] {e}")
+                raise typer.Exit(1) from e
+
         setup_logging("DEBUG" if verbose else "INFO")
 
         try:

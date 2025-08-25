@@ -34,14 +34,25 @@ class ScrapliTransportFactory:
         connection_params: dict[str, Any],
     ) -> Transport:
         """Create a Scrapli transport instance."""
-        from scrapli import Scrapli
+        # Import Scrapli symbol from device module so unit tests that patch
+        # `network_toolkit.device.Scrapli` continue to intercept driver creation.
+        # Import via device module so tests patching that symbol catch it
+        from network_toolkit.device import Scrapli as DeviceScrapli
+        from network_toolkit.device import (
+            ScrapliSyncTransport as DeviceScrapliSyncTransport,
+        )
 
-        from network_toolkit.transport.scrapli_sync import ScrapliSyncTransport
+        # Map generic transport values to concrete Scrapli backends
+        def _map_transport(value: str | None) -> str:
+            v = (value or "paramiko").lower()
+            return "paramiko" if v == "ssh" else v
 
-        # Create Scrapli driver with existing logic
-        driver = Scrapli(**connection_params)
+        params = dict(connection_params)
+        params["transport"] = _map_transport(params.get("transport"))
 
-        return ScrapliSyncTransport(driver)
+    # Create Scrapli driver
+    driver = DeviceScrapli(**params)
+    return DeviceScrapliSyncTransport(driver)
 
 
 class NornirNetmikoTransportFactory:
@@ -58,36 +69,12 @@ class NornirNetmikoTransportFactory:
         connection_params: dict[str, Any],
     ) -> Transport:
         """Create a Nornir+Netmiko transport instance."""
-        try:
-            from network_toolkit.transport.nornir_inventory import (
-                build_nornir_inventory,
-            )
-            from network_toolkit.transport.nornir_netmiko import NornirNetmikoTransport
-        except ImportError as e:
-            error_msg = (
-                "Nornir and related packages required for nornir_netmiko transport. "
-                "Install with: pip install nornir nornir-netmiko"
-            )
-            raise ImportError(error_msg) from e
-
-        # Initialize Nornir runner if needed
-        if self._nornir_runner is None:
-            self._nornir_runner = self._setup_nornir(config)
-
-        # Get device info
-        device_config = config.devices[device_name] if config.devices else None
-        host = (
-            device_config.host
-            if device_config
-            else connection_params.get("host", "unknown")
+        # nornir_netmiko transport coming soon - use scrapli for now
+        msg = (
+            "nornir_netmiko transport is not yet fully implemented. "
+            "This feature is coming soon. Please use 'scrapli' transport for now."
         )
-        port = (
-            device_config.port if device_config else connection_params.get("port", 22)
-        )
-        # Ensure port is an int
-        port = int(port) if port is not None else 22
-
-        return NornirNetmikoTransport(self._nornir_runner, device_name, host, port)
+        raise NotImplementedError(msg)
 
     def _setup_nornir(self, config: NetworkConfig) -> Nornir:
         """Setup Nornir runner with inventory from config."""
@@ -117,5 +104,9 @@ def get_transport_factory(transport_type: str = "scrapli") -> TransportFactory:
     elif transport_type == "scrapli":
         return ScrapliTransportFactory()
     else:
-        error_msg = f"Unknown transport type: {transport_type}"
-        raise ValueError(error_msg)
+        supported_transports = ["scrapli", "nornir_netmiko"]
+        error_msg = (
+            f"Unknown transport type: '{transport_type}'. "
+            f"Supported transports: {', '.join(supported_transports)}"
+        )
+    raise ValueError(error_msg)

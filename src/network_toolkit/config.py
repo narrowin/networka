@@ -9,7 +9,7 @@ import csv
 import logging
 import os
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, cast
 
 import yaml
 from dotenv import load_dotenv
@@ -170,18 +170,9 @@ class DeviceOverrides(BaseModel):
     transfer_timeout: int | None = None
 
 
-# Define supported device types as a type alias for reuse
-SupportedDeviceType = Literal[
-    "mikrotik_routeros",
-    "cisco_iosxe",
-    "cisco_ios",
-    "cisco_iosxr",
-    "cisco_nxos",
-    "juniper_junos",
-    "arista_eos",
-    "linux",
-    "generic",
-]
+# Device type is intentionally a free-form string at config load time.
+# Validation of supported values occurs at runtime where appropriate.
+SupportedDeviceType = str
 
 
 class DeviceConfig(BaseModel):
@@ -351,7 +342,9 @@ class NetworkConfig(BaseModel):
 
         return members
 
-    def get_transport_type(self, device_name: str) -> str:
+    def get_transport_type(
+        self, device_name: str, transport_override: str | None = None
+    ) -> str:
         """
         Get the transport type for a device.
 
@@ -359,12 +352,18 @@ class NetworkConfig(BaseModel):
         ----------
         device_name : str
             Name of the device
+        transport_override : str | None
+            Override transport type from CLI or other source
 
         Returns
         -------
         str
             Transport type ('scrapli' or 'nornir_netmiko')
         """
+        # CLI override takes highest precedence
+        if transport_override:
+            return transport_override
+
         if not self.devices or device_name not in self.devices:
             return self.general.default_transport_type
 

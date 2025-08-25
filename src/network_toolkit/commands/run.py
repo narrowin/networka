@@ -131,6 +131,17 @@ def register(app: typer.Typer) -> None:
         ] = None,
     ) -> None:
         """Execute a single command or a sequence on a device or a group."""
+        # Validate transport type if provided
+        if transport_type is not None:
+            from network_toolkit.transport.factory import get_transport_factory
+
+            try:
+                # This will raise ValueError if transport_type is invalid
+                get_transport_factory(transport_type)
+            except ValueError as e:
+                print(f"Error: {e}")
+                raise typer.Exit(1)
+
         # Handle legacy raw mode mapping
         if raw is not None:
             output_mode = OutputMode.RAW
@@ -212,13 +223,18 @@ def register(app: typer.Typer) -> None:
             cmd: str,
             username_override: str | None = None,
             password_override: str | None = None,
+            transport_override: str | None = None,
         ) -> tuple[str, str | None, str | None]:
             # Late import to allow tests to patch `network_toolkit.cli.DeviceSession`
             from network_toolkit.cli import DeviceSession
 
             try:
                 with DeviceSession(
-                    device_name, config, username_override, password_override
+                    device_name,
+                    config,
+                    username_override,
+                    password_override,
+                    transport_override,
                 ) as session:
                     result = session.execute_command(cmd)
                     return (device_name, result, None)
@@ -241,13 +257,18 @@ def register(app: typer.Typer) -> None:
             seq_name: str,
             username_override: str | None = None,
             password_override: str | None = None,
+            transport_override: str | None = None,
         ) -> tuple[str, dict[str, str] | None, str | None]:
             # Import DeviceSession from cli to preserve tests' patch path
             from network_toolkit.cli import DeviceSession
 
             try:
                 with DeviceSession(
-                    device_name, config, username_override, password_override
+                    device_name,
+                    config,
+                    username_override,
+                    password_override,
+                    transport_override,
                 ) as session:
                     # Use vendor-aware sequence resolution
                     sm = SequenceManager(config)
@@ -405,6 +426,7 @@ def register(app: typer.Typer) -> None:
                         command_or_sequence,
                         username_override,
                         password_override,
+                        transport_type,
                     )
 
                     if error:
@@ -508,6 +530,7 @@ def register(app: typer.Typer) -> None:
                                 command_or_sequence,
                                 username_override,
                                 password_override,
+                                transport_type,
                             ): device
                             for device in group_members
                         }
@@ -653,6 +676,7 @@ def register(app: typer.Typer) -> None:
                     command_or_sequence,
                     username_override,
                     password_override,
+                    transport_type,
                 )
                 if error:
                     raise typer.Exit(1)
@@ -739,6 +763,7 @@ def register(app: typer.Typer) -> None:
                             command_or_sequence,
                             username_override,
                             password_override,
+                            transport_type,
                         ): device
                         for device in members
                     }

@@ -1,5 +1,7 @@
 # Networka (nw) - LLM Development Guide
 
+NO MATTER WHAT RUN THE TESTS DIRECTLY THROUGH VS CODE TEST FEATURE, NOT TERMINAL!!!
+
 ## CRITICAL PRINCIPLES
 
 1. **KISS (Keep It Simple, Stupid)** - Simplicity and clarity above all
