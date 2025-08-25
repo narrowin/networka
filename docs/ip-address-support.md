@@ -1,87 +1,83 @@
-# IP Address Support```bash
-# Multiple IPs separated by commas (no spaces)
-nw run "192.168.1.1,192.168.1.2,192.168.1.3" "/system/clock/print" --platform mikrotik_routeros
+# IP Address Support
 
-# SSH to multiple devices by IP
-nw ssh "192.168.1.1,192.168.1.2" --platform mikrotik_routeros
+Networka lets you target devices directly by IP address (single or comma-separated list) without predefining them in configuration files.
 
-# Mix configured devices and IPs
-nw run "192.168.1.1,sw-acc1,192.168.1.2" "/system/clock/print" --platform mikrotik_routeroswork Toolkit
+## Usage examples
 
-The network toolkit now supports using IP addresses directly in commands instead of requiring predefined device configurations.
+### Single IP address
 
-## Usage Examples
-
-### Single IP Address
 ```bash
-```bash
+# Run a command
 nw run 192.168.1.1 "/system/clock/print" --platform mikrotik_routeros
 
 # SSH to device by IP
 nw ssh 192.168.1.1 --platform mikrotik_routeros
 
-# Check device info by IP
+# Show device info by IP
 nw info 192.168.1.1 --platform mikrotik_routeros
 ```
 
-### Multiple IP Addresses
+### Multiple IP addresses
+
 ```bash
-# Execute command on multiple IPs
+# Execute command on multiple IPs (comma-separated, no spaces)
 nw run "192.168.1.1,192.168.1.2,192.168.1.3" "/system/clock/print" --platform mikrotik_routeros
 
 # SSH to multiple IPs (opens tmux with multiple panes)
 nw ssh "192.168.1.1,192.168.1.2" --platform mikrotik_routeros
 
-# Mixed: IPs and predefined devices
+# Mix IPs and configured device names
 nw run "192.168.1.1,sw-acc1,192.168.1.2" "/system/clock/print" --platform mikrotik_routeros
 ```
 
-### With Custom Port
+### With custom port
+
 ```bash
-# Use custom SSH port
 nw run 192.168.1.1 "/system/clock/print" --platform mikrotik_routeros --port 2222
 ```
 
-### Interactive Authentication
+### Interactive authentication
+
 ```bash
-# Prompt for credentials interactively
+# Prompt for credentials at runtime
 nw run 192.168.1.1 "/system/clock/print" --platform mikrotik_routeros --interactive-auth
 ```
 
-## Required Parameters
+## Required parameters
 
-When using IP addresses, you **must** specify:
+When using IP addresses, you must specify:
 
-- `--platform`: The device platform type (required for Scrapli to know how to connect)
+- `--platform`: The device type (network driver), e.g. `mikrotik_routeros`, `cisco_iosxe`.
 
 Optional parameters:
+
 - `--port`: SSH port (defaults to 22)
-- `--interactive-auth`: Prompt for username/password instead of using environment variables
+- `--interactive-auth`: Prompt for username/password instead of environment
+- `--transport`: Transport driver to use for the session; defaults to configuration or Scrapli. Note: nornir-netmiko is not yet supported but coming soon.
 
-## Supported Platforms
+## Supported platforms
 
-- `mikrotik_routeros`: MikroTik RouterOS
-- `cisco_iosxe`: Cisco IOS-XE
-- `cisco_iosxr`: Cisco IOS-XR
-- `cisco_nxos`: Cisco NX-OS
-- `juniper_junos`: Juniper JunOS
-- `arista_eos`: Arista EOS
-- `linux`: Linux SSH
+- mikrotik_routeros — MikroTik RouterOS
+- cisco_iosxe — Cisco IOS-XE
+- cisco_iosxr — Cisco IOS-XR
+- cisco_nxos — Cisco NX-OS
+- juniper_junos — Juniper JunOS
+- arista_eos — Arista EOS
+- linux — Linux SSH
 
 ## Authentication
 
-IP-based connections use the same authentication mechanisms as predefined devices:
+IP-based connections use the same authentication as configured devices:
 
 1. Environment variables: `NW_USER_DEFAULT` and `NW_PASSWORD_DEFAULT`
-2. Interactive mode: Use `--interactive-auth` flag to be prompted
-3. SSH keys: Standard SSH key authentication is supported
+2. Interactive mode with `--interactive-auth`
+3. SSH keys (via the underlying transport)
 
-## Error Handling
+## Error handling
 
-If you forget to specify the platform when using IP addresses:
+If you omit the platform when using IPs:
 
-```bash
-$ nw run 192.168.1.1 "/system/clock/print"
+```text
 Error: When using IP addresses, --platform is required
 Supported platforms:
   mikrotik_routeros: MikroTik RouterOS
@@ -93,14 +89,12 @@ Supported platforms:
   linux: Linux SSH
 ```
 
-## Implementation Details
+## Implementation details
 
-When you use IP addresses:
+When IPs are used as the target:
 
-1. The toolkit detects IP addresses in the target parameter
-2. Creates temporary device configurations with generated names (e.g., `ip_192_168_1_1`)
-3. Uses the specified platform for Scrapli connection parameters
-4. Combines these with any existing device configurations
-5. Executes commands normally using the enhanced configuration
-
-This allows seamless mixing of predefined devices and ad-hoc IP addresses in the same command.
+1. Networka detects the IPs in the target argument
+2. Creates temporary devices with generated names (e.g. `ip_192_168_1_1`)
+3. Applies the specified `--platform` for connection parameters
+4. Merges with any configured devices so you can mix both
+5. Executes commands as usual and supports results storage

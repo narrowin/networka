@@ -42,9 +42,10 @@ All combinations have been thoroughly tested using automated CI/CD pipelines:
 
 ### Windows
 
+- Scrapli (default transport) is not officially supported on native Windows. It may work via Paramiko or ssh2-python, but the strongly recommended setup is WSL2 (Ubuntu) to provide a POSIX environment.
 - Pre-built wheels for all C extensions
 - No Visual Studio Build Tools required
-- PowerShell and Command Prompt compatible
+- PowerShell and Command Prompt compatible (best-effort); WSL2 is preferred
 
 ## Dependencies
 

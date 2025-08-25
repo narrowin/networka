@@ -91,18 +91,18 @@ pipx upgrade networka
 pip install --user --upgrade git+https://github.com/narrowin/networka.git
 
 # Remove installation
-uv tool uninstall net-worker
+uv tool uninstall networka
 # or
-pipx uninstall net-worker
+pipx uninstall networka
 # or
-pip uninstall net-worker
+pip uninstall networka
 ```
 
 ### Platform-Specific Notes
 
 **Linux/macOS**: No additional dependencies required
 
-**Windows**: All dependencies include pre-built wheels for seamless installation
+**Windows**: Scrapli (the default transport) does not officially support native Windows. While it may work with Paramiko or ssh2-python drivers, the recommended approach is to run Networka on WSL2 (Ubuntu) for a fully supported POSIX environment. Native Windows usage is best-effort.
 
 ## Quick Start
 
@@ -121,6 +121,20 @@ nano config/devices/mikrotik.yml    # Update device IP addresses
 nw run sw-office-01 system_info
 nw run office_switches "/system/identity/print"
 ```
+
+## Terminology: device_type vs hardware platform vs transport
+
+- device_type: Network OS driver used for connections and commands (Scrapli "platform"). Examples: mikrotik_routeros, cisco_iosxe, arista_eos, juniper_junos. Set per device and used to resolve vendor-aware sequences.
+- platform (hardware/firmware): Hardware architecture used for firmware-related operations. Examples: x86, x86_64, arm, mipsbe, tile. Not used for SSH connections or command execution.
+- transport: Connection backend used by Networka. Default is scrapli; nornir-netmiko transport is planned (not yet supported).
+
+Note about flags: When targeting IP addresses directly, the CLI flag --platform refers to the network driver (device_type), not the hardware architecture.
+
+## Connection transports
+
+- Default: Scrapli (stable)
+- CLI override: use --transport to select the connection backend per run
+- Planned: nornir-netmiko integration. Note: nornir-netmiko is not yet supported but coming soon.
 
 ## CLI overview
 
@@ -310,6 +324,11 @@ name,host,device_type,description,platform,model,location,tags
 sw-01,192.168.1.1,mikrotik_routeros,Lab Switch,mipsbe,CRS326,Lab,switch;access;lab
 ```
 
+Notes:
+
+- device_type = network driver (Scrapli platform); controls connection behavior and command semantics
+- platform = hardware architecture for firmware tasks (upgrade/downgrade/bootloader)
+
 **Groups CSV Headers:**
 
 ```csv
@@ -341,7 +360,8 @@ general:
 devices:
   device_name:
     host: "IP_ADDRESS"
-    device_type: "mikrotik_routeros" # or cisco_iosxe, arista_eos, juniper_junos
+  device_type: "mikrotik_routeros" # network driver (Scrapli platform): cisco_iosxe, arista_eos, juniper_junos, ...
+  # platform: "mipsbe"            # hardware architecture for firmware ops (optional)
     description: "Device description"
     tags: ["tag1", "tag2"]
 ```
@@ -511,6 +531,8 @@ Have a look through existing [Issues](https://github.com/narrowin/networka/issue
 - [Platform Compatibility](docs/platform-compatibility.md) - Cross-platform support details
 - [Development Guide](docs/development.md) - Contributing and extending the toolkit
 - [Multi-Vendor Support](docs/multi-vendor-support.md) - Using multiple network vendors
+- [IP Address Support](docs/ip-address-support.md) - Run against ad-hoc IPs with --platform
+- [Transport Selection](docs/transport.md) - Choose Scrapli now; nornir-netmiko coming soon
 - [Environment Variables](docs/environment-variables.md) - Secure credential management
 - [File Upload Guide](docs/file_upload.md) - Firmware and configuration management
 - [Interactive Credentials](docs/interactive-credentials.md) - Alternative authentication methods
