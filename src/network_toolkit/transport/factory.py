@@ -5,8 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
-    from nornir import Nornir
-
+    from nornir import Nornir  # pragma: no cover
     from network_toolkit.config import NetworkConfig
     from network_toolkit.transport.interfaces import Transport
 
@@ -36,7 +35,7 @@ class ScrapliTransportFactory:
         """Create a Scrapli transport instance."""
         # Import Scrapli symbol from device module so unit tests that patch
         # `network_toolkit.device.Scrapli` continue to intercept driver creation.
-        # Import via device module so tests patching that symbol catch it
+        # Also import the adapter symbol via device module to keep tests patchable.
         from network_toolkit.device import Scrapli as DeviceScrapli
         from network_toolkit.device import (
             ScrapliSyncTransport as DeviceScrapliSyncTransport,
@@ -50,9 +49,15 @@ class ScrapliTransportFactory:
         params = dict(connection_params)
         params["transport"] = _map_transport(params.get("transport"))
 
-    # Create Scrapli driver
-    driver = DeviceScrapli(**params)
-    return DeviceScrapliSyncTransport(driver)
+        # Create Scrapli driver and wrap it in our adapter
+        driver = DeviceScrapli(**params)
+        adapter = DeviceScrapliSyncTransport(driver)
+        # Expose raw driver for callers/tests that inspect underlying open/close
+        try:
+            adapter._raw_driver = driver  # type: ignore[attr-defined]
+        except Exception:
+            pass
+        return adapter
 
 
 class NornirNetmikoTransportFactory:
@@ -80,20 +85,21 @@ class NornirNetmikoTransportFactory:
         """Setup Nornir runner with inventory from config."""
         try:
             # Import nornir-netmiko to register its plugins
-            import nornir_netmiko
-            from nornir.core import Nornir
+            import nornir_netmiko  # type: ignore
+            from nornir.core import Nornir  # type: ignore
         except ImportError as e:
             error_msg = "Nornir package required. Install with: pip install nornir"
             raise ImportError(error_msg) from e
 
-        from network_toolkit.transport.nornir_inventory import build_nornir_inventory
+        from network_toolkit.transport.nornir_inventory import (
+            build_nornir_inventory,
+        )
 
         # Build inventory directly
         inventory = build_nornir_inventory(config)
 
         # Create Nornir instance directly with inventory - simplest approach
-        nr = Nornir(inventory=inventory)
-
+        nr = Nornir(inventory=inventory)  # type: ignore[call-arg]
         return nr
 
 

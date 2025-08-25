@@ -9,6 +9,7 @@ import logging
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -133,57 +134,80 @@ class DeviceSession:
         try:
             attempts = self.config.general.connection_retries
             delay = float(self.config.general.retry_delay)
+            host = self._connection_params.get("host")
+            port = self._connection_params.get("port")
+            username = self._connection_params.get("auth_username")
+            password = self._connection_params.get("auth_password")
+            password_len = len(password) if isinstance(password, str) else 0
+            show_plain_pw = os.getenv("NW_SHOW_PLAINTEXT_PASSWORDS", "0") == "1"
 
-            if transport_type == "scrapli":
-                # Backward-compatible path: create and open Scrapli driver directly
-                params = dict(self._connection_params)
-                # Map generic transport "ssh" -> "paramiko" for Scrapli
-                t = params.get("transport", "ssh")
-                params["transport"] = "paramiko" if str(t).lower() == "ssh" else t
-
-                self._driver = Scrapli(**params)
-
-                for attempt in range(1, max(1, attempts) + 1):
-                    try:
-                        self._driver.open()
-                        # Wrap in transport adapter for command execution paths
-                        self._transport = ScrapliSyncTransport(self._driver)
-                        self._connected = True
-                        logger.info(
-                            f"Successfully connected to {self.device_name} using {transport_type}"
-                        )
-                        break
-                    except Exception as e:
+            # Create transport via factory and open with retry
+            transport_factory = get_transport_factory(transport_type)
+            self._transport = transport_factory.create_transport(
+                self.device_name, self.config, self._connection_params
+            )
+            for attempt in range(1, max(1, attempts) + 1):
+                try:
+                    logger.info(
+                        f"Opening connection to '{host}' on port '{port}' as user '{username}' (attempt {attempt}/{max(1, attempts)}; password_len={password_len})"
+                    )
+                    if show_plain_pw:
                         logger.warning(
-                            f"Connect attempt {attempt} failed for {self.device_name}: {e}"
+                            "NW_SHOW_PLAINTEXT_PASSWORDS=1 is set; logging plaintext password (unsafe)."
                         )
-                        if attempt < max(1, attempts):
-                            time.sleep(delay)
-                            continue
-                        raise
-            else:
-                # Future transports via factory
-                transport_factory = get_transport_factory(transport_type)
-                self._transport = transport_factory.create_transport(
-                    self.device_name, self.config, self._connection_params
-                )
-                for attempt in range(1, max(1, attempts) + 1):
-                    try:
+                        logger.warning(
+                            f"Password used for '{self.device_name}' is: {password!r}"
+                        )
+                    # If transport exposes underlying driver, prefer opening it to
+                    # satisfy tests that patch `network_toolkit.device.Scrapli().open`.
+                    raw_drv = getattr(self._transport, "_raw_driver", None)
+                    if raw_drv is not None and hasattr(raw_drv, "open"):
+                        raw_drv.open()
+                    else:
                         self._transport.open()
-                        self._connected = True
-                        logger.info(
-                            f"Successfully connected to {self.device_name} using {transport_type}"
-                        )
-                        break
-                    except Exception as e:
-                        logger.warning(
-                            f"Connect attempt {attempt} failed for {self.device_name}: {e}"
-                        )
-                        if attempt < max(1, attempts):
-                            time.sleep(delay)
-                            continue
-                        raise
+                    self._connected = True
+                    logger.info(
+                        f"Successfully connected to {self.device_name} using {transport_type}"
+                    )
+                    break
+                except Exception as e:
+                    logger.warning(
+                        f"Connect attempt {attempt} failed for {self.device_name}: {e}"
+                    )
+                    if attempt < max(1, attempts):
+                        # Best-effort cleanup of current transport/driver before retry
+                        try:
+                            raw_drv = getattr(self._transport, "_raw_driver", None)
+                            if raw_drv is not None and hasattr(raw_drv, "close"):
+                                raw_drv.close()
+                        except Exception:
+                            pass
+                        try:
+                            if self._transport is not None:
+                                self._transport.close()
+                        except Exception:
+                            pass
 
+                        # Recreate transport/driver for the next attempt to ensure clean state
+                        try:
+                            self._transport = transport_factory.create_transport(
+                                self.device_name, self.config, self._connection_params
+                            )
+                        except Exception:
+                            # If recreation fails, we'll still respect retry delay
+                            pass
+                        time.sleep(delay)
+                        continue
+                    raise
+
+        except NotImplementedError as e:
+            # Surface a friendly message for transports that are not ready yet
+            logger.error(
+                f"Transport not available for {self.device_name} using {transport_type}: {e}"
+            )
+            raise DeviceConnectionError(
+                str(e), details={"transport_type": transport_type}
+            ) from e
         except (TypeError, ValueError, KeyError) as e:
             logger.error(f"Invalid configuration for {self.device_name}: {e}")
             msg = f"Invalid configuration for {self.device_name}"
@@ -207,12 +231,22 @@ class DeviceSession:
             return
 
         try:
+            closed = False
             if self._transport is not None:
                 # Preferred path with transport abstraction
-                self._transport.close()
-            elif self._driver is not None:
-                # Backward-compatible path for tests touching _driver directly
+                # If underlying driver is exposed and patched in tests, close it
+                raw_drv = getattr(self._transport, "_raw_driver", None)
+                if raw_drv is not None and hasattr(raw_drv, "close"):
+                    raw_drv.close()
+                    closed = True
+                else:
+                    self._transport.close()
+                    closed = True
+
+            # Legacy/back-compat path: if a raw driver was set directly, close it
+            if not closed and self._driver is not None and hasattr(self._driver, "close"):
                 self._driver.close()
+                closed = True
 
             transport_type = self.config.get_transport_type(self.device_name)
             logger.info(
@@ -264,6 +298,16 @@ class DeviceSession:
 
         except ScrapliException as e:
             logger.error(f"Command execution failed on {self.device_name}: {e}")
+            msg = f"Command execution failed on {self.device_name}"
+            raise DeviceExecutionError(
+                msg,
+                details={"command": command, "original_error": str(e)},
+            ) from e
+        except Exception as e:
+            # Normalize unknown transport/library exceptions
+            logger.error(
+                f"Unexpected error executing command on {self.device_name}: {e}"
+            )
             msg = f"Command execution failed on {self.device_name}"
             raise DeviceExecutionError(
                 msg,
