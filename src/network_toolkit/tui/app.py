@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 import logging
+import threading
 import time
 from pathlib import Path
 from typing import Any, ClassVar
@@ -160,6 +161,9 @@ def run(config: str | Path = "config") -> None:
             _mk_binding("f", "focus_filter", "Focus filter", show=True, priority=True),
             _mk_binding("t", "toggle_theme", "Theme", show=True, priority=True),
             _mk_binding("f2", "toggle_summary", "Summary"),
+            # Copy helpers
+            _mk_binding("y", "copy_last_error", "Copy last error", show=True, priority=True),
+            _mk_binding("ctrl+y", "copy_status", "Copy status", show=True, priority=True),
         ]
 
         def compose(self) -> Any:
@@ -243,6 +247,11 @@ def run(config: str | Path = "config") -> None:
                 self._populate_selection_list("list-sequences", self._all_sequences)
             except Exception:
                 pass
+            # Record UI thread identity for safe callback dispatching
+            try:
+                self._ui_thread_ident = threading.get_ident()
+            except Exception:
+                self._ui_thread_ident = None
             # Internal state for user toggling of summary
             self._summary_user_hidden = False
             # Internal state for user toggling of output
@@ -407,11 +416,9 @@ def run(config: str | Path = "config") -> None:
                 summary_result = await service.run_plan(
                     plan,
                     RunCallbacks(
-                        on_output=lambda m: self.call_from_thread(
-                            self._output_append, m
-                        ),
-                        on_error=lambda m: self.call_from_thread(self._add_error, m),
-                        on_meta=lambda m: self.call_from_thread(self._add_meta, m),
+                        on_output=lambda m: self._dispatch_ui(self._output_append, m),
+                        on_error=lambda m: self._dispatch_ui(self._add_error, m),
+                        on_meta=lambda m: self._dispatch_ui(self._add_meta, m),
                     ),
                 )
                 # Update summary panel (include errors if any)
@@ -485,6 +492,33 @@ def run(config: str | Path = "config") -> None:
             except Exception:
                 pass
 
+        def _dispatch_ui(self, fn: Any, *args: Any, **kwargs: Any) -> None:
+            """Invoke a UI-mutating function safely from any thread.
+
+            If called from the UI thread, call directly. Otherwise, use
+            call_from_thread when available. Fallback to direct call.
+            """
+            try:
+                current = threading.get_ident()
+                ui_ident = getattr(self, "_ui_thread_ident", None)
+            except Exception:
+                ui_ident = None
+                current = None
+            # If background thread, prefer call_from_thread
+            if ui_ident is not None and current is not None and current != ui_ident:
+                try:
+                    if hasattr(self, "call_from_thread"):
+                        self.call_from_thread(fn, *args, **kwargs)
+                        return
+                except Exception:
+                    # Fall through to direct call
+                    pass
+            # Same thread or no special API
+            try:
+                fn(*args, **kwargs)
+            except Exception as exc:
+                logging.debug(f"UI dispatch failed: {exc}")
+
         def on_key(self, event: Any) -> None:
             """Global key fallback to ensure toggles work even if focus is on inputs."""
             try:
@@ -515,6 +549,13 @@ def run(config: str | Path = "config") -> None:
             elif key == "f":
                 try:
                     self.action_focus_filter()
+                    if hasattr(event, "stop"):
+                        event.stop()
+                except Exception:
+                    pass
+            elif key == "y":
+                try:
+                    self.action_copy_last_error()
                     if hasattr(event, "stop"):
                         event.stop()
                 except Exception:
@@ -918,6 +959,106 @@ def run(config: str | Path = "config") -> None:
                     btn.disabled = not enabled
             except Exception:
                 pass
+
+        # --- Clipboard utilities & copy actions
+        def _copy_to_clipboard(self, text: str) -> bool:
+            """Best-effort copy to system clipboard across Textual versions.
+
+            Returns True if the framework reported success, False otherwise.
+            """
+            try:
+                if hasattr(self, "copy_to_clipboard"):
+                    self.copy_to_clipboard(text)
+                    return True
+            except Exception:
+                pass
+            for obj_name in ("set_clipboard",):
+                try:
+                    if hasattr(self, obj_name):
+                        getattr(self, obj_name)(text)
+                        return True
+                except Exception:
+                    pass
+            try:
+                scr = getattr(self, "screen", None)
+                if scr is not None and hasattr(scr, "set_clipboard"):
+                    scr.set_clipboard(text)
+                    return True
+            except Exception:
+                pass
+            try:
+                drv = getattr(self, "driver", None)
+                if drv is not None and hasattr(drv, "set_clipboard"):
+                    drv.set_clipboard(text)
+                    return True
+            except Exception:
+                pass
+            return False
+
+        def action_copy_status(self) -> None:
+            """Copy the current status line text to clipboard."""
+            try:
+                status_widget = self.query_one("#run-status")
+            except Exception:
+                status_widget = None
+            text = ""
+            if status_widget is not None:
+                try:
+                    content = getattr(status_widget, "renderable", None)
+                    if content is None:
+                        content = getattr(status_widget, "text", None)
+                    text = str(content) if content is not None else ""
+                except Exception:
+                    text = ""
+            if not text:
+                text = "Status: idle"
+            ok = self._copy_to_clipboard(text)
+            self._add_meta("Status copied to clipboard" if ok else "Could not access clipboard")
+
+        def action_copy_last_error(self) -> None:
+            """Copy the last error message to clipboard.
+
+            Priority order:
+            1) Last recorded error from error callbacks
+            2) Last output line containing 'error'
+            3) Entire status line if it mentions an error
+            """
+            err_text: str | None = None
+            try:
+                errs = getattr(self, "_errors", []) or []
+                if errs:
+                    err_text = str(errs[-1])
+            except Exception:
+                err_text = None
+            if not err_text:
+                try:
+                    lines = list(getattr(self, "_output_lines", []) or [])
+                except Exception:
+                    lines = []
+                for ln in reversed(lines):
+                    try:
+                        if "error" in ln.lower():
+                            err_text = ln
+                            break
+                    except Exception as exc:
+                        logging.debug(f"Scanning output line for error failed: {exc}")
+                        continue
+            if not err_text:
+                try:
+                    status_widget = self.query_one("#run-status")
+                    content = getattr(status_widget, "renderable", None)
+                    if content is None:
+                        content = getattr(status_widget, "text", None)
+                    status_text = str(content) if content is not None else ""
+                    if "error" in status_text.lower():
+                        err_text = status_text
+                except Exception:
+                    err_text = None
+            if not err_text:
+                self._add_meta("No error found to copy")
+                return
+            ok = self._copy_to_clipboard(err_text)
+            self._add_meta("Error copied to clipboard" if ok else "Could not access clipboard")
 
         def _show_summary_panel(self) -> None:
             # Ensure bottom area is visible and unhide summary panel

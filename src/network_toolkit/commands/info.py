@@ -14,6 +14,7 @@ from network_toolkit.common.credentials import prompt_for_credentials
 from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import (
     OutputMode,
+    get_output_mode_from_config,
     get_output_manager_with_config,
     set_output_mode,
 )
@@ -35,9 +36,6 @@ def register(app: typer.Typer) -> None:
             typer.Argument(
                 help="Comma-separated device/group names from configuration"
             ),
-            typer.Argument(
-                help="Comma-separated device/group names from configuration"
-            ),
         ],
         config_file: Annotated[
             Path,
@@ -52,9 +50,6 @@ def register(app: typer.Typer) -> None:
                 show_default=False,
             ),
         ] = None,
-        verbose: Annotated[
-            bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
-        ] = False,
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
         ] = False,
@@ -100,14 +95,17 @@ def register(app: typer.Typer) -> None:
                 # CLI parameter overrides everything
                 set_output_mode(output_mode)
                 output_manager = get_output_manager_with_config()
+                active_mode: OutputMode = output_mode
             else:
                 # Use config-based output mode
-                output_manager = get_output_manager_with_config(
-                    config.general.output_mode
-                )
+                cfg_mode_str: str = config.general.output_mode
+                output_manager = get_output_manager_with_config(cfg_mode_str)
+                active_mode = get_output_mode_from_config(cfg_mode_str)
 
             resolver = DeviceResolver(config)
 
+            # Initialize style manager from active mode and get themed console
+            style_manager = StyleManager(active_mode)
             # Get themed console
             themed_console = output_manager.console
 
@@ -135,9 +133,7 @@ def register(app: typer.Typer) -> None:
                 raise typer.Exit(1) from None
 
             themed_console.print(
-                style_manager.format_message(
-                    f"Device Information ({len(devices)} devices)", StyleName.BOLD
-                )
+                f"[bold]Device Information ({len(devices)} devices)[/bold]"
             )
 
             # Helper function to check if environment variable is truthy
