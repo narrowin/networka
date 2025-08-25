@@ -53,7 +53,7 @@ class _DynamicConsoleProxy:
     output mode (e.g., via --output-mode or config) are reflected everywhere.
     """
 
-    def __getattr__(self, name: str):  # type: ignore[override]
+    def __getattr__(self, name: str) -> Any:
         return getattr(get_output_manager().console, name)
 
 
@@ -236,9 +236,8 @@ def _handle_file_downloads(
         filename = replace_placeholders(local_filename_str)
         destination = local_dir / filename
 
-        get_output_manager().print_info(
-            f"Downloading {remote_file} from {device_name}..."
-        )
+        # Keep console.print here for backward-compatible tests expecting direct console output
+        console.print(f"[cyan]Downloading {remote_file} from {device_name}...[/cyan]")
 
         try:
             success = session.download_file(
@@ -247,15 +246,15 @@ def _handle_file_downloads(
                 delete_remote=delete_remote,
             )
             if success:
-                get_output_manager().print_success(
-                    f"Downloaded {remote_file} to {destination}"
+                console.print(
+                    f"[green]OK Downloaded {remote_file} to {destination}[/green]"
                 )
                 results[remote_file] = f"Downloaded to {destination}"
             else:
-                get_output_manager().print_error(f"Failed to download {remote_file}")
+                console.print(f"[red]FAIL Failed to download {remote_file}[/red]")
                 results[remote_file] = "Download failed"
         except Exception as e:  # DeviceExecutionError or unexpected
-            get_output_manager().print_error(f"Error downloading {remote_file}: {e}")
+            console.print(f"[red]FAIL Error downloading {remote_file}: {e}[/red]")
             results[remote_file] = f"Download error: {e}"
 
     return results

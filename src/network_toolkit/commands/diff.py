@@ -34,9 +34,7 @@ import typer
 
 from network_toolkit.common.command import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
-from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import OutputMode
-from network_toolkit.common.styles import StyleManager, StyleName
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.results_enhanced import ResultsManager
@@ -195,10 +193,6 @@ def register(app: typer.Typer) -> None:
             verbose=verbose,
             config_file=config_file,
         )
-
-        # Setup style manager for consistent theming
-        style_manager = StyleManager(ctx.output_mode)
-        console = style_manager.console
 
         subj = subject.strip()
         is_config = subj.lower() == "config"
@@ -477,7 +471,7 @@ def register(app: typer.Typer) -> None:
                                 dev, f"DIFF {name}", res.output or "(no diff)"
                             )
 
-                ctx.console.print("-" * 80)
+                ctx.output.print_separator()
 
             if any_diffs:
                 ctx.print_info(

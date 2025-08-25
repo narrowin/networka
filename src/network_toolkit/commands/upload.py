@@ -8,10 +8,9 @@ from typing import Annotated
 
 import typer
 
-from network_toolkit.common.command import CommandContext, handle_toolkit_errors
+from network_toolkit.common.command import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.logging import setup_logging
-from network_toolkit.common.styles import StyleManager, StyleName
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 
@@ -82,9 +81,7 @@ def register(app: typer.Typer) -> None:
             output_mode=None,  # Use global config theme
         )
 
-        # Create style manager for consistent theming
-        style_manager = StyleManager(ctx.output_mode)
-        console = ctx.console
+        output = ctx.output
 
         try:
             config = load_config(config_file)
@@ -141,9 +138,9 @@ def register(app: typer.Typer) -> None:
                 ctx.print_info(
                     f"  Checksum verify: {'Yes' if checksum_verify else 'No'}"
                 )
-                console.print()
+                output.print_blank_line()
 
-                with console.status(f"Uploading {local_file.name} to {target_name}..."):
+                with output.status(f"Uploading {local_file.name} to {target_name}..."):
                     with device_session(target_name, config) as session:
                         success = session.upload_file(
                             local_path=local_file,
@@ -185,9 +182,9 @@ def register(app: typer.Typer) -> None:
             ctx.print_info(f"  Max concurrent: {max_concurrent}")
             ctx.print_info(f"  Verify upload: {'Yes' if verify else 'No'}")
             ctx.print_info(f"  Checksum verify: {'Yes' if checksum_verify else 'No'}")
-            console.print()
+            output.print_blank_line()
 
-            with console.status(
+            with output.status(
                 f"Uploading {local_file.name} to {len(members)} devices...",
             ):
                 results = device_session.upload_file_to_devices(
@@ -207,7 +204,7 @@ def register(app: typer.Typer) -> None:
             ctx.print_success(f"  Successful: {successful}/{total}")
             if total - successful > 0:
                 ctx.print_error(f"  Failed: {total - successful}/{total}")
-            console.print()
+            output.print_blank_line()
 
             ctx.print_info("Per-Device Results:")
             for dev in members:

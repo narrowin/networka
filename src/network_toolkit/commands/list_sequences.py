@@ -9,8 +9,12 @@ from typing import Annotated
 import typer
 
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
-from network_toolkit.common.logging import console, setup_logging
-from network_toolkit.common.output import OutputMode, get_output_manager_with_config
+from network_toolkit.common.logging import setup_logging
+from network_toolkit.common.output import (
+    OutputManager,
+    OutputMode,
+    get_output_manager_with_config,
+)
 from network_toolkit.common.styles import StyleManager, StyleName
 from network_toolkit.config import CommandSequence, load_config
 from network_toolkit.sequence_manager import SequenceManager, SequenceRecord
@@ -49,6 +53,7 @@ def register(app: typer.Typer) -> None:
         """List all available command sequences, optionally filtered by vendor or category."""
         setup_logging("DEBUG" if verbose else "INFO")
 
+        output_manager = None
         try:
             config = load_config(config_file)
 
@@ -80,7 +85,7 @@ def register(app: typer.Typer) -> None:
                         all_vendor, category, style_manager, verbose=verbose
                     )
                 else:
-                    console.print(
+                    output_manager.print_text(
                         style_manager.format_message(
                             "No vendor-specific sequences found.", StyleName.WARNING
                         )
@@ -88,15 +93,21 @@ def register(app: typer.Typer) -> None:
 
             # Show global sequences if they exist
             if config.global_command_sequences:
-                console.print("\n")
+                output_manager.print_blank_line()
                 _show_global_sequences(
-                    config.global_command_sequences, style_manager, verbose=verbose
+                    config.global_command_sequences,
+                    style_manager,
+                    output_manager,
+                    verbose=verbose,
                 )
 
         except Exception as e:
             # Create default style manager for error output
             style_manager = StyleManager(OutputMode.DEFAULT)
-            console.print(
+            # Use a default OutputManager for error display
+            from network_toolkit.common.output import get_output_manager
+
+            get_output_manager().print_text(
                 style_manager.format_message(
                     f"Error loading configuration: {e}", StyleName.ERROR
                 )
@@ -113,14 +124,17 @@ def _show_vendor_sequences(
     verbose: bool,
 ) -> None:
     """Show sequences for a specific vendor."""
-    console.print(
+    from network_toolkit.common.output import get_output_manager
+
+    output_manager = get_output_manager()
+    output_manager.print_text(
         style_manager.format_message(
             f"Command Sequences for {vendor.title()}", StyleName.BOLD
         )
     )
 
     if not sequences:
-        console.print(
+        output_manager.print_text(
             style_manager.format_message(
                 "No sequences found for this vendor.", StyleName.WARNING
             )
@@ -137,7 +151,7 @@ def _show_vendor_sequences(
         }
 
     if not filtered_sequences:
-        console.print(
+        output_manager.print_text(
             style_manager.format_message(
                 f"No sequences found for category '{category_filter}'.",
                 StyleName.WARNING,
@@ -179,7 +193,7 @@ def _show_vendor_sequences(
 
         table.add_row(*row)
 
-    console.print(table)
+    output_manager.print_table(table)
 
 
 def _show_all_vendor_sequences(
@@ -190,13 +204,16 @@ def _show_all_vendor_sequences(
     verbose: bool,
 ) -> None:
     """Show sequences for all vendors."""
-    console.print(
+    from network_toolkit.common.output import get_output_manager
+
+    output_manager = get_output_manager()
+    output_manager.print_text(
         style_manager.format_message("Command Sequences by Vendor", StyleName.BOLD)
     )
 
     for vendor, vendor_sequences in sequences.items():
         vendor_title = vendor.replace("_", " ").title()
-        console.print(
+        output_manager.print_text(
             f"\n{style_manager.format_message(vendor_title, StyleName.DEVICE)}"
         )
 
@@ -210,7 +227,7 @@ def _show_all_vendor_sequences(
             }
 
         if not filtered_sequences:
-            console.print(
+            output_manager.print_text(
                 style_manager.format_message(
                     f"  No sequences for category '{category_filter}'", StyleName.DIM
                 )
@@ -232,14 +249,18 @@ def _show_all_vendor_sequences(
                 row.append(commands_str)
             table.add_row(*row)
 
-        console.print(table)
+    output_manager.print_table(table)
 
 
 def _show_global_sequences(
-    sequences: dict[str, CommandSequence], style_manager: StyleManager, *, verbose: bool
+    sequences: dict[str, CommandSequence],
+    style_manager: StyleManager,
+    output_manager: OutputManager,
+    *,
+    verbose: bool,
 ) -> None:
     """Show global sequences."""
-    console.print(
+    output_manager.print_text(
         style_manager.format_message("Global Command Sequences", StyleName.BOLD)
     )
 
@@ -247,7 +268,7 @@ def _show_global_sequences(
     filtered_sequences = sequences
 
     if not filtered_sequences:
-        console.print(
+        output_manager.print_text(
             style_manager.format_message(
                 "No global sequences found.", StyleName.WARNING
             )
@@ -284,5 +305,5 @@ def _show_global_sequences(
 
         table.add_row(*row)
 
-    console.print(table)
-    console.print(table)
+    output_manager.print_table(table)
+    output_manager.print_table(table)

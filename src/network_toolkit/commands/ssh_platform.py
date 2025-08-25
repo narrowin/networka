@@ -6,9 +6,7 @@ import platform
 import shutil
 from typing import Any
 
-from network_toolkit.common.logging import console
-from network_toolkit.common.styles import StyleManager, StyleName
-from network_toolkit.common.output import OutputMode
+from network_toolkit.common.command_helpers import CommandContext
 
 
 class PlatformCapabilities:
@@ -72,44 +70,54 @@ class PlatformCapabilities:
             "can_do_tmux_fanout": self.supports_tmux and self.ssh_client_type != "none",
         }
 
-    def suggest_alternatives(self) -> None:
+    def suggest_alternatives(self, ctx: CommandContext | None = None) -> None:
         """Print platform-specific installation suggestions."""
-        style_manager = StyleManager(mode=OutputMode.DEFAULT)
+        if ctx is None:
+            # Temporary fallback for non-converted code
+            from network_toolkit.common.output import OutputManager, OutputMode
+
+            output_manager = OutputManager(mode=OutputMode.DEFAULT)
+
+            class TempContext:
+                def __init__(self, output_mgr: Any) -> None:
+                    self.output_manager = output_mgr
+
+                def print_warning(self, msg: str) -> None:
+                    self.output_manager.print_text(f"[yellow]Warning:[/yellow] {msg}")
+
+            ctx = TempContext(output_manager)  # type: ignore
+
+        # At this point ctx is guaranteed to not be None
+        assert ctx is not None
 
         if not self.supports_tmux:
             if self.system == "Windows":
-                warning_msg = style_manager.format_message(
-                    "tmux not available on Windows. Consider:", StyleName.WARNING
+                ctx.print_warning("tmux not available on Windows. Consider:")
+                ctx.output_manager.print_text("• Install WSL2 and use: wsl -d Ubuntu")
+                ctx.output_manager.print_text(
+                    "• Use Windows Terminal with multiple tabs"
                 )
-                console.print(warning_msg)
-                console.print("• Install WSL2 and use: wsl -d Ubuntu")
-                console.print("• Use Windows Terminal with multiple tabs")
-                console.print("• Use ConEmu or similar terminal multiplexer")
+                ctx.output_manager.print_text(
+                    "• Use ConEmu or similar terminal multiplexer"
+                )
             else:
-                warning_msg = style_manager.format_message(
-                    "tmux not found. Install with:", StyleName.WARNING
-                )
-                console.print(warning_msg)
+                ctx.print_warning("tmux not found. Install with:")
                 if self.system == "Darwin":
-                    console.print("• brew install tmux")
+                    ctx.output_manager.print_text("• brew install tmux")
                 else:
-                    console.print("• apt install tmux (Ubuntu/Debian)")
-                    console.print("• yum install tmux (RHEL/CentOS)")
+                    ctx.output_manager.print_text("• apt install tmux (Ubuntu/Debian)")
+                    ctx.output_manager.print_text("• yum install tmux (RHEL/CentOS)")
 
         if self.ssh_client_type == "none":
             if self.system == "Windows":
-                warning_msg = style_manager.format_message(
-                    "No SSH client found. Install:", StyleName.WARNING
+                ctx.print_warning("No SSH client found. Install:")
+                ctx.output_manager.print_text(
+                    "• Windows OpenSSH: Settings > Apps > Optional Features"
                 )
-                console.print(warning_msg)
-                console.print("• Windows OpenSSH: Settings > Apps > Optional Features")
-                console.print("• PuTTY: https://www.putty.org/")
-                console.print("• Git Bash (includes OpenSSH)")
+                ctx.output_manager.print_text("• PuTTY: https://www.putty.org/")
+                ctx.output_manager.print_text("• Git Bash (includes OpenSSH)")
             else:
-                warning_msg = style_manager.format_message(
-                    "SSH client not found. Install openssh-client", StyleName.WARNING
-                )
-                console.print(warning_msg)
+                ctx.print_warning("SSH client not found. Install openssh-client")
 
 
 # Global instance

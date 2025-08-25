@@ -84,7 +84,7 @@ class OutputManager:
                     "unknown": "yellow",
                 }
             )
-            return Console(theme=light_theme, stderr=False)
+            return Console(theme=light_theme, stderr=False, force_terminal=True)
         elif self.mode == OutputMode.DARK:
             # Dark uses defaults; also avoid dim to keep consistency
             dark_theme = Theme(
@@ -108,7 +108,7 @@ class OutputManager:
                     "unknown": "yellow",
                 }
             )
-            return Console(theme=dark_theme, stderr=False)
+            return Console(theme=dark_theme, stderr=False, force_terminal=True)
         else:
             # Default mode uses Rich's default styling with our semantic colors
             default_theme = Theme(
@@ -134,7 +134,7 @@ class OutputManager:
                     "unknown": "yellow",
                 }
             )
-            return Console(theme=default_theme, stderr=False)
+            return Console(theme=default_theme, stderr=False, force_terminal=True)
 
     @property
     def console(self) -> Console:
@@ -319,6 +319,25 @@ class OutputManager:
         if self.mode == OutputMode.RAW:
             return
         self._console.print(table)
+
+    def print_text(self, text: str) -> None:
+        """Print arbitrary rich-markup text using the current console.
+
+        Use this sparingly for help screens or pre-formatted content.
+        """
+        if self.mode == OutputMode.RAW:
+            sys.stdout.write(f"{text}\n")
+        else:
+            self._console.print(text)
+
+    def status(self, message: str) -> Any:
+        """Return a status/spinner context manager bound to this console.
+
+        Example:
+            with output.status("Working..."):
+                ...
+        """
+        return self._console.status(message)
 
     def print_transport_info(self, transport_type: str) -> None:
         """Print transport information."""

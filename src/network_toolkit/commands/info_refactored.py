@@ -7,13 +7,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 import typer
-from rich.table import Table
 
 from network_toolkit.common.command import CommandContext, handle_toolkit_errors
 from network_toolkit.common.credentials import prompt_for_credentials
 from network_toolkit.common.output import OutputMode
 from network_toolkit.common.resolver import DeviceResolver
-from network_toolkit.common.styles import StyleManager, StyleName
 from network_toolkit.exceptions import NetworkToolkitError
 
 if TYPE_CHECKING:
@@ -73,18 +71,6 @@ def register(app: typer.Typer) -> None:
             output_mode=output_mode,
         )
 
-        # Create style manager for consistent theming
-        style_manager = StyleManager(ctx.output_mode)
-
-        def add_table_row(
-            table: Table,
-            label: str,
-            value: str,
-            label_style: StyleName = StyleName.COMMAND,
-        ) -> None:
-            """Helper to add consistently styled table rows."""
-            table.add_row(style_manager.format_message(label, label_style), value)
-
         # Handle interactive authentication if requested
         interactive_creds = None
         if interactive_auth:
@@ -101,56 +87,51 @@ def register(app: typer.Typer) -> None:
         devices, unknowns = resolver.resolve_targets(targets)
 
         if unknowns:
-            ctx.print_warning(f"Unknown targets: {', '.join(unknowns)}")
+            ctx.output.print_unknown_warning(unknowns)
 
         if not devices:
-            ctx.print_error("No valid devices found in targets")
+            ctx.output.print_error("No valid devices found in targets")
             raise typer.Exit(1) from None
 
-        ctx.console.print(
-            style_manager.format_message(
-                f"Device Information ({len(devices)} devices)", StyleName.INFO
-            )
-        )
+        ctx.output.print_info(f"Device Information ({len(devices)} devices)")
 
         # Show info for each resolved device
         for i, device in enumerate(devices):
             if i > 0:
-                ctx.console.print()  # Blank line between devices
+                ctx.output.print_blank_line()  # Blank line between devices
 
             if not ctx.config.devices or device not in ctx.config.devices:
-                ctx.print_error(f"Device '{device}' not found in configuration")
+                ctx.output.print_error(f"Device '{device}' not found in configuration")
                 continue
 
             device_config = ctx.config.devices[device]
 
             # Create device info table
-            table = Table(
+            table = ctx.output.create_table(
                 title=f"Device: {device}",
-                box=None,
                 show_header=False,
-                padding=(0, 1),
+                box=None,
             )
 
             # Basic device information
-            add_table_row(table, "Host", str(device_config.host))
-            add_table_row(table, "Type", device_config.device_type)
+            table.add_row("Host", str(device_config.host))
+            table.add_row("Type", device_config.device_type)
 
             if device_config.description:
-                add_table_row(table, "Description", device_config.description)
+                table.add_row("Description", device_config.description)
 
             if device_config.tags:
-                add_table_row(table, "Tags", ", ".join(device_config.tags))
+                table.add_row("Tags", ", ".join(device_config.tags))
 
             if device_config.platform:
-                add_table_row(table, "Platform", device_config.platform)
+                table.add_row("Platform", device_config.platform)
 
             if device_config.model:
-                add_table_row(table, "Model", device_config.model)
+                table.add_row("Model", device_config.model)
 
             # Transport information
             transport_type = getattr(device_config, "transport_type", "scrapli")
-            add_table_row(table, "Transport", transport_type)
+            table.add_row("Transport", transport_type)
 
             # Connection test
             try:
@@ -168,52 +149,20 @@ def register(app: typer.Typer) -> None:
                     device, ctx.config, username_override, password_override
                 ) as session:
                     identity_result = session.execute_command("/system/identity/print")
-                    add_table_row(
-                        table,
-                        "Status",
-                        style_manager.format_message(
-                            "Connected OK", StyleName.CONNECTED
-                        ),
-                        StyleName.SUCCESS,
-                    )
+                    table.add_row("Status", "Connected OK")
                     if identity_result:
                         lines = identity_result.strip().split("\n")
                         if lines:
                             identity = lines[0].strip()
-                            add_table_row(table, "Identity", identity)
+                            table.add_row("Identity", identity)
 
             except NetworkToolkitError as e:
-                add_table_row(
-                    table,
-                    "Status",
-                    style_manager.format_message("Failed FAIL", StyleName.FAILED),
-                    StyleName.ERROR,
-                )
-                add_table_row(
-                    table,
-                    "Error",
-                    style_manager.format_message(e.message, StyleName.FAILED),
-                    StyleName.ERROR,
-                )
+                table.add_row("Status", "Failed")
+                table.add_row("Error", e.message)
                 if ctx.verbose and e.details:
-                    add_table_row(
-                        table,
-                        "Details",
-                        style_manager.format_message(str(e.details), StyleName.FAILED),
-                        StyleName.ERROR,
-                    )
+                    table.add_row("Details", str(e.details))
             except Exception as e:
-                add_table_row(
-                    table,
-                    "Status",
-                    style_manager.format_message("Failed FAIL", StyleName.FAILED),
-                    StyleName.ERROR,
-                )
-                add_table_row(
-                    table,
-                    "Error",
-                    style_manager.format_message(str(e), StyleName.FAILED),
-                    StyleName.ERROR,
-                )
+                table.add_row("Status", "Failed")
+                table.add_row("Error", str(e))
 
-            ctx.console.print(table)
+            ctx.output.print_table(table)

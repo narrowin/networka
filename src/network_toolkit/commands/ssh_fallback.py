@@ -7,9 +7,7 @@ import shutil
 import subprocess
 from typing import Any
 
-from network_toolkit.common.logging import console, setup_logging
-from network_toolkit.common.output import OutputMode
-from network_toolkit.common.styles import StyleManager, StyleName
+from network_toolkit.common.output import get_output_manager
 from network_toolkit.config import NetworkConfig
 
 
@@ -17,21 +15,13 @@ def open_sequential_ssh_sessions(
     devices: list[str], config: NetworkConfig, **kwargs: Any
 ) -> None:
     """Open SSH sessions sequentially when tmux is not available."""
-    sm = StyleManager(OutputMode.DEFAULT)
-    console.print(
-        sm.format_message(
-            f"Opening {len(devices)} SSH sessions sequentially...", StyleName.INFO
-        )
-    )
+    output_manager = get_output_manager()
+    output_manager.print_info(f"Opening {len(devices)} SSH sessions sequentially...")
 
     system = platform.system()
 
     for i, device in enumerate(devices, 1):
-        console.print(
-            sm.format_message(
-                f"({i}/{len(devices)}) Connecting to {device}...", StyleName.INFO
-            )
-        )
+        output_manager.print_info(f"({i}/{len(devices)}) Connecting to {device}...")
 
         try:
             params = config.get_device_connection_params(device)
@@ -53,20 +43,13 @@ def open_sequential_ssh_sessions(
                     subprocess.run(terminal_cmd, check=False)
                 else:
                     # Fallback: run SSH directly (will take over current terminal)
-                    console.print(
-                        sm.format_message(
-                            f"Opening SSH in current terminal for {device}",
-                            StyleName.WARNING,
-                        )
+                    output_manager.print_warning(
+                        f"Opening SSH in current terminal for {device}"
                     )
                     subprocess.run(ssh_cmd, check=False)
 
         except Exception as e:
-            console.print(
-                sm.format_message(
-                    f"Failed to connect to {device}: {e}", StyleName.ERROR
-                )
-            )
+            output_manager.print_error(f"Failed to connect to {device}: {e}")
 
 
 def _build_platform_ssh_command(

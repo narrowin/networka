@@ -14,9 +14,9 @@ import typer
 
 from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
-from network_toolkit.common.logging import setup_logging
-from network_toolkit.common.output import OutputMode
-from network_toolkit.common.styles import StyleManager, StyleName
+
+# For backward compatibility with tests
+from network_toolkit.common.logging import console, setup_logging
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.platforms import UnsupportedOperationError, get_platform_operations
@@ -63,10 +63,6 @@ def register(app: typer.Typer) -> None:
         """
         setup_logging("DEBUG" if verbose else "INFO")
 
-        # Create style manager for consistent theming
-        style_manager = StyleManager(mode=OutputMode.DEFAULT)
-        console = style_manager.console
-
         # ACTION command - use global config theme
         ctx = CommandContext(
             config_file=config_file,
@@ -86,11 +82,8 @@ def register(app: typer.Typer) -> None:
             is_group = target_name in groups
 
             if not (is_device or is_group):
-                console.print(
-                    style_manager.format_message(
-                        f"Error: '{target_name}' not found as device or group in configuration",
-                        StyleName.ERROR,
-                    )
+                ctx.print_error(
+                    f"Error: '{target_name}' not found as device or group in configuration"
                 )
                 if devices:
                     dev_names = sorted(devices.keys())
@@ -139,13 +132,14 @@ def register(app: typer.Typer) -> None:
                             for cmd in seq_cmds:
                                 session.execute_command(cmd)
 
-                        console.print(
-                            style_manager.format_message(
-                                f"Upgrading BIOS/RouterBOOT on {dev} and rebooting...",
-                                StyleName.WARNING,
-                            )
+                        ctx.print_warning(
+                            f"Upgrading BIOS/RouterBOOT on {dev} and rebooting..."
                         )
-                        platform_name = platform_ops.get_platform_name()
+                        try:
+                            platform_name_obj = platform_ops.get_platform_name()
+                            platform_name = str(platform_name_obj)
+                        except Exception:  # pragma: no cover - defensive
+                            platform_name = "unknown"
                         ctx.print_info(f"Platform: {platform_name}")
 
                         # Use platform-specific BIOS upgrade
@@ -155,12 +149,7 @@ def register(app: typer.Typer) -> None:
                                 f"OK BIOS upgrade scheduled; device rebooting: {dev}"
                             )
                             return True
-                        console.print(
-                            style_manager.format_message(
-                                f"FAIL BIOS upgrade failed to start on {dev}",
-                                StyleName.ERROR,
-                            )
-                        )
+                        ctx.print_error(f"FAIL BIOS upgrade failed to start on {dev}")
                         return False
                 except NetworkToolkitError as e:
                     ctx.print_error(f"Error on {dev}: {e.message}")
@@ -186,19 +175,11 @@ def register(app: typer.Typer) -> None:
                     members = grp.members or []
 
             if not members:
-                console.print(
-                    style_manager.format_message(
-                        f"Error: No devices found in group '{target_name}'",
-                        StyleName.ERROR,
-                    )
-                )
+                ctx.print_error(f"Error: No devices found in group '{target_name}'")
                 raise typer.Exit(1)
 
-            console.print(
-                style_manager.format_message(
-                    f"Starting RouterBOARD upgrade for group '{target_name}' ({len(members)} devices)",
-                    StyleName.INFO,
-                )
+            ctx.print_info(
+                f"Starting RouterBOARD upgrade for group '{target_name}' ({len(members)} devices)"
             )
             failures = 0
             for dev in members:
@@ -206,9 +187,9 @@ def register(app: typer.Typer) -> None:
                 failures += 0 if ok else 1
 
             total = len(members)
-            console.print(
-                style_manager.format_message("Completed:", StyleName.BOLD)
-                + f" {total - failures}/{total} initiated"
+            # Keep summary formatting consistent with other commands
+            ctx.output_manager.print_info(
+                f"Completed: {total - failures}/{total} initiated"
             )
             if failures:
                 raise typer.Exit(1)

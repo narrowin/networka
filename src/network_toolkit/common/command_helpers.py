@@ -86,24 +86,15 @@ class CommandContext:
 
     def print_warning(self, message: str, device_name: str | None = None) -> None:
         """Print a warning message with proper styling."""
-        from network_toolkit.common.styles import StyleName
-
-        styled_message = self.style_manager.format_message(message, StyleName.WARNING)
-        self.console.print(styled_message)
+        self.output_manager.print_warning(message, device_name)
 
     def print_success(self, message: str, device_name: str | None = None) -> None:
         """Print a success message with proper styling."""
-        from network_toolkit.common.styles import StyleName
-
-        styled_message = self.style_manager.format_message(message, StyleName.SUCCESS)
-        self.console.print(styled_message)
+        self.output_manager.print_success(message, device_name)
 
     def print_info(self, message: str, device_name: str | None = None) -> None:
         """Print an info message with proper styling."""
-        from network_toolkit.common.styles import StyleName
-
-        styled_message = self.style_manager.format_message(message, StyleName.INFO)
-        self.console.print(styled_message)
+        self.output_manager.print_info(message, device_name)
 
     def handle_error(self, error: Exception) -> None:
         """Handle exceptions with proper styled output and exit."""
