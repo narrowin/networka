@@ -162,8 +162,12 @@ def run(config: str | Path = "config") -> None:
             _mk_binding("t", "toggle_theme", "Theme", show=True, priority=True),
             _mk_binding("f2", "toggle_summary", "Summary"),
             # Copy helpers
-            _mk_binding("y", "copy_last_error", "Copy last error", show=True, priority=True),
-            _mk_binding("ctrl+y", "copy_status", "Copy status", show=True, priority=True),
+            _mk_binding(
+                "y", "copy_last_error", "Copy last error", show=True, priority=True
+            ),
+            _mk_binding(
+                "ctrl+y", "copy_status", "Copy status", show=True, priority=True
+            ),
         ]
 
         def compose(self) -> Any:
@@ -1013,7 +1017,9 @@ def run(config: str | Path = "config") -> None:
             if not text:
                 text = "Status: idle"
             ok = self._copy_to_clipboard(text)
-            self._add_meta("Status copied to clipboard" if ok else "Could not access clipboard")
+            self._add_meta(
+                "Status copied to clipboard" if ok else "Could not access clipboard"
+            )
 
         def action_copy_last_error(self) -> None:
             """Copy the last error message to clipboard.
@@ -1058,7 +1064,9 @@ def run(config: str | Path = "config") -> None:
                 self._add_meta("No error found to copy")
                 return
             ok = self._copy_to_clipboard(err_text)
-            self._add_meta("Error copied to clipboard" if ok else "Could not access clipboard")
+            self._add_meta(
+                "Error copied to clipboard" if ok else "Could not access clipboard"
+            )
 
         def _show_summary_panel(self) -> None:
             # Ensure bottom area is visible and unhide summary panel

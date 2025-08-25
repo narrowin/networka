@@ -14,8 +14,8 @@ from network_toolkit.common.credentials import prompt_for_credentials
 from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import (
     OutputMode,
-    get_output_mode_from_config,
     get_output_manager_with_config,
+    get_output_mode_from_config,
     set_output_mode,
 )
 from network_toolkit.common.resolver import DeviceResolver
