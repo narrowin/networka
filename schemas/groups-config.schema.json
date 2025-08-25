@@ -1,19 +1,19 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Device Collection Configuration",
-  "description": "Schema for device collection files (config/devices/*.yml)",
+  "title": "Groups Collection Configuration",
+  "description": "Schema for group collection files (config/groups/*.yml)",
   "type": "object",
   "properties": {
-    "devices": {
+    "groups": {
       "type": "object",
       "additionalProperties": {
-        "$ref": "#/$defs/DeviceConfig"
+        "$ref": "#/$defs/DeviceGroup"
       },
-      "description": "Dictionary of device configurations keyed by device name"
+      "description": "Dictionary of device group configurations keyed by group name"
     }
   },
   "required": [
-    "devices"
+    "groups"
   ],
   "$defs": {
     "CommandSequence": {
