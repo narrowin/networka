@@ -70,7 +70,7 @@ class OutputManager:
                     "device": "cyan",
                     "command": "magenta",
                     # Ensure readable plain output on light backgrounds
-                    "output": "black",
+                    "output": "#000000",
                     "summary": "blue",
                     # Avoid washed-out text on light themes
                     "dim": "default",

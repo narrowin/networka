@@ -12,8 +12,8 @@ from time import perf_counter
 from typing import Annotated, Any
 
 import typer
-# Tables and printing routed via OutputManager helpers
 
+# Tables and printing routed via OutputManager helpers
 from network_toolkit.common.command import CommandContext
 from network_toolkit.common.credentials import prompt_for_credentials
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
@@ -540,43 +540,20 @@ def register(app: typer.Typer) -> None:
                     else:
                         ctx.print_success("Group Sequence Results")
                         for device_name, device_results, error in all_results:
-                            table = output_mgr.create_table(
-                                title=f"Device: {device_name}",
-                                box=None,
-                                show_header=False,
-                            )
-                            if error:
-                                table.add_row(
-                                    "[error]Status[/error]",
-                                    "[failed]Failed[/failed]",
-                                )
-                                table.add_row(
-                                    "[error]Error[/error]",
-                                    f"[failed]{error}[/failed]",
-                                )
-                            else:
-                                table.add_row(
-                                    "[success]Status[/success]",
-                                    "[connected]Success[/connected]",
-                                )
-                                if device_results:
-                                    table.add_row(
-                                        "[command]Commands[/command]",
-                                        f"{len(device_results)} executed",
-                                    )
-                                    first_output = next(
-                                        iter(device_results.values()),
-                                        "",
-                                    )
-                                    preview = first_output[:PREVIEW_LEN] + (
-                                        "..." if len(first_output) > PREVIEW_LEN else ""
-                                    )
-                                    table.add_row(
-                                        "[command]Preview[/command]",
-                                        f"[output]{preview}[/output]",
-                                    )
-                            output_mgr.print_table(table)
+                            # Print a simple device header and status lines (no tables)
                             output_mgr.print_separator()
+                            output_mgr.print_info(f"Device: {device_name}")
+                            if error:
+                                output_mgr.print_error("Failed", device_name)
+                                output_mgr.print_error(str(error), device_name)
+                            else:
+                                output_mgr.print_success("Success", device_name)
+                                if device_results:
+                                    output_mgr.print_info(
+                                        f"Commands executed: {len(device_results)}",
+                                        device_name,
+                                    )
+                            output_mgr.print_blank_line()
 
                     if results_mgr.store_results:
                         # Store per-device results and a group summary file
@@ -764,29 +741,18 @@ def register(app: typer.Typer) -> None:
                 else:
                     ctx.print_success("Group Command Results:")
                     for device_name, out_text, error in group_results:
-                        table = output_mgr.create_table(
-                            title=f"Device: {device_name}", box=None, show_header=False
-                        )
-                        if error:
-                            table.add_row(
-                                "[error]Status[/error]",
-                                "[failed]Failed[/failed]",
-                            )
-                            table.add_row(
-                                "[error]Error[/error]",
-                                f"[failed]{error}[/failed]",
-                            )
-                        else:
-                            table.add_row(
-                                "[success]Status[/success]",
-                                "[connected]Success[/connected]",
-                            )
-                            table.add_row(
-                                "[command]Output[/command]",
-                                f"[output]{out_text or ''}[/output]",
-                            )
-                        output_mgr.print_table(table)
+                        # Print a simple device header and status lines (no tables)
                         output_mgr.print_separator()
+                        output_mgr.print_info(f"Device: {device_name}")
+                        if error:
+                            output_mgr.print_error("Failed", device_name)
+                            output_mgr.print_error(str(error), device_name)
+                        else:
+                            output_mgr.print_success("Success", device_name)
+                            if out_text:
+                                output_mgr.print_blank_line()
+                                output_mgr.print_output(out_text)
+                        output_mgr.print_blank_line()
 
                 if results_mgr.store_results:
                     # Store per-device results and a group summary file

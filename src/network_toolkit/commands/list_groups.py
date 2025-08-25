@@ -15,7 +15,6 @@ from network_toolkit.common.output import (
     get_output_manager,
     set_output_mode,
 )
-from network_toolkit.common.styles import StyleManager, StyleName
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 
@@ -58,9 +57,6 @@ def register(app: typer.Typer) -> None:
                     config.general.output_mode
                 )
 
-            # Create style manager for consistent theming
-            style_manager = StyleManager(output_manager.mode)
-
             if output_manager.mode == OutputMode.RAW:
                 # Raw mode output
                 if not config.device_groups:
@@ -80,28 +76,22 @@ def register(app: typer.Typer) -> None:
                     )
                 return
 
-            # Get the themed console from style manager
-            themed_console = style_manager.console
-
-            themed_console.print(
-                style_manager.format_message("Device Groups", StyleName.BOLD)
-            )
-            themed_console.print()
+            # Headline
+            output_manager.print_info("Device Groups")
+            output_manager.print_blank_line()
 
             if not config.device_groups:
-                themed_console.print(
-                    style_manager.format_message(
-                        "No device groups configured", StyleName.WARNING
-                    )
-                )
+                output_manager.print_warning("No device groups configured")
                 return
 
             # Create table with centralized styling
-            table = style_manager.create_table()
-            style_manager.add_column(table, "Group Name", StyleName.DEVICE)
-            style_manager.add_column(table, "Description", StyleName.OUTPUT)
-            style_manager.add_column(table, "Match Tags", StyleName.COMMAND)
-            style_manager.add_column(table, "Members", StyleName.SUCCESS)
+            table = output_manager.create_table(
+                title="Groups", show_header=True, box=None
+            )
+            table.add_column("Group Name")
+            table.add_column("Description")
+            table.add_column("Match Tags")
+            table.add_column("Members")
 
             for name, group in config.device_groups.items():
                 # Use the proven get_group_members method
@@ -114,17 +104,17 @@ def register(app: typer.Typer) -> None:
                     ", ".join(members) if members else "None",
                 )
 
-            themed_console.print(table)
-            themed_console.print(
-                f"\n{style_manager.format_message(f'Total groups: {len(config.device_groups)}', StyleName.BOLD)}"
-            )
+            output_manager.print_table(table)
+            output_manager.print_blank_line()
+            output_manager.print_info(f"Total groups: {len(config.device_groups)}")
 
             if verbose:
-                themed_console.print(
-                    f"\n{style_manager.format_message('Usage Examples:', StyleName.BOLD)}"
-                )
+                output_manager.print_blank_line()
+                output_manager.print_info("Usage Examples:")
                 for group_name in config.device_groups.keys():
-                    themed_console.print(f"  nw group-run {group_name} health_check")
+                    output_manager.print_info(
+                        f"  nw group-run {group_name} health_check"
+                    )
 
         except NetworkToolkitError as e:
             # Initialize output_manager if not already set
