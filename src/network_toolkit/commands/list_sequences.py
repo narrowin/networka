@@ -249,7 +249,7 @@ def _show_all_vendor_sequences(
                 row.append(commands_str)
             table.add_row(*row)
 
-    output_manager.print_table(table)
+        output_manager.print_table(table)
 
 
 def _show_global_sequences(

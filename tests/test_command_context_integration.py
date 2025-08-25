@@ -102,22 +102,22 @@ class TestCommandContextIntegration:
         # Test the pattern we established with StyleManager helper functions
         from network_toolkit.common.styles import StyleManager, StyleName
 
-    # This pattern is used in config_init.py
-    style_manager = StyleManager(mode=OutputMode.DEFAULT)
+        # This pattern is used in config_init.py
+        style_manager = StyleManager(mode=OutputMode.DEFAULT)
 
-    # Test INFO style formatting
-    info_style = style_manager.get_style(StyleName.INFO)
-    success_style = style_manager.get_style(StyleName.SUCCESS)
+        # Test INFO style formatting
+        info_style = style_manager.get_style(StyleName.INFO)
+        success_style = style_manager.get_style(StyleName.SUCCESS)
 
-    assert info_style == "blue"  # From DEFAULT theme
-    assert success_style == "green"  # From DEFAULT theme
+        assert info_style == "blue"  # From DEFAULT theme
+        assert success_style == "green"  # From DEFAULT theme
 
-    # Test message formatting
-    info_msg = style_manager.format_message("Test info", StyleName.INFO)
-    success_msg = style_manager.format_message("Test success", StyleName.SUCCESS)
+        # Test message formatting
+        info_msg = style_manager.format_message("Test info", StyleName.INFO)
+        success_msg = style_manager.format_message("Test success", StyleName.SUCCESS)
 
-    assert info_msg == "[info]Test info[/info]"
-    assert success_msg == "[success]Test success[/success]"
+        assert info_msg == "[info]Test info[/info]"
+        assert success_msg == "[success]Test success[/success]"
 
     def test_hardcoded_colors_removed(self) -> None:
         """Test that major commands don't use hardcoded colors."""
