@@ -427,6 +427,24 @@ def run(config: str | Path = "config") -> None:
                 )
                 # Update summary panel (include errors if any)
                 try:
+                    # If any output lines were collected, ensure the output panel is visible
+                    if getattr(self, "_output_lines", None):
+                        self._show_output_panel()
+                        # Repaint output from buffer to avoid empty view due to race
+                        try:
+                            out_log = self.query_one("#output-log")
+                            if hasattr(out_log, "clear"):
+                                out_log.clear()
+                            filt = (
+                                (getattr(self, "_output_filter", "") or "")
+                                .strip()
+                                .lower()
+                            )
+                            for line in self._output_lines:
+                                if not filt or (filt in line.lower()):
+                                    log_write(out_log, line)
+                        except Exception:
+                            pass
                     elapsed = time.monotonic() - start_ts
                     summary_with_time = (
                         f"{summary_result.human_summary()} (duration: {elapsed:.2f}s)"
@@ -457,6 +475,9 @@ def run(config: str | Path = "config") -> None:
                     self.query_one("#run-status").update(
                         f"Status: idle — Run failed: {e}"
                     )
+                    # If partial output exists, show it
+                    if getattr(self, "_output_lines", None):
+                        self._show_output_panel()
                     self._refresh_bottom_visibility()
                 except Exception:
                     pass
@@ -502,22 +523,14 @@ def run(config: str | Path = "config") -> None:
             If called from the UI thread, call directly. Otherwise, use
             call_from_thread when available. Fallback to direct call.
             """
+            # Prefer scheduling via call_from_thread when available to ensure UI paints
             try:
-                current = threading.get_ident()
-                ui_ident = getattr(self, "_ui_thread_ident", None)
+                if hasattr(self, "call_from_thread"):
+                    self.call_from_thread(fn, *args, **kwargs)
+                    return
             except Exception:
-                ui_ident = None
-                current = None
-            # If background thread, prefer call_from_thread
-            if ui_ident is not None and current is not None and current != ui_ident:
-                try:
-                    if hasattr(self, "call_from_thread"):
-                        self.call_from_thread(fn, *args, **kwargs)
-                        return
-                except Exception:
-                    # Fall through to direct call
-                    pass
-            # Same thread or no special API
+                pass
+            # Fallback: attempt direct call
             try:
                 fn(*args, **kwargs)
             except Exception as exc:
@@ -799,8 +812,8 @@ def run(config: str | Path = "config") -> None:
                         widget.update(str(renderable))
                 except Exception:
                     pass
-            # Auto-show summary only when there's an actual summary (final) or errors
-            should_show = bool(base_summary) or bool(errors)
+            # Auto-show summary only when there are errors; otherwise keep user control
+            should_show = bool(errors)
             if should_show and not getattr(self, "_summary_user_hidden", False):
                 self._show_summary_panel()
 

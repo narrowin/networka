@@ -27,6 +27,7 @@ class DeviceRunResult(BaseModel):
     model_config = ConfigDict(frozen=True)
     device: str
     ok: bool
+    output_lines: list[str]
 
 
 class ExecutionService:
@@ -76,13 +77,18 @@ class ExecutionService:
         completed = 0
         successes = 0
         failures = 0
+        results_by_device: dict[str, DeviceRunResult] = {}
 
         async def run_device(device: str, commands: list[str]) -> DeviceRunResult:
             async with self._sem:
-                ok = await asyncio.to_thread(
+                result = await asyncio.to_thread(
                     self._run_device_blocking, device, commands, cb
                 )
-                return DeviceRunResult(device=device, ok=ok)
+                # _run_device_blocking may return DeviceRunResult (new) or bool (tests)
+                # Use duck-typing to avoid static typing complaints in tests
+                if hasattr(result, "device") and hasattr(result, "output_lines"):
+                    return result
+                return DeviceRunResult(device=device, ok=bool(result), output_lines=[])
 
         tasks = [run_device(dev, cmds) for dev, cmds in plan.items()]
         for coro in asyncio.as_completed(tasks):
@@ -92,34 +98,53 @@ class ExecutionService:
                 successes += 1
             else:
                 failures += 1
+            # Store device results for ordered emission later
+            results_by_device[res.device] = res
             cb.on_meta(f"progress: {completed}/{total}")
+        # Emit outputs grouped and ordered by the plan's device order
+        for dev in plan.keys():
+            r = results_by_device.get(dev)
+            if not r:
+                continue
+            for line in r.output_lines:
+                cb.on_output(line)
         return RunResult(total=total, successes=successes, failures=failures)
 
     def _run_device_blocking(
         self, device: str, commands: list[str], cb: RunCallbacks
-    ) -> bool:
+    ) -> DeviceRunResult:
         ok = True
+        # Collect output lines per device to avoid interleaving
+        buf: list[str] = []
         try:
             # Import here to avoid making CLI a hard dependency of module import
             from network_toolkit.cli import DeviceSession
 
+            # Emit a clear device header into the buffer for identification
+            buf.append(f"--- Device: {device} ---")
             cb.on_meta(f"{device}: connecting...")
             with DeviceSession(device, self._data.config) as session:
                 cb.on_meta(f"{device}: connected")
                 for cmd in commands:
+                    # Record command context in buffer for clarity
                     cb.on_meta(f"{device}$ {cmd}")
+                    buf.append(f"{device}$ {cmd}")
                     try:
                         raw = session.execute_command(cmd)
                         text = raw if type(raw) is str else str(raw)
                         out_strip = text.strip()
                         if out_strip:
                             for line in text.rstrip().splitlines():
-                                cb.on_output(line)
+                                # Prefix each output line with device name
+                                buf.append(f"{device}: {line}")
                     except Exception as e:  # noqa: BLE001
                         ok = False
                         cb.on_error(f"{device}: command error: {e}")
             cb.on_meta(f"{device}: done")
+            buf.append(f"--- Device: {device} done ---")
+            return DeviceRunResult(device=device, ok=ok, output_lines=buf)
         except Exception as e:  # noqa: BLE001
             ok = False
             cb.on_error(f"{device}: Failed: {e}")
-        return ok
+        # Return whatever we collected (may be empty) on failure
+        return DeviceRunResult(device=device, ok=ok, output_lines=buf)
