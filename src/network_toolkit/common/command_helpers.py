@@ -63,14 +63,19 @@ class CommandContext:
             set_output_mode(output_mode)
             self.output_manager = get_output_manager()
         else:
-            # Try to use config-based output mode if config exists
+            # Try to use config-based output mode if config exists and is loadable
             try:
-                config = load_config(self.config_file)
-                self.output_manager = get_output_manager_with_config(
-                    config.general.output_mode
-                )
+                # Only try to load config if the path seems valid
+                if self.config_file and self.config_file.exists():
+                    config = load_config(self.config_file)
+                    self.output_manager = get_output_manager_with_config(
+                        config.general.output_mode
+                    )
+                else:
+                    # Use default if config doesn't exist or path is invalid
+                    self.output_manager = get_output_manager()
             except Exception:
-                # Fall back to default if config loading fails
+                # Fall back to default if config loading fails for any reason
                 self.output_manager = get_output_manager()
 
         # Create style manager for themed output
