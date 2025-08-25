@@ -62,8 +62,7 @@ def create_env_file(target_dir: Path) -> None:
         (target_dir / ".env").write_text(env_content, encoding="utf-8")
         logger.debug(f"Created .env file in {target_dir}")
     except OSError as e:
-        msg = f"Failed to create .env file: {e}"
-        raise FileTransferError(msg) from e
+        raise FileTransferError(f"Failed to create .env file: {e}") from e
 
 
 def create_config_yml(config_dir: Path) -> None:
@@ -80,8 +79,7 @@ def create_config_yml(config_dir: Path) -> None:
         (config_dir / "config.yml").write_text(content, encoding="utf-8")
         logger.debug(f"Created config.yml in {config_dir}")
     except OSError as e:
-        msg = f"Failed to create config.yml: {e}"
-        raise FileTransferError(msg) from e
+        raise FileTransferError(f"Failed to create config.yml: {e}") from e
 
 
 def create_example_devices(devices_dir: Path) -> None:
@@ -113,8 +111,7 @@ def create_example_devices(devices_dir: Path) -> None:
         (devices_dir / "cisco.yml").write_text(cisco, encoding="utf-8")
         logger.debug(f"Created example device files in {devices_dir}")
     except OSError as e:
-        msg = f"Failed to create device examples: {e}"
-        raise FileTransferError(msg) from e
+        raise FileTransferError(f"Failed to create device examples: {e}") from e
 
 
 def create_example_groups(groups_dir: Path) -> None:
@@ -132,8 +129,7 @@ def create_example_groups(groups_dir: Path) -> None:
         (groups_dir / "main.yml").write_text(content, encoding="utf-8")
         logger.debug(f"Created example group files in {groups_dir}")
     except OSError as e:
-        msg = f"Failed to create group examples: {e}"
-        raise FileTransferError(msg) from e
+        raise FileTransferError(f"Failed to create group examples: {e}") from e
 
 
 def create_example_sequences(sequences_dir: Path) -> None:
@@ -156,8 +152,7 @@ def create_example_sequences(sequences_dir: Path) -> None:
         (sequences_dir / "basic.yml").write_text(content, encoding="utf-8")
         logger.debug(f"Created example sequence files in {sequences_dir}")
     except OSError as e:
-        msg = f"Failed to create sequence examples: {e}"
-        raise FileTransferError(msg) from e
+        raise FileTransferError(f"Failed to create sequence examples: {e}") from e
 
 
 def _detect_repo_root() -> Path | None:
@@ -185,20 +180,17 @@ def _validate_git_url(url: str) -> None:
         ConfigurationError: If URL is invalid or insecure
     """
     if not url:
-        msg = "Git URL cannot be empty"
-        raise ConfigurationError(msg)
+        raise ConfigurationError("Git URL cannot be empty")
 
     if not url.startswith(("https://", "git@")):
-        msg = "Git URL must use HTTPS or SSH protocol"
-        raise ConfigurationError(msg)
+        raise ConfigurationError("Git URL must use HTTPS or SSH protocol")
 
     # Block localhost and private IPs for security
     if any(
         pattern in url.lower()
         for pattern in ["localhost", "127.", "192.168.", "10.", "172."]
     ):
-        msg = "Private IP addresses not allowed in Git URLs"
-        raise ConfigurationError(msg)
+        raise ConfigurationError("Private IP addresses not allowed in Git URLs")
 
 
 def _find_git_executable() -> str:
@@ -214,8 +206,7 @@ def _find_git_executable() -> str:
 
     git_path = sh.which("git")
     if not git_path:
-        msg = "Git executable not found in PATH"
-        raise ConfigurationError(msg)
+        raise ConfigurationError("Git executable not found in PATH")
     return git_path
 
 
@@ -272,11 +263,9 @@ def install_sequences_from_repo(url: str, ref: str, dest: Path) -> None:
 
         except subprocess.CalledProcessError as e:
             error_msg = e.stderr if e.stderr else str(e)
-            msg = f"Git clone failed: {error_msg}"
-            raise FileTransferError(msg) from e
+            raise FileTransferError(f"Git clone failed: {error_msg}") from e
         except OSError as e:
-            msg = f"Failed to copy sequences: {e}"
-            raise FileTransferError(msg) from e
+            raise FileTransferError(f"Failed to copy sequences: {e}") from e
 
 
 def install_editor_schemas(
@@ -368,8 +357,7 @@ def install_editor_schemas(
         logger.info("Installed JSON schemas for YAML editor validation")
 
     except OSError as e:
-        msg = f"Failed to install schemas: {e}"
-        raise FileTransferError(msg) from e
+        raise FileTransferError(f"Failed to install schemas: {e}") from e
 
 
 def detect_shell(shell: str | None = None) -> str | None:
@@ -404,8 +392,9 @@ def install_shell_completions(selected: str) -> tuple[Path | None, Path | None]:
         FileTransferError: If installation fails
     """
     if selected not in {"bash", "zsh"}:
-        msg = "Only bash and zsh shells are supported for completion installation"
-        raise ConfigurationError(msg)
+        raise ConfigurationError(
+            "Only bash and zsh shells are supported for completion installation"
+        )
 
     repo_root = _detect_repo_root()
     if not repo_root:
@@ -439,8 +428,7 @@ def install_shell_completions(selected: str) -> tuple[Path | None, Path | None]:
             return (dest, home / ".zshrc")
 
     except OSError as e:
-        msg = f"Failed to install {selected} completion: {e}"
-        raise FileTransferError(msg) from e
+        raise FileTransferError(f"Failed to install {selected} completion: {e}") from e
 
 
 def activate_shell_completion(
@@ -483,8 +471,7 @@ def activate_shell_completion(
         logger.info(f"Activated shell completion in: {rc_file}")
 
     except OSError as e:
-        msg = f"Failed to activate shell completion: {e}"
-        raise FileTransferError(msg) from e
+        raise FileTransferError(f"Failed to activate shell completion: {e}") from e
 
 
 def register(app: typer.Typer) -> None:
@@ -802,9 +789,9 @@ def register(app: typer.Typer) -> None:
         except NetworkToolkitError as e:
             ctx = CommandContext()
             ctx.print_error(str(e))
-            raise typer.Exit(1) from e
+            raise typer.Exit(1)
         except Exception as e:
             logger.exception("Unexpected error during configuration initialization")
             ctx = CommandContext()
             ctx.print_error(f"Unexpected error: {e}")
-            raise typer.Exit(1) from e
+            raise typer.Exit(1)

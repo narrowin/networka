@@ -10,12 +10,16 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
+from subprocess import CalledProcessError
 from typing import Any
+from unittest.mock import patch
 
+import pytest
 from typer.testing import CliRunner
 
 import network_toolkit.commands.config_init as config_init_mod
 from network_toolkit.cli import app
+from network_toolkit.exceptions import FileTransferError
 
 
 def test_config_init_yes_uses_default_location(monkeypatch: Any) -> None:
@@ -63,20 +67,30 @@ def test_config_init_dry_run_interactive_no_writes(monkeypatch: Any) -> None:
 
 def test_config_init_install_sequences_triggers_git_clone(monkeypatch: Any) -> None:
     """--install-sequences should attempt a git clone, but we mock subprocess.run."""
+    import shutil
+
     runner = CliRunner()
 
     calls: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
 
-    def fake_run(*args: Any, **kwargs: Any):
+    def fake_run(*args: Any, **kwargs: Any) -> Any:
         calls.append((args, kwargs))
 
         class _Result:
             returncode = 0
+            stderr = ""
 
         return _Result()
 
+    # Mock shutil.which to return a git path
+    def mock_which(cmd: str) -> str | None:
+        if cmd == "git":
+            return "/usr/bin/git"
+        return None
+
     # Patch the subprocess.run used inside the module under test
     monkeypatch.setattr(config_init_mod.subprocess, "run", fake_run)
+    monkeypatch.setattr(shutil, "which", mock_which)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         test_dir = Path(tmpdir)
@@ -94,8 +108,12 @@ def test_config_init_install_sequences_triggers_git_clone(monkeypatch: Any) -> N
         )
 
         assert result.exit_code == 0
-        # We attempted to run git clone once
-        assert any("git" in (args[0][0] if args and args[0] else "") for args in calls)
+        # We attempted to run git clone once - check for full git path (security improvement)
+        assert any(
+            "/usr/bin/git" in str(args[0])
+            for args, _ in calls
+            if args and args[0] and len(args[0]) > 0
+        )
 
 
 def test_config_init_install_completions_install_and_activate(monkeypatch: Any) -> None:
@@ -125,7 +143,140 @@ def test_config_init_install_completions_install_and_activate(monkeypatch: Any) 
         # Should report installation and rc update under our temp HOME
         assert "Installed bash completion script to:" in result.stdout
         assert str(test_dir) in result.stdout
+        # Check for the new logging message format from our improved implementation
         assert (
-            "Updated rc file:" in result.stdout
-            or "Activated shell completion in:" in result.stdout
+            "Activation snippet appended. Open a new shell to use completions."
+            in result.stdout
         )
+
+
+def test_clone_error_handling() -> None:
+    """Test git clone error handling in install_sequences_from_repo."""
+    runner = CliRunner()
+
+    with patch(
+        "network_toolkit.commands.config_init.subprocess.run"
+    ) as mock_subprocess:
+        # Mock git clone failure
+        mock_subprocess.side_effect = CalledProcessError(128, ["git", "clone"])
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = runner.invoke(
+                app,
+                [
+                    "config-init",
+                    temp_dir,  # target_dir positional argument
+                    "--git-url",
+                    "https://github.com/owner/repo.git",
+                    "--install-sequences",  # Enable sequences to trigger git clone
+                    "--no-install-completions",
+                    "--no-install-schemas",
+                    "--yes",  # Non-interactive mode
+                ],
+            )
+
+            # The application should continue gracefully and show a warning
+            assert result.exit_code == 0
+            assert "Failed to install sequences" in result.stdout
+
+
+def test_env_file_creation_error() -> None:
+    """Test .env file creation error handling."""
+    runner = CliRunner()
+
+    # Mock Path.write_text to raise PermissionError when writing .env file
+    with patch("pathlib.Path.write_text", side_effect=PermissionError("Access denied")):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = runner.invoke(
+                app,
+                [
+                    "config-init",
+                    temp_dir,  # target_dir positional argument
+                    "--no-install-sequences",
+                    "--no-install-completions",
+                    "--no-install-schemas",
+                    "--yes",  # Non-interactive mode
+                ],
+            )
+
+            assert result.exit_code == 1
+            assert "Failed to create .env file" in result.stdout
+
+
+def test_failed_git_clone_error_handling(monkeypatch: Any) -> None:
+    """Test that failed git clone operations are handled gracefully."""
+    import shutil
+    import subprocess
+
+    runner = CliRunner()
+
+    def mock_run(*args: Any, **kwargs: Any) -> Any:
+        # Simulate git clone failure
+        error = subprocess.CalledProcessError(
+            128, "git", stderr="fatal: repository not found"
+        )
+        raise error
+
+    def mock_which(cmd: str) -> str | None:
+        if cmd == "git":
+            return "/usr/bin/git"
+        return None
+
+    monkeypatch.setattr(config_init_mod.subprocess, "run", mock_run)
+    monkeypatch.setattr(shutil, "which", mock_which)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        test_dir = Path(tmpdir)
+        result = runner.invoke(
+            app,
+            [
+                "config-init",
+                str(test_dir),
+                "--install-sequences",
+                "--git-url",
+                "https://github.com/nonexistent/repo.git",
+            ],
+        )
+
+        # Should still complete successfully but show warning about sequences
+        assert result.exit_code == 0
+        assert "Failed to install sequences" in result.stdout
+
+
+def test_completion_script_not_found(monkeypatch: Any) -> None:
+    """Test behavior when completion scripts are not found."""
+    runner = CliRunner()
+
+    # Mock _detect_repo_root to return None (scripts not found)
+    monkeypatch.setattr(config_init_mod, "_detect_repo_root", lambda: None)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        test_dir = Path(tmpdir)
+        result = runner.invoke(
+            app,
+            [
+                "config-init",
+                str(test_dir),
+                "--install-completions",
+                "--shell",
+                "bash",
+            ],
+        )
+
+        # Should still complete successfully but show warning about completions
+        assert result.exit_code == 0
+        assert "Shell completion installation failed" in result.stdout
+
+
+def test_file_creation_error_handling(monkeypatch: Any) -> None:
+    """Test that file creation errors are handled gracefully."""
+    from network_toolkit.commands.config_init import create_env_file
+
+    # Create a read-only directory to simulate permission error
+    with tempfile.TemporaryDirectory() as tmpdir:
+        readonly_dir = Path(tmpdir) / "readonly"
+        readonly_dir.mkdir()
+        readonly_dir.chmod(0o444)  # Read-only
+
+        with pytest.raises(FileTransferError, match="Failed to create .env file"):
+            create_env_file(readonly_dir)
