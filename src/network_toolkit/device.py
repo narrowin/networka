@@ -6,10 +6,10 @@
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -244,7 +244,11 @@ class DeviceSession:
                     closed = True
 
             # Legacy/back-compat path: if a raw driver was set directly, close it
-            if not closed and self._driver is not None and hasattr(self._driver, "close"):
+            if (
+                not closed
+                and self._driver is not None
+                and hasattr(self._driver, "close")
+            ):
                 self._driver.close()
                 closed = True
 

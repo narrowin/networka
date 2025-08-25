@@ -437,9 +437,11 @@ def register(app: typer.Typer) -> None:
         chosen_shell: str | None = None
         do_activate_compl = False
 
+        interactive_extras = interactive and not dry_run
+
         if install_sequences is not None:
             do_install_sequences = install_sequences
-        elif interactive:
+        elif interactive_extras:
             do_install_sequences = typer.confirm(
                 "Install additional predefined vendor sequences from GitHub?",
                 default=True,
@@ -447,12 +449,12 @@ def register(app: typer.Typer) -> None:
 
         if install_completions is not None:
             do_install_compl = install_completions
-        elif interactive:
+        elif interactive_extras:
             do_install_compl = typer.confirm("Install shell completions?", default=True)
 
         if install_schemas is not None:
             do_install_schemas = install_schemas
-        elif interactive:
+        elif interactive_extras:
             do_install_schemas = typer.confirm(
                 "Install JSON schemas for YAML editor validation and auto-completion?",
                 default=True,
@@ -461,10 +463,10 @@ def register(app: typer.Typer) -> None:
         if do_install_compl:
             detected = (
                 _detect_shell()
-                if interactive
+                if interactive_extras
                 else (shell if shell in {"bash", "zsh"} else None)
             )
-            if interactive:
+            if interactive_extras:
                 default_shell = detected or "bash"
                 answer = typer.prompt(
                     "Choose shell for completions (bash|zsh)", default=default_shell
@@ -475,7 +477,7 @@ def register(app: typer.Typer) -> None:
 
             if activate_completions is not None:
                 do_activate_compl = activate_completions
-            elif interactive:
+            elif interactive_extras:
                 do_activate_compl = typer.confirm(
                     "Activate completions by updating your shell rc file?", default=True
                 )

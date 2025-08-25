@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from enum import Enum
@@ -462,7 +463,8 @@ def register(app: typer.Typer) -> None:
                                 console.print(
                                     f"[bold cyan]Command {i}:[/bold cyan] {cmd}"
                                 )
-                                console.print(f"[white]{output}[/white]")
+                                # Print raw device output without additional styling/markup/highlighting
+                                console.print(output, markup=False, highlight=False)
                                 console.print("-" * 80)
 
                             if results_mgr.store_results:
@@ -809,9 +811,10 @@ def register(app: typer.Typer) -> None:
                                 "[bold green]Status[/bold green]",
                                 "[green]Success[/green]",
                             )
+                            # Show raw device output without extra styling to keep assertions stable
                             table.add_row(
                                 "[bold cyan]Output[/bold cyan]",
-                                f"[white]{out_text}[/white]",
+                                out_text,
                             )
                         console.print(table)
                         console.print("-" * 80)

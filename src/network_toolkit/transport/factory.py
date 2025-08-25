@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
     from nornir import Nornir  # pragma: no cover
+
     from network_toolkit.config import NetworkConfig
     from network_toolkit.transport.interfaces import Transport
 
@@ -91,9 +92,7 @@ class NornirNetmikoTransportFactory:
             error_msg = "Nornir package required. Install with: pip install nornir"
             raise ImportError(error_msg) from e
 
-        from network_toolkit.transport.nornir_inventory import (
-            build_nornir_inventory,
-        )
+        from network_toolkit.transport.nornir_inventory import build_nornir_inventory
 
         # Build inventory directly
         inventory = build_nornir_inventory(config)
