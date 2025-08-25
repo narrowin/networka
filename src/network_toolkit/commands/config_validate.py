@@ -8,9 +8,11 @@ from typing import Annotated
 
 import typer
 
-from network_toolkit.common.logging import console, setup_logging
-from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.command_helpers import CommandContext
+from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
+from network_toolkit.common.logging import setup_logging
+from network_toolkit.common.output import OutputMode
+from network_toolkit.common.styles import StyleManager, StyleName
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 
@@ -31,6 +33,10 @@ def register(app: typer.Typer) -> None:
         """Validate the configuration file and show any issues."""
         setup_logging("DEBUG" if verbose else "INFO")
 
+        # Create style manager for consistent theming
+        style_manager = StyleManager(mode=OutputMode.DEFAULT)
+        console = style_manager.console
+
         # ACTION command - use global config theme
         ctx = CommandContext(
             config_file=config_file,
@@ -46,7 +52,11 @@ def register(app: typer.Typer) -> None:
 
             config = load_config(config_file)
 
-            console.print("[bold green]OK Configuration is valid![/bold green]")
+            console.print(
+                style_manager.format_message(
+                    "OK Configuration is valid!", StyleName.SUCCESS
+                )
+            )
             console.print()
 
             device_count = len(config.devices) if config.devices else 0
@@ -62,7 +72,10 @@ def register(app: typer.Typer) -> None:
             console.print(f"🔄 Global Sequences: {global_seq_count}")
 
             if verbose and device_count > 0 and config.devices:
-                console.print("\n[bold]Device Summary:[/bold]")
+                console.print(
+                    "\n"
+                    + style_manager.format_message("Device Summary:", StyleName.BOLD)
+                )
                 for name, device in config.devices.items():
                     console.print(f"  • {name} ({device.host}) - {device.device_type}")
 

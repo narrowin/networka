@@ -7,7 +7,9 @@ import shutil
 import subprocess
 from typing import Any
 
-from network_toolkit.common.logging import console
+from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.output import OutputMode
+from network_toolkit.common.styles import StyleManager, StyleName
 from network_toolkit.config import NetworkConfig
 
 
@@ -15,13 +17,20 @@ def open_sequential_ssh_sessions(
     devices: list[str], config: NetworkConfig, **kwargs: Any
 ) -> None:
     """Open SSH sessions sequentially when tmux is not available."""
-    console.print(f"[cyan]Opening {len(devices)} SSH sessions sequentially...[/cyan]")
+    sm = StyleManager(OutputMode.DEFAULT)
+    console.print(
+        sm.format_message(
+            f"Opening {len(devices)} SSH sessions sequentially...", StyleName.INFO
+        )
+    )
 
     system = platform.system()
 
     for i, device in enumerate(devices, 1):
         console.print(
-            f"[dim]({i}/{len(devices)})[/dim] Connecting to [bold]{device}[/bold]..."
+            sm.format_message(
+                f"({i}/{len(devices)}) Connecting to {device}...", StyleName.INFO
+            )
         )
 
         try:
@@ -45,12 +54,19 @@ def open_sequential_ssh_sessions(
                 else:
                     # Fallback: run SSH directly (will take over current terminal)
                     console.print(
-                        f"[yellow]Opening SSH in current terminal for {device}[/yellow]"
+                        sm.format_message(
+                            f"Opening SSH in current terminal for {device}",
+                            StyleName.WARNING,
+                        )
                     )
                     subprocess.run(ssh_cmd, check=False)
 
         except Exception as e:
-            console.print(f"[red]Failed to connect to {device}: {e}[/red]")
+            console.print(
+                sm.format_message(
+                    f"Failed to connect to {device}: {e}", StyleName.ERROR
+                )
+            )
 
 
 def _build_platform_ssh_command(

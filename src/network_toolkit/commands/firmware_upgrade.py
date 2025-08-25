@@ -72,6 +72,7 @@ def register(app: typer.Typer) -> None:
 
         # Create style manager for consistent theming
         style_manager = StyleManager(mode=OutputMode.DEFAULT)
+        console = style_manager.console
 
         try:
             if not firmware_file.exists() or not firmware_file.is_file():
@@ -116,7 +117,11 @@ def register(app: typer.Typer) -> None:
                     preview = ", ".join(grp_names[:MAX_LIST_PREVIEW])
                     if len(grp_names) > MAX_LIST_PREVIEW:
                         preview += " ..."
-                    console.print("[yellow]Known groups:[/yellow] " + preview)
+                    console.print(
+                        style_manager.format_message("Known groups:", StyleName.WARNING)
+                        + " "
+                        + preview
+                    )
                 raise typer.Exit(1)
 
             def process_device(dev: str) -> bool:
@@ -125,7 +130,10 @@ def register(app: typer.Typer) -> None:
                     devices = config.devices or {}
                     if dev not in devices:
                         console.print(
-                            f"[red]Error: Device '{dev}' not found in configuration[/red]"
+                            style_manager.format_message(
+                                f"Error: Device '{dev}' not found in configuration",
+                                StyleName.ERROR,
+                            )
                         )
                         return False
 
@@ -137,7 +145,12 @@ def register(app: typer.Typer) -> None:
                         device_type, "firmware_upgrade"
                     )
                     if not is_supported:
-                        console.print(f"[red]Error on {dev}: {error_msg}[/red]")
+                        console.print(
+                            style_manager.format_message(
+                                f"Error on {dev}: {error_msg}",
+                                StyleName.ERROR,
+                            )
+                        )
                         return False
 
                     # Check supported file extensions before connecting
@@ -150,8 +163,11 @@ def register(app: typer.Typer) -> None:
                             "cisco_iosxe": "Cisco IOS-XE",
                         }.get(device_type, device_type)
                         console.print(
-                            f"[red]Error: Invalid firmware file for {platform_name}. "
-                            f"Expected {ext_list}, got {firmware_file.suffix}[/red]"
+                            style_manager.format_message(
+                                f"Error: Invalid firmware file for {platform_name}. "
+                                f"Expected {ext_list}, got {firmware_file.suffix}",
+                                StyleName.ERROR,
+                            )
                         )
                         return False
 
@@ -162,9 +178,10 @@ def register(app: typer.Typer) -> None:
 
                         if precheck_sequence and not skip_precheck:
                             console.print(
-                                "[cyan]Running precheck sequence '"
-                                + precheck_sequence
-                                + f"' on {dev}[/cyan]"
+                                style_manager.format_message(
+                                    f"Running precheck sequence '{precheck_sequence}' on {dev}...",
+                                    StyleName.INFO,
+                                )
                             )
                             # Run sequence via CLI sequence resolver logic
                             # Keep simple: resolve from global or device sequences
@@ -188,13 +205,23 @@ def register(app: typer.Typer) -> None:
                                 session.execute_command(cmd)
 
                         console.print(
-                            "[bold yellow]Uploading firmware to "
-                            f"{dev} and rebooting...[/bold yellow]"
+                            style_manager.format_message(
+                                f"Uploading firmware to {dev} and rebooting...",
+                                StyleName.WARNING,
+                            )
                         )
                         transport_type = config.get_transport_type(dev)
                         platform_name = platform_ops.get_platform_name()
-                        console.print(f"[yellow]Platform:[/yellow] {platform_name}")
-                        console.print(f"[yellow]Transport:[/yellow] {transport_type}")
+                        console.print(
+                            style_manager.format_message("Platform:", StyleName.WARNING)
+                            + f" {platform_name}"
+                        )
+                        console.print(
+                            style_manager.format_message(
+                                "Transport:", StyleName.WARNING
+                            )
+                            + f" {transport_type}"
+                        )
 
                         # Use platform-specific firmware upgrade
                         ok = platform_ops.firmware_upgrade(
@@ -202,21 +229,38 @@ def register(app: typer.Typer) -> None:
                         )
                         if ok:
                             console.print(
-                                "[green]OK Firmware upload initiated; device rebooting: "
-                                f"{dev}[/green]"
+                                style_manager.format_message(
+                                    f"OK Firmware upload initiated; device rebooting: {dev}",
+                                    StyleName.SUCCESS,
+                                )
                             )
                             return True
                         console.print(
-                            f"[red]FAIL Firmware upgrade failed to start on {dev}[/red]"
+                            style_manager.format_message(
+                                f"FAIL Firmware upgrade failed to start on {dev}",
+                                StyleName.ERROR,
+                            )
                         )
                         return False
                 except NetworkToolkitError as e:
-                    console.print(f"[red]Error on {dev}: {e.message}[/red]")
+                    console.print(
+                        style_manager.format_message(
+                            f"Error on {dev}: {e.message}", StyleName.ERROR
+                        )
+                    )
                     if verbose and e.details:
-                        console.print(f"[red]Details: {e.details}[/red]")
+                        console.print(
+                            style_manager.format_message(
+                                f"Details: {e.details}", StyleName.ERROR
+                            )
+                        )
                     return False
                 except Exception as e:  # pragma: no cover - unexpected
-                    console.print(f"[red]Unexpected error on {dev}: {e}[/red]")
+                    console.print(
+                        style_manager.format_message(
+                            f"Unexpected error on {dev}: {e}", StyleName.ERROR
+                        )
+                    )
                     return False
 
             if is_device:
@@ -235,16 +279,18 @@ def register(app: typer.Typer) -> None:
 
             if not members:
                 console.print(
-                    f"[red]Error: No devices found in group '{target_name}'[/red]",
+                    style_manager.format_message(
+                        f"Error: No devices found in group '{target_name}'",
+                        StyleName.ERROR,
+                    )
                 )
                 raise typer.Exit(1)
 
             console.print(
-                "[bold cyan]Starting firmware upgrade for group '"
-                + target_name
-                + "' ("
-                + str(len(members))
-                + ") devices)[/bold cyan]"
+                style_manager.format_message(
+                    f"Starting firmware upgrade for group '{target_name}' ({len(members)} devices)",
+                    StyleName.INFO,
+                )
             )
             failures = 0
             for dev in members:
@@ -253,16 +299,25 @@ def register(app: typer.Typer) -> None:
 
             total = len(members)
             console.print(
-                f"[bold]Completed:[/bold] {total - failures}/{total} initiated"
+                style_manager.format_message("Completed:", StyleName.BOLD)
+                + f" {total - failures}/{total} initiated"
             )
             if failures:
                 raise typer.Exit(1)
 
         except NetworkToolkitError as e:
-            console.print(f"[red]Error: {e.message}[/red]")
+            console.print(
+                style_manager.format_message(f"Error: {e.message}", StyleName.ERROR)
+            )
             if verbose and e.details:
-                console.print(f"[red]Details: {e.details}[/red]")
+                console.print(
+                    style_manager.format_message(
+                        f"Details: {e.details}", StyleName.ERROR
+                    )
+                )
             raise typer.Exit(1) from None
         except Exception as e:  # pragma: no cover - unexpected
-            console.print(f"[red]Unexpected error: {e}[/red]")
+            console.print(
+                style_manager.format_message(f"Unexpected error: {e}", StyleName.ERROR)
+            )
             raise typer.Exit(1) from None

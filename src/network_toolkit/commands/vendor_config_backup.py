@@ -12,8 +12,10 @@ from typing import Annotated, Any, cast
 
 import typer
 
-from network_toolkit.common.logging import console, setup_logging
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
+from network_toolkit.common.logging import setup_logging
+from network_toolkit.common.output import OutputMode
+from network_toolkit.common.styles import StyleManager, StyleName
 from network_toolkit.config import DeviceConfig, NetworkConfig, load_config
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.platforms import UnsupportedOperationError, get_platform_operations
@@ -92,6 +94,11 @@ def register(app: typer.Typer) -> None:
         Cisco IOS/IOS-XE: Uses show running-config commands
         """
         setup_logging("DEBUG" if verbose else "INFO")
+
+        # Setup style manager for consistent theming
+        style_manager = StyleManager(OutputMode.DEFAULT)
+        console = style_manager.console
+
         try:
             config = load_config(config_file)
 
@@ -107,21 +114,33 @@ def register(app: typer.Typer) -> None:
 
             if not (is_device or is_group):
                 console.print(
-                    f"[red]Error: '{target_name}' not found as device or group in "
-                    "configuration[/red]"
+                    style_manager.format_message(
+                        f"Error: '{target_name}' not found as device or group in configuration",
+                        StyleName.ERROR,
+                    )
                 )
                 if devices:
                     dev_names = sorted(devices.keys())
                     preview = ", ".join(dev_names[:MAX_LIST_PREVIEW])
                     if len(dev_names) > MAX_LIST_PREVIEW:
                         preview += " ..."
-                    console.print("[yellow]Known devices:[/yellow] " + preview)
+                    console.print(
+                        style_manager.format_message(
+                            "Known devices:", StyleName.WARNING
+                        )
+                        + " "
+                        + preview
+                    )
                 if groups:
                     grp_names = sorted(groups.keys())
                     preview = ", ".join(grp_names[:MAX_LIST_PREVIEW])
                     if len(grp_names) > MAX_LIST_PREVIEW:
                         preview += " ..."
-                    console.print("[yellow]Known groups:[/yellow] " + preview)
+                    console.print(
+                        style_manager.format_message("Known groups:", StyleName.WARNING)
+                        + " "
+                        + preview
+                    )
                 raise typer.Exit(1)
 
             def process_device(dev: str) -> bool:
@@ -131,25 +150,42 @@ def register(app: typer.Typer) -> None:
                         try:
                             platform_ops = get_platform_operations(session)
                         except UnsupportedOperationError as e:
-                            console.print(f"[red]Error on {dev}: {e}[/red]")
+                            console.print(
+                                style_manager.format_message(
+                                    f"Error on {dev}: {e}", StyleName.ERROR
+                                )
+                            )
                             return False
 
                         # Resolve config backup sequence (device-specific or global)
                         seq_cmds = _resolve_config_backup_sequence(config, dev)
                         if not seq_cmds:
                             console.print(
-                                "[red]Error: configuration backup sequence 'config_backup' not defined "
-                                f"for {dev}[/red]"
+                                style_manager.format_message(
+                                    f"Error: configuration backup sequence 'config_backup' not defined for {dev}",
+                                    StyleName.ERROR,
+                                )
                             )
                             return False
 
                         console.print(
-                            f"[bold cyan]Creating configuration backup on {dev}[/bold cyan]"
+                            style_manager.format_message(
+                                f"Creating configuration backup on {dev}",
+                                StyleName.INFO,
+                            )
                         )
                         transport_type = config.get_transport_type(dev)
                         platform_name = platform_ops.get_platform_name()
-                        console.print(f"[yellow]Platform:[/yellow] {platform_name}")
-                        console.print(f"[yellow]Transport:[/yellow] {transport_type}")
+                        console.print(
+                            style_manager.format_message("Platform:", StyleName.WARNING)
+                            + f" {platform_name}"
+                        )
+                        console.print(
+                            style_manager.format_message(
+                                "Transport:", StyleName.WARNING
+                            )
+                            + f" {transport_type}"
+                        )
 
                         # Use platform-specific config backup creation
                         backup_success = platform_ops.config_backup(
@@ -159,7 +195,10 @@ def register(app: typer.Typer) -> None:
 
                         if not backup_success:
                             console.print(
-                                f"[red]Error: Configuration backup creation failed on {dev}[/red]"
+                                style_manager.format_message(
+                                    f"Error: Configuration backup creation failed on {dev}",
+                                    StyleName.ERROR,
+                                )
                             )
                             return False
 
@@ -182,7 +221,10 @@ def register(app: typer.Typer) -> None:
                             elif "cisco" in platform_name.lower():
                                 # For Cisco devices, configuration is typically displayed, not saved to file
                                 console.print(
-                                    f"[yellow]Note: Cisco platform '{platform_name}' typically shows configuration output rather than saving to files[/yellow]"
+                                    style_manager.format_message(
+                                        f"Note: Cisco platform '{platform_name}' typically shows configuration output rather than saving to files",
+                                        StyleName.WARNING,
+                                    )
                                 )
                                 downloads = []
 
@@ -195,19 +237,35 @@ def register(app: typer.Typer) -> None:
                                 )
                         return True
                 except NetworkToolkitError as e:
-                    console.print(f"[red]Error on {dev}: {e.message}[/red]")
+                    console.print(
+                        style_manager.format_message(
+                            f"Error on {dev}: {e.message}", StyleName.ERROR
+                        )
+                    )
                     if verbose and e.details:
-                        console.print(f"[red]Details: {e.details}[/red]")
+                        console.print(
+                            style_manager.format_message(
+                                f"Details: {e.details}", StyleName.ERROR
+                            )
+                        )
                     return False
                 except Exception as e:  # pragma: no cover - unexpected
-                    console.print(f"[red]Unexpected error on {dev}: {e}[/red]")
+                    console.print(
+                        style_manager.format_message(
+                            f"Unexpected error on {dev}: {e}", StyleName.ERROR
+                        )
+                    )
                     return False
 
             if is_device:
                 ok = process_device(target_name)
                 if not ok:
                     raise typer.Exit(1)
-                console.print("[bold green]Configuration backup completed[/bold green]")
+                console.print(
+                    style_manager.format_message(
+                        "Configuration backup completed", StyleName.SUCCESS
+                    )
+                )
                 return
 
             # Group path
@@ -221,13 +279,18 @@ def register(app: typer.Typer) -> None:
 
             if not members:
                 console.print(
-                    f"[red]Error: No devices found in group '{target_name}'[/red]",
+                    style_manager.format_message(
+                        f"Error: No devices found in group '{target_name}'",
+                        StyleName.ERROR,
+                    )
                 )
                 raise typer.Exit(1)
 
             console.print(
-                "[bold cyan]Starting configuration backups for group:[/bold cyan] "
-                + target_name
+                style_manager.format_message(
+                    f"Starting configuration backups for group: {target_name}",
+                    StyleName.INFO,
+                )
             )
             failures = 0
             for dev in members:
@@ -236,18 +299,22 @@ def register(app: typer.Typer) -> None:
 
             total = len(members)
             console.print(
-                (
-                    f"[bold]Completed:[/bold] {total - failures}/{total} "
-                    "successful configuration backups"
-                ),
+                style_manager.format_message("Completed:", StyleName.BOLD)
+                + f" {total - failures}/{total} successful configuration backups"
             )
             if failures:
                 raise typer.Exit(1)
 
         except NetworkToolkitError as e:
-            console.print(f"[red]Error: {e.message}[/red]")
+            console.print(
+                style_manager.format_message(f"Error: {e.message}", StyleName.ERROR)
+            )
             if verbose and e.details:
-                console.print(f"[red]Details: {e.details}[/red]")
+                console.print(
+                    style_manager.format_message(
+                        f"Details: {e.details}", StyleName.ERROR
+                    )
+                )
             raise typer.Exit(1) from e
 
     # Register the main config-backup command

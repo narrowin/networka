@@ -137,10 +137,11 @@ def register(app: typer.Typer) -> None:
         )
 
         # Create style manager for consistent theming
-        style_manager = StyleManager(ctx.output_mode)
+        # Use the original output_mode parameter directly to ensure correct theming
+        style_manager = StyleManager(output_mode or OutputMode.DEFAULT)
 
-        # Expose console for backward compatibility with existing code
-        console = ctx.console
+        # Use console from style manager to ensure consistent theming
+        console = style_manager.console
 
         # Handle interactive authentication if requested
         interactive_creds = None
@@ -158,7 +159,7 @@ def register(app: typer.Typer) -> None:
         # Track run timing & reporting state
         started_at = perf_counter()
         printed_results_dir = False
-        output_mgr = ctx.output_manager  # Use context's output manager
+        output_mgr = ctx.output  # Use context's output manager
 
         def _print_results_dir_once(results_mgr: ResultsManager) -> None:
             """Print the results directory once if storing is enabled."""

@@ -42,7 +42,13 @@ from network_toolkit.commands.vendor_backup import register as register_vendor_b
 from network_toolkit.commands.vendor_config_backup import (
     register as register_vendor_config_backup,
 )
-from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.logging import setup_logging
+from network_toolkit.common.output import OutputMode
+from network_toolkit.common.styles import StyleManager, StyleName
+
+# Create a default console for CLI operations
+_style_manager = StyleManager(mode=OutputMode.DEFAULT)
+console = _style_manager.console
 
 # Keep this import here to preserve tests that patch `network_toolkit.cli.DeviceSession`
 from network_toolkit.device import DeviceSession as _DeviceSession
@@ -220,7 +226,12 @@ def _handle_file_downloads(
         filename = replace_placeholders(local_filename_str)
         destination = local_dir / filename
 
-        console.print(f"[cyan]Downloading {remote_file} from {device_name}...[/cyan]")
+        console.print(
+            _style_manager.format_message(
+                f"Downloading {remote_file} from {device_name}...",
+                StyleName.INFO,
+            )
+        )
 
         try:
             success = session.download_file(
@@ -230,14 +241,27 @@ def _handle_file_downloads(
             )
             if success:
                 console.print(
-                    f"[green]OK Downloaded {remote_file} to {destination}[/green]"
+                    _style_manager.format_message(
+                        f"OK Downloaded {remote_file} to {destination}",
+                        StyleName.SUCCESS,
+                    )
                 )
                 results[remote_file] = f"Downloaded to {destination}"
             else:
-                console.print(f"[red]FAIL Failed to download {remote_file}[/red]")
+                console.print(
+                    _style_manager.format_message(
+                        f"FAIL Failed to download {remote_file}",
+                        StyleName.ERROR,
+                    )
+                )
                 results[remote_file] = "Download failed"
         except Exception as e:  # DeviceExecutionError or unexpected
-            console.print(f"[red]FAIL Error downloading {remote_file}: {e}[/red]")
+            console.print(
+                _style_manager.format_message(
+                    f"FAIL Error downloading {remote_file}: {e}",
+                    StyleName.ERROR,
+                )
+            )
             results[remote_file] = f"Download error: {e}"
 
     return results

@@ -9,9 +9,11 @@ from typing import Annotated, Any, cast
 
 import typer
 
-from network_toolkit.common.logging import console, setup_logging
-from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.command_helpers import CommandContext
+from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
+from network_toolkit.common.logging import setup_logging
+from network_toolkit.common.output import OutputMode
+from network_toolkit.common.styles import StyleManager, StyleName
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 
@@ -70,6 +72,10 @@ def register(app: typer.Typer) -> None:
             output_mode=None,  # Use global config theme
         )
 
+        # Setup style manager for consistent theming
+        style_manager = StyleManager(OutputMode.DEFAULT)
+        console = style_manager.console
+
         try:
             config = load_config(config_file)
 
@@ -84,32 +90,57 @@ def register(app: typer.Typer) -> None:
 
             if not (is_device or is_group):
                 console.print(
-                    f"[red]Error: '{target_name}' not found as device or group in "
-                    "configuration[/red]"
+                    style_manager.format_message(
+                        f"Error: '{target_name}' not found as device or group in configuration",
+                        StyleName.ERROR,
+                    )
                 )
                 raise typer.Exit(1)
 
             if is_device:
                 # Show summary
                 transport_type = config.get_transport_type(target_name)
-                console.print("[bold cyan]File Download Details:[/bold cyan]")
-                console.print(f"  [bold]Device:[/bold] {target_name}")
-                console.print(f"  [bold]Transport:[/bold] {transport_type}")
-                console.print(f"  [bold]Remote file:[/bold] {remote_file}")
-                console.print(f"  [bold]Local path:[/bold] {local_path}")
                 console.print(
-                    "  [bold]Delete remote after download:[/bold] "
-                    + ("Yes" if delete_remote else "No")
+                    style_manager.format_message(
+                        "File Download Details:", StyleName.INFO
+                    )
                 )
                 console.print(
-                    "  [bold]Verify download:[/bold] "
-                    + ("Yes" if verify_download else "No")
+                    style_manager.format_message(
+                        f"  Device: {target_name}", StyleName.BOLD
+                    )
+                )
+                console.print(
+                    style_manager.format_message(
+                        f"  Transport: {transport_type}", StyleName.BOLD
+                    )
+                )
+                console.print(
+                    style_manager.format_message(
+                        f"  Remote file: {remote_file}", StyleName.BOLD
+                    )
+                )
+                console.print(
+                    style_manager.format_message(
+                        f"  Local path: {local_path}", StyleName.BOLD
+                    )
+                )
+                console.print(
+                    style_manager.format_message(
+                        "  Delete remote after download: "
+                        + ("Yes" if delete_remote else "No"),
+                        StyleName.BOLD,
+                    )
+                )
+                console.print(
+                    style_manager.format_message(
+                        "  Verify download: " + ("Yes" if verify_download else "No"),
+                        StyleName.BOLD,
+                    )
                 )
                 console.print()
 
-                with console.status(
-                    f"[bold green]Downloading {remote_file} from {target_name}..."
-                ):
+                with console.status(f"Downloading {remote_file} from {target_name}..."):
                     with device_session(target_name, config) as session:
                         success = session.download_file(
                             remote_filename=remote_file,
@@ -119,12 +150,20 @@ def register(app: typer.Typer) -> None:
                         )
 
                 if success:
-                    console.print("[bold green]OK Download successful![/bold green]")
+                    console.print(
+                        style_manager.format_message(
+                            "OK Download successful!", StyleName.SUCCESS
+                        )
+                    )
                     ctx.print_success(
                         f"File '{remote_file}' downloaded to '{local_path}'"
                     )
                 else:
-                    console.print("[bold red]FAIL Download failed![/bold red]")
+                    console.print(
+                        style_manager.format_message(
+                            "FAIL Download failed!", StyleName.ERROR
+                        )
+                    )
                     raise typer.Exit(1)
                 return
 
@@ -137,25 +176,49 @@ def register(app: typer.Typer) -> None:
 
             if not members:
                 console.print(
-                    f"[red]Error: No devices found in group '{target_name}'[/red]",
+                    style_manager.format_message(
+                        f"Error: No devices found in group '{target_name}'",
+                        StyleName.ERROR,
+                    )
                 )
                 raise typer.Exit(1)
 
-            console.print("[bold cyan]Group File Download Details:[/bold cyan]")
-            console.print(f"  [bold]Group:[/bold] {target_name}")
-            console.print(f"  [bold]Devices:[/bold] {len(members)}")
-            console.print(f"  [bold]Remote file:[/bold] {remote_file}")
             console.print(
-                "  [bold]Base path:[/bold] "
-                f"{local_path} (files saved under <base>/<device>/{remote_file})"
+                style_manager.format_message(
+                    "Group File Download Details:", StyleName.INFO
+                )
             )
             console.print(
-                "  [bold]Delete remote after download:[/bold] "
-                + ("Yes" if delete_remote else "No")
+                style_manager.format_message(f"  Group: {target_name}", StyleName.BOLD)
             )
             console.print(
-                "  [bold]Verify download:[/bold] "
-                + ("Yes" if verify_download else "No")
+                style_manager.format_message(
+                    f"  Devices: {len(members)}", StyleName.BOLD
+                )
+            )
+            console.print(
+                style_manager.format_message(
+                    f"  Remote file: {remote_file}", StyleName.BOLD
+                )
+            )
+            console.print(
+                style_manager.format_message(
+                    f"  Base path: {local_path} (files saved under <base>/<device>/{remote_file})",
+                    StyleName.BOLD,
+                )
+            )
+            console.print(
+                style_manager.format_message(
+                    "  Delete remote after download: "
+                    + ("Yes" if delete_remote else "No"),
+                    StyleName.BOLD,
+                )
+            )
+            console.print(
+                style_manager.format_message(
+                    "  Verify download: " + ("Yes" if verify_download else "No"),
+                    StyleName.BOLD,
+                )
             )
             console.print()
 
@@ -164,9 +227,7 @@ def register(app: typer.Typer) -> None:
 
             for dev in members:
                 dest = (local_path / dev / remote_file).resolve()
-                with console.status(
-                    f"[bold green]Downloading {remote_file} from {dev}..."
-                ):
+                with console.status(f"Downloading {remote_file} from {dev}..."):
                     try:
                         with device_session(dev, config) as session:
                             ok = session.download_file(
@@ -184,13 +245,26 @@ def register(app: typer.Typer) -> None:
                     except Exception as e:  # pragma: no cover - unexpected
                         results[dev] = False
                         console.print(
-                            f"[red]FAIL {dev}: error during download: {e}[/red]"
+                            style_manager.format_message(
+                                f"FAIL {dev}: error during download: {e}",
+                                StyleName.ERROR,
+                            )
                         )
 
             total = len(members)
-            console.print("[bold cyan]Group Download Results:[/bold cyan]")
-            console.print(f"  [bold green]Successful:[/bold green] {successes}/{total}")
-            console.print(f"  [bold red]Failed:[/bold red] {total - successes}/{total}")
+            console.print(
+                style_manager.format_message("Group Download Results:", StyleName.INFO)
+            )
+            console.print(
+                style_manager.format_message(
+                    f"  Successful: {successes}/{total}", StyleName.SUCCESS
+                )
+            )
+            console.print(
+                style_manager.format_message(
+                    f"  Failed: {total - successes}/{total}", StyleName.ERROR
+                )
+            )
 
             if successes < total:
                 raise typer.Exit(1)

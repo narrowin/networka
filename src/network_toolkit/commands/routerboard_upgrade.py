@@ -12,9 +12,11 @@ from typing import Annotated, Any, cast
 
 import typer
 
-from network_toolkit.common.logging import console, setup_logging
-from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.command_helpers import CommandContext
+from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
+from network_toolkit.common.logging import setup_logging
+from network_toolkit.common.output import OutputMode
+from network_toolkit.common.styles import StyleManager, StyleName
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.platforms import UnsupportedOperationError, get_platform_operations
@@ -61,6 +63,10 @@ def register(app: typer.Typer) -> None:
         """
         setup_logging("DEBUG" if verbose else "INFO")
 
+        # Create style manager for consistent theming
+        style_manager = StyleManager(mode=OutputMode.DEFAULT)
+        console = style_manager.console
+
         # ACTION command - use global config theme
         ctx = CommandContext(
             config_file=config_file,
@@ -81,8 +87,10 @@ def register(app: typer.Typer) -> None:
 
             if not (is_device or is_group):
                 console.print(
-                    f"[red]Error: '{target_name}' not found as device or group in "
-                    "configuration[/red]"
+                    style_manager.format_message(
+                        f"Error: '{target_name}' not found as device or group in configuration",
+                        StyleName.ERROR,
+                    )
                 )
                 if devices:
                     dev_names = sorted(devices.keys())
@@ -132,8 +140,10 @@ def register(app: typer.Typer) -> None:
                                 session.execute_command(cmd)
 
                         console.print(
-                            "[bold yellow]Upgrading BIOS/RouterBOOT on "
-                            f"{dev} and rebooting...[/bold yellow]"
+                            style_manager.format_message(
+                                f"Upgrading BIOS/RouterBOOT on {dev} and rebooting...",
+                                StyleName.WARNING,
+                            )
                         )
                         platform_name = platform_ops.get_platform_name()
                         ctx.print_info(f"Platform: {platform_name}")
@@ -146,7 +156,10 @@ def register(app: typer.Typer) -> None:
                             )
                             return True
                         console.print(
-                            f"[red]FAIL BIOS upgrade failed to start on {dev}[/red]"
+                            style_manager.format_message(
+                                f"FAIL BIOS upgrade failed to start on {dev}",
+                                StyleName.ERROR,
+                            )
                         )
                         return False
                 except NetworkToolkitError as e:
@@ -174,16 +187,18 @@ def register(app: typer.Typer) -> None:
 
             if not members:
                 console.print(
-                    f"[red]Error: No devices found in group '{target_name}'[/red]",
+                    style_manager.format_message(
+                        f"Error: No devices found in group '{target_name}'",
+                        StyleName.ERROR,
+                    )
                 )
                 raise typer.Exit(1)
 
             console.print(
-                "[bold cyan]Starting RouterBOARD upgrade for group '"
-                + target_name
-                + "' ("
-                + str(len(members))
-                + ") devices)[/bold cyan]"
+                style_manager.format_message(
+                    f"Starting RouterBOARD upgrade for group '{target_name}' ({len(members)} devices)",
+                    StyleName.INFO,
+                )
             )
             failures = 0
             for dev in members:
@@ -192,7 +207,8 @@ def register(app: typer.Typer) -> None:
 
             total = len(members)
             console.print(
-                f"[bold]Completed:[/bold] {total - failures}/{total} initiated"
+                style_manager.format_message("Completed:", StyleName.BOLD)
+                + f" {total - failures}/{total} initiated"
             )
             if failures:
                 raise typer.Exit(1)

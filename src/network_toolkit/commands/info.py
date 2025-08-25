@@ -129,7 +129,9 @@ def register(app: typer.Typer) -> None:
                 raise typer.Exit(1) from None
 
             themed_console.print(
-                f"[bold]Device Information ({len(devices)} devices)[/bold]"
+                style_manager.format_message(
+                    f"Device Information ({len(devices)} devices)", StyleName.BOLD
+                )
             )
 
             # Show info for each resolved device

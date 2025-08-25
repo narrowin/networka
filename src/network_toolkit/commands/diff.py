@@ -196,6 +196,10 @@ def register(app: typer.Typer) -> None:
             config_file=config_file,
         )
 
+        # Setup style manager for consistent theming
+        style_manager = StyleManager(ctx.output_mode)
+        console = style_manager.console
+
         subj = subject.strip()
         is_config = subj.lower() == "config"
         is_command = subj.startswith("/")
