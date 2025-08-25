@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
@@ -18,6 +19,7 @@ from network_toolkit.common.output import (
 from network_toolkit.common.resolver import DeviceResolver
 from network_toolkit.common.styles import StyleManager, StyleName
 from network_toolkit.config import load_config
+from network_toolkit.credentials import EnvironmentCredentialManager
 from network_toolkit.exceptions import NetworkToolkitError
 
 if TYPE_CHECKING:
@@ -29,6 +31,9 @@ def register(app: typer.Typer) -> None:
     def info(
         targets: Annotated[
             str,
+            typer.Argument(
+                help="Comma-separated device/group names from configuration"
+            ),
             typer.Argument(
                 help="Comma-separated device/group names from configuration"
             ),
@@ -46,6 +51,9 @@ def register(app: typer.Typer) -> None:
                 show_default=False,
             ),
         ] = None,
+        verbose: Annotated[
+            bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
+        ] = False,
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
         ] = False,
@@ -97,9 +105,6 @@ def register(app: typer.Typer) -> None:
                     config.general.output_mode
                 )
 
-            # Create style manager for consistent theming
-            style_manager = StyleManager(output_manager.mode)
-
             resolver = DeviceResolver(config)
 
             # Get themed console
@@ -131,6 +136,76 @@ def register(app: typer.Typer) -> None:
             themed_console.print(
                 f"[bold]Device Information ({len(devices)} devices)[/bold]"
             )
+
+            # Helper function to check if environment variable is truthy
+            def _env_truthy(var_name: str) -> bool:
+                val = os.getenv(var_name, "")
+                return val.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+            # Helper function to determine credential source with exact filenames
+            def get_credential_source(device_name: str, credential_type: str) -> str:
+                """Get the source of a credential with exact file paths."""
+                # Check interactive override
+                if interactive_auth and interactive_creds:
+                    if credential_type == "username" and interactive_creds.username:
+                        return "interactive input"
+                    if credential_type == "password" and interactive_creds.password:
+                        return "interactive input"
+
+                # Check device config
+                dev = config.devices.get(device_name) if config.devices else None
+                if dev:
+                    if credential_type == "username" and getattr(dev, "user", None):
+                        return "device config file (config/devices/devices.yml)"
+                    if credential_type == "password" and getattr(dev, "password", None):
+                        return "device config file (config/devices/devices.yml)"
+
+                # Check device-specific environment variables
+                env_var_name = f"NW_{credential_type.upper()}_{device_name.upper().replace('-', '_')}"
+                if os.getenv(env_var_name):
+                    return f"environment ({env_var_name})"
+
+                # Check group-level credentials
+                group_user, group_password = config.get_group_credentials(device_name)
+                target_credential = (
+                    group_user if credential_type == "username" else group_password
+                )
+
+                if target_credential:
+                    # Find which group provided the credential
+                    device_groups = config.get_device_groups(device_name)
+                    for group_name in device_groups:
+                        group = (
+                            config.device_groups.get(group_name)
+                            if config.device_groups
+                            else None
+                        )
+                        if group and group.credentials:
+                            if credential_type == "username" and group.credentials.user:
+                                return f"group config file config/groups/groups.yml ({group_name})"
+                            elif (
+                                credential_type == "password"
+                                and group.credentials.password
+                            ):
+                                return f"group config file config/groups/groups.yml ({group_name})"
+
+                        # Check group environment variable
+                        if EnvironmentCredentialManager.get_group_specific(
+                            group_name, credential_type
+                        ):
+                            grp_env = f"NW_{credential_type.upper()}_{group_name.upper().replace('-', '_')}"
+                            return f"environment ({grp_env})"
+
+                # Check default environment variables
+                default_env_var = f"NW_{credential_type.upper()}_DEFAULT"
+                if os.getenv(default_env_var):
+                    return f"environment ({default_env_var})"
+
+                # Fallback to general config
+                return f"config (general.default_{credential_type})"
+
+            # Check if user wants to show plaintext passwords
+            show_passwords = _env_truthy("NW_SHOW_PLAINTEXT_PASSWORDS")
 
             # Show info for each resolved device
             for i, device in enumerate(devices):
@@ -172,7 +247,24 @@ def register(app: typer.Typer) -> None:
                     device, username_override, password_override
                 )
                 table.add_row("SSH Port", str(conn_params["port"]))
+
+                # Show actual username value and its source
                 table.add_row("Username", conn_params["auth_username"])
+                table.add_row(
+                    "Username Source", get_credential_source(device, "username")
+                )
+
+                # Show password based on environment variable setting
+                if show_passwords:
+                    table.add_row(
+                        "Password", conn_params["auth_password"]
+                    )  # pragma: allowlist secret
+                else:
+                    table.add_row("Password", "[hidden]")
+                table.add_row(
+                    "Password Source", get_credential_source(device, "password")
+                )
+
                 table.add_row("Timeout", f"{conn_params['timeout_socket']}s")
 
                 # Show transport type
@@ -180,16 +272,6 @@ def register(app: typer.Typer) -> None:
                 table.add_row(
                     "Transport Type", f"[transport]{transport_type}[/transport]"
                 )
-
-                # Show credential source
-                if interactive_auth:
-                    table.add_row(
-                        "Credentials", "[credential]Interactive input[/credential]"
-                    )
-                else:
-                    table.add_row(
-                        "Credentials", "[credential]Environment/Config[/credential]"
-                    )
 
                 # Show group memberships
                 group_memberships = []

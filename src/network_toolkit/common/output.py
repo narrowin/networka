@@ -21,7 +21,8 @@ class OutputMode(str, Enum):
     LIGHT = "light"  # Custom light theme (dark colors on light background)
     DARK = "dark"  # Custom dark theme (bright colors on dark background)
     NO_COLOR = "no-color"  # No colors, structured output only
-    RAW = "raw"  # Machine-readable, minimal formatting
+    RAW = "raw"  # Machine-readable text, minimal formatting
+    JSON = "json"  # Machine-readable JSONL events per line
 
 
 class OutputManager:
@@ -45,8 +46,8 @@ class OutputManager:
 
     def _create_console(self) -> Console:
         """Create a console instance based on the current mode."""
-        if self.mode == OutputMode.RAW:
-            # Raw mode uses no styling at all
+        if self.mode in (OutputMode.RAW, OutputMode.JSON):
+            # Raw/JSON modes use no styling at all
             return Console(
                 color_system=None,
                 force_terminal=False,
@@ -151,14 +152,37 @@ class OutputManager:
 
     def print_device_info(self, device: str, message: str) -> None:
         """Print device-related information."""
-        if self.mode == OutputMode.RAW:
+        if self.mode == OutputMode.JSON:
+            sys.stdout.write(
+                json.dumps(
+                    {
+                        "type": "info",
+                        "device": device,
+                        "message": message,
+                    }
+                )
+                + "\n"
+            )
+        elif self.mode == OutputMode.RAW:
             sys.stdout.write(f"device={device} {message}\n")
         else:
             self._console.print(f"[device]{device}[/device]: {message}")
 
     def print_command_output(self, device: str, command: str, output: str) -> None:
         """Print command output with appropriate formatting."""
-        if self.mode == OutputMode.RAW:
+        if self.mode == OutputMode.JSON:
+            sys.stdout.write(
+                json.dumps(
+                    {
+                        "type": "output",
+                        "device": device,
+                        "command": command,
+                        "message": output,
+                    }
+                )
+                + "\n"
+            )
+        elif self.mode == OutputMode.RAW:
             sys.stdout.write(f"device={device} cmd={command}\n")
             sys.stdout.write(f"{output}\n")
         else:
@@ -180,7 +204,12 @@ class OutputManager:
 
     def print_error(self, message: str, context: str | None = None) -> None:
         """Print an error message."""
-        if self.mode == OutputMode.RAW:
+        if self.mode == OutputMode.JSON:
+            payload: dict[str, Any] = {"type": "error", "message": message}
+            if context:
+                payload["device"] = context
+            sys.stdout.write(json.dumps(payload) + "\n")
+        elif self.mode == OutputMode.RAW:
             if context:
                 sys.stdout.write(f"device={context} error: {message}\n")
             else:
@@ -192,7 +221,12 @@ class OutputManager:
 
     def print_warning(self, message: str, context: str | None = None) -> None:
         """Print a warning message."""
-        if self.mode == OutputMode.RAW:
+        if self.mode == OutputMode.JSON:
+            payload: dict[str, Any] = {"type": "warning", "message": message}
+            if context:
+                payload["device"] = context
+            sys.stdout.write(json.dumps(payload) + "\n")
+        elif self.mode == OutputMode.RAW:
             if context:
                 sys.stdout.write(f"device={context} warning: {message}\n")
             else:
@@ -204,7 +238,12 @@ class OutputManager:
 
     def print_info(self, message: str, context: str | None = None) -> None:
         """Print an informational message."""
-        if self.mode == OutputMode.RAW:
+        if self.mode == OutputMode.JSON:
+            payload: dict[str, Any] = {"type": "info", "message": message}
+            if context:
+                payload["device"] = context
+            sys.stdout.write(json.dumps(payload) + "\n")
+        elif self.mode == OutputMode.RAW:
             if context:
                 sys.stdout.write(f"device={context} info: {message}\n")
             else:
