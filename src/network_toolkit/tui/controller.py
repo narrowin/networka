@@ -15,6 +15,13 @@ from typing import Any
 from network_toolkit.tui.constants import STARTUP_NOTICE
 from network_toolkit.tui.models import CancellationToken
 
+# Single-source cancel prompt text used in toasts
+CANCEL_TOAST = (
+    "1) Keep running\n"
+    "2) Cancel (soft) — recommended\n"
+    "3) Cancel (hard) — may disconnect sessions and leave devices in a partial state"
+)
+
 
 class TuiController:
     def __init__(
@@ -70,7 +77,7 @@ class TuiController:
         # Background tasks and toast-prompt state flags
         app._bg_tasks = set()
         app._cancel_prompt_active = False
-        app._cancel_mode_prompt_active = False
+        # legacy flag no longer used; kept off for compatibility
         app._quit_prompt_active = False
 
     async def on_input_changed(self, event: Any) -> None:
@@ -146,19 +153,15 @@ class TuiController:
         app = self.app
         service = self.service
         state = self.state
-        # Disallow starting a new run if one is active: show toast and let on_key handle
+        # use module-level CANCEL_TOAST
+        # Disallow starting a new run if one is active: single-step cancel/keep prompt
         if getattr(app, "_run_active", False):
             app._cancel_prompt_active = True
             app._add_meta(
-                "Run already in progress — press 'y' to cancel, 'n' or Enter to continue."
+                "Run already in progress — choose: 1) keep, 2) soft cancel, 3) hard cancel"
             )
             try:
-                self.compat.notify(
-                    app,
-                    "A job is already running. Cancel it? [y/N]",
-                    timeout=5,
-                    severity="warning",
-                )
+                self.compat.notify(app, CANCEL_TOAST, timeout=8, severity="warning")
             except Exception:
                 pass
             return
@@ -396,43 +399,8 @@ class TuiController:
         # Handle toast-driven prompts first (cancel/quit flows)
         try:
             if getattr(app, "_cancel_prompt_active", False):
-                if key in {"y"}:
+                if key in {"2"}:  # soft cancel
                     app._cancel_prompt_active = False
-                    app._cancel_mode_prompt_active = True
-                    try:
-                        self.compat.notify(
-                            app,
-                            "Cancel type? Soft [s] (recommended) or Hard [h]. Hard will close sessions immediately and may leave devices in a partial state.",
-                            timeout=8,
-                            severity="warning",
-                        )
-                    except Exception:
-                        pass
-                    if hasattr(event, "stop"):
-                        event.stop()
-                    return
-                if key in {"n", "enter", "return", "escape"}:
-                    app._cancel_prompt_active = False
-                    try:
-                        status = app.query_one("#run-status")
-                        status.update("Status: running — Continuing current run")
-                        app._refresh_bottom_visibility()
-                    except Exception:
-                        try:
-                            self.compat.notify(
-                                app,
-                                "Continuing current run",
-                                timeout=2,
-                                severity="info",
-                            )
-                        except Exception:
-                            pass
-                    if hasattr(event, "stop"):
-                        event.stop()
-                    return
-            if getattr(app, "_cancel_mode_prompt_active", False):
-                if key in {"s", "enter", "return"}:  # default soft
-                    app._cancel_mode_prompt_active = False
                     try:
                         task = asyncio.create_task(self.action_cancel())
                         self.app._bg_tasks.add(task)
@@ -442,8 +410,8 @@ class TuiController:
                     if hasattr(event, "stop"):
                         event.stop()
                     return
-                if key == "h":
-                    app._cancel_mode_prompt_active = False
+                if key in {"3"}:  # hard cancel
+                    app._cancel_prompt_active = False
                     try:
                         task = asyncio.create_task(self.action_cancel_hard())
                         self.app._bg_tasks.add(task)
@@ -453,8 +421,8 @@ class TuiController:
                     if hasattr(event, "stop"):
                         event.stop()
                     return
-                if key in {"n", "escape"}:
-                    app._cancel_mode_prompt_active = False
+                if key in {"1", "enter", "return", "escape"}:  # keep running
+                    app._cancel_prompt_active = False
                     try:
                         status = app.query_one("#run-status")
                         status.update("Status: running — Continuing current run")
@@ -570,16 +538,13 @@ class TuiController:
             except Exception:
                 pass
         elif key in {"ctrl+c"}:
-            # Ctrl+C: show cancel y/N toast; on_key will handle response and next step
+            # Ctrl+C: show single-step cancel toast; on_key will handle response
             try:
                 if getattr(app, "_run_active", False):
                     app._cancel_prompt_active = True
                     try:
                         self.compat.notify(
-                            app,
-                            "A job is already running. Cancel it? [y/N]",
-                            timeout=5,
-                            severity="warning",
+                            app, CANCEL_TOAST, timeout=8, severity="warning"
                         )
                     except Exception:
                         pass

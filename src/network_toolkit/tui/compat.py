@@ -58,10 +58,18 @@ class TextualCompat:
         Falls back to calling ``notify`` without severity when necessary.
         Raises AttributeError if notify is not available at all.
         """
+        # Escape Rich markup so messages like "[s]" show literally across versions
+        msg = str(message)
+        try:  # optional rich
+            from rich.markup import escape as _escape  # type: ignore
+
+            msg = _escape(msg)
+        except Exception:  # pragma: no cover - rich optional
+            pass
         try:
-            app.notify(message, timeout=timeout, severity=severity)
+            app.notify(msg, timeout=timeout, severity=severity)
         except TypeError:
-            app.notify(message, timeout=timeout)
+            app.notify(msg, timeout=timeout)
 
 
 def load_textual() -> TextualCompat:

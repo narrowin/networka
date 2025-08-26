@@ -126,8 +126,8 @@ async def test_cancel_prompt_no_keeps_running() -> None:
     assert app._cancel_prompt_active is True
     assert any("Run already in progress" in m for m in app._meta)
 
-    # Press 'n' -> continue running
-    evt = _Event("n")
+    # Press '1' -> continue running
+    evt = _Event("1")
     ctl.on_key(evt)
     assert app._cancel_prompt_active is False
     assert "Continuing current run" in app._w_status._text
@@ -148,10 +148,8 @@ async def test_cancel_prompt_soft_cancel() -> None:
     await ctl.action_confirm()
     assert app._cancel_prompt_active is True
 
-    # 'y' then soft 's'
-    ctl.on_key(_Event("y"))
-    assert app._cancel_mode_prompt_active is True
-    ctl.on_key(_Event("s"))
+    # Single-step: press '2' to soft-cancel
+    ctl.on_key(_Event("2"))
 
     # Allow bg task to run
     await asyncio.sleep(0)
@@ -173,10 +171,8 @@ async def test_cancel_prompt_hard_cancel() -> None:
     await ctl.action_confirm()
     assert app._cancel_prompt_active is True
 
-    # 'y' then hard 'h'
-    ctl.on_key(_Event("y"))
-    assert app._cancel_mode_prompt_active is True
-    ctl.on_key(_Event("h"))
+    # Single-step: press '3' to hard-cancel
+    ctl.on_key(_Event("3"))
     await asyncio.sleep(0)
     assert app._cancel_token.is_set()
     assert svc.hard_cancel_called is True
