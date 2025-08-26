@@ -154,7 +154,10 @@ class TuiController:
                 except Exception:
                     pass
                 filt = (value or "").strip().lower()
-                for line in getattr(app, "_output_lines", []) or []:
+                lines: list[str] = [
+                    str(x) for x in (getattr(app, "_output_lines", []) or [])
+                ]
+                for line in lines:
                     if not filt or (filt in line.lower()):
                         from network_toolkit.tui.helpers import log_write
 
@@ -236,7 +239,10 @@ class TuiController:
                         filt = (
                             (getattr(app, "_output_filter", "") or "").strip().lower()
                         )
-                        for line in app._output_lines:
+                        lines: list[str] = [
+                            str(x) for x in (getattr(app, "_output_lines", []) or [])
+                        ]
+                        for line in lines:
                             if not filt or (filt in line.lower()):
                                 from network_toolkit.tui.helpers import log_write
 
@@ -313,7 +319,29 @@ class TuiController:
             key = str(getattr(event, "key", "")).lower()
         except Exception:
             key = ""
-        if key == "s":
+        if key == "q":
+            # Always close overlays; never quit on 'q'
+            try:
+                app.action_close_overlays()
+                if hasattr(event, "stop"):
+                    event.stop()
+                return
+            except Exception:
+                # If anything fails, still stop to avoid quitting
+                try:
+                    if hasattr(event, "stop"):
+                        event.stop()
+                except Exception:
+                    pass
+                return
+        if key == "escape":
+            try:
+                app.action_close_overlays()
+                if hasattr(event, "stop"):
+                    event.stop()
+            except Exception:
+                pass
+        elif key == "s":
             try:
                 app.action_toggle_summary()
                 if hasattr(event, "stop"):
@@ -334,16 +362,9 @@ class TuiController:
                     event.stop()
             except Exception:
                 pass
-        elif key == "f":
+        elif key == "h":
             try:
-                app.action_focus_filter()
-                if hasattr(event, "stop"):
-                    event.stop()
-            except Exception:
-                pass
-        elif key == "y":
-            try:
-                app.action_copy_last_error()
+                app.action_toggle_help()
                 if hasattr(event, "stop"):
                     event.stop()
             except Exception:

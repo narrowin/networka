@@ -616,6 +616,38 @@ def run(config: str | Path = "config") -> None:
                         pass
             self._refresh_bottom_visibility()
 
+        def _show_help_panel(self) -> None:
+            try:
+                panel = self.query_one("#help-panel")
+            except Exception:
+                return
+            try:
+                panel.remove_class("hidden")
+            except Exception:
+                try:
+                    styles = getattr(panel, "styles", None)
+                    if styles and hasattr(styles, "display"):
+                        styles.display = "block"
+                except Exception:
+                    pass
+            self._refresh_bottom_visibility()
+
+        def _hide_help_panel(self) -> None:
+            try:
+                panel = self.query_one("#help-panel")
+            except Exception:
+                return
+            try:
+                panel.add_class("hidden")
+            except Exception:
+                try:
+                    styles = getattr(panel, "styles", None)
+                    if styles and hasattr(styles, "display"):
+                        styles.display = "none"
+                except Exception:
+                    pass
+            self._refresh_bottom_visibility()
+
         def _show_bottom_panel(self) -> None:
             try:
                 container = self.query_one("#bottom")
@@ -650,6 +682,7 @@ def run(config: str | Path = "config") -> None:
             """Hide entire bottom area if no output and summary is hidden and status is idle."""
             try:
                 summary_panel = self.query_one("#summary-panel")
+                help_panel = self.query_one("#help-panel")
                 output_panel = self.query_one("#output-panel")
                 status_widget = self.query_one("#run-status")
                 bottom_container = self.query_one("#bottom")
@@ -657,11 +690,14 @@ def run(config: str | Path = "config") -> None:
                 return
             try:
                 s_classes: set[str] = set(getattr(summary_panel, "classes", []) or [])
+                h_classes: set[str] = set(getattr(help_panel, "classes", []) or [])
                 o_classes: set[str] = set(getattr(output_panel, "classes", []) or [])
                 is_summary_hidden = "hidden" in s_classes
+                is_help_hidden = "hidden" in h_classes
                 is_output_hidden = "hidden" in o_classes
             except Exception:
                 is_summary_hidden = False
+                is_help_hidden = False
                 is_output_hidden = False
             try:
                 status_text = getattr(status_widget, "renderable", "") or getattr(
@@ -676,13 +712,20 @@ def run(config: str | Path = "config") -> None:
                 has_status_info = status_str.strip() not in {"", "Status: idle"}
             except Exception:
                 has_status_info = False
-            if is_summary_hidden and is_output_hidden and not has_status_info:
+            if (
+                is_summary_hidden
+                and is_help_hidden
+                and is_output_hidden
+                and not has_status_info
+            ):
                 self._hide_bottom_panel()
             else:
                 self._show_bottom_panel()
             # Expand bottom when any panel is visible; otherwise compact to auto height
             try:
-                any_panel_visible = not (is_summary_hidden and is_output_hidden)
+                any_panel_visible = not (
+                    is_summary_hidden and is_help_hidden and is_output_hidden
+                )
                 if any_panel_visible:
                     bottom_container.add_class("expanded")
                 else:
@@ -838,6 +881,69 @@ def run(config: str | Path = "config") -> None:
             self._dark_mode = new_dark
             self._apply_theme(new_dark)
 
+        def action_show_help(self) -> None:
+            """Display a streamlined help view in the Help panel."""
+            # Build content for help
+            try:
+                from rich.text import Text
+
+                rich_text: Any = Text()
+                rich_text.append("Help", style="bold")
+                rich_text.append("\nPress Esc to close this help.")
+                rich_text.append("\n\nKeys and actions:")
+                for kb in KEYMAP:
+                    key_label = kb.key_display or kb.key
+                    rich_text.append("\n • ")
+                    rich_text.append(f"{key_label} — ")
+                    rich_text.append(kb.description)
+                content: Any = rich_text
+            except Exception:
+                lines = [
+                    "Help",
+                    "Press Esc to close this help.",
+                    "",
+                    "Keys and actions:",
+                ]
+                for kb in KEYMAP:
+                    key_label = kb.key_display or kb.key
+                    lines.append(f" • {key_label} — {kb.description}")
+                content = "\n".join(lines)
+
+            # Update help widget
+            try:
+                help_log = self.query_one("#help-log")
+                if hasattr(help_log, "clear"):
+                    try:
+                        help_log.clear()
+                    except Exception:
+                        pass
+                if hasattr(help_log, "update"):
+                    help_log.update(content)
+                elif hasattr(help_log, "write"):
+                    text = str(content)
+                    for line in text.splitlines():
+                        help_log.write(line)
+            except Exception:
+                pass
+
+            # Show help panel, hide summary to avoid confusion
+            try:
+                self._hide_summary_panel()
+            except Exception:
+                pass
+            try:
+                self._show_help_panel()
+            except Exception:
+                pass
+            try:
+                status_msg = (
+                    "Status: idle — Help (press h to refresh, s/o to toggle panels)"
+                )
+                self.query_one("#run-status").update(status_msg)
+                self._refresh_bottom_visibility()
+            except Exception:
+                pass
+
         def _apply_theme(self, dark: bool) -> None:
             # Preferred: property 'dark' on App
             try:
@@ -875,6 +981,47 @@ def run(config: str | Path = "config") -> None:
             try:
                 if hasattr(self, "refresh"):
                     self.refresh()
+            except Exception:
+                pass
+
+        def action_toggle_help(self) -> None:
+            """Toggle the visibility of the Help panel.
+
+            If the Help panel is hidden, render and show it; if visible, hide it.
+            """
+            try:
+                panel = self.query_one("#help-panel")
+                classes: set[str] = set(getattr(panel, "classes", []) or [])
+                is_hidden = "hidden" in classes
+            except Exception:
+                is_hidden = True
+            if is_hidden:
+                self.action_show_help()
+            else:
+                self._hide_help_panel()
+                try:
+                    self.query_one("#run-status").update("Status: idle")
+                    self._refresh_bottom_visibility()
+                except Exception:
+                    pass
+
+        def action_close_overlays(self) -> None:
+            """Close any open bottom overlays (Help, Summary, Output)."""
+            try:
+                self._hide_help_panel()
+            except Exception:
+                pass
+            try:
+                self._hide_summary_panel()
+            except Exception:
+                pass
+            try:
+                self._hide_output_panel()
+            except Exception:
+                pass
+            try:
+                self.query_one("#run-status").update("Status: idle")
+                self._refresh_bottom_visibility()
             except Exception:
                 pass
             # Fallback: no-op; CSS uses theme vars so best effort only

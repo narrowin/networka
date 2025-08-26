@@ -16,6 +16,8 @@ from network_toolkit.tui.constants import (
     ID_FILTER_OUTPUT,
     ID_FILTER_SEQUENCES,
     ID_FILTER_SUMMARY,
+    ID_HELP_LOG,
+    ID_HELP_PANEL,
     ID_INPUT_COMMANDS,
     ID_LAYOUT,
     ID_LIST_DEVICES,
@@ -33,6 +35,7 @@ from network_toolkit.tui.constants import (
     ID_TAB_SEQUENCES,
     ID_TARGETS_TABS,
     LBL_ACTIONS,
+    LBL_HELP,
     LBL_OUTPUT,
     LBL_PRESS_ENTER,
     LBL_RUN,
@@ -89,6 +92,9 @@ def compose_root(compat: Any) -> Any:
                 yield static(LBL_SUMMARY, classes="pane-title title")
                 yield compat.TextLogClass(id=ID_RUN_SUMMARY, classes="scroll")
                 yield _filter_input(compat, ID_FILTER_SUMMARY, "Filter summary...")
+            with vertical(classes="panel hidden", id=ID_HELP_PANEL):
+                yield static(LBL_HELP, classes="pane-title title")
+                yield compat.TextLogClass(id=ID_HELP_LOG, classes="scroll")
             with vertical(classes="panel hidden", id=ID_OUTPUT_PANEL):
                 yield static(LBL_OUTPUT, classes="pane-title title")
                 yield compat.TextLogClass(id=ID_OUTPUT_LOG, classes="scroll")

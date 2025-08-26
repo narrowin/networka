@@ -20,17 +20,12 @@ class KeyBinding(NamedTuple):
 
 # Default keymap for the TUI
 KEYMAP: list[KeyBinding] = [
-    KeyBinding("q", "quit", "Quit", True),
-    KeyBinding("enter", "confirm", "Run"),
+    KeyBinding("q", "close_overlays", "Close panel", True, None, True),
+    KeyBinding("ctrl+c", "quit", "Quit", True, None, True),
+    KeyBinding("h", "toggle_help", "Help", True, None, True),
     KeyBinding("r", "confirm", "Run"),
-    KeyBinding("ctrl+c", "quit", "Quit"),
     # Priority toggles so they work during input and runs
     KeyBinding("s", "toggle_summary", "Summary", True, None, True),
     KeyBinding("o", "toggle_output", "Output", True, None, True),
-    KeyBinding("f", "focus_filter", "Focus filter", True, None, True),
     KeyBinding("t", "toggle_theme", "Theme", True, None, True),
-    KeyBinding("f2", "toggle_summary", "Summary"),
-    # Copy helpers
-    KeyBinding("y", "copy_last_error", "Copy last error", True, None, True),
-    KeyBinding("ctrl+y", "copy_status", "Copy status", True, None, True),
 ]
