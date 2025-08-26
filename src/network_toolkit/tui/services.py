@@ -153,13 +153,7 @@ class ExecutionService:
                     output_lines=[f"{dev}: cancelled before start"],
                 )
                 failures += 1
-            # Emit outputs grouped and ordered by the plan's device order
-            for dev in plan.keys():
-                r = results_by_device.get(dev)
-                if not r:
-                    continue
-                for line in r.output_lines:
-                    cb.on_output(line)
+            # Do not emit buffered outputs on pre-start cancel; return summary only
             return RunResult(total=total, successes=successes, failures=failures)
 
         async def run_device(device: str, commands: list[str]) -> DeviceRunResult:
@@ -233,7 +227,7 @@ class ExecutionService:
                 # Do not schedule any new work; allow current active tasks to finish
             else:
                 _schedule_next()
-        # Emit outputs grouped and ordered by the plan's device order
+        # Emit any buffered outputs from tasks that didn't stream directly
         for dev in plan.keys():
             r = results_by_device.get(dev)
             if not r:
@@ -250,18 +244,16 @@ class ExecutionService:
         cancel: CancellationToken | None = None,
     ) -> DeviceRunResult:
         ok = True
-        # Collect output lines per device to avoid interleaving
+        # Collect output lines for return (not emitted here); we stream per-command chunks
         buf: list[str] = []
+        device_header_emitted = False
         try:
             # Import here to avoid making CLI a hard dependency of module import
             from network_toolkit.cli import DeviceSession
 
-            # Emit a clear device header into the buffer for identification
-            buf.append(f"--- Device: {device} ---")
             cb.on_meta(f"{device}: connecting...")
             if cancel and cancel.is_set():
                 cb.on_meta(f"{device}: cancelled before connect")
-                buf.append(f"--- Device: {device} cancelled ---")
                 return DeviceRunResult(device=device, ok=False, output_lines=buf)
             with DeviceSession(device, self._data.config) as session:
                 # Make this session visible for hard-cancel
@@ -275,17 +267,29 @@ class ExecutionService:
                         cb.on_meta(f"{device}: cancelled")
                         ok = False
                         break
-                    # Record command context in buffer for clarity
+                    # Build a per-command chunk: optional device header, the command echo, then output lines
+                    chunk_lines: list[str] = []
+                    if not device_header_emitted:
+                        chunk_lines.append(f"--- Device: {device} ---")
+                        buf.append(f"--- Device: {device} ---")
+                        device_header_emitted = True
+                    # Keep command echo as meta only; do not include in output chunk
                     cb.on_meta(f"{device}$ {cmd}")
-                    buf.append(f"{device}$ {cmd}")
                     try:
                         raw = session.execute_command(cmd)
                         text = raw if type(raw) is str else str(raw)
                         out_strip = text.strip()
                         if out_strip:
                             for line in text.rstrip().splitlines():
-                                # Prefix each output line with device name
-                                buf.append(f"{device}: {line}")
+                                # Append raw lines without device prefix
+                                chunk_lines.append(line)
+                                buf.append(line)
+                        # Emit the complete command chunk atomically
+                        if chunk_lines:
+                            try:
+                                cb.on_output("\n".join(chunk_lines))
+                            except Exception:
+                                pass
                     except Exception as e:  # noqa: BLE001
                         ok = False
                         cb.on_error(f"{device}: command error: {e}")
@@ -296,13 +300,24 @@ class ExecutionService:
                 pass
             if cancel and cancel.is_set():
                 cb.on_meta(f"{device}: cancelled done")
-                buf.append(f"--- Device: {device} cancelled done ---")
+                footer = f"--- Device: {device} cancelled done ---"
+                buf.append(footer)
+                try:
+                    cb.on_output(footer)
+                except Exception:
+                    pass
             else:
                 cb.on_meta(f"{device}: done")
-                buf.append(f"--- Device: {device} done ---")
-            return DeviceRunResult(device=device, ok=ok, output_lines=buf)
+                footer = f"--- Device: {device} done ---"
+                buf.append(footer)
+                try:
+                    cb.on_output(footer)
+                except Exception:
+                    pass
+            # Return empty output_lines to indicate streaming already handled output
+            return DeviceRunResult(device=device, ok=ok, output_lines=[])
         except Exception as e:  # noqa: BLE001
             ok = False
             cb.on_error(f"{device}: Failed: {e}")
         # Return whatever we collected (may be empty) on failure
-        return DeviceRunResult(device=device, ok=ok, output_lines=buf)
+        return DeviceRunResult(device=device, ok=ok, output_lines=[])

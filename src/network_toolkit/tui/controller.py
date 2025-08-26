@@ -153,7 +153,6 @@ class TuiController:
         app = self.app
         service = self.service
         state = self.state
-        # use module-level CANCEL_TOAST
         # Disallow starting a new run if one is active: single-step cancel/keep prompt
         if getattr(app, "_run_active", False):
             app._cancel_prompt_active = True
@@ -182,6 +181,7 @@ class TuiController:
             app._hide_output_panel()
         except Exception:
             pass
+
         app._add_meta("Starting run...")
         app._run_active = True
         app._cancel_token = CancellationToken()
@@ -219,6 +219,16 @@ class TuiController:
                         pass
                     return
                 total = len(plan)
+                # Render an upfront summary of what will run and show summary panel
+                try:
+                    device_list = ", ".join(list(plan.keys()))
+                    summary_intro = (
+                        f"Planned devices: {device_list} — commands per device vary"
+                    )
+                    app._render_summary(summary_intro)
+                    app._show_summary_panel()
+                except Exception:
+                    pass
                 try:
                     app._show_bottom_panel()
                     app.query_one("#run-status").update(
@@ -241,9 +251,9 @@ class TuiController:
                     if getattr(app, "_output_lines", None):
                         app._show_output_panel()
                         try:
-                            out_log = app.query_one("#output-log")
-                            if hasattr(out_log, "clear"):
-                                out_log.clear()
+                            out_log2 = app.query_one("#output-log")
+                            if hasattr(out_log2, "clear"):
+                                out_log2.clear()
                             filt = (
                                 (getattr(app, "_output_filter", "") or "")
                                 .strip()
@@ -257,7 +267,7 @@ class TuiController:
                                 if not filt or (filt in line.lower()):
                                     from network_toolkit.tui.helpers import log_write
 
-                                    log_write(out_log, line)
+                                    log_write(out_log2, line)
                         except Exception:
                             pass
                     elapsed = time.monotonic() - start_ts
@@ -303,8 +313,6 @@ class TuiController:
                     app._set_run_enabled(True)
                     app._cancel_token = None
                     app._run_task = None
-                    # No prompt state flags
-                    # After run completes, clear any selections in the UI
                     try:
                         app._dispatch_ui(app._clear_all_selections)
                     except Exception:

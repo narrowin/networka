@@ -471,21 +471,25 @@ def run(config: str | Path = "config") -> None:
                 pass
 
         def _output_append(self, msg: str) -> None:
-            """Append a line to the output log honoring the current output filter."""
+            """Append output to the log atomically per chunk and honor the filter."""
             try:
                 text = str(msg)
             except Exception:
                 text = f"{msg}"
-            # Show output panel on first output unless user hid it
+            # Split into physical lines to keep filtering accurate
+            lines = list(text.splitlines())
+            if not lines:
+                return
+            # Show output panel only when we actually have output
             try:
                 self._maybe_show_output_panel()
             except Exception:
                 pass
             try:
-                self._output_lines.append(text)
+                self._output_lines.extend(lines)
             except Exception:
-                self._output_lines = [text]
-            # Re-render depending on filter
+                self._output_lines = list(lines)
+            # Append efficiently depending on filter
             try:
                 out_log = self.query_one("#output-log")
             except Exception:
@@ -500,10 +504,14 @@ def run(config: str | Path = "config") -> None:
                 except Exception:
                     pass
                 for line in self._output_lines:
-                    if filt in line.lower():
-                        log_write(out_log, line)
+                    try:
+                        if filt in line.lower():
+                            log_write(out_log, line)
+                    except Exception:
+                        pass
             else:
-                log_write(out_log, text)
+                for line in lines:
+                    log_write(out_log, line)
 
         def _show_output_panel(self) -> None:
             try:
