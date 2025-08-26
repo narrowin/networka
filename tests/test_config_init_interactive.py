@@ -280,3 +280,84 @@ def test_file_creation_error_handling(monkeypatch: Any) -> None:
 
         with pytest.raises(FileTransferError, match="Failed to create .env file"):
             create_env_file(readonly_dir)
+
+
+def test_overwrite_protection_user_declines() -> None:
+    """Test that user declining to overwrite exits cleanly without error logging."""
+    runner = CliRunner()
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config_dir = Path(temp_dir)
+
+        # Create existing .env file to trigger overwrite protection
+        (config_dir / ".env").write_text("existing content")
+
+        # Mock typer.confirm to handle multiple confirmations:
+        # 1. "Use default location?" -> False (we'll provide custom path)
+        # 2. "Overwrite existing files?" -> False (decline overwrite)
+        confirm_responses = [
+            False,
+            False,
+        ]  # First: decline default, Second: decline overwrite
+
+        with (
+            patch("typer.confirm", side_effect=confirm_responses),
+            patch(
+                "typer.prompt", return_value=str(config_dir)
+            ),  # Provide our temp dir path
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "config-init",  # No target dir - triggers interactive mode
+                    "--no-install-sequences",
+                    "--no-install-completions",
+                    "--no-install-schemas",
+                ],
+            )
+
+            # Should exit cleanly with code 1, no "Unexpected error" in output
+            assert result.exit_code == 1
+            assert "Unexpected error" not in result.stdout
+            assert "Configuration initialization complete" not in result.stdout
+
+
+def test_overwrite_protection_user_accepts() -> None:
+    """Test that user accepting overwrite continues normally."""
+    runner = CliRunner()
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config_dir = Path(temp_dir)
+
+        # Create existing .env file to trigger overwrite protection
+        (config_dir / ".env").write_text("existing content")
+
+        # Mock typer.confirm to handle multiple confirmations:
+        # 1. "Use default location?" -> False (we'll provide custom path)
+        # 2. Prompt for directory path (mocked via typer.prompt)
+        # 3. "Overwrite existing files?" -> True (accept overwrite)
+        confirm_responses = [
+            False,
+            True,
+        ]  # First: decline default, Second: accept overwrite
+
+        with (
+            patch("typer.confirm", side_effect=confirm_responses),
+            patch(
+                "typer.prompt", return_value=str(config_dir)
+            ),  # Provide our temp dir path
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "config-init",  # No target dir - triggers interactive mode
+                    "--no-install-sequences",
+                    "--no-install-completions",
+                    "--no-install-schemas",
+                ],
+            )
+
+            # Should complete successfully
+            assert result.exit_code == 0
+            assert "Configuration initialization complete" in result.stdout
+            assert "Unexpected error" not in result.stdout

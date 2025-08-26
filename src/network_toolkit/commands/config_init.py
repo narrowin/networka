@@ -268,7 +268,7 @@ def install_sequences_from_repo(url: str, ref: str, dest: Path) -> None:
                 else:
                     shutil.copy2(item, target)
 
-            logger.info(f"Installed additional sequences from {url}@{ref} into: {dest}")
+            logger.debug(f"Copied sequences from {url}@{ref} to {dest}")
 
         except subprocess.CalledProcessError as e:
             error_msg = e.stderr if e.stderr else str(e)
@@ -365,7 +365,7 @@ def install_editor_schemas(
             json.dumps(yaml_schema_config, indent=2), encoding="utf-8"
         )
 
-        logger.info("Installed JSON schemas for YAML editor validation")
+        logger.debug("Configured JSON schemas and VS Code settings")
 
     except OSError as e:
         msg = f"Failed to install schemas: {e}"
@@ -645,7 +645,6 @@ def register(app: typer.Typer) -> None:
             ctx.print_info(
                 f"Initializing network toolkit configuration in: {target_path}"
             )
-            ctx.output_manager.print_blank_line()
 
             # Gather answers first when interactive
             default_seq_repo = "https://github.com/narrowin/networka.git"
@@ -796,13 +795,15 @@ def register(app: typer.Typer) -> None:
                     except NetworkToolkitError as e:
                         ctx.print_warning(f"Failed to install schemas: {e}")
 
-            ctx.output_manager.print_blank_line()
             ctx.print_success("Configuration initialization complete!")
 
         except NetworkToolkitError as e:
             ctx = CommandContext()
             ctx.print_error(str(e))
             raise typer.Exit(1) from e
+        except typer.Exit:
+            # Let typer.Exit pass through without logging as unexpected error
+            raise
         except Exception as e:
             logger.exception("Unexpected error during configuration initialization")
             ctx = CommandContext()
