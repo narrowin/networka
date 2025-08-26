@@ -126,8 +126,7 @@ class TestCommandContextIntegration:
         # Import the commands we've fixed
         from network_toolkit.commands import (
             backup,
-            config_init,
-            config_validate,
+            config,
             diff,
             download,
             firmware,
@@ -140,13 +139,12 @@ class TestCommandContextIntegration:
         for module in [
             backup,
             diff,
-            config_validate,
+            config,
             upload,
             download,
             firmware,
             routerboard_upgrade,
             run,
-            config_init,
         ]:
             source = inspect.getsource(module)
 
