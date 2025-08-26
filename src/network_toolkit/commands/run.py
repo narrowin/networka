@@ -127,7 +127,7 @@ def register(app: typer.Typer) -> None:
             typer.Option(
                 "--transport",
                 "-t",
-                help="Transport type to use for connections (scrapli, nornir_netmiko). Defaults to configuration or scrapli.",
+                help="Transport type to use for connections (currently only scrapli is supported). Defaults to configuration or scrapli.",
             ),
         ] = None,
     ) -> None:

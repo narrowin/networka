@@ -60,7 +60,7 @@ _nw() {
                 if [[ -n "$result" ]]; then
                     echo "$result"
                 else
-                    echo "info run upload download config-backup backup firmware-upgrade firmware-downgrade bios-upgrade ssh diff list-devices list-groups list-sequences config-init config-validate"
+                    echo "info run upload download backup firmware ssh diff list config schema complete"
                 fi
                 return ;;
             devices)
@@ -172,7 +172,12 @@ _nw() {
     case "$cmd" in
         info)
             if [[ ${COMP_CWORD} -eq 2 ]]; then
-                _opts "$(_nw_list devices)"
+                # Offer devices, groups, and sequences for info command
+                local devices groups sequences
+                devices=$(_nw_list devices)
+                groups=$(_nw_list groups)
+                sequences=$(_nw_list sequences)
+                _opts "$devices $groups $sequences"
             else
                 _opts "$info_opts"
             fi
@@ -229,8 +234,10 @@ _nw() {
                 _opts "$download_opts"
             fi
             ;;
-        config-backup|backup)
+        backup)
             if [[ ${COMP_CWORD} -eq 2 ]]; then
+                _opts "config comprehensive vendors"
+            elif [[ ${COMP_CWORD} -eq 3 && ("${COMP_WORDS[2]}" == "config" || "${COMP_WORDS[2]}" == "comprehensive") ]]; then
                 local groups devices
                 groups=$(_nw_list groups)
                 devices=$(_nw_list devices)
@@ -239,34 +246,16 @@ _nw() {
                 _opts "$config_backup_opts"
             fi
             ;;
-        firmware-upgrade)
+        firmware)
             if [[ ${COMP_CWORD} -eq 2 ]]; then
+                _opts "upgrade downgrade bios vendors"
+            elif [[ ${COMP_CWORD} -eq 3 && ("${COMP_WORDS[2]}" == "upgrade" || "${COMP_WORDS[2]}" == "downgrade" || "${COMP_WORDS[2]}" == "bios") ]]; then
                 local groups devices
                 groups=$(_nw_list groups)
                 devices=$(_nw_list devices)
                 _opts "$devices $groups"
             else
                 _opts "$firmware_upgrade_opts"
-            fi
-            ;;
-        firmware-downgrade)
-            if [[ ${COMP_CWORD} -eq 2 ]]; then
-                local groups devices
-                groups=$(_nw_list groups)
-                devices=$(_nw_list devices)
-                _opts "$devices $groups"
-            else
-                _opts "$firmware_downgrade_opts"
-            fi
-            ;;
-        bios-upgrade)
-            if [[ ${COMP_CWORD} -eq 2 ]]; then
-                local groups devices
-                groups=$(_nw_list groups)
-                devices=$(_nw_list devices)
-                _opts "$devices $groups"
-            else
-                _opts "$bios_upgrade_opts"
             fi
             ;;
         diff)
@@ -279,16 +268,63 @@ _nw() {
                 _opts "$diff_opts"
             fi
             ;;
-        list-devices)
-            _opts "$list_devices_opts" ;;
-        list-groups)
-            _opts "$list_groups_opts" ;;
-        list-sequences)
-            _opts "$list_sequences_opts" ;;
-        config-init)
-            _opts "$config_init_opts" ;;
-        config-validate)
-            _opts "$config_validate_opts" ;;
+        list)
+            # Handle list subcommands
+            if [[ ${#COMP_WORDS[@]} -eq 3 ]]; then
+                # If we're at position 2 (after "nw list"), suggest subcommands
+                COMPREPLY=( $(compgen -W "devices groups sequences supported-types" -- "$cur") )
+            elif [[ ${#COMP_WORDS[@]} -gt 3 ]]; then
+                # Handle options for specific subcommands
+                case "${COMP_WORDS[2]}" in
+                    devices)
+                        _opts "$list_devices_opts" ;;
+                    groups)
+                        _opts "$list_groups_opts" ;;
+                    sequences)
+                        _opts "$list_sequences_opts" ;;
+                    supported-types)
+                        _opts "$common_opts" ;;
+                    *)
+                        _opts "$common_opts" ;;
+                esac
+            fi
+            ;;
+        config)
+            # Handle config subcommands
+            if [[ $COMP_CWORD -gt 2 ]]; then
+                local config_subcommand="${COMP_WORDS[2]}"
+                case "$config_subcommand" in
+                    init)
+                        _opts "$config_init_opts" ;;
+                    validate)
+                        _opts "$config_validate_opts" ;;
+                    *)
+                        _opts "$common_opts" ;;
+                esac
+            else
+                # Complete config subcommands
+                COMPREPLY=( $(compgen -W "init validate" -- "$cur") )
+            fi
+            ;;
+        complete)
+            # Handle completion command options
+            _opts "$common_opts --for --device"
+            ;;
+        schema)
+            # Handle schema subcommands
+            if [[ $COMP_CWORD -gt 2 ]]; then
+                local schema_subcommand="${COMP_WORDS[2]}"
+                case "$schema_subcommand" in
+                    update|info)
+                        _opts "$common_opts" ;;
+                    *)
+                        _opts "$common_opts" ;;
+                esac
+            else
+                # Complete schema subcommands
+                COMPREPLY=( $(compgen -W "update info" -- "$cur") )
+            fi
+            ;;
         *)
             # Fallback: suggest common opts
             if [[ $cur == -* ]]; then _opts "$common_opts"; fi ;;

@@ -185,7 +185,7 @@ Check that:
 Check that:
 
 1. The group name in the environment variable matches exactly the group name in `groups.yml`
-2. The device is actually a member of the group (check with `nw list-groups`)
+2. The device is actually a member of the group (check with `nw list groups`)
 3. Use the correct format: `NW_USER_GROUPNAME` and `NW_PASSWORD_GROUPNAME`
 4. Group credentials have lower priority than device-specific credentials
 

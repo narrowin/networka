@@ -104,14 +104,12 @@ class NornirNetmikoTransportFactory:
 
 def get_transport_factory(transport_type: str = "scrapli") -> TransportFactory:
     """Get the appropriate transport factory."""
-    if transport_type == "nornir_netmiko":
-        return NornirNetmikoTransportFactory()
-    elif transport_type == "scrapli":
+    if transport_type == "scrapli":
         return ScrapliTransportFactory()
     else:
-        supported_transports = ["scrapli", "nornir_netmiko"]
+        supported_transports = ["scrapli"]
         error_msg = (
             f"Unknown transport type: '{transport_type}'. "
             f"Supported transports: {', '.join(supported_transports)}"
         )
-    raise ValueError(error_msg)
+        raise ValueError(error_msg)

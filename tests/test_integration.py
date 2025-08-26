@@ -39,7 +39,7 @@ class TestCLIIntegration:
         )
 
     def test_list_devices_with_config(self, config_file: Path) -> None:
-        """Test list-devices command with a real config file."""
+        """Test list devices command with a real config file."""
         result = subprocess.run(
             [
                 sys.executable,
@@ -47,7 +47,8 @@ class TestCLIIntegration:
                 "network_toolkit.cli",
                 "--config",
                 str(config_file),
-                "list-devices",
+                "list",
+                "devices",
             ],
             check=False,
             capture_output=True,
@@ -104,7 +105,8 @@ class TestCLIIntegration:
                 "network_toolkit",
                 "--config",
                 "/nonexistent/config.yml",
-                "list-devices",
+                "list",
+                "devices",
             ],
             check=False,
             capture_output=True,

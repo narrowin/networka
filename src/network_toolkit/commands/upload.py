@@ -229,6 +229,9 @@ def register(app: typer.Typer) -> None:
         except FileNotFoundError as e:  # pragma: no cover
             ctx.print_error(f"File not found: {e}")
             raise typer.Exit(1) from None
+        except typer.Exit:
+            # Allow clean exits (e.g., user cancellation) to pass through
+            raise
         except Exception as e:  # pragma: no cover - unexpected
             ctx.print_error(f"Unexpected error: {e}")
             raise typer.Exit(1) from None

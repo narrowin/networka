@@ -18,28 +18,30 @@ class TestBasicCommandCoverage:
     """Simple tests for basic command coverage."""
 
     def test_list_devices_basic_functionality(self, config_file: Path) -> None:
-        """Test list-devices command basic path."""
+        """Test list devices command basic path."""
         runner = CliRunner()
-        result = runner.invoke(app, ["list-devices", "--config", str(config_file)])
+        result = runner.invoke(app, ["list", "devices", "--config", str(config_file)])
         assert result.exit_code == 0
         assert "test_device1" in result.output
 
     def test_list_groups_basic_functionality(self, config_file: Path) -> None:
-        """Test list-groups command basic path."""
+        """Test list groups command basic path."""
         runner = CliRunner()
-        result = runner.invoke(app, ["list-groups", "--config", str(config_file)])
+        result = runner.invoke(app, ["list", "groups", "--config", str(config_file)])
         assert result.exit_code == 0
 
     def test_config_validate_basic_functionality(self, config_file: Path) -> None:
-        """Test config-validate command basic path."""
+        """Test config validate command basic path."""
         runner = CliRunner()
-        result = runner.invoke(app, ["config-validate", "--config", str(config_file)])
+        result = runner.invoke(
+            app, ["config", "validate", "--config", str(config_file)]
+        )
         assert result.exit_code == 0
 
     def test_list_sequences_basic_functionality(self, config_file: Path) -> None:
-        """Test list-sequences command basic path."""
+        """Test list sequences command basic path."""
         runner = CliRunner()
-        result = runner.invoke(app, ["list-sequences", "--config", str(config_file)])
+        result = runner.invoke(app, ["list", "sequences", "--config", str(config_file)])
         assert result.exit_code == 0
 
     def test_help_commands(self) -> None:
@@ -51,7 +53,7 @@ class TestBasicCommandCoverage:
         assert result.exit_code == 0
 
         # Test basic command help that works reliably
-        result = runner.invoke(app, ["list-devices", "--help"])
+        result = runner.invoke(app, ["list", "devices", "--help"])
         assert result.exit_code == 0
 
     def test_info_command_with_mocked_device(self, config_file: Path) -> None:

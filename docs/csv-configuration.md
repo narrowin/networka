@@ -145,10 +145,10 @@ grep -c "," config/devices/devices.csv  # Should match number of headers
 
 ```bash
 # Test configuration loading
-nw config-validate
+nw config validate
 
 # List devices to verify CSV loading
-nw list-devices
+nw list devices
 
 # Check specific devices from CSV
 nw info device-from-csv

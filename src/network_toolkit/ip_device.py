@@ -96,7 +96,7 @@ def create_ip_device_config(
     port : int | None
         SSH port, defaults to 22 if not provided
     transport_type : str | None
-        Transport type (e.g., 'scrapli', 'nornir_netmiko')
+        Transport type (currently only 'scrapli' is supported)
         Defaults to configuration or 'scrapli'
 
     Returns
@@ -157,7 +157,7 @@ def create_ip_based_config(
     port : int | None
         SSH port for all IP devices, defaults to 22
     transport_type : str | None
-        Transport type for all IP devices (e.g., 'scrapli', 'nornir_netmiko')
+        Transport type for all IP devices (currently only 'scrapli' is supported)
 
     Returns
     -------

@@ -27,14 +27,14 @@ def _list_commands() -> list[str]:
         "run",
         "upload",
         "download",
-        "config-backup",
-        "firmware-upgrade",
-        "firmware-downgrade",
-        "bios-upgrade",
-        "list-devices",
-        "list-groups",
-        "list-sequences",
-        "config-validate",
+        "backup",
+        "firmware",
+        "ssh",
+        "diff",
+        "list",
+        "config",
+        "schema",
+        "complete",
     ]
 
 

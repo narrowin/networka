@@ -358,7 +358,7 @@ class NetworkConfig(BaseModel):
         Returns
         -------
         str
-            Transport type ('scrapli' or 'nornir_netmiko')
+            Transport type (currently only 'scrapli' is supported)
         """
         # CLI override takes highest precedence
         if transport_override:

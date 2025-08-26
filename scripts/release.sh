@@ -44,50 +44,68 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$VERSION" ]]; then
-    echo "❌ Version is required. Use -v VERSION"
+    echo "ERROR: Version is required. Use -v VERSION"
     exit 1
 fi
 
 # Validate version format (basic semver check)
 if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
-    echo "❌ Invalid version format. Use semantic versioning (e.g., 1.0.0, 1.0.0-beta1)"
+    echo "ERROR: Invalid version format. Use semantic versioning (e.g., 1.0.0, 1.0.0-beta1)"
     exit 1
 fi
 
-echo "🚀 Preparing release v$VERSION..."
+echo "Preparing release v$VERSION..."
 
 if [[ "$DRY_RUN" == true ]]; then
-    echo "🔍 DRY RUN MODE - No changes will be made"
+    echo "DRY RUN MODE - No changes will be made"
 fi
 
 # Check if we're on the right branch
 CURRENT_BRANCH=$(git branch --show-current)
 if [[ "$CURRENT_BRANCH" != "main" ]] && [[ "$FORCE" != true ]]; then
-    echo "❌ Not on main branch. Current branch: $CURRENT_BRANCH"
+    echo "ERROR: Not on main branch. Current branch: $CURRENT_BRANCH"
     echo "   Use --force to release from current branch"
     exit 1
 fi
 
 # Check for uncommitted changes
 if ! git diff-index --quiet HEAD --; then
-    echo "❌ There are uncommitted changes. Please commit or stash them first."
+    echo "ERROR: There are uncommitted changes. Please commit or stash them first."
     exit 1
 fi
 
 # Check if tag already exists
 if git tag | grep -q "^v$VERSION$" && [[ "$FORCE" != true ]]; then
-    echo "❌ Tag v$VERSION already exists. Use --force to overwrite"
+    echo "ERROR: Tag v$VERSION already exists. Use --force to overwrite"
+    exit 1
+fi
+
+# Check current version in file
+CURRENT_VERSION=$(grep -o '__version__ = "[^"]*"' src/network_toolkit/__about__.py | cut -d'"' -f2)
+echo "Current version in __about__.py: $CURRENT_VERSION"
+echo "Target version: $VERSION"
+
+if [[ "$CURRENT_VERSION" == "$VERSION" ]] && [[ "$FORCE" != true ]]; then
+    echo "ERROR: Version $VERSION is already set in __about__.py. Use --force to proceed anyway"
     exit 1
 fi
 
 # Update version in __about__.py
 VERSION_FILE="src/network_toolkit/__about__.py"
 if [[ "$DRY_RUN" != true ]]; then
-    echo "📝 Updating version in $VERSION_FILE..."
+    echo "Updating version in $VERSION_FILE..."
     sed -i.bak "s/__version__ = \".*\"/__version__ = \"$VERSION\"/" "$VERSION_FILE"
     rm -f "$VERSION_FILE.bak"
+
+    # Verify the change
+    NEW_VERSION=$(grep -o '__version__ = "[^"]*"' src/network_toolkit/__about__.py | cut -d'"' -f2)
+    if [[ "$NEW_VERSION" != "$VERSION" ]]; then
+        echo "ERROR: Failed to update version. Expected $VERSION, got $NEW_VERSION"
+        exit 1
+    fi
+    echo "Version updated successfully: $CURRENT_VERSION -> $VERSION"
 else
-    echo "📝 Would update version in $VERSION_FILE to $VERSION"
+    echo "Would update version in $VERSION_FILE to $VERSION"
 fi
 
 # Update CHANGELOG.md
@@ -95,7 +113,7 @@ CHANGELOG_FILE="CHANGELOG.md"
 TODAY=$(date +%Y-%m-%d)
 
 if [[ "$DRY_RUN" != true ]]; then
-    echo "📝 Updating CHANGELOG.md..."
+    echo "Updating CHANGELOG.md..."
     # Replace [Unreleased] with [VERSION] - DATE and add new [Unreleased] section
     sed -i.bak "s/## \[Unreleased\]/## [$VERSION] - $TODAY/" "$CHANGELOG_FILE"
 
@@ -118,47 +136,50 @@ if [[ "$DRY_RUN" != true ]]; then
     mv "$TEMP_FILE" "$CHANGELOG_FILE"
     rm -f "$CHANGELOG_FILE.bak"
 else
-    echo "📝 Would update CHANGELOG.md with version $VERSION and date $TODAY"
+    echo "Would update CHANGELOG.md with version $VERSION and date $TODAY"
 fi
 
 # Update uv.lock with new version
 if [[ "$DRY_RUN" != true ]]; then
-    echo "🔄 Updating uv.lock..."
+    echo "Updating uv.lock..."
     uv sync
 else
-    echo "🔄 Would update uv.lock"
+    echo "Would update uv.lock"
 fi
 
 # Commit changes
 if [[ "$DRY_RUN" != true ]]; then
-    echo "💾 Committing release changes..."
+    echo "Committing release changes..."
     git add "$VERSION_FILE" "$CHANGELOG_FILE" uv.lock
     git commit --no-verify -m "chore: bump version to v$VERSION"
 else
-    echo "💾 Would commit release changes"
+    echo "Would commit release changes"
 fi
 
-# Create and push tag
+# Push commit first, then create and push tag
 if [[ "$DRY_RUN" != true ]]; then
-    echo "🏷️  Creating tag v$VERSION..."
+    echo "Pushing version bump commit..."
+    git push origin main
+
+    echo "Creating tag v$VERSION..."
     git tag -a "v$VERSION" -m "Release v$VERSION"
 
-    echo "📤 Pushing changes and tag..."
-    git push origin main
+    echo "Pushing tag..."
     git push origin "v$VERSION"
 else
-    echo "🏷️  Would create tag v$VERSION"
-    echo "📤 Would push changes and tag"
+    echo "Would push version bump commit to main"
+    echo "Would create tag v$VERSION"
+    echo "Would push tag"
 fi
 
 echo ""
-echo "✅ Release v$VERSION prepared successfully!"
+echo "Release v$VERSION prepared successfully!"
 echo ""
 if [[ "$DRY_RUN" != true ]]; then
-    echo "🎯 Next steps:"
+    echo "Next steps:"
     echo "   1. GitHub Actions will automatically build and publish to PyPI"
     echo "   2. A GitHub release will be created automatically"
     echo "   3. Monitor the CI/CD pipeline: https://github.com/narrowin/networka/actions"
 else
-    echo "🔍 This was a dry run. Use without --dry-run to execute the release."
+    echo "This was a dry run. Use without --dry-run to execute the release."
 fi

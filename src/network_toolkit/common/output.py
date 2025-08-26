@@ -241,9 +241,9 @@ class OutputManager:
             else:
                 sys.stdout.write(f"info: {message}\n")
         elif context:
-            self._console.print(f"[info]i[/info] [{context}] {message}")
+            self._console.print(f"[{context}] {message}")
         else:
-            self._console.print(f"[info]i[/info] {message}")
+            self._console.print(f"{message}")
 
     def print_summary(
         self,

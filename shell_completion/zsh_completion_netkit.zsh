@@ -38,8 +38,26 @@ _nw_complete() {
     args)
       case $words[2] in
         info)
-          values=(${(f)"$(nw __complete --for devices --config \"$cfg\" 2>/dev/null)"})
-          _describe -t devices 'devices' values && return ;;
+          # Offer devices, groups, and sequences for info command
+          local -a devices groups sequences annotated
+          devices=(${(f)"$(nw __complete --for devices --config \"$cfg\" 2>/dev/null)"})
+          groups=(${(f)"$(nw __complete --for groups --config \"$cfg\" 2>/dev/null)"})
+          sequences=(${(f)"$(nw __complete --for sequences --config \"$cfg\" 2>/dev/null)"})
+          annotated=()
+          local d g s
+          # Annotate device entries
+          for d in $devices; do
+            annotated+=("$d:device")
+          done
+          # Annotate group entries
+          for g in $groups; do
+            annotated+=("$g:group")
+          done
+          # Annotate sequence entries
+          for s in $sequences; do
+            annotated+=("$s:sequence")
+          done
+          _describe -t targets 'info targets' annotated && return ;;
         run)
           if (( CURRENT == 3 )); then
             # Groups first, then devices for better UX, annotate entries
@@ -69,14 +87,45 @@ _nw_complete() {
             values=($annotated)
             _describe -t targets 'targets (groups first)' values && return
           fi ;;
-        upload|download|config-backup|backup|firmware-upgrade|firmware-downgrade|bios-upgrade|diff)
+        config)
+          if (( CURRENT == 3 )); then
+            values=("init:Initialize a network toolkit configuration" "validate:Validate the configuration file")
+            _describe -t subcommands 'config subcommands' values && return
+          fi ;;
+        schema)
+          if (( CURRENT == 3 )); then
+            values=("update:Update JSON schemas for YAML editor validation" "info:Display information about JSON schema files")
+            _describe -t subcommands 'schema subcommands' values && return
+          fi ;;
+        backup)
+          if (( CURRENT == 3 )); then
+            values=("config:Backup device configuration" "comprehensive:Perform comprehensive backup" "vendors:Show vendor support")
+            _describe -t subcommands 'backup subcommands' values && return
+          elif (( CURRENT == 4 && ($words[3] == "config" || $words[3] == "comprehensive") )); then
+            values=(${(f)"$(nw __complete --for devices --config \"$cfg\" 2>/dev/null)"} ${(f)"$(nw __complete --for groups --config \"$cfg\" 2>/dev/null)"})
+            _describe -t targets 'targets' values && return
+          fi ;;
+        firmware)
+          if (( CURRENT == 3 )); then
+            values=("upgrade:Upgrade firmware" "downgrade:Downgrade firmware" "bios:Upgrade BIOS" "vendors:Show vendor support")
+            _describe -t subcommands 'firmware subcommands' values && return
+          elif (( CURRENT == 4 && ($words[3] == "upgrade" || $words[3] == "downgrade" || $words[3] == "bios") )); then
+            values=(${(f)"$(nw __complete --for devices --config \"$cfg\" 2>/dev/null)"} ${(f)"$(nw __complete --for groups --config \"$cfg\" 2>/dev/null)"})
+            _describe -t targets 'targets' values && return
+          fi ;;
+        list)
+          if (( CURRENT == 3 )); then
+            values=("devices:List all configured network devices" "groups:List all configured device groups" "sequences:List available sequences" "supported-types:List supported device types")
+            _describe -t subcommands 'list subcommands' values && return
+          fi ;;
+        complete)
+          # Handle completion command - mostly internal use
+          ;;
+        upload|download|diff)
           if (( CURRENT == 3 )); then
             values=(${(f)"$(nw __complete --for devices --config \"$cfg\" 2>/dev/null)"} ${(f)"$(nw __complete --for groups --config \"$cfg\" 2>/dev/null)"})
             _describe -t targets 'targets' values && return
           fi ;;
-        list-sequences)
-          # options handled by _arguments; nothing positional
-          ;;
       esac
       ;;
   esac

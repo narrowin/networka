@@ -87,17 +87,19 @@ Once installed, you can use TAB completion with the `nw` command:
 
 ```bash
 nw <TAB><TAB>
-# Shows: info run list-devices ...
+# Shows: info run list ...
 
-nw list-<TAB><TAB>
-# Shows: list-devices list-sequences list-groups ...
+nw list <TAB><TAB>
+# Shows: devices sequences groups supported-types ...
 ```
 
-### Device Name Completion
+### Device, Group, and Sequence Name Completion
 
 ```bash
 nw info <TAB><TAB>
-# Shows: core1br core2br vpn1br sw-acc1 sw-dist1 ...
+# Shows: core1br core2br vpn1br sw-acc1 sw-dist1 ... (devices)
+#        access_switches core_devices dmz_devices ... (groups)
+#        system_info backup_config health_check ... (sequences)
 
 nw run sw-<TAB><TAB>
 # Shows: sw-acc1 sw-acc2 sw-dist1
@@ -215,7 +217,7 @@ The completion gracefully handles:
 1. **Verify YAML syntax:**
 
    ```bash
-   nw config-validate
+   nw config validate
    ```
 
 2. **Check file permissions:**
