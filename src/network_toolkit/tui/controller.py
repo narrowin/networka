@@ -154,11 +154,15 @@ class TuiController:
             app._output_lines = []
         except Exception:
             pass
+        # Clear per-device tabs and buffers to start fresh
+        try:
+            app._reset_output_tabs()
+        except Exception:
+            pass
         app._errors = []
         app._meta = []
+        # Keep the previous summary visible to avoid flicker; we'll update it once the new plan is ready.
         try:
-            app.query_one("#run-summary").update("")
-            app._hide_summary_panel()
             app._hide_output_panel()
         except Exception:
             pass

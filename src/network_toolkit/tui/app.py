@@ -17,10 +17,10 @@ from network_toolkit.tui.compat import TextualNotInstalledError, load_textual
 from network_toolkit.tui.constants import CSS as APP_CSS
 from network_toolkit.tui.controller import TuiController
 from network_toolkit.tui.data import TuiData
-from network_toolkit.tui.helpers import log_write
 from network_toolkit.tui.keymap import KEYMAP
 from network_toolkit.tui.layout import compose_root
 from network_toolkit.tui.models import SelectionState
+from network_toolkit.tui.output_manager import OutputPanelManager
 from network_toolkit.tui.services import ExecutionService
 
 
@@ -72,6 +72,7 @@ def run(config: str | Path = "config") -> None:
         # Per-device output structures
         _output_device_logs: dict[str, Any]
         _output_device_lines: dict[str, list[str]]
+        _output_mgr: OutputPanelManager
 
         CSS = APP_CSS
         BINDINGS: ClassVar[list[Any]] = [
@@ -97,6 +98,8 @@ def run(config: str | Path = "config") -> None:
             # Initialize per-device output structures
             self._output_device_logs = {}
             self._output_device_lines = {}
+            # Create output manager abstraction
+            self._output_mgr = OutputPanelManager(self, compat)
 
         async def on_input_changed(self, event: Any) -> None:  # Textual Input change
             await self._controller.on_input_changed(event)
@@ -477,47 +480,8 @@ def run(config: str | Path = "config") -> None:
                 pass
 
         def _output_append(self, msg: str) -> None:
-            """Append output to the log atomically per chunk and honor the filter."""
-            try:
-                text = str(msg)
-            except Exception:
-                text = f"{msg}"
-            # Split into physical lines to keep filtering accurate
-            lines = list(text.splitlines())
-            if not lines:
-                return
-            # Show output panel only when we actually have output
-            try:
-                self._maybe_show_output_panel()
-            except Exception:
-                pass
-            try:
-                self._output_lines.extend(lines)
-            except Exception:
-                self._output_lines = list(lines)
-            # Append efficiently depending on filter
-            try:
-                out_log = self.query_one("#output-log")
-            except Exception:
-                out_log = None
-            if out_log is None:
-                return
-            filt = (getattr(self, "_output_filter", "") or "").strip().lower()
-            if filt:
-                try:
-                    if hasattr(out_log, "clear"):
-                        out_log.clear()
-                except Exception:
-                    pass
-                for line in self._output_lines:
-                    try:
-                        if filt in line.lower():
-                            log_write(out_log, line)
-                    except Exception:
-                        pass
-            else:
-                for line in lines:
-                    log_write(out_log, line)
+            """Append output to the All tab via the manager."""
+            self._output_mgr.append_all(msg)
 
         def _sanitize_id(self, name: str) -> str:
             try:
@@ -529,71 +493,7 @@ def run(config: str | Path = "config") -> None:
 
         def _ensure_device_tab(self, device: str) -> Any:
             """Ensure a per-device output tab and return its TextLog widget."""
-            dev_key = str(device)
-            if dev_key in self._output_device_logs:
-                return self._output_device_logs[dev_key]
-            # Build IDs
-            dev_id = self._sanitize_id(dev_key)
-            tab_id = f"output-tab-{dev_id}"
-            log_id = f"output-log-{dev_id}"
-            # Locate TabbedContent
-            try:
-                tabs = self.query_one("#output-tabs")
-            except Exception:
-                tabs = None
-            if tabs is None:
-                return None
-            # Create pane and log
-            try:
-                log = compat.TextLogClass(id=log_id, classes="scroll")
-            except Exception:
-                log = None
-            if log is None:
-                return None
-            # Construct a TabPane, preferring passing child in constructor
-            pane = None
-            try:
-                pane = compat.TabPane(dev_key, log, id=tab_id)
-            except Exception:
-                try:
-                    pane = compat.TabPane(dev_key, id=tab_id)
-                except Exception:
-                    pane = None
-                if pane is not None:
-                    try:
-                        if hasattr(pane, "mount"):
-                            pane.mount(log)
-                    except Exception:
-                        pass
-            if pane is None:
-                return None
-            # Add pane to tabs
-            added = False
-            for method in ("add_pane", "add", "add_panes"):
-                try:
-                    if hasattr(tabs, method):
-                        if method == "add_panes":
-                            getattr(tabs, method)([pane])
-                        else:
-                            getattr(tabs, method)(pane)
-                        added = True
-                        break
-                except Exception as exc:
-                    logging.debug(f"Adding tab pane via {method} failed: {exc}")
-            # Some Textual versions use add_tab(title, *children, id=...)
-            if not added and hasattr(tabs, "add_tab"):
-                try:
-                    tabs.add_tab(dev_key, log, id=tab_id)
-                    added = True
-                except Exception as exc:
-                    logging.debug(f"Adding tab via add_tab failed: {exc}")
-            if not added:
-                return None
-            # Track mappings and initialize buffer
-            self._output_device_logs[dev_key] = log
-            if dev_key not in self._output_device_lines:
-                self._output_device_lines[dev_key] = []
-            return log
+            return self._output_mgr.ensure_device_tab(device)
 
         def _output_append_device(self, device: str, msg: str) -> None:
             """Append output for a specific device and also to the All tab."""
@@ -604,92 +504,15 @@ def run(config: str | Path = "config") -> None:
             lines = list(text.splitlines())
             if not lines:
                 return
-            # Ensure per-device tab/log exists
-            log_dev = self._ensure_device_tab(device)
-            # Show output panel when we have output
-            try:
-                self._maybe_show_output_panel()
-            except Exception:
-                pass
-            # Extend buffers
-            try:
-                self._output_lines.extend(lines)
-            except Exception:
-                self._output_lines = list(lines)
-            try:
-                buf = self._output_device_lines.setdefault(str(device), [])
-                buf.extend(lines)
-            except Exception:
-                self._output_device_lines[str(device)] = list(lines)
-            # If filter is active, re-render the active tab; else append incrementally
-            filt = (getattr(self, "_output_filter", "") or "").strip().lower()
-            if filt:
-                try:
-                    self._apply_output_filter(filt)
-                except Exception:
-                    pass
-                return
-            # Append to All tab
-            try:
-                out_all = self.query_one("#output-log")
-                for line in lines:
-                    log_write(out_all, line)
-            except Exception:
-                pass
-            # Append to device tab
-            try:
-                if log_dev is not None:
-                    for line in lines:
-                        log_write(log_dev, line)
-            except Exception:
-                pass
+            # Delegate to manager
+            self._output_mgr.append_device(device, msg)
+
+        def _reset_output_tabs(self) -> None:
+            """Clear All output and remove all per-device tabs; reset buffers."""
+            self._output_mgr.reset()
 
         def _apply_output_filter(self, value: str) -> None:
-            self._output_filter = value
-            filt = (value or "").strip().lower()
-            # Determine active tab
-            try:
-                tabs = self.query_one("#output-tabs")
-                active = getattr(tabs, "active", None)
-                active_id = getattr(active, "id", None) or str(active or "")
-            except Exception:
-                active_id = None
-            # Choose log and buffer per active tab
-            log_widget: Any | None = None
-            lines_src: list[str] = []
-            try:
-                if not active_id or "output-tab-all" in str(active_id):
-                    log_widget = self.query_one("#output-log")
-                    lines_src = list(getattr(self, "_output_lines", []) or [])
-                elif str(active_id).startswith("output-tab-"):
-                    dev = str(active_id)[len("output-tab-") :]
-                    # Find original device key by reverse mapping of sanitized id
-                    # Best-effort: try direct match by sanitized id first
-                    dev_key = None
-                    for k in self._output_device_lines.keys():
-                        if self._sanitize_id(k) == dev:
-                            dev_key = k
-                            break
-                    if dev_key is None:
-                        dev_key = dev
-                    log_widget = self._output_device_logs.get(dev_key)
-                    lines_src = list(self._output_device_lines.get(dev_key, []))
-            except Exception:
-                pass
-            if log_widget is None:
-                return
-            # Clear and re-render filtered lines
-            try:
-                if hasattr(log_widget, "clear"):
-                    log_widget.clear()
-            except Exception:
-                pass
-            for line in lines_src:
-                try:
-                    if not filt or (filt in line.lower()):
-                        log_write(log_widget, line)
-                except Exception:
-                    pass
+            self._output_mgr.apply_filter(value)
 
         def _show_output_panel(self) -> None:
             try:
