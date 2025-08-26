@@ -48,6 +48,9 @@ def register(app: typer.Typer) -> None:
             if verbose and hasattr(e, "details") and e.details:
                 ctx.print_error(f"Details: {e.details}")
             raise typer.Exit(1) from None
+        except typer.Exit:
+            # Allow clean exits (e.g., user cancellation) to pass through
+            raise
         except Exception as e:  # pragma: no cover - unexpected
             from network_toolkit.common.command_helpers import CommandContext
 
@@ -75,6 +78,9 @@ def register(app: typer.Typer) -> None:
             if verbose and hasattr(e, "details") and e.details:
                 ctx.print_error(f"Details: {e.details}")
             raise typer.Exit(1) from None
+        except typer.Exit:
+            # Allow clean exits (e.g., user cancellation) to pass through
+            raise
         except Exception as e:  # pragma: no cover - unexpected
             from network_toolkit.common.command_helpers import CommandContext
 
