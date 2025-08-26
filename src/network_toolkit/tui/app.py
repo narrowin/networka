@@ -1,26 +1,23 @@
 """Textual app for selecting targets and actions.
 
 First iteration focuses on selection only:
-- Left pane: two tabs for Devices and Groups with multi-select lists
-- Right pane: two tabs for Sequences and Commands
-- Bottom bar: context help and key hints
 
 Execution is not wired yet; we only collect selections and show a preview.
 """
 
 from __future__ import annotations
 
-import asyncio
-import importlib
 import logging
-import threading
-import time
 from pathlib import Path
 from typing import Any, ClassVar
 
+from network_toolkit.tui.compat import TextualNotInstalledError, load_textual
+from network_toolkit.tui.constants import CSS as APP_CSS
+from network_toolkit.tui.controller import TuiController
 from network_toolkit.tui.data import TuiData
 from network_toolkit.tui.helpers import log_write
-from network_toolkit.tui.models import RunCallbacks, SelectionState
+from network_toolkit.tui.layout import compose_root
+from network_toolkit.tui.models import SelectionState
 from network_toolkit.tui.services import ExecutionService
 
 
@@ -40,30 +37,12 @@ def run(config: str | Path = "config") -> None:
 
     Imports Textual at runtime to keep it an optional dependency.
     """
-    try:  # pragma: no cover - UI framework import
-        textual_app = importlib.import_module("textual.app")
-        textual_binding = importlib.import_module("textual.binding")
-        textual_containers = importlib.import_module("textual.containers")
-        textual_widgets = importlib.import_module("textual.widgets")
-        app_cls: Any = getattr(textual_app, "App")  # noqa: B009
-        binding_cls: Any = getattr(textual_binding, "Binding")  # noqa: B009
-        horizontal: Any = getattr(textual_containers, "Horizontal")  # noqa: B009
-        vertical: Any = getattr(textual_containers, "Vertical")  # noqa: B009
-        footer: Any = getattr(textual_widgets, "Footer")  # noqa: B009
-        header: Any = getattr(textual_widgets, "Header")  # noqa: B009
-        input_widget: Any = getattr(textual_widgets, "Input")  # noqa: B009
-        static: Any = getattr(textual_widgets, "Static")  # noqa: B009
-        tabbed_content: Any = getattr(textual_widgets, "TabbedContent")  # noqa: B009
-        tab_pane: Any = getattr(textual_widgets, "TabPane")  # noqa: B009
-        selection_list: Any = getattr(textual_widgets, "SelectionList")  # noqa: B009
-        # Prefer RichLog; fall back to Log if not available in this Textual version
-        try:
-            text_log_cls: Any = getattr(textual_widgets, "RichLog")  # noqa: B009
-        except AttributeError:
-            text_log_cls = getattr(textual_widgets, "Log")  # noqa: B009
-    except Exception as exc:  # pragma: no cover
-        msg = "The TUI requires the 'textual' package. Install with: uv add textual or pip install textual"
-        raise RuntimeError(msg) from exc
+    try:
+        compat = load_textual()
+        app_cls: Any = compat.App
+        binding_cls: Any = compat.Binding
+    except TextualNotInstalledError as exc:  # pragma: no cover
+        raise RuntimeError(str(exc)) from exc
 
     data = TuiData(config)
 
@@ -97,59 +76,17 @@ def run(config: str | Path = "config") -> None:
     class _App(app_cls):
         _errors: list[str]
         _meta: list[str]
-        CSS = """
-        #layout { height: 1fr; }
-        #top { height: 1fr; }
-    #bottom { height: auto; }
-    #bottom.expanded { height: 3fr; }
-    #output-log { height: 1fr; }
-    #summary-panel { height: 1fr; }
-        .hidden { display: none; }
-        #top > .panel { height: 1fr; }
-        .panel Static.title { content-align: center middle; color: $secondary; }
-        .panel { border: round $surface; padding: 1 1; }
-        .pane-title { height: 3; content-align: center middle; text-style: bold; }
-        .search { height: 3; }
-        .scroll { height: 1fr; overflow: auto; }
-    /* Improve visibility of selected items (full-line) in SelectionList */
-    /* Cover multiple Textual versions/states (class-based only) */
-    SelectionList .selected,
-        SelectionList .is-selected,
-        SelectionList .option--selected,
-        SelectionList .selection-list--option--selected,
-        SelectionList *.-selected,
-        SelectionList *.-highlight,
-        SelectionList .selection-list--option.-selected,
-        SelectionList .selection-list--option.--selected,
-        #list-devices .selected,
-        #list-devices .is-selected,
-        #list-devices .option--selected,
-        #list-devices .selection-list--option--selected,
-        #list-devices *.-selected,
-        #list-devices *.-highlight,
-        #list-devices .selection-list--option.-selected,
-        #list-devices .selection-list--option.--selected,
-        #list-groups .selected,
-        #list-groups .is-selected,
-        #list-groups .option--selected,
-        #list-groups .selection-list--option--selected,
-        #list-groups *.-selected,
-        #list-groups *.-highlight,
-        #list-groups .selection-list--option.-selected,
-        #list-groups .selection-list--option.--selected,
-        #list-sequences .selected,
-        #list-sequences .is-selected,
-        #list-sequences .option--selected,
-        #list-sequences .selection-list--option--selected,
-        #list-sequences *.-selected,
-        #list-sequences *.-highlight,
-        #list-sequences .selection-list--option.-selected,
-        #list-sequences .selection-list--option.--selected {
-            background: #0057d9;
-            color: #ffffff;
-            text-style: bold;
-        }
-        """
+        _output_lines: list[str]
+        _summary_filter: str
+        _output_filter: str
+        _summary_user_hidden: bool
+        _output_user_hidden: bool
+        _run_active: bool
+        _dark_mode: bool
+        _ui_thread_ident: int
+        _controller: TuiController
+
+        CSS = APP_CSS
         BINDINGS: ClassVar[list[Any]] = [
             _mk_binding("q", "quit", "Quit", show=True),
             _mk_binding("enter", "confirm", "Run"),
@@ -171,394 +108,25 @@ def run(config: str | Path = "config") -> None:
         ]
 
         def compose(self) -> Any:
-            yield header(show_clock=True)
-            with vertical(id="layout"):
-                with horizontal(id="top"):
-                    with vertical(classes="panel"):
-                        yield static("Targets", classes="pane-title title")
-                        with tabbed_content(id="targets-tabs"):
-                            with tab_pane("Devices", id="tab-devices"):
-                                yield input_widget(
-                                    placeholder="Filter devices...",
-                                    id="filter-devices",
-                                    classes="search",
-                                )
-                                # Create empty list; we'll populate in on_mount for compatibility
-                                yield selection_list(
-                                    id="list-devices",
-                                    classes="scroll",
-                                )
-                            with tab_pane("Groups", id="tab-groups"):
-                                yield input_widget(
-                                    placeholder="Filter groups...",
-                                    id="filter-groups",
-                                    classes="search",
-                                )
-                                yield selection_list(
-                                    id="list-groups",
-                                    classes="scroll",
-                                )
-                    with vertical(classes="panel"):
-                        yield static("Actions", classes="pane-title title")
-                        with tabbed_content(id="actions-tabs"):
-                            with tab_pane("Sequences", id="tab-sequences"):
-                                yield input_widget(
-                                    placeholder="Filter sequences...",
-                                    id="filter-sequences",
-                                    classes="search",
-                                )
-                                yield selection_list(
-                                    id="list-sequences",
-                                    classes="scroll",
-                                )
-                            with tab_pane("Commands", id="tab-commands"):
-                                yield input_widget(
-                                    placeholder="Enter a command and press Enter to run",
-                                    id="input-commands",
-                                )
-                        yield static("Press Enter to run", classes="title")
-                        yield textual_widgets.Button("Run", id="run-button")
-                with vertical(id="bottom"):
-                    yield static("Status: idle", id="run-status")
-                    with vertical(classes="panel hidden", id="summary-panel"):
-                        yield static("Summary", classes="pane-title title")
-                        yield text_log_cls(id="run-summary", classes="scroll")
-                        yield input_widget(
-                            placeholder="Filter summary...",
-                            id="filter-summary",
-                            classes="search",
-                        )
-                    with vertical(classes="panel hidden", id="output-panel"):
-                        yield static("Output", classes="pane-title title")
-                        yield text_log_cls(id="output-log", classes="scroll")
-                        yield input_widget(
-                            placeholder="Filter output...",
-                            id="filter-output",
-                            classes="search",
-                        )
-            yield footer()
+            # Delegate UI tree building to the layout module
+            yield from compose_root(compat)
 
         async def on_mount(self) -> None:  # Populate lists after UI mounts
-            try:
-                t = data.targets()
-                a = data.actions()
-                # Keep base lists for filtering
-                self._all_devices = list(t.devices)
-                self._all_groups = list(t.groups)
-                self._all_sequences = list(a.sequences)
-                self._populate_selection_list("list-devices", self._all_devices)
-                self._populate_selection_list("list-groups", self._all_groups)
-                self._populate_selection_list("list-sequences", self._all_sequences)
-            except Exception:
-                pass
-            # Brief startup notice that this TUI is a prototype/WIP
-            try:
-                msg = (
-                    "Prototype: This TUI is a work in progress — expect rough edges."
-                )
-                try:
-                    # Prefer modern Textual notify API with severity & timeout
-                    self.notify(msg, timeout=3, severity="warning")  # type: ignore[arg-type]
-                except TypeError:
-                    # Older Textual: severity param may not exist
-                    self.notify(msg, timeout=3)  # type: ignore[misc]
-                except AttributeError:
-                    # Fallback: temporarily show in status bar and restore after delay
-                    try:
-                        status = self.query_one("#run-status")
-                        # Save and restore prior content
-                        try:
-                            prev_text = getattr(getattr(status, "renderable", None), "plain", None) or "Status: idle"
-                        except Exception:
-                            prev_text = "Status: idle"
-                        try:
-                            status.update(msg)
-                        except Exception:
-                            pass
-                        try:
-                            # Use App timer if available
-                            self.set_timer(3.0, lambda: status.update(prev_text))  # type: ignore[attr-defined]
-                        except Exception:
-                            # Best-effort async sleep & restore
-                            async def _restore() -> None:
-                                try:
-                                    await asyncio.sleep(3)
-                                    status.update(prev_text)
-                                except Exception:
-                                    pass
-                            try:
-                                self.call_later(_restore)  # type: ignore[attr-defined]
-                            except Exception:
-                                pass
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-            # Record UI thread identity for safe callback dispatching
-            try:
-                self._ui_thread_ident = threading.get_ident()
-            except Exception:
-                self._ui_thread_ident = None
-            # Internal state for user toggling of summary
-            self._summary_user_hidden = False
-            # Internal state for user toggling of output
-            self._output_user_hidden = False
-            # Track whether a run is currently active
-            self._run_active = False
-            # Theme
-            try:
-                self._dark_mode = bool(getattr(self, "dark", True))
-            except Exception:
-                self._dark_mode = True
-            # Filters state
-            self._summary_filter = ""
-            self._output_filter = ""
-            # Output lines buffer for filtering
-            self._output_lines: list[str] = []
-            # Hide bottom area initially if no summary/output and idle status
-            self._refresh_bottom_visibility()
+            # Create controller on mount to avoid overriding __init__ on dynamic base
+            self._controller = TuiController(self, compat, data, service, state)
+            await self._controller.on_mount()
 
         async def on_input_changed(self, event: Any) -> None:  # Textual Input change
-            """Live-filter lists and logs based on associated input widgets."""
-            try:
-                sender = (
-                    getattr(event, "input", None)
-                    or getattr(event, "control", None)
-                    or getattr(event, "sender", None)
-                )
-                sender_id = getattr(sender, "id", "") or ""
-                value = getattr(sender, "value", "") or ""
-            except Exception:
-                return
-            text = value.strip().lower()
-            # Devices filter
-            if sender_id == "filter-devices":
-                base: list[str] = list(getattr(self, "_all_devices", []) or [])
-                try:
-                    sel_widget = self.query_one("#list-devices")
-                    current_sel: set[str] = self._selected_values(sel_widget)
-                except Exception:
-                    current_sel = set()
-                items = [d for d in base if text in d.lower()]
-                self._populate_selection_list(
-                    "list-devices", items, selected=current_sel
-                )
-                return
-            # Groups filter
-            if sender_id == "filter-groups":
-                base = list(getattr(self, "_all_groups", []) or [])
-                try:
-                    sel_widget = self.query_one("#list-groups")
-                    current_sel = self._selected_values(sel_widget)
-                except Exception:
-                    current_sel = set()
-                items = [g for g in base if text in g.lower()]
-                self._populate_selection_list(
-                    "list-groups", items, selected=current_sel
-                )
-                return
-            # Sequences filter
-            if sender_id == "filter-sequences":
-                base = list(getattr(self, "_all_sequences", []) or [])
-                try:
-                    sel_widget = self.query_one("#list-sequences")
-                    current_sel = self._selected_values(sel_widget)
-                except Exception:
-                    current_sel = set()
-                items = [s for s in base if text in s.lower()]
-                self._populate_selection_list(
-                    "list-sequences", items, selected=current_sel
-                )
-                return
-            # Summary filter
-            if sender_id == "filter-summary":
-                try:
-                    self._summary_filter = value
-                except Exception:
-                    self._summary_filter = value
-                # Re-render summary in-place
-                self._render_summary()
-                return
-            # Output filter
-            if sender_id == "filter-output":
-                try:
-                    self._output_filter = value
-                except Exception:
-                    self._output_filter = value
-                # Re-render output log from buffer
-                try:
-                    out_log = self.query_one("#output-log")
-                except Exception:
-                    out_log = None
-                if out_log is not None:
-                    try:
-                        if hasattr(out_log, "clear"):
-                            out_log.clear()
-                    except Exception:
-                        pass
-                    filt = (value or "").strip().lower()
-                    for line in getattr(self, "_output_lines", []) or []:
-                        if not filt or (filt in line.lower()):
-                            log_write(out_log, line)
-                return
+            await self._controller.on_input_changed(event)
 
         async def action_confirm(self) -> None:
-            out_log = self.query_one("#output-log")
-            if hasattr(out_log, "clear"):
-                out_log.clear()
-            # reset buffered output lines for fresh run
-            try:
-                self._output_lines = []
-            except Exception:
-                pass
-            # reset summary and any previous errors
-            self._errors = []
-            self._meta = []
-            start_ts: float | None = None
-            try:
-                self.query_one("#run-summary").update("")
-                self._hide_summary_panel()
-                self._hide_output_panel()
-            except Exception:
-                pass
-            self._add_meta("Starting run...")
-            # Temporarily silence library logging to avoid background metadata
-            logging.disable(logging.CRITICAL)
-            try:
-                # Mark run active and disable inputs & run button to avoid focus capture
-                self._run_active = True
-                self._set_inputs_enabled(False)
-                self._set_run_enabled(False)
-                start_ts = time.monotonic()
-                self._collect_state()
-                devices = await asyncio.to_thread(
-                    service.resolve_devices, state.devices, state.groups
-                )
-                if not devices:
-                    self._render_summary("No devices selected.")
-                    try:
-                        msg = "Status: idle — No devices selected."
-                        self.query_one("#run-status").update(msg)
-                        self._refresh_bottom_visibility()
-                    except Exception:
-                        pass
-                    return
-                plan = service.build_plan(devices, state.sequences, state.command_text)
-                if not plan:
-                    self._render_summary("No sequences or commands provided.")
-                    try:
-                        msg = "Status: idle — No sequences or commands provided."
-                        self.query_one("#run-status").update(msg)
-                        self._refresh_bottom_visibility()
-                    except Exception:
-                        pass
-                    return
-                # Update status and run with streaming
-                total = len(plan)
-                try:
-                    self._show_bottom_panel()
-                    self.query_one("#run-status").update(f"Status: running 0/{total}")
-                except Exception:
-                    pass
-                summary_result = await service.run_plan(
-                    plan,
-                    RunCallbacks(
-                        on_output=lambda m: self._dispatch_ui(self._output_append, m),
-                        on_error=lambda m: self._dispatch_ui(self._add_error, m),
-                        on_meta=lambda m: self._dispatch_ui(self._add_meta, m),
-                    ),
-                )
-                # Update summary panel (include errors if any)
-                try:
-                    # If any output lines were collected, ensure the output panel is visible
-                    if getattr(self, "_output_lines", None):
-                        self._show_output_panel()
-                        # Repaint output from buffer to avoid empty view due to race
-                        try:
-                            out_log = self.query_one("#output-log")
-                            if hasattr(out_log, "clear"):
-                                out_log.clear()
-                            filt = (
-                                (getattr(self, "_output_filter", "") or "")
-                                .strip()
-                                .lower()
-                            )
-                            for line in self._output_lines:
-                                if not filt or (filt in line.lower()):
-                                    log_write(out_log, line)
-                        except Exception:
-                            pass
-                    elapsed = time.monotonic() - start_ts
-                    summary_with_time = (
-                        f"{summary_result.human_summary()} (duration: {elapsed:.2f}s)"
-                    )
-                    self._render_summary(summary_with_time)
-                    # Reflect summary on the status line; hint about errors if present
-                    err_count = 0
-                    try:
-                        err_count = len(getattr(self, "_errors", []) or [])
-                    except Exception:
-                        err_count = 0
-                    status_msg = f"Status: idle — {summary_with_time}"
-                    if err_count:
-                        status_msg += " — errors available (press s)"
-                    self.query_one("#run-status").update(status_msg)
-                    self._refresh_bottom_visibility()
-                except Exception:
-                    pass
-            except Exception as e:  # noqa: BLE001
-                try:
-                    elapsed = (
-                        (time.monotonic() - start_ts) if (start_ts is not None) else 0.0
-                    )
-                except Exception:
-                    elapsed = 0.0
-                self._render_summary(f"Run failed: {e} (after {elapsed:.2f}s)")
-                try:
-                    self.query_one("#run-status").update(
-                        f"Status: idle — Run failed: {e}"
-                    )
-                    # If partial output exists, show it
-                    if getattr(self, "_output_lines", None):
-                        self._show_output_panel()
-                    self._refresh_bottom_visibility()
-                except Exception:
-                    pass
-            finally:
-                logging.disable(logging.NOTSET)
-                # Re-enable controls after run
-                try:
-                    self._run_active = False
-                    self._set_inputs_enabled(True)
-                    self._set_run_enabled(True)
-                except Exception:
-                    pass
+            await self._controller.action_confirm()
 
         async def on_input_submitted(self, event: Any) -> None:  # Textual Input submit
-            # Only trigger when the commands input is submitted
-            try:
-                sender = (
-                    getattr(event, "input", None)
-                    or getattr(event, "control", None)
-                    or getattr(event, "sender", None)
-                )
-                if getattr(sender, "id", "") == "input-commands":
-                    await self.action_confirm()
-                    if hasattr(event, "stop"):
-                        event.stop()
-            except Exception:
-                # Best-effort; let Textual handle any event issues
-                pass
+            await self._controller.on_input_submitted(event)
 
         async def on_button_pressed(self, event: Any) -> None:
-            try:
-                btn = getattr(event, "button", None)
-                if getattr(btn, "id", "") == "run-button":
-                    await self.action_confirm()
-                    if hasattr(event, "stop"):
-                        event.stop()
-            except Exception:
-                pass
+            await self._controller.on_button_pressed(event)
 
         def _dispatch_ui(self, fn: Any, *args: Any, **kwargs: Any) -> None:
             """Invoke a UI-mutating function safely from any thread.
@@ -580,46 +148,7 @@ def run(config: str | Path = "config") -> None:
                 logging.debug(f"UI dispatch failed: {exc}")
 
         def on_key(self, event: Any) -> None:
-            """Global key fallback to ensure toggles work even if focus is on inputs."""
-            try:
-                key = str(getattr(event, "key", "")).lower()
-            except Exception:
-                key = ""
-            if key == "s":
-                try:
-                    self.action_toggle_summary()
-                    if hasattr(event, "stop"):
-                        event.stop()
-                except Exception:
-                    pass
-            elif key == "o":
-                try:
-                    self.action_toggle_output()
-                    if hasattr(event, "stop"):
-                        event.stop()
-                except Exception:
-                    pass
-            elif key == "t":
-                try:
-                    self.action_toggle_theme()
-                    if hasattr(event, "stop"):
-                        event.stop()
-                except Exception:
-                    pass
-            elif key == "f":
-                try:
-                    self.action_focus_filter()
-                    if hasattr(event, "stop"):
-                        event.stop()
-                except Exception:
-                    pass
-            elif key == "y":
-                try:
-                    self.action_copy_last_error()
-                    if hasattr(event, "stop"):
-                        event.stop()
-                except Exception:
-                    pass
+            self._controller.on_key(event)
 
         def _collect_state(self) -> None:
             dev_list = self.query_one("#list-devices")
