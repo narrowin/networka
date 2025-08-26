@@ -71,11 +71,11 @@ class TestListCommands:
             "download",
             "backup",
             "firmware",
+            "ssh",
+            "diff",
             "list",
             "config",
             "schema",
-            "diff",
-            "ssh",
             "complete",
         ]
 

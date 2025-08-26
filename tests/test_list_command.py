@@ -179,7 +179,7 @@ class TestListCommand:
         assert result.exit_code == 1
         assert "Unexpected error" in result.output
 
-    @patch("network_toolkit.commands.list_devices._list_devices_impl")
+    @patch("network_toolkit.commands.list._list_devices_impl")
     def test_list_devices_implementation_called(
         self, mock_impl: Mock, config_file: Path
     ) -> None:
@@ -192,7 +192,7 @@ class TestListCommand:
         assert result.exit_code == 0
         mock_impl.assert_called_once()
 
-    @patch("network_toolkit.commands.list_groups._list_groups_impl")
+    @patch("network_toolkit.commands.list._list_groups_impl")
     def test_list_groups_implementation_called(
         self, mock_impl: Mock, config_file: Path
     ) -> None:
@@ -205,7 +205,7 @@ class TestListCommand:
         assert result.exit_code == 0
         mock_impl.assert_called_once()
 
-    @patch("network_toolkit.commands.list_sequences._list_sequences_impl")
+    @patch("network_toolkit.commands.list._list_sequences_impl")
     def test_list_sequences_implementation_called(
         self, mock_impl: Mock, config_file: Path
     ) -> None:
@@ -218,7 +218,7 @@ class TestListCommand:
         assert result.exit_code == 0
         mock_impl.assert_called_once()
 
-    @patch("network_toolkit.commands.info._show_supported_types_impl")
+    @patch("network_toolkit.commands.list._show_supported_types_impl")
     def test_list_supported_types_implementation_called(self, mock_impl: Mock) -> None:
         """Test that the supported types implementation is called correctly."""
         mock_impl.return_value = None

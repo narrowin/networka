@@ -22,7 +22,7 @@ class TestConfigCommand:
         assert "init" in result.output
         assert "validate" in result.output
 
-    @patch("network_toolkit.commands.config_init._config_init_impl")
+    @patch("network_toolkit.commands.config._config_init_impl")
     def test_config_init_basic(self, mock_impl: Mock) -> None:
         """Test config init subcommand."""
         runner = CliRunner()
@@ -35,7 +35,7 @@ class TestConfigCommand:
         assert call_args.kwargs["yes"] is True
         assert call_args.kwargs["dry_run"] is True
 
-    @patch("network_toolkit.commands.config_init._config_init_impl")
+    @patch("network_toolkit.commands.config._config_init_impl")
     def test_config_init_with_options(self, mock_impl: Mock) -> None:
         """Test config init with various options."""
         runner = CliRunner()
@@ -62,7 +62,7 @@ class TestConfigCommand:
         assert call_args.kwargs["install_completions"] is True
         assert call_args.kwargs["shell"] == "bash"
 
-    @patch("network_toolkit.commands.config_validate._config_validate_impl")
+    @patch("network_toolkit.commands.config._config_validate_impl")
     def test_config_validate_basic(self, mock_impl: Mock) -> None:
         """Test config validate subcommand."""
         runner = CliRunner()
@@ -71,7 +71,7 @@ class TestConfigCommand:
         assert result.exit_code == 0
         mock_impl.assert_called_once()
 
-    @patch("network_toolkit.commands.config_validate._config_validate_impl")
+    @patch("network_toolkit.commands.config._config_validate_impl")
     def test_config_validate_with_options(
         self, mock_impl: Mock, config_file: Path
     ) -> None:
