@@ -11,11 +11,13 @@ import logging
 from pathlib import Path
 from typing import Any, ClassVar
 
+from network_toolkit.tui.clipboard import copy_to_clipboard
 from network_toolkit.tui.compat import TextualNotInstalledError, load_textual
 from network_toolkit.tui.constants import CSS as APP_CSS
 from network_toolkit.tui.controller import TuiController
 from network_toolkit.tui.data import TuiData
 from network_toolkit.tui.helpers import log_write
+from network_toolkit.tui.keymap import KEYMAP
 from network_toolkit.tui.layout import compose_root
 from network_toolkit.tui.models import SelectionState
 from network_toolkit.tui.services import ExecutionService
@@ -40,29 +42,10 @@ def run(config: str | Path = "config") -> None:
     try:
         compat = load_textual()
         app_cls: Any = compat.App
-        binding_cls: Any = compat.Binding
     except TextualNotInstalledError as exc:  # pragma: no cover
         raise RuntimeError(str(exc)) from exc
 
     data = TuiData(config)
-
-    # Helper to construct bindings with compatibility across Textual versions
-    def _mk_binding(
-        key: str,
-        action: str,
-        desc: str,
-        *,
-        show: bool = False,
-        key_display: str | None = None,
-        priority: bool = False,
-    ) -> Any:
-        try:
-            return binding_cls(key, action, desc, show, key_display, priority)
-        except TypeError:
-            try:
-                return binding_cls(key, action, desc, show)
-            except TypeError:
-                return binding_cls(key, action)
 
     # Use shared SelectionState model for state
     state = SelectionState(
@@ -88,23 +71,15 @@ def run(config: str | Path = "config") -> None:
 
         CSS = APP_CSS
         BINDINGS: ClassVar[list[Any]] = [
-            _mk_binding("q", "quit", "Quit", show=True),
-            _mk_binding("enter", "confirm", "Run"),
-            _mk_binding("r", "confirm", "Run"),
-            _mk_binding("ctrl+c", "quit", "Quit"),
-            # Make toggles priority so they work even while typing or during runs
-            _mk_binding("s", "toggle_summary", "Summary", show=True, priority=True),
-            _mk_binding("o", "toggle_output", "Output", show=True, priority=True),
-            _mk_binding("f", "focus_filter", "Focus filter", show=True, priority=True),
-            _mk_binding("t", "toggle_theme", "Theme", show=True, priority=True),
-            _mk_binding("f2", "toggle_summary", "Summary"),
-            # Copy helpers
-            _mk_binding(
-                "y", "copy_last_error", "Copy last error", show=True, priority=True
-            ),
-            _mk_binding(
-                "ctrl+y", "copy_status", "Copy status", show=True, priority=True
-            ),
+            compat.mk_binding(
+                k.key,
+                k.action,
+                k.description,
+                show=k.show,
+                key_display=k.key_display,
+                priority=k.priority,
+            )
+            for k in KEYMAP
         ]
 
         def compose(self) -> Any:
@@ -551,38 +526,7 @@ def run(config: str | Path = "config") -> None:
 
         # --- Clipboard utilities & copy actions
         def _copy_to_clipboard(self, text: str) -> bool:
-            """Best-effort copy to system clipboard across Textual versions.
-
-            Returns True if the framework reported success, False otherwise.
-            """
-            try:
-                if hasattr(self, "copy_to_clipboard"):
-                    self.copy_to_clipboard(text)
-                    return True
-            except Exception:
-                pass
-            for obj_name in ("set_clipboard",):
-                try:
-                    if hasattr(self, obj_name):
-                        getattr(self, obj_name)(text)
-                        return True
-                except Exception:
-                    pass
-            try:
-                scr = getattr(self, "screen", None)
-                if scr is not None and hasattr(scr, "set_clipboard"):
-                    scr.set_clipboard(text)
-                    return True
-            except Exception:
-                pass
-            try:
-                drv = getattr(self, "driver", None)
-                if drv is not None and hasattr(drv, "set_clipboard"):
-                    drv.set_clipboard(text)
-                    return True
-            except Exception:
-                pass
-            return False
+            return copy_to_clipboard(self, text)
 
         def action_copy_status(self) -> None:
             """Copy the current status line text to clipboard."""

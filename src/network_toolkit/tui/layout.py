@@ -27,11 +27,11 @@ from network_toolkit.tui.constants import (
     ID_RUN_STATUS,
     ID_RUN_SUMMARY,
     ID_SUMMARY_PANEL,
-    ID_TARGETS_TABS,
     ID_TAB_COMMANDS,
     ID_TAB_DEVICES,
     ID_TAB_GROUPS,
     ID_TAB_SEQUENCES,
+    ID_TARGETS_TABS,
     LBL_ACTIONS,
     LBL_OUTPUT,
     LBL_PRESS_ENTER,
@@ -57,10 +57,14 @@ def compose_root(compat: Any) -> Any:
                 yield static(LBL_TARGETS, classes="pane-title title")
                 with tabbed_content(id=ID_TARGETS_TABS):
                     with tab_pane("Devices", id=ID_TAB_DEVICES):
-                        yield _filter_input(compat, ID_FILTER_DEVICES, "Filter devices...")
+                        yield _filter_input(
+                            compat, ID_FILTER_DEVICES, "Filter devices..."
+                        )
                         yield compat.SelectionList(id=ID_LIST_DEVICES, classes="scroll")
                     with tab_pane("Groups", id=ID_TAB_GROUPS):
-                        yield _filter_input(compat, ID_FILTER_GROUPS, "Filter groups...")
+                        yield _filter_input(
+                            compat, ID_FILTER_GROUPS, "Filter groups..."
+                        )
                         yield compat.SelectionList(id=ID_LIST_GROUPS, classes="scroll")
             with vertical(classes="panel"):
                 yield static(LBL_ACTIONS, classes="pane-title title")
@@ -69,7 +73,9 @@ def compose_root(compat: Any) -> Any:
                         yield _filter_input(
                             compat, ID_FILTER_SEQUENCES, "Filter sequences..."
                         )
-                        yield compat.SelectionList(id=ID_LIST_SEQUENCES, classes="scroll")
+                        yield compat.SelectionList(
+                            id=ID_LIST_SEQUENCES, classes="scroll"
+                        )
                     with tab_pane("Commands", id=ID_TAB_COMMANDS):
                         yield compat.Input(
                             placeholder="Enter a command and press Enter to run",

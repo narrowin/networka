@@ -50,7 +50,9 @@ class TextualCompat:
             except TypeError:
                 return cls(key, action)
 
-    def notify(self, app: Any, message: str, *, timeout: float = 3, severity: str = "warning") -> None:
+    def notify(
+        self, app: Any, message: str, *, timeout: float = 3, severity: str = "warning"
+    ) -> None:
         """Show a temporary toast/notification if supported by this Textual version.
 
         Falls back to calling ``notify`` without severity when necessary.
@@ -97,7 +99,5 @@ def load_textual() -> TextualCompat:
             TextLogClass=text_log_cls,
         )
     except Exception as exc:  # pragma: no cover
-        msg = (
-            "The TUI requires the 'textual' package. Install with: uv add textual or pip install textual"
-        )
+        msg = "The TUI requires the 'textual' package. Install with: uv add textual or pip install textual"
         raise TextualNotInstalledError(msg) from exc

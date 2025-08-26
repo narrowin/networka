@@ -46,9 +46,7 @@ LBL_PRESS_ENTER = "Press Enter to run"
 LBL_RUN = "Run"
 
 # Startup notice
-STARTUP_NOTICE = (
-    "Prototype: This TUI is a work in progress — expect rough edges."
-)
+STARTUP_NOTICE = "Prototype: This TUI is a work in progress — expect rough edges."
 
 
 # Basic CSS used by the app

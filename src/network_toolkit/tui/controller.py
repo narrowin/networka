@@ -15,7 +15,9 @@ from network_toolkit.tui.constants import STARTUP_NOTICE
 
 
 class TuiController:
-    def __init__(self, app: Any, compat: Any, data: Any, service: Any, state: Any) -> None:
+    def __init__(
+        self, app: Any, compat: Any, data: Any, service: Any, state: Any
+    ) -> None:
         self.app = app
         self.compat = compat
         self.data = data
@@ -58,12 +60,14 @@ class TuiController:
                     try:
                         app.set_timer(3.0, lambda: status.update(prev_text))
                     except Exception:
+
                         async def _restore() -> None:
                             try:
                                 await asyncio.sleep(3)
                                 status.update(prev_text)
                             except Exception:
                                 pass
+
                         try:
                             app.call_later(_restore)
                         except Exception:
@@ -264,9 +268,7 @@ class TuiController:
                 elapsed = 0.0
             app._render_summary(f"Run failed: {e} (after {elapsed:.2f}s)")
             try:
-                app.query_one("#run-status").update(
-                    f"Status: idle — Run failed: {e}"
-                )
+                app.query_one("#run-status").update(f"Status: idle — Run failed: {e}")
                 if getattr(app, "_output_lines", None):
                     app._show_output_panel()
                 app._refresh_bottom_visibility()
