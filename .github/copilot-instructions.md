@@ -11,6 +11,30 @@ ALL IMPORTS ONLY GO TO THE TOP OF THE FILE, NO EXCEPTIONS!!!
 4. **No emojis or decorative symbols** in code, help text, or markdown
 5. **Test via VS Code test feature**, not terminal
 
+## QUALITY STANDARDS
+
+### User Experience
+
+- **ALWAYS test actual command output** - Run commands and evaluate formatting
+- **Clean, professional output** - Every character must serve a purpose
+- **No duplicate messages** - One clear message per action
+- **Proper exception handling** - Framework exceptions (typer.Exit) pass through, never log as "unexpected"
+- **Separation of concerns** - Low-level functions use logger.debug(), high-level use user messages
+
+### Code Quality
+
+- **Question inherited patterns** - Don't accept bad code without improvement
+- **Remove rather than add** - Prefer deletion over complexity
+- **Test realistic scenarios** - Cover actual user workflows, not implementation details
+- **Follow project standards** - Read and apply existing patterns consistently
+
+### Before Any Commit
+
+1. Run the actual commands and check output formatting
+2. Verify no duplicate or confusing messages
+3. Ensure proper exception handling separation
+4. Confirm tests cover real user scenarios
+
 ## PROJECT CONTEXT
 
 - **Purpose**: Async Python CLI for MikroTik RouterOS automation
@@ -91,6 +115,9 @@ async def test_feature(mock_config):
 
 ## CLI COMMAND TEMPLATE
 
+````python
+## CLI COMMAND TEMPLATE
+
 ```python
 @app.command()
 def command_name(
@@ -103,17 +130,36 @@ def command_name(
 
     try:
         config = load_config(config_file)
+        ctx = CommandContext()
         # Implementation
-        console.print("[green]Operation completed[/green]")
+        ctx.print_success("Operation completed")
     except NetworkToolkitError as e:
-        console.print(f"[red]{e}[/red]")
+        ctx = CommandContext()
+        ctx.print_error(str(e))
         raise typer.Exit(1)
+````
+
+## TESTING REQUIREMENTS
+
+```python
+@pytest.mark.asyncio
+async def test_feature(mock_config):
+    """All external dependencies must be mocked: network, filesystem, subprocess."""
+    with patch('scrapli.AsyncScrapli') as mock:
+        # Test implementation
 ```
 
-## MIKROTIK SPECIFICS
+**Mock everything external:**
 
-- Command format: `/system/identity/print`
-- Handle v6 vs v7 syntax differences
+- Network operations (scrapli, requests, etc.)
+- File system operations when testing edge cases
+- Subprocess calls (git, shell commands)
+- Environment variables and user input
+
+```
+
+## NETWORK DEVICE SPECIFICS
+
 - Account for device resource limitations
 - Proper timeout handling for slow devices
 
@@ -125,3 +171,4 @@ def command_name(
 - **Package Management**: uv
 - **Testing**: pytest, pytest-asyncio
 - **Quality**: Ruff (lint/format), mypy (types)
+```
