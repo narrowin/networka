@@ -252,7 +252,8 @@ class TestCLI:
         result = runner.invoke(
             app,
             [
-                "firmware-downgrade",
+                "firmware",
+                "downgrade",
                 "--config",
                 str(config_file),
                 "test_device1",
@@ -276,7 +277,8 @@ class TestCLI:
         result = runner.invoke(
             app,
             [
-                "firmware-downgrade",
+                "firmware",
+                "downgrade",
                 "--config",
                 str(config_file),
                 "lab_devices",
@@ -303,7 +305,8 @@ class TestCLI:
         result = runner.invoke(
             app,
             [
-                "bios-upgrade",
+                "firmware",
+                "bios",
                 "--config",
                 str(config_file),
                 "test_device1",
@@ -326,7 +329,8 @@ class TestCLI:
         result = runner.invoke(
             app,
             [
-                "bios-upgrade",
+                "firmware",
+                "bios",
                 "--config",
                 str(config_file),
                 "lab_devices",

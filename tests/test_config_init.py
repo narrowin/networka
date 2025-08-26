@@ -20,8 +20,8 @@ def test_config_init_creates_minimal_environment() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         test_dir = Path(tmpdir)
 
-        # Run config-init in the test directory
-        result = runner.invoke(app, ["config-init", str(test_dir)])
+        # Run config init in the test directory
+        result = runner.invoke(app, ["config", "init", str(test_dir)])
 
         assert result.exit_code == 0
         assert "Configuration initialization complete" in result.stdout
@@ -71,8 +71,8 @@ def test_config_init_force_overwrite() -> None:
         env_file = test_dir / ".env"
         env_file.write_text("OLD_CONTENT=test")
 
-        # Run config-init with --force
-        result = runner.invoke(app, ["config-init", str(test_dir), "--force"])
+        # Run config init with --force
+        result = runner.invoke(app, ["config", "init", str(test_dir), "--force"])
 
         assert result.exit_code == 0
 
@@ -92,8 +92,8 @@ def test_config_init_fails_without_force() -> None:
         # Create an existing .env file
         (test_dir / ".env").write_text("OLD_CONTENT=test")
 
-        # Run config-init without --force
-        result = runner.invoke(app, ["config-init", str(test_dir)])
+        # Run config init without --force
+        result = runner.invoke(app, ["config", "init", str(test_dir)])
 
         assert result.exit_code == 1
         assert "already exist" in result.stdout
@@ -103,7 +103,7 @@ def test_config_init_fails_without_force() -> None:
 def test_config_init_help() -> None:
     """Test that config-init --help works."""
     runner = CliRunner()
-    result = runner.invoke(app, ["config-init", "--help"])
+    result = runner.invoke(app, ["config", "init", "--help"])
 
     assert result.exit_code == 0
     assert (

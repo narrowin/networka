@@ -31,9 +31,11 @@ class TestBasicCommandCoverage:
         assert result.exit_code == 0
 
     def test_config_validate_basic_functionality(self, config_file: Path) -> None:
-        """Test config-validate command basic path."""
+        """Test config validate command basic path."""
         runner = CliRunner()
-        result = runner.invoke(app, ["config-validate", "--config", str(config_file)])
+        result = runner.invoke(
+            app, ["config", "validate", "--config", str(config_file)]
+        )
         assert result.exit_code == 0
 
     def test_list_sequences_basic_functionality(self, config_file: Path) -> None:

@@ -125,11 +125,12 @@ class TestCommandContextIntegration:
 
         # Import the commands we've fixed
         from network_toolkit.commands import (
-            config_backup,
+            backup,
             config_init,
             config_validate,
             diff,
             download,
+            firmware,
             routerboard_upgrade,
             run,
             upload,
@@ -137,11 +138,12 @@ class TestCommandContextIntegration:
 
         # Check that these modules don't contain hardcoded color patterns
         for module in [
-            config_backup,
+            backup,
             diff,
             config_validate,
             upload,
             download,
+            firmware,
             routerboard_upgrade,
             run,
             config_init,

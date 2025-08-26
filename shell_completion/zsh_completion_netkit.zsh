@@ -97,7 +97,23 @@ _nw_complete() {
             values=("update:Update JSON schemas for YAML editor validation" "info:Display information about JSON schema files")
             _describe -t subcommands 'schema subcommands' values && return
           fi ;;
-        upload|download|config-backup|backup|firmware-upgrade|firmware-downgrade|bios-upgrade|diff)
+        backup)
+          if (( CURRENT == 3 )); then
+            values=("config:Backup device configuration" "comprehensive:Perform comprehensive backup" "vendors:Show vendor support")
+            _describe -t subcommands 'backup subcommands' values && return
+          elif (( CURRENT == 4 && ($words[3] == "config" || $words[3] == "comprehensive") )); then
+            values=(${(f)"$(nw __complete --for devices --config \"$cfg\" 2>/dev/null)"} ${(f)"$(nw __complete --for groups --config \"$cfg\" 2>/dev/null)"})
+            _describe -t targets 'targets' values && return
+          fi ;;
+        firmware)
+          if (( CURRENT == 3 )); then
+            values=("upgrade:Upgrade firmware" "downgrade:Downgrade firmware" "bios:Upgrade BIOS" "vendors:Show vendor support")
+            _describe -t subcommands 'firmware subcommands' values && return
+          elif (( CURRENT == 4 && ($words[3] == "upgrade" || $words[3] == "downgrade" || $words[3] == "bios") )); then
+            values=(${(f)"$(nw __complete --for devices --config \"$cfg\" 2>/dev/null)"} ${(f)"$(nw __complete --for groups --config \"$cfg\" 2>/dev/null)"})
+            _describe -t targets 'targets' values && return
+          fi ;;
+        upload|download|diff)
           if (( CURRENT == 3 )); then
             values=(${(f)"$(nw __complete --for devices --config \"$cfg\" 2>/dev/null)"} ${(f)"$(nw __complete --for groups --config \"$cfg\" 2>/dev/null)"})
             _describe -t targets 'targets' values && return

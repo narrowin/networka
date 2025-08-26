@@ -60,7 +60,7 @@ _nw() {
                 if [[ -n "$result" ]]; then
                     echo "$result"
                 else
-                    echo "info run upload download config-backup backup firmware-upgrade firmware-downgrade bios-upgrade ssh diff list config schema"
+                    echo "info run upload download backup firmware ssh diff list config schema"
                 fi
                 return ;;
             devices)
@@ -234,8 +234,10 @@ _nw() {
                 _opts "$download_opts"
             fi
             ;;
-        config-backup|backup)
+        backup)
             if [[ ${COMP_CWORD} -eq 2 ]]; then
+                _opts "config comprehensive vendors"
+            elif [[ ${COMP_CWORD} -eq 3 && ("${COMP_WORDS[2]}" == "config" || "${COMP_WORDS[2]}" == "comprehensive") ]]; then
                 local groups devices
                 groups=$(_nw_list groups)
                 devices=$(_nw_list devices)
@@ -244,34 +246,16 @@ _nw() {
                 _opts "$config_backup_opts"
             fi
             ;;
-        firmware-upgrade)
+        firmware)
             if [[ ${COMP_CWORD} -eq 2 ]]; then
+                _opts "upgrade downgrade bios vendors"
+            elif [[ ${COMP_CWORD} -eq 3 && ("${COMP_WORDS[2]}" == "upgrade" || "${COMP_WORDS[2]}" == "downgrade" || "${COMP_WORDS[2]}" == "bios") ]]; then
                 local groups devices
                 groups=$(_nw_list groups)
                 devices=$(_nw_list devices)
                 _opts "$devices $groups"
             else
                 _opts "$firmware_upgrade_opts"
-            fi
-            ;;
-        firmware-downgrade)
-            if [[ ${COMP_CWORD} -eq 2 ]]; then
-                local groups devices
-                groups=$(_nw_list groups)
-                devices=$(_nw_list devices)
-                _opts "$devices $groups"
-            else
-                _opts "$firmware_downgrade_opts"
-            fi
-            ;;
-        bios-upgrade)
-            if [[ ${COMP_CWORD} -eq 2 ]]; then
-                local groups devices
-                groups=$(_nw_list groups)
-                devices=$(_nw_list devices)
-                _opts "$devices $groups"
-            else
-                _opts "$bios_upgrade_opts"
             fi
             ;;
         diff)

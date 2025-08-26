@@ -39,6 +39,7 @@ Because a real **Networka** wants the f\*ing lot.”<br><br>
 
 - [Installation instructions →](#installation)
 - [Platform compatibility →](docs/platform-compatibility.md)
+- [Shell completion setup →](docs/shell-completion.md)
 - [CLI overview →](#cli-overview)
 - [Quick Start guide →](#quick-start)
 - [Configuration →](#configuration)
@@ -46,14 +47,35 @@ Because a real **Networka** wants the f\*ing lot.”<br><br>
 
 ## Features
 
-- **Cross-platform**: Full support for Linux, macOS, and Windows
-- **Multi-vendor support**: MikroTik RouterOS, Cisco IOS-XE/NX-OS, Arista EOS, Juniper JunOS, and more
-- **Device/Group operations**: Execute commands across devices or groups concurrently
-- **Flexible config options**: Device and group configs can be done in yaml or csv with powerful tag and group options
-- **Modern async architecture**: Built with async/await for high performance
-- **Command sequences**: Vendor-aware predefined command sets
-- **Results management**: Organized storage with multiple output formats
-- **Type safety**: Full type checking with mypy for reliability
+### **Core Capabilities**
+
+- **Multi-vendor network automation**: Native support for MikroTik RouterOS, Cisco IOS/IOS-XE/NX-OS, Arista EOS, Juniper JunOS, and more
+- **Scalable device management**: Execute commands across individual devices or groups concurrently with async/await architecture
+- **Cross-platform compatibility**: Full support for Linux, macOS, and Windows environments
+- **Flexible configuration**: YAML and CSV configuration options with powerful device tagging and grouping
+
+### **Operational Features**
+
+- **Command execution**: Run single commands or predefined sequences across devices and groups
+- **File management**: Upload/download files to/from network devices with verification and error handling
+- **Device backup**: Automated configuration and comprehensive backups with vendor-specific implementations
+- **Firmware management**: Upgrade, downgrade, and BIOS operations with platform validation
+- **SSH session management**: Direct SSH access with tmux integration for interactive sessions
+
+### **Advanced Features**
+
+- **Intelligent completions**: Context-aware shell completions for devices, groups, and sequences
+- **Vendor-aware sequences**: Predefined command sets optimized for different network platforms
+- **Results management**: Organized storage with multiple output formats and automatic timestamping
+- **Configuration validation**: Schema-based validation with detailed error reporting
+- **Credential management**: Secure credential handling via environment variables with device-specific overrides
+
+### **Developer & Integration Features**
+
+- **Type safety**: Full mypy type checking for reliability and maintainability
+- **Modern architecture**: Built with async/await patterns for high performance
+- **Extensible design**: Plugin-friendly architecture for adding new vendors and operations
+- **Rich output**: Professional CLI interface with color coding and structured information display
 
 ## Installation
 
@@ -170,11 +192,8 @@ upload Upload a file to a device or to all devices in a group.
 download Download a file from a device or all devices in a group.
 
 Vendor-Specific Operations:
-config-backup Create device configuration backup using vendor-specific commands.
-backup Create comprehensive device backup using vendor-specific commands.
-firmware-upgrade Upload firmware package and reboot device to apply it.
-firmware-downgrade Upload older firmware package, schedule downgrade, and reboot to apply.
-bios-upgrade Upgrade device BIOS/RouterBOOT and reboot to apply.
+backup Device backup operations (config and comprehensive)
+firmware Firmware and BIOS management operations
 
 ````
 
@@ -505,18 +524,18 @@ Networka provides vendor-specific backup operations that automatically use the c
 
 ```bash
 # Configuration backup (text-only configuration export)
-nw config-backup sw-acc1                    # MikroTik: /export commands
-nw config-backup cisco-sw1                  # Cisco: show running-config
-nw config-backup --no-download sw-acc1      # Create but don't download files
+nw backup config sw-acc1                     # MikroTik: /export commands
+nw backup config cisco-sw1                  # Cisco: show running-config
+nw backup config --no-download sw-acc1      # Create but don't download files
 
 # Comprehensive backup (configuration + system data)
-nw backup sw-acc1                           # MikroTik: /export + /system/backup
-nw backup cisco-sw1                         # Cisco: show commands (running/startup/version/inventory)
-nw backup office_switches                   # Run on device group
+nw backup comprehensive sw-acc1             # MikroTik: /export + /system/backup
+nw backup comprehensive cisco-sw1           # Cisco: show commands (running/startup/version/inventory)
+nw backup comprehensive office_switches     # Run on device group
 
 # Options for backup operations
-nw config-backup sw-acc1 --delete-remote    # Remove remote files after download
-nw backup sw-acc1 --verbose                 # Detailed operation logging
+nw backup config sw-acc1 --delete-remote    # Remove remote files after download
+nw backup comprehensive sw-acc1 --verbose   # Detailed operation logging
 ```
 
 **Platform-specific behavior:**

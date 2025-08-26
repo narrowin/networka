@@ -32,7 +32,7 @@ def test_config_init_yes_uses_default_location(monkeypatch: Any) -> None:
         # Redirect default config root to a temp dir
         monkeypatch.setattr(config_init_mod, "default_config_root", lambda: tmp_path)
 
-        result = runner.invoke(app, ["config-init", "--yes"])  # non-interactive
+        result = runner.invoke(app, ["config", "init", "--yes"])  # non-interactive
 
         assert result.exit_code == 0
         assert (tmp_path / ".env").exists()
@@ -55,7 +55,7 @@ def test_config_init_dry_run_interactive_no_writes(monkeypatch: Any) -> None:
         user_input += "n\n"  # do not install sequences
         user_input += "n\n"  # do not install completions
 
-        result = runner.invoke(app, ["config-init", "--dry-run"], input=user_input)
+        result = runner.invoke(app, ["config", "init", "--dry-run"], input=user_input)
 
         assert result.exit_code == 0
         # Nothing should be created in dry-run
@@ -97,7 +97,8 @@ def test_config_init_install_sequences_triggers_git_clone(monkeypatch: Any) -> N
         result = runner.invoke(
             app,
             [
-                "config-init",
+                "config",
+                "init",
                 str(test_dir),
                 "--install-sequences",
                 "--git-url",
@@ -130,7 +131,8 @@ def test_config_init_install_completions_install_and_activate(monkeypatch: Any) 
         result = runner.invoke(
             app,
             [
-                "config-init",
+                "config",
+                "init",
                 str(test_dir),
                 "--install-completions",
                 "--shell",
@@ -164,7 +166,8 @@ def test_clone_error_handling() -> None:
             result = runner.invoke(
                 app,
                 [
-                    "config-init",
+                    "config",
+                    "init",
                     temp_dir,  # target_dir positional argument
                     "--git-url",
                     "https://github.com/owner/repo.git",
@@ -190,7 +193,8 @@ def test_env_file_creation_error() -> None:
             result = runner.invoke(
                 app,
                 [
-                    "config-init",
+                    "config",
+                    "init",
                     temp_dir,  # target_dir positional argument
                     "--no-install-sequences",
                     "--no-install-completions",
@@ -230,7 +234,8 @@ def test_failed_git_clone_error_handling(monkeypatch: Any) -> None:
         result = runner.invoke(
             app,
             [
-                "config-init",
+                "config",
+                "init",
                 str(test_dir),
                 "--install-sequences",
                 "--git-url",
@@ -255,7 +260,8 @@ def test_completion_script_not_found(monkeypatch: Any) -> None:
         result = runner.invoke(
             app,
             [
-                "config-init",
+                "config",
+                "init",
                 str(test_dir),
                 "--install-completions",
                 "--shell",
@@ -309,7 +315,8 @@ def test_overwrite_protection_user_declines() -> None:
             result = runner.invoke(
                 app,
                 [
-                    "config-init",  # No target dir - triggers interactive mode
+                    "config",
+                    "init",  # No target dir - triggers interactive mode
                     "--no-install-sequences",
                     "--no-install-completions",
                     "--no-install-schemas",
@@ -350,7 +357,8 @@ def test_overwrite_protection_user_accepts() -> None:
             result = runner.invoke(
                 app,
                 [
-                    "config-init",  # No target dir - triggers interactive mode
+                    "config",
+                    "init",  # No target dir - triggers interactive mode
                     "--no-install-sequences",
                     "--no-install-completions",
                     "--no-install-schemas",

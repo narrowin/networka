@@ -91,9 +91,9 @@ class TestUnsupportedOperations:
 class TestCommandLineUnsupportedOperations:
     """Test unsupported operations through command line interface."""
 
-    @patch("network_toolkit.commands.firmware_upgrade.check_operation_support")
-    @patch("network_toolkit.commands.firmware_upgrade.load_config")
-    @patch("network_toolkit.commands.firmware_upgrade.setup_logging")
+    @patch("network_toolkit.commands.firmware.check_operation_support")
+    @patch("network_toolkit.commands.firmware.load_config")
+    @patch("network_toolkit.commands.firmware.setup_logging")
     @patch("pathlib.Path.exists")
     @patch("pathlib.Path.is_file")
     def test_firmware_upgrade_fails_fast_for_unsupported_platform(
@@ -126,13 +126,15 @@ class TestCommandLineUnsupportedOperations:
         import typer
         from typer.testing import CliRunner
 
-        from network_toolkit.commands.firmware_upgrade import register
+        from network_toolkit.commands.firmware import register
 
         app = typer.Typer()
         register(app)
         runner = CliRunner()
 
-        result = runner.invoke(app, ["test_device", "firmware.bin"])
+        result = runner.invoke(
+            app, ["firmware", "upgrade", "test_device", "firmware.bin"]
+        )
 
         # Should fail without attempting connection
         assert result.exit_code == 1

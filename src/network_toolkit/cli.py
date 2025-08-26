@@ -16,28 +16,18 @@ from network_toolkit import __version__
 
 # Command registration: import command factories that attach to `app`
 # Each module defines a `register(app)` function that adds its commands.
-from network_toolkit.commands.bios_upgrade import register as register_bios_upgrade
+from network_toolkit.commands.backup import register as register_backup
 from network_toolkit.commands.complete import register as register_complete
 from network_toolkit.commands.config import register as register_config
-from network_toolkit.commands.config_backup import register as register_config_backup
 from network_toolkit.commands.diff import register as register_diff
 from network_toolkit.commands.download import register as register_download
-from network_toolkit.commands.firmware_downgrade import (
-    register as register_firmware_downgrade,
-)
-from network_toolkit.commands.firmware_upgrade import (
-    register as register_firmware_upgrade,
-)
+from network_toolkit.commands.firmware import register as register_firmware
 from network_toolkit.commands.info import register as register_info
 from network_toolkit.commands.list import register as register_list
 from network_toolkit.commands.run import register as register_run
 from network_toolkit.commands.schema_unified import register as register_schema
 from network_toolkit.commands.ssh import register as register_ssh
 from network_toolkit.commands.upload import register as register_upload
-from network_toolkit.commands.vendor_backup import register as register_vendor_backup
-from network_toolkit.commands.vendor_config_backup import (
-    register as register_vendor_config_backup,
-)
 from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import get_output_manager
 
@@ -73,14 +63,10 @@ class CategorizedHelpGroup(TyperGroup):
             "ssh",
             "upload",
             "download",
-        ]
-        vendor_names = [
-            "config-backup",
             "backup",
-            "firmware-upgrade",
-            "firmware-downgrade",
-            "bios-upgrade",
+            "firmware",
         ]
+        vendor_names = []
         info_names = [
             "info",
             "list",
@@ -259,14 +245,10 @@ register_info(app)
 register_list(app)
 register_run(app)
 register_config(app)
-register_config_backup(app)
+register_backup(app)
 register_upload(app)
 register_download(app)
-register_vendor_config_backup(app)
-register_vendor_backup(app)
-register_firmware_upgrade(app)
-register_firmware_downgrade(app)
-register_bios_upgrade(app)
+register_firmware(app)
 register_complete(app)
 register_diff(app)
 register_schema(app)
