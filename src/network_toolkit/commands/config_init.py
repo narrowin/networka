@@ -280,7 +280,7 @@ def install_sequences_from_repo(url: str, ref: str, dest: Path) -> None:
 
 
 def install_editor_schemas(
-    config_root: Path, git_url: str | None = None, git_ref: str = "ssh_multiplex"
+    config_root: Path, git_url: str | None = None, git_ref: str = "main"
 ) -> None:
     """Install JSON schemas and VS Code settings for YAML editor validation.
 
@@ -528,7 +528,7 @@ def register(app: typer.Typer) -> None:
             typer.Option(
                 "--git-ref", help="Git branch/tag/ref for sequences", show_default=True
             ),
-        ] = "ssh_multiplex",
+        ] = "main",
         install_completions: Annotated[
             bool | None,
             typer.Option(
