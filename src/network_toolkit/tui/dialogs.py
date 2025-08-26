@@ -8,14 +8,14 @@ from __future__ import annotations
 
 # ruff: noqa: ANN001,ANN002,ANN003,ANN201
 # pyright: reportUnknownArgumentType=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportGeneralTypeIssues=false
-
 from collections.abc import Callable
 from typing import Any
 
 try:  # Optional at import time; provide stubs if unavailable
     from textual.containers import Vertical as _Vertical  # type: ignore
     from textual.screen import ModalScreen as _ModalScreenBase  # type: ignore
-    from textual.widgets import Button as _Button, Static as _Static  # type: ignore
+    from textual.widgets import Button as _Button  # type: ignore
+    from textual.widgets import Static as _Static
 except Exception:  # pragma: no cover - textual not installed
     _ModalScreenBase = object  # type: ignore
 
@@ -27,8 +27,10 @@ except Exception:  # pragma: no cover - textual not installed
 
     class _Vertical:  # type: ignore
         def __init__(self, *args: Any, **kwargs: Any) -> None: ...
-    def __enter__(self) -> _Vertical:  # noqa: D401
+
+        def __enter__(self) -> _Vertical:  # noqa: D401
             return self
+
         def __exit__(self, *_: Any) -> bool:  # noqa: D401
             return False
 
@@ -40,7 +42,9 @@ class _ConfirmDialog(_ModalScreenBase):  # type: ignore[misc]
         "#nw-dialog .buttons { content-align: center middle; height: 3; }\n"
     )
 
-    def __init__(self, message: str, on_yes: Callable[[], None], on_no: Callable[[], None]) -> None:
+    def __init__(
+        self, message: str, on_yes: Callable[[], None], on_no: Callable[[], None]
+    ) -> None:
         super().__init__()  # type: ignore[misc]
         self._message = message
         self._on_yes = on_yes
@@ -91,7 +95,12 @@ class _CancelModeDialog(_ModalScreenBase):  # type: ignore[misc]
         "#nw-dialog .buttons { content-align: center middle; height: 3; }\n"
     )
 
-    def __init__(self, on_soft: Callable[[], None], on_hard: Callable[[], None], on_abort: Callable[[], None]) -> None:
+    def __init__(
+        self,
+        on_soft: Callable[[], None],
+        on_hard: Callable[[], None],
+        on_abort: Callable[[], None],
+    ) -> None:
         super().__init__()  # type: ignore[misc]
         self._on_soft = on_soft
         self._on_hard = on_hard

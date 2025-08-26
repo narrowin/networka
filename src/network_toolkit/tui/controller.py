@@ -14,6 +14,7 @@ from typing import Any
 
 from network_toolkit.tui.constants import STARTUP_NOTICE
 from network_toolkit.tui.models import CancellationToken
+from network_toolkit.tui.prompt import Prompt
 
 
 class TuiController:
@@ -41,42 +42,11 @@ class TuiController:
             app._populate_selection_list("list-sequences", app._all_sequences)
         except Exception:
             pass
-        # Startup notice
+        # Startup notice: use toast notification (lower-right, orange frame)
         try:
-            try:
-                self.compat.notify(app, STARTUP_NOTICE, timeout=3, severity="warning")
-            except AttributeError:
-                try:
-                    status = app.query_one("#run-status")
-                    try:
-                        prev_text = (
-                            getattr(getattr(status, "renderable", None), "plain", None)
-                            or "Status: idle"
-                        )
-                    except Exception:
-                        prev_text = "Status: idle"
-                    try:
-                        status.update(STARTUP_NOTICE)
-                    except Exception:
-                        pass
-                    try:
-                        app.set_timer(3.0, lambda: status.update(prev_text))
-                    except Exception:
-
-                        async def _restore() -> None:
-                            try:
-                                await asyncio.sleep(3)
-                                status.update(prev_text)
-                            except Exception:
-                                pass
-
-                        try:
-                            app.call_later(_restore)
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
+            self.compat.notify(app, STARTUP_NOTICE, timeout=3, severity="warning")
         except Exception:
+            # If notify isn't available, skip (avoid status-line fallback)
             pass
         # Record UI thread identity for safe callback dispatching
         try:
@@ -99,9 +69,8 @@ class TuiController:
         app._run_task = None
         app._cancel_token = None
         app._bg_tasks = set()
-        # Prompt state for confirming cancellation when a run is already active
-        app._cancel_prompt_active = False
-        app._cancel_mode_prompt_active = False
+
+    # No prompt state flags needed with unified Prompt
 
     async def on_input_changed(self, event: Any) -> None:
         app = self.app
@@ -178,35 +147,40 @@ class TuiController:
         state = self.state
         # Disallow starting a new run if one is active
         if getattr(app, "_run_active", False):
-            # Show visual feedback and ask user if they want to cancel the running job
+            # Maintain legacy flag for tests while using unified Prompt
             try:
-                # Avoid stacking prompts
-                if not getattr(app, "_cancel_prompt_active", False):
-                    app._cancel_prompt_active = True
-                    try:
-                        # Prefer a toast/notification if available
-                        self.compat.notify(
-                            app,
-                            "A job is already running. Cancel it? [y/N]",
-                            timeout=5,
-                            severity="warning",
-                        )
-                    except Exception:
-                        pass
-                    try:
-                        app._show_bottom_panel()
-                        status = app.query_one("#run-status")
-                        status.update(
-                            "Status: running — A job is already in progress. Cancel it? [y/N]"
-                        )
-                        app._refresh_bottom_visibility()
-                    except Exception:
-                        pass
-                    app._add_meta(
-                        "Run already in progress — press 'y' to cancel, 'n' or Enter to continue."
-                    )
+                app._cancel_prompt_active = True
             except Exception:
                 pass
+            app._add_meta(
+                "Run already in progress — press 'y' to cancel, 'n' or Enter to continue."
+            )
+            try:
+                do_cancel = await Prompt.ask_yes_no(
+                    app, "A job is already running. Cancel it? [y/N]", default_no=True
+                )
+            except Exception:
+                do_cancel = False
+            finally:
+                try:
+                    app._cancel_prompt_active = False
+                except Exception:
+                    pass
+            if not do_cancel:
+                return
+            # Ask if the user wants a hard cancel
+            try:
+                hard = await Prompt.ask_yes_no(
+                    app,
+                    "Hard cancel (disconnect sessions)? [y/N]",
+                    default_no=True,
+                )
+            except Exception:
+                hard = False
+            if hard:
+                await self.action_cancel_hard()
+            else:
+                await self.action_cancel()
             return
 
         # Prepare UI for a new run
@@ -346,7 +320,7 @@ class TuiController:
                     app._set_run_enabled(True)
                     app._cancel_token = None
                     app._run_task = None
-                    app._cancel_prompt_active = False
+                    # No prompt state flags
                     # After run completes, clear any selections in the UI
                     try:
                         app._dispatch_ui(app._clear_all_selections)
@@ -376,11 +350,7 @@ class TuiController:
                     status.update("Status: cancelling…")
                 except Exception:
                     pass
-                try:
-                    app._cancel_prompt_active = False
-                    app._cancel_mode_prompt_active = False
-                except Exception:
-                    pass
+                # No prompt state flags
         except Exception:
             pass
 
@@ -409,11 +379,7 @@ class TuiController:
                     )
                 except Exception:
                     pass
-                try:
-                    app._cancel_prompt_active = False
-                    app._cancel_mode_prompt_active = False
-                except Exception:
-                    pass
+                # No prompt state flags
         except Exception:
             pass
 
@@ -447,119 +413,73 @@ class TuiController:
             key = str(getattr(event, "key", "")).lower()
         except Exception:
             key = ""
-        # Handle pending cancel prompt (default No)
-        try:
-            if getattr(app, "_cancel_prompt_active", False):
-                if key in {"y"}:
-                    # Confirm cancellation; show mode selection prompt next
-                    try:
-                        app._cancel_prompt_active = False
-                        app._cancel_mode_prompt_active = True
-                        # Show options dialog in status area (compact)
-                        app.open_cancel_mode_dialog()
-                    except Exception:
-                        pass
-                    try:
-                        if hasattr(event, "stop"):
-                            event.stop()
-                    except Exception:
-                        pass
-                    return
-                if key in {"n", "enter", "return", "escape"}:
-                    # Continue running without cancelling (default)
-                    try:
-                        app._cancel_prompt_active = False
-                        status = app.query_one("#run-status")
-                        status.update("Status: running — Continuing current run")
-                        app._refresh_bottom_visibility()
-                    except Exception:
-                        pass
-                    try:
-                        if hasattr(event, "stop"):
-                            event.stop()
-                    except Exception:
-                        pass
-                    return
-            # Handle cancel mode selection prompt
-            if getattr(app, "_cancel_mode_prompt_active", False):
-                if key in {"s", "enter", "return"}:  # default soft
-                    try:
-                        app._cancel_mode_prompt_active = False
-                    except Exception:
-                        pass
-                    try:
-                        task = asyncio.create_task(self.action_cancel())
-                        try:
-                            self.app._bg_tasks.add(task)
-                            task.add_done_callback(self.app._bg_tasks.discard)
-                        except Exception:
-                            pass
-                    except Exception:
-                        pass
-                    try:
-                        if hasattr(event, "stop"):
-                            event.stop()
-                    except Exception:
-                        pass
-                    return
-                if key in {"h"}:
-                    try:
-                        app._cancel_mode_prompt_active = False
-                    except Exception:
-                        pass
-                    try:
-                        task = asyncio.create_task(self.action_cancel_hard())
-                        try:
-                            self.app._bg_tasks.add(task)
-                            task.add_done_callback(self.app._bg_tasks.discard)
-                        except Exception:
-                            pass
-                    except Exception:
-                        pass
-                    try:
-                        if hasattr(event, "stop"):
-                            event.stop()
-                    except Exception:
-                        pass
-                    return
-                if key in {"n", "escape"}:  # abort cancel entirely
-                    try:
-                        app._cancel_mode_prompt_active = False
-                        status = app.query_one("#run-status")
-                        status.update("Status: running — Continuing current run")
-                        app._refresh_bottom_visibility()
-                    except Exception:
-                        pass
-                    try:
-                        app.close_cancel_mode_dialog()
-                    except Exception:
-                        pass
-                    try:
-                        if hasattr(event, "stop"):
-                            event.stop()
-                    except Exception:
-                        pass
-                    return
-        except Exception:
-            pass
+        # No inline prompt state handling needed with unified Prompt
         if key == "q":
-            # Always close overlays; never quit on 'q'
+            # If any overlay is visible, close it; otherwise ask to quit
             try:
-                app.action_close_overlays()
-                if hasattr(event, "stop"):
-                    event.stop()
-                return
+                sum_panel = app.query_one("#summary-panel")
+                help_panel = app.query_one("#help-panel")
+                out_panel = app.query_one("#output-panel")
+                s_hidden = "hidden" in (getattr(sum_panel, "classes", []) or [])
+                h_hidden = "hidden" in (getattr(help_panel, "classes", []) or [])
+                o_hidden = "hidden" in (getattr(out_panel, "classes", []) or [])
+                any_visible = not (s_hidden and h_hidden and o_hidden)
             except Exception:
-                # If anything fails, still stop to avoid quitting
+                any_visible = False
+            if any_visible:
+                try:
+                    app.action_close_overlays()
+                except Exception:
+                    pass
                 try:
                     if hasattr(event, "stop"):
                         event.stop()
                 except Exception:
                     pass
                 return
+
+            # No overlays: prompt to quit using unified Prompt (async task)
+            async def _ask_quit() -> None:
+                try:
+                    do_quit = await Prompt.ask_yes_no(
+                        app, "Do you want to quit?", default_no=True
+                    )
+                except Exception:
+                    do_quit = False
+                if do_quit:
+                    try:
+                        if hasattr(app, "exit"):
+                            app.exit()
+                        else:
+                            raise SystemExit(0)
+                    except Exception as _exc:
+                        raise SystemExit(0) from None
+
+            try:
+                task = asyncio.create_task(_ask_quit())
+                try:
+                    self.app._bg_tasks.add(task)
+                    task.add_done_callback(self.app._bg_tasks.discard)
+                except Exception:
+                    pass
+            except Exception:
+                pass
+            try:
+                if hasattr(event, "stop"):
+                    event.stop()
+            except Exception:
+                pass
+            return
         if key == "escape":
             try:
                 app.action_close_overlays()
+                if hasattr(event, "stop"):
+                    event.stop()
+            except Exception:
+                pass
+        elif key in {"ctrl+q"}:
+            # Disable Ctrl+Q quitting entirely
+            try:
                 if hasattr(event, "stop"):
                     event.stop()
             except Exception:
@@ -593,12 +513,37 @@ class TuiController:
             except Exception:
                 pass
         elif key in {"ctrl+c"}:
-            # Ctrl+C opens the same cancel type dialog (soft/hard)
+            # Ctrl+C asks to cancel the current run (soft by default)
             try:
                 if getattr(app, "_run_active", False):
-                    app._cancel_prompt_active = False
-                    app._cancel_mode_prompt_active = True
-                    app.open_cancel_mode_dialog()
+
+                    async def _ask_cancel() -> None:
+                        try:
+                            app._cancel_prompt_active = True
+                        except Exception:
+                            pass
+                        try:
+                            do_cancel = await Prompt.ask_yes_no(
+                                app,
+                                "A job is already running. Cancel it? [y/N]",
+                                default_no=True,
+                            )
+                        except Exception:
+                            do_cancel = False
+                        finally:
+                            try:
+                                app._cancel_prompt_active = False
+                            except Exception:
+                                pass
+                        if do_cancel:
+                            await self.action_cancel()
+
+                    task = asyncio.create_task(_ask_cancel())
+                    try:
+                        self.app._bg_tasks.add(task)
+                        task.add_done_callback(self.app._bg_tasks.discard)
+                    except Exception:
+                        pass
                 if hasattr(event, "stop"):
                     event.stop()
             except Exception:
