@@ -20,7 +20,11 @@ from network_toolkit.common.output import (
 )
 from network_toolkit.common.paths import default_config_root
 from network_toolkit.config import load_config
-from network_toolkit.exceptions import NetworkToolkitError
+from network_toolkit.exceptions import (
+    ConfigurationError,
+    FileTransferError,
+    NetworkToolkitError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +69,8 @@ general:
 
 def create_example_devices(devices_dir: Path) -> None:
     """Create example device configurations."""
+    devices_dir.mkdir(parents=True, exist_ok=True)
+
     mikrotik_content = """# MikroTik RouterOS Device Example
 host: 192.168.1.1
 device_type: mikrotik_routeros
@@ -89,6 +95,8 @@ tags:
 
 def create_example_groups(groups_dir: Path) -> None:
     """Create example group configurations."""
+    groups_dir.mkdir(parents=True, exist_ok=True)
+
     office_content = """# Office devices group
 description: "All office network devices"
 match_tags:
@@ -107,6 +115,8 @@ match_tags:
 
 def create_example_sequences(sequences_dir: Path) -> None:
     """Create example sequence configurations."""
+    sequences_dir.mkdir(parents=True, exist_ok=True)
+
     global_content = """# Global command sequences
 health_check:
   description: "Basic device health check"
@@ -127,44 +137,293 @@ backup_config:
     (sequences_dir / "cisco").mkdir(exist_ok=True)
 
 
-def detect_shell(shell: str | None = None) -> str | None:
-    """Detect the current shell."""
-    if shell:
-        return shell if shell in {"bash", "zsh"} else None
+def _validate_git_url(url: str) -> None:
+    """Validate Git URL for security."""
+    if not url:
+        msg = "Git URL cannot be empty"
+        raise ConfigurationError(msg)
 
-    # Try to detect from environment
-    shell_env = os.environ.get("SHELL", "")
-    if "bash" in shell_env:
-        return "bash"
-    elif "zsh" in shell_env:
-        return "zsh"
+    if not url.startswith(("https://", "git@")):
+        msg = "Git URL must use HTTPS or SSH protocol"
+        raise ConfigurationError(msg)
 
+    # Block localhost and private IPs for security
+    if any(
+        pattern in url.lower()
+        for pattern in ["localhost", "127.", "192.168.", "10.", "172."]
+    ):
+        msg = "Private IP addresses not allowed in Git URLs"
+        raise ConfigurationError(msg)
+
+
+def _find_git_executable() -> str:
+    """Find git executable with full path for security."""
+    import shutil as sh
+
+    git_path = sh.which("git")
+    if not git_path:
+        msg = "Git executable not found in PATH"
+        raise ConfigurationError(msg)
+    return git_path
+
+
+def _detect_repo_root() -> Path | None:
+    """Detect the repository root directory."""
+    here = Path(__file__).resolve()
+    parts = list(here.parents)
+    if len(parts) >= 4:
+        candidate = parts[3]
+        if (candidate / "shell_completion").exists():
+            return candidate
     return None
 
 
-def install_shell_completions(shell: str) -> tuple[Path | None, Path | None]:
+def detect_shell(shell: str | None = None) -> str | None:
+    """Detect the user's shell for completion installation."""
+    if shell in {"bash", "zsh"}:
+        return shell
+    env_shell = os.environ.get("SHELL", "")
+    for name in ("bash", "zsh"):
+        if name in env_shell:
+            return name
+    return None
+
+
+def install_shell_completions(selected: str) -> tuple[Path | None, Path | None]:
     """Install shell completion scripts."""
-    # This is a simplified version - just return None for now
-    # In a real implementation, this would copy completion scripts
-    return None, None
+    if selected not in {"bash", "zsh"}:
+        msg = "Only bash and zsh shells are supported for completion installation"
+        raise ConfigurationError(msg)
+
+    repo_root = _detect_repo_root()
+    if not repo_root:
+        logger.warning("Completion scripts not found; skipping")
+        return (None, None)
+
+    sc_dir = repo_root / "shell_completion"
+    if not sc_dir.exists():
+        logger.warning(f"Shell completion directory not found: {sc_dir}")
+        return (None, None)
+
+    try:
+        import shutil
+
+        home = Path.home()
+        if selected == "bash":
+            src = sc_dir / "bash_completion_nw.sh"
+            if not src.exists():
+                logger.warning(f"Bash completion script not found: {src}")
+                return (None, None)
+            dest = home / ".local" / "share" / "bash-completion" / "completions" / "nw"
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dest)
+            return (dest, home / ".bashrc")
+        else:  # zsh
+            src = sc_dir / "zsh_completion_netkit.zsh"
+            if not src.exists():
+                logger.warning(f"Zsh completion script not found: {src}")
+                return (None, None)
+            dest = home / ".zsh" / "completions" / "_nw"
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dest)
+            return (dest, home / ".zshrc")
+
+    except OSError as e:
+        msg = f"Failed to install {selected} completion: {e}"
+        raise FileTransferError(msg) from e
 
 
-def activate_shell_completion(shell: str, config_path: Path, rc_file: Path) -> None:
-    """Activate shell completion in the shell profile."""
-    # This is a simplified version - just log that it would be activated
-    logger.info(f"Would activate {shell} completion in {rc_file}")
+def activate_shell_completion(
+    shell: str, installed: Path, rc_file: Path | None
+) -> None:
+    """Activate shell completion by updating RC file."""
+    if rc_file is None:
+        return
+
+    try:
+        begin = "# >>> NW COMPLETION >>>"
+        end = "# <<< NW COMPLETION <<<"
+        if shell == "bash":
+            snippet = f'\n{begin}\n# Networka bash completion\nif [ -f "{installed}" ]; then\n  source "{installed}"\nfi\n{end}\n'
+        else:
+            compdir = installed.parent
+            snippet = f"\n{begin}\n# Networka zsh completion\nfpath=({compdir} $fpath)\nautoload -Uz compinit && compinit\n{end}\n"
+
+        if not rc_file.exists():
+            rc_file.write_text(snippet, encoding="utf-8")
+            logger.debug(f"Created rc file with completion: {rc_file}")
+            return
+
+        content = rc_file.read_text(encoding="utf-8")
+        if begin in content and end in content:
+            logger.debug("Completion activation already present in rc; skipping")
+            return
+
+        with rc_file.open("a", encoding="utf-8") as fh:
+            fh.write(snippet)
+        logger.debug(f"Activated shell completion in: {rc_file}")
+
+    except OSError as e:
+        msg = f"Failed to activate shell completion: {e}"
+        raise FileTransferError(msg) from e
 
 
-def install_sequences_from_repo(url: str, ref: str, dest: Path) -> None:
-    """Install sequences from a git repository."""
-    # This is a simplified version - just log that it would install
-    logger.info(f"Would install sequences from {url}#{ref} to {dest}")
+def install_sequences_from_repo(url: str, ref: str, dest: Path) -> int:
+    """Install sequences from a Git repository.
+
+    Returns:
+        Number of files installed
+    """
+    import shutil
+    import subprocess
+    import tempfile
+
+    _validate_git_url(url)
+    git_exe = _find_git_executable()
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_root = Path(tmp_dir) / "repo"
+        try:
+            subprocess.run(
+                [
+                    git_exe,
+                    "clone",
+                    "--depth",
+                    "1",
+                    "--branch",
+                    ref,
+                    url,
+                    str(tmp_root),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            src = tmp_root / "config" / "sequences"
+            if not src.exists():
+                logger.debug("No sequences found in repo under config/sequences")
+                return 0
+
+            # Copy sequences to destination
+            files_copied = 0
+            for item in src.iterdir():
+                if item.name.startswith(".git"):
+                    continue
+                target = dest / item.name
+                if item.is_dir():
+                    shutil.copytree(item, target, dirs_exist_ok=True)
+                    files_copied += 1
+                else:
+                    shutil.copy2(item, target)
+                    files_copied += 1
+
+            logger.debug(
+                f"Copied {files_copied} sequence files from {url}@{ref} to {dest}"
+            )
+            return files_copied
+
+        except subprocess.CalledProcessError as e:
+            error_msg = e.stderr if e.stderr else str(e)
+            msg = f"Git clone failed: {error_msg}"
+            raise FileTransferError(msg) from e
+        except OSError as e:
+            msg = f"Failed to copy sequences: {e}"
+            raise FileTransferError(msg) from e
 
 
-def install_editor_schemas(target_path: Path) -> None:
-    """Install JSON schemas for YAML editor validation."""
-    # This is a simplified version - just log that it would install
-    logger.info(f"Would install JSON schemas to {target_path}")
+def install_editor_schemas(
+    config_root: Path, git_url: str | None = None, git_ref: str = "main"
+) -> int:
+    """Install JSON schemas and VS Code settings for YAML editor validation.
+
+    Returns:
+        Number of schema files installed
+    """
+    import json
+    import urllib.request
+
+    try:
+        # Create schemas directory
+        schemas_dir = config_root / "schemas"
+        schemas_dir.mkdir(exist_ok=True)
+
+        # Schema files to download from GitHub
+        schema_files = [
+            "network-config.schema.json",
+            "device-config.schema.json",
+            "groups-config.schema.json",
+        ]
+
+        github_base_url = (
+            f"{git_url or 'https://github.com/narrowin/networka.git'}".replace(
+                ".git", ""
+            )
+            + f"/raw/{git_ref}/schemas"
+        )
+
+        # Download each schema file
+        files_downloaded = 0
+        for schema_file in schema_files:
+            try:
+                schema_url = f"{github_base_url}/{schema_file}"
+                schema_path = schemas_dir / schema_file
+
+                # Validate URL scheme for security
+                if not schema_url.startswith(("http:", "https:")):
+                    msg = "URL must start with 'http:' or 'https:'"
+                    raise ValueError(msg)
+
+                with urllib.request.urlopen(schema_url) as response:  # noqa: S310
+                    schema_content = response.read().decode("utf-8")
+                    schema_path.write_text(schema_content, encoding="utf-8")
+
+                logger.debug(f"Downloaded {schema_file}")
+                files_downloaded += 1
+            except Exception as e:
+                logger.debug(f"Failed to download {schema_file}: {e}")
+
+        # Create VS Code settings for YAML validation
+        vscode_dir = config_root / ".vscode"
+        vscode_dir.mkdir(exist_ok=True)
+
+        settings_path = vscode_dir / "settings.json"
+        yaml_schema_config = {
+            "yaml.schemas": {
+                "./schemas/network-config.schema.json": [
+                    "config/config.yml",
+                    "devices.yml",
+                ],
+                "./schemas/device-config.schema.json": [
+                    "config/devices/*.yml",
+                    "config/devices.yml",
+                ],
+                "./schemas/groups-config.schema.json": [
+                    "config/groups/*.yml",
+                    "config/groups.yml",
+                ],
+            }
+        }
+
+        if settings_path.exists():
+            try:
+                with settings_path.open(encoding="utf-8") as f:
+                    existing_settings = json.load(f)
+                existing_settings.update(yaml_schema_config)
+                yaml_schema_config = existing_settings
+            except (json.JSONDecodeError, OSError) as e:
+                logger.debug(f"Failed to merge existing VS Code settings: {e}")
+
+        settings_path.write_text(
+            json.dumps(yaml_schema_config, indent=2), encoding="utf-8"
+        )
+
+        logger.debug("Configured JSON schemas and VS Code settings")
+        return files_downloaded
+
+    except OSError as e:
+        msg = f"Failed to install schemas: {e}"
+        raise FileTransferError(msg) from e
 
 
 def _config_init_impl(
@@ -206,11 +465,8 @@ def _config_init_impl(
     # Check if configuration already exists and handle force flag
     if target_path.exists() and any(target_path.iterdir()) and not force:
         if yes:
-            ctx.print_error(
-                f"Configuration directory {target_path} already exists and is not empty. "
-                "Use --force to overwrite."
-            )
-            raise typer.Exit(1)
+            # In --yes mode, we proceed without prompting (same as if user said yes)
+            pass
         else:
             overwrite = typer.confirm(
                 f"Configuration directory {target_path} already exists and is not empty. "
@@ -232,13 +488,23 @@ def _config_init_impl(
     (target_path / "sequences").mkdir(exist_ok=True)
 
     # Create core configuration files
+    ctx.print_info("Creating configuration files...")
     create_env_file(target_path)
-    create_config_yml(target_path)
-    create_example_devices(target_path / "devices")
-    create_example_groups(target_path / "groups")
-    create_example_sequences(target_path / "sequences")
+    ctx.print_success(f"Created credential template: {target_path / '.env'}")
 
-    ctx.print_success(f"Configuration initialized in {target_path}")
+    create_config_yml(target_path)
+    ctx.print_success(f"Created main configuration: {target_path / 'config.yml'}")
+
+    create_example_devices(target_path / "devices")
+    ctx.print_success(f"Created example devices: {target_path / 'devices'}")
+
+    create_example_groups(target_path / "groups")
+    ctx.print_success(f"Created example groups: {target_path / 'groups'}")
+
+    create_example_sequences(target_path / "sequences")
+    ctx.print_success(f"Created example sequences: {target_path / 'sequences'}")
+
+    ctx.print_success(f"Base configuration initialized in {target_path}")
 
     # Handle optional features
     default_seq_repo = "https://github.com/narrowin/networka.git"
@@ -297,33 +563,53 @@ def _config_init_impl(
     # Execute optional installations
     if do_install_sequences:
         try:
-            install_sequences_from_repo(
+            ctx.print_info("Installing additional vendor sequences...")
+            files_installed = install_sequences_from_repo(
                 git_url or default_seq_repo,
                 git_ref,
                 target_path / "sequences",
             )
+            if files_installed > 0:
+                ctx.print_success(
+                    f"Installed {files_installed} sequence files from {git_url or default_seq_repo}"
+                )
+            else:
+                ctx.print_warning("No sequence files found in repository")
         except Exception as e:
             ctx.print_error(f"Failed to install sequences: {e}")
 
     if do_install_compl and chosen_shell:
         try:
-            install_shell_completions(chosen_shell)
-            if do_activate_compl:
-                # Find the rc file for the shell
-                rc_file = None
-                if chosen_shell == "bash":
-                    rc_file = Path.home() / ".bashrc"
-                elif chosen_shell == "zsh":
-                    rc_file = Path.home() / ".zshrc"
-
-                if rc_file:
-                    activate_shell_completion(chosen_shell, target_path, rc_file)
+            ctx.print_info(f"Installing {chosen_shell} shell completion...")
+            installed_path, rc_file = install_shell_completions(chosen_shell)
+            if installed_path is not None:
+                ctx.print_success(f"Installed completion script: {installed_path}")
+                if do_activate_compl and rc_file:
+                    activate_shell_completion(chosen_shell, installed_path, rc_file)
+                    ctx.print_success(f"Activated completion in: {rc_file}")
+                    ctx.print_info(
+                        "Restart your shell or run 'source ~/.bashrc' to enable completions"
+                    )
+                else:
+                    ctx.print_info("Completion script installed but not activated")
+            else:
+                ctx.print_warning("Shell completion installation failed")
         except Exception as e:
             ctx.print_error(f"Failed to install completions: {e}")
 
     if do_install_schemas:
         try:
-            install_editor_schemas(target_path)
+            ctx.print_info("Installing JSON schemas for YAML editor validation...")
+            schema_count = install_editor_schemas(target_path, git_url, git_ref)
+            if schema_count > 0:
+                ctx.print_success(
+                    f"Installed {schema_count} schema files in: {target_path / 'schemas'}"
+                )
+                ctx.print_success(
+                    f"Configured VS Code settings: {target_path / '.vscode' / 'settings.json'}"
+                )
+            else:
+                ctx.print_warning("No schema files could be downloaded")
         except Exception as e:
             ctx.print_error(f"Failed to install schemas: {e}")
 
@@ -511,6 +797,9 @@ def register(app: typer.Typer) -> None:
             if verbose and hasattr(e, "details") and e.details:
                 ctx.print_error(f"Details: {e.details}")
             raise typer.Exit(1) from None
+        except typer.Exit:
+            # Allow clean exits (e.g., user cancellation) to pass through
+            raise
         except Exception as e:  # pragma: no cover - unexpected
             from network_toolkit.common.command_helpers import CommandContext
 
@@ -558,6 +847,9 @@ def register(app: typer.Typer) -> None:
             if verbose and hasattr(e, "details") and e.details:
                 ctx.print_error(f"Details: {e.details}")
             raise typer.Exit(1) from None
+        except typer.Exit:
+            # Allow clean exits (e.g., user cancellation) to pass through
+            raise
         except Exception as e:  # pragma: no cover - unexpected
             from network_toolkit.common.command_helpers import CommandContext
 
