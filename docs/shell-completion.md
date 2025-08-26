@@ -87,10 +87,10 @@ Once installed, you can use TAB completion with the `nw` command:
 
 ```bash
 nw <TAB><TAB>
-# Shows: info run list-devices ...
+# Shows: info run list ...
 
-nw list-<TAB><TAB>
-# Shows: list-devices list-sequences list-groups ...
+nw list <TAB><TAB>
+# Shows: devices sequences groups supported-types ...
 ```
 
 ### Device, Group, and Sequence Name Completion

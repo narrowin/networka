@@ -25,7 +25,7 @@ sequences:
 
 3. List sequences:
 
-- `nw list-sequences --vendor mikrotik_routeros`
+- `nw list sequences --vendor mikrotik_routeros`
 
 4. Run the sequence:
 

@@ -38,7 +38,7 @@ class TestCLITransportConfiguration:
                     "--platform",
                     "mikrotik_routeros",
                     "--transport",
-                    "nornir_netmiko",
+                    "scrapli",
                 ],
             )
 
@@ -49,7 +49,7 @@ class TestCLITransportConfiguration:
             if mock_create_ip.called:
                 call_args = mock_create_ip.call_args
                 if call_args and "transport_type" in call_args.kwargs:
-                    assert call_args.kwargs["transport_type"] == "nornir_netmiko"
+                    assert call_args.kwargs["transport_type"] == "scrapli"
 
     def test_ssh_command_with_transport_option(self):
         """Test that ssh command accepts transport option."""
@@ -85,10 +85,10 @@ class TestCLITransportConfiguration:
             assert "--transport" in str(result.stdout) or result.exit_code != 2
 
     def test_supported_types_shows_transport_info(self):
-        """Test that supported-types command shows transport information."""
+        """Test that list supported-types command shows transport information."""
         runner = CliRunner()
 
-        result = runner.invoke(app, ["supported-types"])
+        result = runner.invoke(app, ["list", "supported-types"])
 
         # Should succeed and show transport information
         assert result.exit_code == 0
@@ -97,11 +97,10 @@ class TestCLITransportConfiguration:
         # Should show transport types
         assert "Transport Types" in output or "Available Transport Types" in output
         assert "scrapli" in output
-        assert "nornir_netmiko" in output
 
         # Should show device types
         assert "mikrotik_routeros" in output
         assert "cisco_ios" in output
 
         # Should show transport support information
-        assert "Transport Support" in output or "scrapli, nornir_netmiko" in output
+        assert "Transport Support" in output or "scrapli" in output

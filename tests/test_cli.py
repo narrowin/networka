@@ -50,9 +50,9 @@ class TestCLI:
 
     @pytest.mark.skip(reason="CLI test has exit code issues, needs investigation")
     def test_list_devices_command(self, config_file: Path) -> None:
-        """Test list-devices command."""
+        """Test list devices command."""
         runner = CliRunner()
-        result = runner.invoke(app, ["list-devices", "--config", str(config_file)])
+        result = runner.invoke(app, ["list", "devices", "--config", str(config_file)])
         assert result.exit_code == 0
         assert "test_device1" in result.output
         assert "test_device2" in result.output
@@ -67,9 +67,9 @@ class TestCLI:
         assert "all_switches" in result.output or "lab_devices" in result.output
 
     def test_list_sequences_command(self, config_file: Path) -> None:
-        """Test list-sequences command."""
+        """Test list sequences command."""
         runner = CliRunner()
-        result = runner.invoke(app, ["list-sequences", "--config", str(config_file)])
+        result = runner.invoke(app, ["list", "sequences", "--config", str(config_file)])
         assert result.exit_code == 0
         # Should show global sequences
         assert "system_info" in result.output
@@ -338,14 +338,16 @@ class TestCLI:
         invalid_config.write_text("invalid: yaml: [")
 
         runner = CliRunner()
-        result = runner.invoke(app, ["list-devices", "--config", str(invalid_config)])
+        result = runner.invoke(
+            app, ["list", "devices", "--config", str(invalid_config)]
+        )
         assert result.exit_code == 1
 
     def test_missing_config_file(self) -> None:
         """Test CLI with missing config file."""
         runner = CliRunner()
         result = runner.invoke(
-            app, ["list-devices", "--config", "/nonexistent/config.yml"]
+            app, ["list", "devices", "--config", "/nonexistent/config.yml"]
         )
         assert result.exit_code == 1
 
@@ -377,7 +379,7 @@ class TestCLI:
         """Test verbose output mode."""
         runner = CliRunner()
         result = runner.invoke(
-            app, ["list-devices", "--config", str(config_file), "--verbose"]
+            app, ["list", "devices", "--config", str(config_file), "--verbose"]
         )
         assert result.exit_code == 0
 

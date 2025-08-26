@@ -12,7 +12,7 @@ class TestTransportConfiguration:
     def test_global_transport_configuration(self):
         """Test global transport configuration."""
         config = NetworkConfig(
-            general=GeneralConfig(default_transport_type="nornir_netmiko"),
+            general=GeneralConfig(default_transport_type="scrapli"),
             devices={
                 "device1": DeviceConfig(
                     host="192.168.1.1", device_type="mikrotik_routeros"
@@ -23,12 +23,12 @@ class TestTransportConfiguration:
 
         # Verify global transport is used when device has no transport_type
         transport = config.get_transport_type("device1")
-        assert transport == "nornir_netmiko"
+        assert transport == "scrapli"
 
     def test_device_level_transport_override(self):
         """Test device level transport override."""
         config = NetworkConfig(
-            general=GeneralConfig(default_transport_type="nornir_netmiko"),
+            general=GeneralConfig(default_transport_type="scrapli"),
             devices={
                 "device1": DeviceConfig(
                     host="192.168.1.1",
@@ -45,14 +45,14 @@ class TestTransportConfiguration:
 
         # Device without explicit transport should use global
         transport2 = config.get_transport_type("device2")
-        assert transport2 == "nornir_netmiko"
+        assert transport2 == "scrapli"
 
     def test_ip_device_transport_configuration(self):
         """Test IP device transport configuration."""
         ip_device = create_ip_device_config(
-            "192.168.1.100", "mikrotik_routeros", transport_type="nornir_netmiko"
+            "192.168.1.100", "mikrotik_routeros", transport_type="scrapli"
         )
-        assert ip_device.transport_type == "nornir_netmiko"
+        assert ip_device.transport_type == "scrapli"
         assert ip_device.device_type == "mikrotik_routeros"
 
     def test_ip_based_config_with_transport(self):
@@ -65,7 +65,7 @@ class TestTransportConfiguration:
             ["192.168.1.101", "192.168.1.102"],
             "cisco_ios",
             base_config,
-            transport_type="nornir_netmiko",
+            transport_type="scrapli",
         )
 
         # Check that IP devices have the specified transport
@@ -73,8 +73,8 @@ class TestTransportConfiguration:
         ip_device_1 = enhanced_config.devices["ip_192_168_1_101"]
         ip_device_2 = enhanced_config.devices["ip_192_168_1_102"]
 
-        assert ip_device_1.transport_type == "nornir_netmiko"
-        assert ip_device_2.transport_type == "nornir_netmiko"
+        assert ip_device_1.transport_type == "scrapli"
+        assert ip_device_2.transport_type == "scrapli"
         assert ip_device_1.device_type == "cisco_ios"
         assert ip_device_2.device_type == "cisco_ios"
 
@@ -93,7 +93,7 @@ class TestTransportConfiguration:
 
         # Global config should override default
         config_global = NetworkConfig(
-            general=GeneralConfig(default_transport_type="nornir_netmiko"),
+            general=GeneralConfig(default_transport_type="scrapli"),
             devices={
                 "device1": DeviceConfig(
                     host="192.168.1.1", device_type="mikrotik_routeros"
@@ -101,11 +101,11 @@ class TestTransportConfiguration:
             },
         )
         transport_global = config_global.get_transport_type("device1")
-        assert transport_global == "nornir_netmiko"
+        assert transport_global == "scrapli"
 
         # Device config should override global
         config_device = NetworkConfig(
-            general=GeneralConfig(default_transport_type="nornir_netmiko"),
+            general=GeneralConfig(default_transport_type="scrapli"),
             devices={
                 "device1": DeviceConfig(
                     host="192.168.1.1",

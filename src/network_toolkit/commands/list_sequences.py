@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 
@@ -18,6 +18,46 @@ from network_toolkit.common.output import (
 from network_toolkit.common.styles import StyleManager, StyleName
 from network_toolkit.config import CommandSequence, load_config
 from network_toolkit.sequence_manager import SequenceManager, SequenceRecord
+
+if TYPE_CHECKING:
+    from network_toolkit.common.command_helpers import CommandContext
+    from network_toolkit.config import NetworkConfig
+
+
+def _list_sequences_impl(
+    config: NetworkConfig,
+    ctx: CommandContext,
+    vendor: str | None,
+    category: str | None,
+    verbose: bool,
+) -> None:
+    """Implementation logic for listing sequences."""
+    sm = SequenceManager(config)
+
+    # Vendor sequences (built-in + repo + user + config)
+    if vendor:
+        vendor_seqs = sm.list_vendor_sequences(vendor)
+        _show_vendor_sequences(
+            vendor, vendor_seqs, category, ctx.style_manager, verbose=verbose
+        )
+    else:
+        all_vendor = sm.list_all_sequences()
+        if all_vendor:
+            _show_all_vendor_sequences(
+                all_vendor, category, ctx.style_manager, verbose=verbose
+            )
+        else:
+            ctx.print_warning("No vendor-specific sequences found.")
+
+    # Show global sequences if they exist
+    if config.global_command_sequences:
+        ctx.output_manager.print_blank_line()
+        _show_global_sequences(
+            config.global_command_sequences,
+            ctx.style_manager,
+            ctx.output_manager,
+            verbose=verbose,
+        )
 
 
 def register(app: typer.Typer) -> None:

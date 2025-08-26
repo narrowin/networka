@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 
@@ -17,6 +17,59 @@ from network_toolkit.common.output import (
 )
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
+
+if TYPE_CHECKING:
+    from network_toolkit.common.command_helpers import CommandContext
+    from network_toolkit.config import NetworkConfig
+
+
+def _list_devices_impl(
+    config: NetworkConfig, ctx: CommandContext, verbose: bool
+) -> None:
+    """Implementation logic for listing devices."""
+    from rich.table import Table
+
+    if ctx.output_manager.mode == ctx.output_manager.mode.RAW:
+        # Raw mode output
+        if not config.devices:
+            return
+
+        for name, device in config.devices.items():
+            tags_str = ",".join(device.tags or []) if device.tags else "none"
+            platform = device.platform or "unknown"
+            print(
+                f"device={name} host={device.host} platform={platform} tags={tags_str}"
+            )
+        return
+
+    # Headline
+    ctx.print_info("Configured Devices")
+    ctx.output_manager.print_blank_line()
+
+    if not config.devices:
+        ctx.print_warning("No devices configured")
+        return
+
+    # Create table with centralized styling
+    table = Table(title="Devices", show_header=True, box=None)
+    table.add_column("Name")
+    table.add_column("Host")
+    table.add_column("Type")
+    table.add_column("Description")
+    table.add_column("Tags")
+
+    for name, device_config in config.devices.items():
+        table.add_row(
+            name,
+            device_config.host,
+            device_config.device_type,
+            device_config.description or "N/A",
+            ", ".join(device_config.tags) if device_config.tags else "None",
+        )
+
+    ctx.output_manager.console.print(table)
+    ctx.output_manager.print_blank_line()
+    ctx.print_info(f"Total devices: {len(config.devices)}")
 
 
 def register(app: typer.Typer) -> None:

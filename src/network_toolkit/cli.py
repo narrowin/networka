@@ -32,9 +32,7 @@ from network_toolkit.commands.firmware_upgrade import (
     register as register_firmware_upgrade,
 )
 from network_toolkit.commands.info import register as register_info
-from network_toolkit.commands.list_devices import register as register_list_devices
-from network_toolkit.commands.list_groups import register as register_list_groups
-from network_toolkit.commands.list_sequences import register as register_list_sequences
+from network_toolkit.commands.list import register as register_list
 from network_toolkit.commands.run import register as register_run
 from network_toolkit.commands.schema import register as register_schema
 from network_toolkit.commands.ssh import register as register_ssh
@@ -88,9 +86,7 @@ class CategorizedHelpGroup(TyperGroup):
         ]
         info_names = [
             "info",
-            "list-devices",
-            "list-groups",
-            "list-sequences",
+            "list",
             "config-init",
             "config-validate",
             "diff",
@@ -263,10 +259,8 @@ def _handle_file_downloads(
 
 # Register all commands with the Typer app
 register_info(app)
+register_list(app)
 register_run(app)
-register_list_devices(app)
-register_list_groups(app)
-register_list_sequences(app)
 register_config_init(app)
 register_config_validate(app)
 register_upload(app)

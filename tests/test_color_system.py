@@ -21,7 +21,7 @@ def test_color_system_no_color_mode() -> None:
 
     with patch("network_toolkit.config.load_config", return_value=mock_config):
         # Test the command works in no-color mode
-        result = runner.invoke(app, ["list-devices", "--output-mode", "no-color"])
+        result = runner.invoke(app, ["list", "devices", "--output-mode", "no-color"])
 
         # Should not crash with color errors
         assert result.exit_code == 0
@@ -44,7 +44,7 @@ def test_color_system_default_mode() -> None:
 
     with patch("network_toolkit.config.load_config", return_value=mock_config):
         # Test the command works in default mode
-        result = runner.invoke(app, ["list-devices"])
+        result = runner.invoke(app, ["list", "devices"])
 
         # Should not crash
         assert result.exit_code == 0

@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 
@@ -18,9 +18,72 @@ from network_toolkit.common.output import (
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 
+if TYPE_CHECKING:
+    from network_toolkit.common.command_helpers import CommandContext
+    from network_toolkit.config import NetworkConfig
+
+
+def _list_groups_impl(
+    config: NetworkConfig, ctx: CommandContext, verbose: bool
+) -> None:
+    """Implementation logic for listing groups."""
+    from rich.table import Table
+
+    if ctx.output_manager.mode == ctx.output_manager.mode.RAW:
+        # Raw mode output
+        if not config.device_groups:
+            return
+
+        for name, group in config.device_groups.items():
+            # Use the proven get_group_members method
+            group_members = config.get_group_members(name)
+
+            members_str = ",".join(group_members) if group_members else "none"
+            tags_str = ",".join(group.match_tags or []) if group.match_tags else "none"
+            description = group.description or ""
+            print(
+                f"group={name} description={description} tags={tags_str} members={members_str}"
+            )
+        return
+
+    # Headline
+    ctx.print_info("Device Groups")
+    ctx.output_manager.print_blank_line()
+
+    if not config.device_groups:
+        ctx.print_warning("No device groups configured")
+        return
+
+    # Create table with centralized styling
+    table = Table(title="Groups", show_header=True, box=None)
+    table.add_column("Group Name")
+    table.add_column("Description")
+    table.add_column("Match Tags")
+    table.add_column("Members")
+
+    for name, group in config.device_groups.items():
+        # Use the proven get_group_members method
+        members = config.get_group_members(name)
+
+        table.add_row(
+            name,
+            group.description,
+            ", ".join(group.match_tags) if group.match_tags else "N/A",
+            ", ".join(members) if members else "None",
+        )
+
+    ctx.output_manager.console.print(table)
+    ctx.output_manager.print_blank_line()
+    ctx.print_info(f"Total groups: {len(config.device_groups)}")
+
+    if verbose:
+        ctx.output_manager.print_blank_line()
+        ctx.print_info("Usage Examples:")
+        for group_name in config.device_groups.keys():
+            ctx.print_info(f"  nw group-run {group_name} health_check")
+
 
 def register(app: typer.Typer) -> None:
-    @app.command("list-groups", rich_help_panel="Info & Configuration")
     def list_groups(
         config_file: Annotated[
             Path, typer.Option("--config", "-c", help="Configuration file path")

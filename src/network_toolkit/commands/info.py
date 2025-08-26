@@ -124,6 +124,7 @@ def register(app: typer.Typer) -> None:
                     _show_sequence_info(target, config, ctx)
                 else:
                     ctx.print_error(f"Unknown target: {target}")
+                    raise typer.Exit(1) from None
 
         except NetworkToolkitError as e:
             ctx.print_error(f"Error: {e.message}")
@@ -134,112 +135,95 @@ def register(app: typer.Typer) -> None:
             ctx.print_error(f"Unexpected error: {e}")
             raise typer.Exit(1) from None
 
-    @app.command("supported-types", rich_help_panel="Info & Configuration")
-    def supported_types(
-        verbose: Annotated[
-            bool, typer.Option("--verbose", "-v", help="Show detailed information")
-        ] = False,
-    ) -> None:
-        """Show supported device types and platform information."""
-        setup_logging("DEBUG" if verbose else "INFO")
 
-        ctx = CommandContext()
+def _show_supported_types_impl(ctx: CommandContext, verbose: bool) -> None:
+    """Implementation logic for showing supported device types."""
+    from rich.table import Table
 
-        from rich.table import Table
+    from network_toolkit.config import get_supported_device_types
+    from network_toolkit.ip_device import (
+        get_supported_device_types as get_device_descriptions,
+    )
+    from network_toolkit.platforms.factory import (
+        get_supported_platforms as get_platform_ops,
+    )
 
-        from network_toolkit.config import get_supported_device_types
-        from network_toolkit.ip_device import (
-            get_supported_device_types as get_device_descriptions,
-        )
-        from network_toolkit.platforms.factory import (
-            get_supported_platforms as get_platform_ops,
-        )
+    # Display available transports first
+    ctx.output_manager.print_text(
+        "[bold blue]Network Toolkit - Transport Types[/bold blue]\\n"
+    )
 
-        # Display available transports first
+    transport_table = Table(title="Available Transport Types")
+    transport_table.add_column("Transport", style="cyan", no_wrap=True)
+    transport_table.add_column("Description", style="white")
+    transport_table.add_column("Device Type Mapping", style="yellow")
+
+    # Add known transports
+    transport_table.add_row(
+        "scrapli",
+        "Async SSH/Telnet library with device-specific drivers",
+        "Direct (uses device_type as-is)",
+    )
+
+    ctx.output_manager.console.print(transport_table)
+    ctx.output_manager.print_blank_line()
+
+    # Display device types
+    ctx.output_manager.print_text("[bold blue]Supported Device Types[/bold blue]\\n")
+
+    # Get all supported device types
+    device_types = get_supported_device_types()
+    device_descriptions = get_device_descriptions()
+    platform_ops = get_platform_ops()
+
+    # Create table
+    table = Table(title="Device Types")
+    table.add_column("Device Type", style="cyan", no_wrap=True)
+    table.add_column("Description", style="white")
+    table.add_column("Platform Ops", style="green")
+    table.add_column("Transport Support", style="magenta")
+
+    for device_type in sorted(device_types):
+        description = device_descriptions.get(device_type, "No description")
+        has_platform_ops = "✓" if device_type in platform_ops else "✗"
+
+        # Show specific supported transports
+        transport_support = "scrapli"
+
+        table.add_row(device_type, description, has_platform_ops, transport_support)
+
+    ctx.output_manager.console.print(table)
+
+    if verbose:
         ctx.output_manager.print_text(
-            "[bold blue]Network Toolkit - Transport Types[/bold blue]\\n"
+            f"\\n[bold]Total device types:[/bold] {len(device_types)}"
         )
-
-        transport_table = Table(title="Available Transport Types")
-        transport_table.add_column("Transport", style="cyan", no_wrap=True)
-        transport_table.add_column("Description", style="white")
-        transport_table.add_column("Device Type Mapping", style="yellow")
-
-        # Add known transports
-        transport_table.add_row(
-            "scrapli",
-            "Async SSH/Telnet library with device-specific drivers",
-            "Direct (uses device_type as-is)",
-        )
-        transport_table.add_row(
-            "nornir_netmiko",
-            "Netmiko library via Nornir framework",
-            "Mapped (device_type → netmiko platform)",
-        )
-
-        ctx.output_manager.console.print(transport_table)
-        ctx.output_manager.print_blank_line()
-
-        # Display device types
         ctx.output_manager.print_text(
-            "[bold blue]Supported Device Types[/bold blue]\\n"
+            f"[bold]With platform operations:[/bold] {len(platform_ops)}"
+        )
+        ctx.output_manager.print_text(
+            "[bold]Available transports:[/bold] scrapli (default)"
         )
 
-        # Get all supported device types
-        device_types = get_supported_device_types()
-        device_descriptions = get_device_descriptions()
-        platform_ops = get_platform_ops()
-
-        # Create table
-        table = Table(title="Device Types")
-        table.add_column("Device Type", style="cyan", no_wrap=True)
-        table.add_column("Description", style="white")
-        table.add_column("Platform Ops", style="green")
-        table.add_column("Transport Support", style="magenta")
-
-        for device_type in sorted(device_types):
-            description = device_descriptions.get(device_type, "No description")
-            has_platform_ops = "✓" if device_type in platform_ops else "✗"
-
-            # Show specific supported transports
-            transport_support = "scrapli, nornir_netmiko"
-
-            table.add_row(device_type, description, has_platform_ops, transport_support)
-
-        ctx.output_manager.console.print(table)
-
-        if verbose:
-            ctx.output_manager.print_text(
-                f"\\n[bold]Total device types:[/bold] {len(device_types)}"
-            )
-            ctx.output_manager.print_text(
-                f"[bold]With platform operations:[/bold] {len(platform_ops)}"
-            )
-            ctx.output_manager.print_text(
-                "[bold]Available transports:[/bold] scrapli (default), nornir_netmiko"
-            )
-
-            # Show usage examples
-            ctx.output_manager.print_text(
-                "\\n[bold yellow]Usage Examples:[/bold yellow]"
-            )
-            ctx.output_manager.print_text("  # Use in device configuration:")
-            ctx.output_manager.print_text("  devices:")
-            ctx.output_manager.print_text("    my_device:")
-            ctx.output_manager.print_text("      host: 192.168.1.1")
-            ctx.output_manager.print_text("      device_type: mikrotik_routeros")
-            ctx.output_manager.print_text(
-                "      transport_type: scrapli  # Optional, defaults to scrapli"
-            )
-            ctx.output_manager.print_text("")
-            ctx.output_manager.print_text("  # Use with IP addresses:")
-            ctx.output_manager.print_text(
-                '  nw run 192.168.1.1 "/system/identity/print" --platform mikrotik_routeros'
-            )
-            ctx.output_manager.print_text("")
-            ctx.output_manager.print_text("  # Transport selection via config:")
-            ctx.output_manager.print_text("  general:")
-            ctx.output_manager.print_text("    default_transport_type: nornir_netmiko")
+        # Show usage examples
+        ctx.output_manager.print_text("\\n[bold yellow]Usage Examples:[/bold yellow]")
+        ctx.output_manager.print_text("  # Use in device configuration:")
+        ctx.output_manager.print_text("  devices:")
+        ctx.output_manager.print_text("    my_device:")
+        ctx.output_manager.print_text("      host: 192.168.1.1")
+        ctx.output_manager.print_text("      device_type: mikrotik_routeros")
+        ctx.output_manager.print_text(
+            "      transport_type: scrapli  # Optional, defaults to scrapli"
+        )
+        ctx.output_manager.print_text("")
+        ctx.output_manager.print_text("  # Use with IP addresses:")
+        ctx.output_manager.print_text(
+            '  nw run 192.168.1.1 "/system/identity/print" --platform mikrotik_routeros'
+        )
+        ctx.output_manager.print_text("")
+        ctx.output_manager.print_text("  # Transport selection via config:")
+        ctx.output_manager.print_text("  general:")
+        ctx.output_manager.print_text("    default_transport_type: scrapli")
 
 
 def _determine_target_type(target: str, config: NetworkConfig) -> str:

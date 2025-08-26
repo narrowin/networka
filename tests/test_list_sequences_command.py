@@ -31,7 +31,8 @@ class TestListSequencesCommand:
             result = runner.invoke(
                 app,
                 [
-                    "list-sequences",
+                    "list",
+                    "sequences",
                     "--config",
                     str(config_file),
                 ],
@@ -58,7 +59,8 @@ class TestListSequencesCommand:
             result = runner.invoke(
                 app,
                 [
-                    "list-sequences",
+                    "list",
+                    "sequences",
                     "--config",
                     str(config_file),
                 ],
@@ -89,7 +91,8 @@ class TestListSequencesCommand:
             result = runner.invoke(
                 app,
                 [
-                    "list-sequences",
+                    "list",
+                    "sequences",
                     "--verbose",  # Correct option name
                     "--config",
                     str(config_file),
@@ -116,7 +119,8 @@ class TestListSequencesCommand:
             result = runner.invoke(
                 app,
                 [
-                    "list-sequences",
+                    "list",
+                    "sequences",
                     "--vendor",
                     "mikrotik_routeros",
                     "--config",
@@ -142,7 +146,8 @@ class TestListSequencesCommand:
             result = runner.invoke(
                 app,
                 [
-                    "list-sequences",
+                    "list",
+                    "sequences",
                     "--config",
                     str(config_file),
                 ],
@@ -167,7 +172,8 @@ class TestListSequencesCommand:
             result = runner.invoke(
                 app,
                 [
-                    "list-sequences",
+                    "list",
+                    "sequences",
                     "--vendor",
                     "mikrotik",
                     "--config",
@@ -200,7 +206,8 @@ class TestListSequencesCommand:
             result = runner.invoke(
                 app,
                 [
-                    "list-sequences",
+                    "list",
+                    "sequences",
                     "--config",
                     str(config_file),
                 ],
@@ -226,7 +233,8 @@ class TestListSequencesCommand:
             result = runner.invoke(
                 app,
                 [
-                    "list-sequences",
+                    "list",
+                    "sequences",
                     "--config",
                     str(config_file),
                 ],
@@ -242,7 +250,8 @@ class TestListSequencesCommand:
         result = runner.invoke(
             app,
             [
-                "list-sequences",
+                "list",
+                "sequences",
                 "--vendor",
                 "invalid_vendor",
                 "--config",
@@ -266,7 +275,8 @@ class TestListSequencesCommand:
             result = runner.invoke(
                 app,
                 [
-                    "list-sequences",
+                    "list",
+                    "sequences",
                     "--config",
                     str(config_file),
                 ],
@@ -291,7 +301,8 @@ class TestListSequencesCommand:
             result = runner.invoke(
                 app,
                 [
-                    "list-sequences",
+                    "list",
+                    "sequences",
                     "--verbose",
                     "--config",
                     str(config_file),
@@ -322,7 +333,8 @@ class TestListSequencesCommand:
             result = runner.invoke(
                 app,
                 [
-                    "list-sequences",
+                    "list",
+                    "sequences",
                     "--config",
                     str(config_file),
                 ],
@@ -350,7 +362,8 @@ class TestListSequencesCommand:
             result = runner.invoke(
                 app,
                 [
-                    "list-sequences",
+                    "list",
+                    "sequences",
                     "--config",
                     str(config_file),
                 ],
@@ -381,7 +394,8 @@ class TestListSequencesCommand:
             result = runner.invoke(
                 app,
                 [
-                    "list-sequences",
+                    "list",
+                    "sequences",
                     "--vendor",
                     "mikrotik",
                     "--config",
@@ -422,7 +436,8 @@ class TestListSequencesCommand:
             result = runner.invoke(
                 app,
                 [
-                    "list-sequences",
+                    "list",
+                    "sequences",
                     "--verbose",
                     "--config",
                     str(config_file),
@@ -443,7 +458,8 @@ class TestListSequencesCommand:
         result = runner.invoke(
             app,
             [
-                "list-sequences",
+                "list",
+                "sequences",
                 "--config",
                 str(invalid_config),
             ],
