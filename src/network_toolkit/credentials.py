@@ -63,14 +63,10 @@ class CredentialResolver:
         device = self.config.devices[device_name]
 
         # Resolve username
-        username = self._resolve_username(
-            device_name, device, username_override
-        )
+        username = self._resolve_username(device_name, device, username_override)
 
         # Resolve password
-        password = self._resolve_password(
-            device_name, device, password_override
-        )
+        password = self._resolve_password(device_name, device, password_override)
 
         return username, password
 
@@ -118,7 +114,9 @@ class CredentialResolver:
             return device.password
 
         # 3. Device-specific environment variable
-        device_env_password = os.getenv(f"NW_PASSWORD_{device_name.upper().replace('-', '_')}")
+        device_env_password = os.getenv(
+            f"NW_PASSWORD_{device_name.upper().replace('-', '_')}"
+        )
         if device_env_password:
             return device_env_password
 
@@ -162,7 +160,9 @@ class EnvironmentCredentialManager:
 
         # Try target-specific credential first
         if target_name:
-            target_env_var = f"NW_{credential_type}_{target_name.upper().replace('-', '_')}"
+            target_env_var = (
+                f"NW_{credential_type}_{target_name.upper().replace('-', '_')}"
+            )
             value = os.getenv(target_env_var)
             if value:
                 return value
@@ -250,7 +250,11 @@ class ConnectionParameterBuilder:
     def _build_base_parameters(
         self, device: DeviceConfig, username: str, password: str
     ) -> dict[str, Any]:
-        """Build base connection parameters."""
+        """Build base connection parameters.
+
+        Uses device_type for Scrapli platform parameter since device_type
+        defines the network driver/protocol, while platform defines hardware architecture.
+        """
         return {
             "host": device.host,
             "auth_username": username,
@@ -259,7 +263,9 @@ class ConnectionParameterBuilder:
             "timeout_socket": self.config.general.timeout,
             "timeout_transport": self.config.general.timeout,
             "transport": self.config.general.transport,
-            "platform": device.platform or "mikrotik_routeros",
+            # Use device_type for Scrapli platform - this determines the network driver
+            # The platform field is reserved for hardware architecture (x86, arm, etc.)
+            "platform": device.device_type,
         }
 
     def _apply_device_overrides(

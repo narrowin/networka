@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 """`nw config-backup` command implementation (device or group).
 
-Runs the configured backup command sequence and optionally downloads artifacts.
+Platform-agnostic backup using vendor-specific implementations.
 """
 
 from __future__ import annotations
@@ -12,9 +12,20 @@ from typing import Annotated, Any, cast
 
 import typer
 
+from network_toolkit.common.command_helpers import CommandContext
+from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
+
+# For backward compatibility with tests
 from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.output import (
+    OutputMode,
+    get_output_manager,
+    get_output_manager_with_config,
+    set_output_mode,
+)
 from network_toolkit.config import DeviceConfig, NetworkConfig, load_config
 from network_toolkit.exceptions import NetworkToolkitError
+from network_toolkit.platforms import UnsupportedOperationError, get_platform_operations
 
 MAX_LIST_PREVIEW = 10
 
@@ -71,17 +82,23 @@ def register(app: typer.Typer) -> None:
         ] = False,
         config_file: Annotated[
             Path, typer.Option("--config", "-c", help="Configuration file path")
-        ] = Path("devices.yml"),
+        ] = DEFAULT_CONFIG_PATH,
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose output")
         ] = False,
     ) -> None:
         """Create device backup and export; optionally download artifacts.
 
-        Runs the 'backup_config' command sequence and downloads files to
-        the configured backup_dir unless disabled.
+        Uses platform-specific implementations to handle vendor differences
+        in backup procedures.
         """
-        setup_logging("DEBUG" if verbose else "INFO")
+        # Create command context with proper styling (respects global config theme)
+        ctx = CommandContext(
+            output_mode=None,  # Use global config theme
+            verbose=verbose,
+            config_file=config_file,
+        )
+
         try:
             config = load_config(config_file)
 
@@ -96,44 +113,58 @@ def register(app: typer.Typer) -> None:
             is_group = target_name in groups
 
             if not (is_device or is_group):
-                console.print(
-                    f"[red]Error: '{target_name}' not found as device or group in "
-                    "configuration[/red]"
+                ctx.output_manager.print_error(
+                    f"'{target_name}' not found as device or group in configuration"
                 )
                 if devices:
                     dev_names = sorted(devices.keys())
                     preview = ", ".join(dev_names[:MAX_LIST_PREVIEW])
                     if len(dev_names) > MAX_LIST_PREVIEW:
                         preview += " ..."
-                    console.print("[yellow]Known devices:[/yellow] " + preview)
+                    ctx.print_info("Known devices: " + preview)
                 if groups:
                     grp_names = sorted(groups.keys())
                     preview = ", ".join(grp_names[:MAX_LIST_PREVIEW])
                     if len(grp_names) > MAX_LIST_PREVIEW:
                         preview += " ..."
-                    console.print("[yellow]Known groups:[/yellow] " + preview)
+                    ctx.print_info("Known groups: " + preview)
                 raise typer.Exit(1)
 
             def process_device(dev: str) -> bool:
-                seq_cmds = _resolve_backup_sequence(config, dev)
-                if not seq_cmds:
-                    console.print(
-                        "[red]Error: backup sequence 'backup_config' not defined "
-                        f"for {dev}[/red]"
-                    )
-                    return False
-
-                console.print(
-                    f"[bold cyan]Creating configuration backup on {dev}[/bold cyan]"
-                )
-                transport_type = config.get_transport_type(dev)
-                console.print(f"[yellow]Transport:[/yellow] {transport_type}")
-
                 try:
                     with device_session(dev, config) as session:
-                        for cmd in seq_cmds:
-                            console.print(f"[cyan]Running:[/cyan] {cmd}")
-                            session.execute_command(cmd)
+                        # Get platform-specific operations
+                        try:
+                            platform_ops = get_platform_operations(session)
+                        except UnsupportedOperationError as e:
+                            ctx.print_error(f"Error on {dev}: {e}")
+                            return False
+
+                        # Resolve backup sequence (device-specific or global)
+                        seq_cmds = _resolve_backup_sequence(config, dev)
+                        if not seq_cmds:
+                            ctx.print_error(
+                                f"backup sequence 'backup_config' not defined for {dev}"
+                            )
+                            return False
+
+                        ctx.output_manager.print_text(
+                            f"[bold cyan]Creating configuration backup on {dev}[/bold cyan]"
+                        )
+                        transport_type = config.get_transport_type(dev)
+                        platform_name = platform_ops.get_platform_name()
+                        ctx.print_info(f"Platform: {platform_name}")
+                        ctx.print_info(f"Transport: {transport_type}")
+
+                        # Use platform-specific backup creation
+                        backup_success = platform_ops.create_backup(
+                            backup_sequence=seq_cmds,
+                            download_files=None,  # Will handle downloads separately
+                        )
+
+                        if not backup_success:
+                            ctx.print_error(f"Backup creation failed on {dev}")
+                            return False
 
                         if download:
                             downloads: list[dict[str, Any]] = [
@@ -158,19 +189,21 @@ def register(app: typer.Typer) -> None:
                             )
                         return True
                 except NetworkToolkitError as e:
-                    console.print(f"[red]Error on {dev}: {e.message}[/red]")
+                    ctx.print_error(f"Error on {dev}: {e.message}")
                     if verbose and e.details:
-                        console.print(f"[red]Details: {e.details}[/red]")
+                        ctx.print_error(f"Details: {e.details}")
                     return False
                 except Exception as e:  # pragma: no cover - unexpected
-                    console.print(f"[red]Unexpected error on {dev}: {e}[/red]")
+                    ctx.print_error(f"Unexpected error on {dev}: {e}")
                     return False
 
             if is_device:
                 ok = process_device(target_name)
                 if not ok:
                     raise typer.Exit(1)
-                console.print("[bold green]Backup completed[/bold green]")
+                ctx.output_manager.print_text(
+                    "[bold green]Backup completed[/bold green]"
+                )
                 return
 
             # Group path
@@ -183,13 +216,11 @@ def register(app: typer.Typer) -> None:
                     members = grp.members or []
 
             if not members:
-                console.print(
-                    f"[red]Error: No devices found in group '{target_name}'[/red]",
-                )
+                ctx.print_error(f"No devices found in group '{target_name}'")
                 raise typer.Exit(1)
 
-            console.print(
-                "[bold cyan]Starting backups for group:[/bold cyan] " + target_name
+            ctx.output_manager.print_text(
+                f"[bold cyan]Starting backups for group:[/bold cyan] {target_name}"
             )
             failures = 0
             for dev in members:
@@ -197,23 +228,16 @@ def register(app: typer.Typer) -> None:
                 failures += 0 if ok else 1
 
             total = len(members)
-            console.print(
-                (
-                    f"[bold]Completed:[/bold] {total - failures}/{total} "
-                    "successful backups"
-                ),
+            ctx.output_manager.print_text(
+                f"[bold]Completed:[/bold] {total - failures}/{total} successful backups"
             )
             if failures:
                 raise typer.Exit(1)
 
         except NetworkToolkitError as e:
-            console.print(f"[red]Error: {e.message}[/red]")
-            if verbose and e.details:
-                console.print(f"[red]Details: {e.details}[/red]")
-            raise typer.Exit(1) from None
+            ctx.handle_error(e)
         except Exception as e:  # pragma: no cover - unexpected
-            console.print(f"[red]Unexpected error: {e}[/red]")
-            raise typer.Exit(1) from None
+            ctx.handle_error(e)
 
     # Register the default hyphenated command
     @app.command(rich_help_panel="Executing Operations", name="config-backup")
@@ -243,7 +267,7 @@ def register(app: typer.Typer) -> None:
         ] = False,
         config_file: Annotated[
             Path, typer.Option("--config", "-c", help="Configuration file path")
-        ] = Path("devices.yml"),
+        ] = DEFAULT_CONFIG_PATH,
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose output")
         ] = False,
@@ -284,7 +308,7 @@ def register(app: typer.Typer) -> None:
         ] = False,
         config_file: Annotated[
             Path, typer.Option("--config", "-c", help="Configuration file path")
-        ] = Path("devices.yml"),
+        ] = DEFAULT_CONFIG_PATH,
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose output")
         ] = False,

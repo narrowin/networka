@@ -10,35 +10,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- 
+
+-
 
 ### Changed
-- 
+
+-
 
 ### Fixed
-- 
 
+-
 
 ## [0.1.2] - 2025-08-15
 
 ### Added
-- 
+
+-
 
 ### Changed
-- 
+
+-
 
 ### Fixed
-- 
 
+-
 
 ### Changed
-- Renamed project from "netkit" to "net-worker"
+
+- Renamed project from "netkit" to "networka"
 - Changed CLI command from "netkit" to "nw"
 - Updated all documentation and examples to use new command name
-- Maintained backward compatibility for environment variables (NETKIT_*)
+- Maintained backward compatibility for environment variables (NETKIT\_\*)
 - Maintained backward compatibility for config directory (~/.config/netkit/)
 
 ### Added
+
 - Professional CI/CD pipeline with multi-platform testing (Linux, Windows, macOS)
 - Automated PyPI publishing with trusted publishing
 - Comprehensive security scanning and quality checks
@@ -53,8 +59,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Global `--version` flag to display version information
 - CLI now properly handles top-level flags without requiring a subcommand
 
-
 ### Technical
+
 - Enhanced pyproject.toml with modern Python packaging standards
 - Multi-platform test matrix (Python 3.11, 3.12, 3.13)
 - Security scanning with TruffleHog and Bandit
@@ -62,4 +68,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Proper artifact management and retention policies
 
 ### Fixed
+
 - GitHub Actions CI test failure for version command support

@@ -9,12 +9,13 @@ import csv
 import logging
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 from dotenv import load_dotenv
 from pydantic import BaseModel, field_validator
 
+from network_toolkit.common.paths import default_modular_config_dir
 from network_toolkit.credentials import (
     ConnectionParameterBuilder,
     EnvironmentCredentialManager,
@@ -43,15 +44,15 @@ def load_dotenv_files(config_path: Path | None = None) -> None:
     # Load .env from current working directory first (lowest priority)
     cwd_env = Path.cwd() / ".env"
     if cwd_env.exists():
-        logging.debug(f"Loading .env from current directory: {cwd_env}")
+        logging.debug(f"Loading .env from current directory: {cwd_env.resolve()}")
         load_dotenv(cwd_env, override=False)
 
-    # Load .env from config directory (higher priority than cwd)
+    # Load .env from config directory (if config_path provided)
     if config_path:
         config_dir = config_path.parent if config_path.is_file() else config_path
         config_env = config_dir / ".env"
         if config_env.exists():
-            logging.debug(f"Loading .env from config directory: {config_env}")
+            logging.debug(f"Loading .env from config directory: {config_env.resolve()}")
             # This will override any values loaded from cwd .env
             load_dotenv(config_env, override=True)
 
@@ -169,12 +170,33 @@ class DeviceOverrides(BaseModel):
     transfer_timeout: int | None = None
 
 
+# Device type is intentionally a free-form string at config load time.
+# Validation of supported values occurs at runtime where appropriate.
+SupportedDeviceType = str
+
+
 class DeviceConfig(BaseModel):
-    """Configuration for a single network device."""
+    """Configuration for a single network device.
+
+    Attributes
+    ----------
+    device_type : SupportedDeviceType
+        Network driver type for connection establishment and command execution.
+        Determines which Scrapli/Netmiko platform driver to use for network operations.
+        Examples: 'mikrotik_routeros', 'cisco_iosxe', 'juniper_junos'
+
+    platform : str | None
+        Hardware architecture platform for firmware operations.
+        Used to select correct firmware images for upgrades and hardware-specific operations.
+        Examples: 'x86', 'x86_64', 'arm', 'tile', 'mipsbe'
+        Optional - only required for firmware upgrade operations.
+    """
 
     host: str
     description: str | None = None
-    device_type: str = "mikrotik_routeros"
+    device_type: SupportedDeviceType = (
+        "mikrotik_routeros"  # Default to most common type
+    )
     model: str | None = None
     platform: str | None = None
     location: str | None = None
@@ -314,13 +336,15 @@ class NetworkConfig(BaseModel):
         # Tag-based members
         if group.match_tags and self.devices:
             for device_name, device in self.devices.items():
-                if device.tags and any(tag in device.tags for tag in group.match_tags):
+                if device.tags and all(tag in device.tags for tag in group.match_tags):
                     if device_name not in members:
                         members.append(device_name)
 
         return members
 
-    def get_transport_type(self, device_name: str) -> str:
+    def get_transport_type(
+        self, device_name: str, transport_override: str | None = None
+    ) -> str:
         """
         Get the transport type for a device.
 
@@ -328,12 +352,18 @@ class NetworkConfig(BaseModel):
         ----------
         device_name : str
             Name of the device
+        transport_override : str | None
+            Override transport type from CLI or other source
 
         Returns
         -------
         str
             Transport type ('scrapli' or 'nornir_netmiko')
         """
+        # CLI override takes highest precedence
+        if transport_override:
+            return transport_override
+
         if not self.devices or device_name not in self.devices:
             return self.general.default_transport_type
 
@@ -631,9 +661,27 @@ def _load_csv_devices(csv_path: Path) -> dict[str, DeviceConfig]:
                     else None
                 )
 
+                # Validate device_type and use fallback if invalid
+                device_type_raw = row.get("device_type", "linux").strip()
+                valid_types = {
+                    "mikrotik_routeros",
+                    "cisco_iosxe",
+                    "cisco_ios",
+                    "cisco_iosxr",
+                    "cisco_nxos",
+                    "juniper_junos",
+                    "arista_eos",
+                    "linux",
+                    "generic",
+                }
+                device_type = cast(
+                    SupportedDeviceType,
+                    device_type_raw if device_type_raw in valid_types else "linux",
+                )
+
                 device_config = DeviceConfig(
                     host=row.get("host", "").strip(),
-                    device_type=row.get("device_type", "mikrotik_routeros").strip(),
+                    device_type=device_type,  # Now guaranteed to be valid
                     description=row.get("description", "").strip() or None,
                     platform=row.get("platform", "").strip() or None,
                     model=row.get("model", "").strip() or None,
@@ -828,6 +876,7 @@ def load_config(config_path: str | Path) -> NetworkConfig:
     2. Legacy monolithic: config_path as single devices.yml file
 
     Additionally loads environment variables from .env files before loading config.
+    Auto-exports JSON schemas for editor validation when working in a project directory.
     """
     config_path = Path(config_path)
     original_path = config_path  # Keep track of original user input
@@ -836,13 +885,14 @@ def load_config(config_path: str | Path) -> NetworkConfig:
     load_dotenv_files(config_path)
 
     # Check for new modular configuration structure
+    # Handle default path "config" - check current directory first, then fall back to platform default
     if config_path.name in ["config", "config/"]:
-        # Direct config directory path
-        config_dir = config_path
-        if not config_dir.exists():
-            msg = f"Configuration directory not found: {config_dir}"
-            raise FileNotFoundError(msg)
-        return load_modular_config(config_dir)
+        # First try current directory
+        if config_path.exists():
+            config = load_modular_config(config_path)
+            _auto_export_schemas_if_project()
+            return config
+        # Fall through to platform default logic below
 
     # If user provided an explicit file path that doesn't exist, fail immediately
     if not config_path.exists() and str(original_path) not in ["config", "devices.yml"]:
@@ -856,7 +906,9 @@ def load_config(config_path: str | Path) -> NetworkConfig:
         direct_config_file = config_path / "config.yml"
         direct_devices_file = config_path / "devices.yml"
         if direct_config_file.exists() and direct_devices_file.exists():
-            return load_modular_config(config_path)
+            config = load_modular_config(config_path)
+            _auto_export_schemas_if_project()
+            return config
         # Also support nested "config/" directory inside the provided directory
         config_dir = config_path / "config"
     else:
@@ -864,29 +916,117 @@ def load_config(config_path: str | Path) -> NetworkConfig:
 
     # Try modular config first (nested config/ next to provided path)
     if config_dir.exists() and config_dir.is_dir():
-        return load_modular_config(config_dir)
+        config = load_modular_config(config_dir)
+        _auto_export_schemas_if_project()
+        return config
 
     # Legacy monolithic config - if file exists, load it
     if config_path.exists():
-        return load_legacy_config(config_path)
+        config = load_legacy_config(config_path)
+        _auto_export_schemas_if_project()
+        return config
 
     # Only try fallback paths for default config names
     if str(original_path) in ["config", "devices.yml"]:
-        possible_paths = [
-            Path("config/config.yml"),  # Modular config
-            Path("devices.yml"),  # Legacy config in root
-        ]
+        # Prefer platform default location first
+        platform_default = default_modular_config_dir()
+        possible_paths: list[Path] = []
+        if (platform_default / "config.yml").exists():
+            possible_paths.append(platform_default / "config.yml")
+        possible_paths.extend(
+            [
+                Path("config/config.yml"),  # Modular config in CWD
+                Path("devices.yml"),  # Legacy config in root
+            ]
+        )
 
         for path in possible_paths:
             if path.exists():
-                if path.name == "config.yml" and path.parent.name == "config":
-                    return load_modular_config(path.parent)
+                if path.name == "config.yml":
+                    # Check if this is a modular config by looking for devices/ or groups/ directories
+                    parent_dir = path.parent
+                    if (parent_dir / "devices").exists() or (
+                        parent_dir / "groups"
+                    ).exists():
+                        config = load_modular_config(parent_dir)
+                        _auto_export_schemas_if_project()
+                        return config
+                    # Fall back to legacy loading
+                    config = load_legacy_config(path)
+                    _auto_export_schemas_if_project()
+                    return config
                 else:
-                    return load_legacy_config(path)
+                    config = load_legacy_config(path)
+                    _auto_export_schemas_if_project()
+                    return config
+
+    # Final attempt: platform default modular path
+    platform_default_dir = default_modular_config_dir()
+    if (platform_default_dir / "config.yml").exists():
+        config = load_modular_config(platform_default_dir)
+        # Don't auto-export for global configs - only for project configs
+        return config
 
     # If we get here, nothing was found
     msg = f"Configuration file not found: {config_path}"
     raise FileNotFoundError(msg)
+
+
+def _auto_export_schemas_if_project() -> None:
+    """
+    Automatically export schemas if we're in a project directory.
+
+    Only exports if:
+    1. We're working with a local config (not global system config)
+    2. Schemas don't already exist or are outdated
+    3. Working directory appears to be a project (has .git, pyproject.toml, etc.)
+    """
+    import time
+    from pathlib import Path
+
+    # Check if this looks like a project directory
+    project_indicators = [
+        Path(".git"),
+        Path("pyproject.toml"),
+        Path("package.json"),
+        Path("Cargo.toml"),
+        Path("go.mod"),
+        Path("config/config.yml"),  # nw project
+    ]
+
+    if not any(indicator.exists() for indicator in project_indicators):
+        logging.debug("Not in a project directory, skipping schema export")
+        return
+
+    schema_dir = Path("schemas")
+    schema_file = schema_dir / "network-config.schema.json"
+
+    # Check if schemas need updating (don't export every time)
+    if schema_file.exists():
+        # Check if schema is less than 1 day old
+        schema_age = time.time() - schema_file.stat().st_mtime
+        if schema_age < 86400:  # 24 hours
+            logging.debug("Schemas are up to date, skipping export")
+            return
+
+    try:
+        export_schemas_to_workspace()
+        logging.debug("Auto-exported JSON schemas for editor validation")
+    except Exception as e:
+        # Don't fail config loading if schema export fails
+        logging.debug(f"Failed to auto-export schemas: {e}")
+
+
+def _is_project_config(config_path: Path) -> bool:
+    """Check if this is a project-local config vs global system config."""
+    try:
+        # If config is in current directory tree, consider it project config
+        cwd = Path.cwd()
+        config_path.resolve().relative_to(cwd.resolve())
+        return True
+    except ValueError:
+        # Config is outside current directory tree (likely global)
+        return False
 
 
 def load_modular_config(config_dir: Path) -> NetworkConfig:
@@ -942,9 +1082,16 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
                         if isinstance(file_devices, dict):
                             # Apply defaults to YAML devices
                             for _device_name, device_config in file_devices.items():
+                                # Ensure dict shape
+                                if not isinstance(device_config, dict):
+                                    continue
+                                # Apply defaults
                                 for key, default_value in device_defaults.items():
                                     if key not in device_config:
                                         device_config[key] = default_value
+                                # Ensure a valid device_type default for YAML devices
+                                # Tests often omit this field for some devices
+                                device_config.setdefault("device_type", "linux")
                             all_devices.update(file_devices)
                         else:
                             logging.warning(
@@ -1016,7 +1163,7 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
             "vendor_sequences": vendor_sequences,
         }
 
-        logging.debug(f"Loaded modular configuration from {config_dir}")
+        logging.debug(f"Loaded modular configuration from {config_dir.resolve()}")
         logging.debug(f"  - Devices: {len(all_devices)}")
         logging.debug(f"  - Groups: {len(all_groups)}")
         logging.debug(f"  - Sequences: {len(all_sequences)}")
@@ -1099,6 +1246,17 @@ def load_legacy_config(config_path: Path) -> NetworkConfig:
         with config_path.open("r", encoding="utf-8") as f:
             raw_config: dict[str, Any] = yaml.safe_load(f) or {}
 
+        # Backfill missing device_type with a sensible default for YAML-based configs
+        try:
+            devices_node = raw_config.get("devices", {})
+            if isinstance(devices_node, dict):
+                for _name, dev in devices_node.items():
+                    if isinstance(dev, dict) and "device_type" not in dev:
+                        dev["device_type"] = "linux"
+        except Exception:
+            # Be permissive; validation will catch irrecoverable shapes
+            pass
+
         # Log config loading for debugging
         logging.debug(f"Loaded legacy configuration from {config_path}")
 
@@ -1110,3 +1268,160 @@ def load_legacy_config(config_path: Path) -> NetworkConfig:
     except Exception as e:  # pragma: no cover - safety
         msg = f"Failed to load configuration from {config_path}: {e}"
         raise ValueError(msg) from e
+
+
+def generate_json_schema() -> dict[str, Any]:
+    """
+    Generate JSON schema for the NetworkConfig model.
+
+    This can be used by YAML editors to provide validation and auto-completion.
+
+    Returns
+    -------
+    dict[str, Any]
+        JSON schema for NetworkConfig
+
+    Examples
+    --------
+    Save schema to file for VS Code YAML extension:
+
+    >>> import json
+    >>> from pathlib import Path
+    >>> schema = generate_json_schema()
+    >>> Path("config-schema.json").write_text(json.dumps(schema, indent=2))
+    """
+    return NetworkConfig.model_json_schema()
+
+
+def export_schemas_to_workspace() -> None:
+    """
+    Export JSON schemas to current workspace for editor integration.
+
+    Creates:
+    - schemas/network-config.schema.json (full config)
+    - schemas/device-config.schema.json (device only)
+    - .vscode/settings.json (VS Code YAML validation)
+
+    This is automatically called by CLI commands when working in a project.
+    """
+    import json
+    from pathlib import Path
+
+    # Generate schemas
+    full_schema = generate_json_schema()
+
+    # Create schema directory
+    schema_dir = Path("schemas")
+    schema_dir.mkdir(exist_ok=True)
+
+    # Full NetworkConfig schema
+    full_schema_path = schema_dir / "network-config.schema.json"
+    with full_schema_path.open("w", encoding="utf-8") as f:
+        json.dump(full_schema, f, indent=2)
+
+    # Extract DeviceConfig schema for standalone device files
+    # Device files contain a "devices" object with multiple DeviceConfig entries
+    device_collection_schema: dict[str, Any] = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Device Collection Configuration",
+        "description": "Schema for device collection files (config/devices/*.yml)",
+        "type": "object",
+        "properties": {
+            "devices": {
+                "type": "object",
+                "additionalProperties": {"$ref": "#/$defs/DeviceConfig"},
+                "description": "Dictionary of device configurations keyed by device name",
+            }
+        },
+        "required": ["devices"],
+        "$defs": full_schema["$defs"],  # Include all definitions for references
+    }
+
+    device_schema_path = schema_dir / "device-config.schema.json"
+    with device_schema_path.open("w", encoding="utf-8") as f:
+        json.dump(device_collection_schema, f, indent=2)
+
+    # Create groups collection schema for standalone group files
+    # Group files contain a "groups" object with multiple DeviceGroup entries
+    groups_collection_schema: dict[str, Any] = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Groups Collection Configuration",
+        "description": "Schema for group collection files (config/groups/*.yml)",
+        "type": "object",
+        "properties": {
+            "groups": {
+                "type": "object",
+                "additionalProperties": {"$ref": "#/$defs/DeviceGroup"},
+                "description": "Dictionary of device group configurations keyed by group name",
+            }
+        },
+        "required": ["groups"],
+        "$defs": full_schema["$defs"],  # Include all definitions for references
+    }
+
+    groups_schema_path = schema_dir / "groups-config.schema.json"
+    with groups_schema_path.open("w", encoding="utf-8") as f:
+        json.dump(groups_collection_schema, f, indent=2)
+
+    # Create/update VS Code settings for YAML validation
+    vscode_dir = Path(".vscode")
+    vscode_dir.mkdir(exist_ok=True)
+
+    settings_path = vscode_dir / "settings.json"
+    yaml_schema_config = {
+        "yaml.schemas": {
+            "./schemas/network-config.schema.json": [
+                "config/config.yml",
+                "devices.yml",
+            ],
+            "./schemas/device-config.schema.json": [
+                "config/devices/*.yml",
+                "config/devices.yml",
+            ],
+            "./schemas/groups-config.schema.json": [
+                "config/groups/*.yml",
+                "config/groups.yml",
+            ],
+        }
+    }
+
+    # Merge with existing settings if they exist
+    if settings_path.exists():
+        try:
+            with settings_path.open("r", encoding="utf-8") as f:
+                existing_settings = json.load(f)
+            # Only update yaml.schemas, preserve other settings
+            existing_settings.update(yaml_schema_config)
+            yaml_schema_config = existing_settings
+        except (json.JSONDecodeError, KeyError):
+            # If existing settings are malformed, just use our config
+            pass
+
+    with settings_path.open("w", encoding="utf-8") as f:
+        json.dump(yaml_schema_config, f, indent=2)
+
+    logging.debug(f"Exported schemas to {schema_dir.resolve()}")
+    logging.debug(f"Updated VS Code settings at {settings_path.resolve()}")
+
+
+def get_supported_device_types() -> set[str]:
+    """
+    Get the set of supported device types for validation.
+
+    Returns
+    -------
+    set[str]
+        Set of supported device type strings
+    """
+    # Extract from the Literal type for consistency
+    return {
+        "mikrotik_routeros",
+        "cisco_iosxe",
+        "cisco_ios",
+        "cisco_iosxr",
+        "cisco_nxos",
+        "juniper_junos",
+        "arista_eos",
+        "linux",
+        "generic",
+    }

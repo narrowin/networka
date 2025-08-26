@@ -213,9 +213,9 @@ class TestModuleStructure:
         if config_dir.exists():
             # Check main config file
             main_config = config_dir / "config.yml"
-            assert (
-                main_config.exists()
-            ), f"Required config file not found: {main_config}"
+            assert main_config.exists(), (
+                f"Required config file not found: {main_config}"
+            )
 
             # Check that subdirectories exist (they may be empty but should exist)
             subdirs = ["devices", "groups", "sequences", "examples"]

@@ -1,6 +1,9 @@
-# Network Worker (nw) - LLM Development Guide
+# Networka (nw) - LLM Development Guide
+
+NO MATTER WHAT RUN THE TESTS DIRECTLY THROUGH VS CODE TEST FEATURE, NOT TERMINAL!!!
 
 ## CRITICAL PRINCIPLES
+
 1. **KISS (Keep It Simple, Stupid)** - Simplicity and clarity above all
 2. **No backward compatibility concerns** - Project has no users yet
 3. **Production-ready code** - Not a prototype
@@ -8,6 +11,7 @@
 5. **Test via VS Code test feature**, not terminal
 
 ## PROJECT CONTEXT
+
 - **Purpose**: Async Python CLI for MikroTik RouterOS automation
 - **Stack**: Python 3.11+, Typer, Scrapli, Pydantic v2, uv package manager
 - **Testing**: pytest with async support, VS Code integration
@@ -16,6 +20,7 @@
 ## CODE STANDARDS
 
 ### Required Patterns
+
 ```python
 # Type hints everywhere
 async def execute_command(device: str, command: str) -> CommandResult:
@@ -40,6 +45,7 @@ class DeviceConfig(BaseModel):
 ```
 
 ### Project Structure
+
 ```
 network_toolkit/
 ├── cli.py           # Typer CLI commands
@@ -54,6 +60,7 @@ tests/
 ```
 
 ## EXCEPTION HIERARCHY
+
 ```
 NetworkToolkitError (base)
 ├── ConfigurationError
@@ -65,12 +72,14 @@ NetworkToolkitError (base)
 ```
 
 ## SECURITY PATTERNS
+
 - Credentials via environment variables only:
   - `NW_USER_DEFAULT` / `NW_PASSWORD_DEFAULT` (defaults)
   - `NW_{DEVICE}_USER` / `NW_{DEVICE}_PASSWORD` (overrides)
 - No hardcoded credentials ever
 
 ## TESTING REQUIREMENTS
+
 ```python
 @pytest.mark.asyncio
 async def test_feature(mock_config):
@@ -80,6 +89,7 @@ async def test_feature(mock_config):
 ```
 
 ## CLI COMMAND TEMPLATE
+
 ```python
 @app.command()
 def command_name(
@@ -100,12 +110,14 @@ def command_name(
 ```
 
 ## MIKROTIK SPECIFICS
+
 - Command format: `/system/identity/print`
 - Handle v6 vs v7 syntax differences
 - Account for device resource limitations
 - Proper timeout handling for slow devices
 
 ## KEY LIBRARIES
+
 - **CLI**: Typer with Rich output
 - **Network**: Scrapli (AsyncScrapli for async)
 - **Validation**: Pydantic v2

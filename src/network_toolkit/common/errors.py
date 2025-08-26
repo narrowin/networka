@@ -9,6 +9,9 @@ from typing import Any
 
 from rich.console import Console
 
+from network_toolkit.common.styles import StyleManager, StyleName
+from network_toolkit.common.output import OutputMode
+
 
 def format_error_message(
     error: str, details: dict[str, Any] | None = None, context: str | None = None
@@ -64,7 +67,10 @@ def print_error(
         If provided, will exit with this code
     """
     message = format_error_message(error, details, context)
-    console.print(f"[red]Error: {message}[/red]")
+    # Use default theme for error display in legacy functions
+    style_manager = StyleManager(mode=OutputMode.DEFAULT)
+    styled_message = style_manager.format_message(f"Error: {message}", StyleName.ERROR)
+    console.print(styled_message)
 
     if exit_code is not None:
         raise SystemExit(exit_code)
@@ -90,7 +96,12 @@ def print_warning(
         Optional context (device name, command, etc.)
     """
     message = format_error_message(warning, details, context)
-    console.print(f"[yellow]Warning: {message}[/yellow]")
+    # Use default theme for warning display in legacy functions
+    style_manager = StyleManager(mode=OutputMode.DEFAULT)
+    styled_message = style_manager.format_message(
+        f"Warning: {message}", StyleName.WARNING
+    )
+    console.print(styled_message)
 
 
 def print_success(
@@ -113,4 +124,7 @@ def print_success(
         Optional context (device name, command, etc.)
     """
     formatted = format_error_message(message, details, context)
-    console.print(f"[green]{formatted}[/green]")
+    # Use default theme for success display in legacy functions
+    style_manager = StyleManager(mode=OutputMode.DEFAULT)
+    styled_message = style_manager.format_message(formatted, StyleName.SUCCESS)
+    console.print(styled_message)

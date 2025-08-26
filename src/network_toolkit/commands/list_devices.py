@@ -7,9 +7,9 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from rich.table import Table
 
-from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
+from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import (
     OutputMode,
     get_output_manager,
@@ -22,9 +22,9 @@ from network_toolkit.exceptions import NetworkToolkitError
 def register(app: typer.Typer) -> None:
     @app.command("list-devices", rich_help_panel="Info & Configuration")
     def list_devices(
-        config_file: Annotated[Path, typer.Option("--config", "-c", help="Configuration file path")] = Path(
-            "devices.yml"
-        ),
+        config_file: Annotated[
+            Path, typer.Option("--config", "-c", help="Configuration file path")
+        ] = DEFAULT_CONFIG_PATH,
         output_mode: Annotated[
             OutputMode | None,
             typer.Option(
@@ -34,10 +34,14 @@ def register(app: typer.Typer) -> None:
                 show_default=False,
             ),
         ] = None,
-        verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose logging")] = False,
+        verbose: Annotated[
+            bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
+        ] = False,
     ) -> None:
         """List all configured network devices."""
         setup_logging("DEBUG" if verbose else "INFO")
+
+        output_manager = None
         try:
             config = load_config(config_file)
 
@@ -49,7 +53,9 @@ def register(app: typer.Typer) -> None:
                 # Use config-based output mode
                 from network_toolkit.common.output import get_output_manager_with_config
 
-                output_manager = get_output_manager_with_config(config.general.output_mode)
+                output_manager = get_output_manager_with_config(
+                    config.general.output_mode
+                )
 
             if output_manager.mode == OutputMode.RAW:
                 # Raw mode output
@@ -59,25 +65,28 @@ def register(app: typer.Typer) -> None:
                 for name, device in config.devices.items():
                     tags_str = ",".join(device.tags or []) if device.tags else "none"
                     platform = device.platform or "unknown"
-                    print(f"device={name} host={device.host} platform={platform} tags={tags_str}")
+                    print(
+                        f"device={name} host={device.host} platform={platform} tags={tags_str}"
+                    )
                 return
 
-            # Get the themed console from output manager
-            themed_console = output_manager.console
-
-            themed_console.print("[bold]Configured Devices[/bold]")
-            themed_console.print()
+            # Headline
+            output_manager.print_info("Configured Devices")
+            output_manager.print_blank_line()
 
             if not config.devices:
-                themed_console.print("[warning]No devices configured[/warning]")
+                output_manager.print_warning("No devices configured")
                 return
 
-            table = Table()
-            table.add_column("Name", style="device")  # Use theme color
-            table.add_column("Host", style="output")  # Use theme color
-            table.add_column("Type", style="command")  # Use theme color
-            table.add_column("Description", style="output")  # Use theme color
-            table.add_column("Tags", style="success")  # Use theme color
+            # Create table with centralized styling
+            table = output_manager.create_table(
+                title="Devices", show_header=True, box=None
+            )
+            table.add_column("Name")
+            table.add_column("Host")
+            table.add_column("Type")
+            table.add_column("Description")
+            table.add_column("Tags")
 
             for name, device_config in config.devices.items():
                 table.add_row(
@@ -88,14 +97,21 @@ def register(app: typer.Typer) -> None:
                     ", ".join(device_config.tags) if device_config.tags else "None",
                 )
 
-            themed_console.print(table)
-            themed_console.print(f"\n[bold]Total devices: {len(config.devices)}[/bold]")
+            output_manager.print_table(table)
+            output_manager.print_blank_line()
+            output_manager.print_info(f"Total devices: {len(config.devices)}")
 
         except NetworkToolkitError as e:
+            # Initialize output_manager if not already set
+            if output_manager is None:
+                output_manager = get_output_manager()
             output_manager.print_error(f"Error: {e.message}")
             if verbose and e.details:
                 output_manager.print_error(f"Details: {e.details}")
             raise typer.Exit(1) from None
-        except Exception as e:
+        except Exception as e:  # pragma: no cover - unexpected
+            # Initialize output_manager if not already set
+            if output_manager is None:
+                output_manager = get_output_manager()
             output_manager.print_error(f"Unexpected error: {e}")
             raise typer.Exit(1) from None

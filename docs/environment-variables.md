@@ -1,12 +1,13 @@
 # Environment Variable Configuration
 
-This document describes how to set up secure credential management using environment variables for the Network Worker.
+This document describes how to set up secure credential management using environment variables for the Networka.
 
 ## Overview
 
 For security best practices, all device credentials have been moved from the `devices.yml` configuration file to environment variables. This prevents sensitive information from being stored in version control.
 
-The Network Worker now supports multiple levels of credential management:
+The Networka now supports multiple levels of credential management:
+
 - **Device-specific credentials** - For individual devices
 - **Group-level credentials** - For entire device groups
 - **Default credentials** - Fallback for all devices
@@ -25,12 +26,14 @@ export NW_PASSWORD_DEFAULT=your_secure_password_here
 ### Device-Specific Credentials (Optional)
 
 You can override credentials for specific devices using the pattern:
+
 - `NW_USER_DEVICENAME` - Username for the specific device
 - `NW_PASSWORD_DEVICENAME` - Password for the specific device
 
 Device names should match those in `devices.yml` and will be automatically converted to uppercase with hyphens replaced by underscores.
 
 Examples:
+
 ```bash
 # For device 'sw-acc1' in devices.yml
 export NW_USER_SW_ACC1=admin
@@ -48,6 +51,7 @@ export NW_PASSWORD_SW_DIST1=distribution_password
 ### Group-Level Credentials (New Feature)
 
 You can set credentials for entire device groups using the pattern:
+
 - `NW_USER_GROUPNAME` - Username for all devices in the group
 - `NW_PASSWORD_GROUPNAME` - Password for all devices in the group
 
@@ -70,11 +74,13 @@ export NW_PASSWORD_CRITICAL_INFRASTRUCTURE=critical_systems_password
 The Network Toolkit automatically loads environment variables from `.env` files, making credential management simple and secure.
 
 1. Copy the example environment file:
+
    ```bash
    cp .env.example .env
    ```
 
 2. Edit `.env` with your actual credentials:
+
    ```bash
    nano .env
    ```
@@ -93,6 +99,7 @@ The toolkit automatically looks for `.env` files in the following order (highest
 3. **Current Working Directory** (Lowest priority) - `.env` file in your current directory
 
 This allows for flexible credential management:
+
 - Place `.env` in your project/config directory for project-specific credentials
 - Place `.env` in your working directory for global defaults
 - Use shell environment variables for runtime overrides
@@ -100,6 +107,7 @@ This allows for flexible credential management:
 ### Option 2: Export in Shell
 
 Add to your `~/.bashrc` or `~/.zshrc`:
+
 ```bash
 # Network Toolkit Credentials
 export NW_USER_DEFAULT=admin
@@ -112,6 +120,7 @@ export NW_PASSWORD_SW_DIST1=distribution_password
 ```
 
 Then reload your shell:
+
 ```bash
 source ~/.bashrc
 ```
@@ -119,6 +128,7 @@ source ~/.bashrc
 ### Option 3: Runtime Export
 
 Set variables directly before running commands:
+
 ```bash
 export NW_USER_DEFAULT=admin
 export NW_PASSWORD_DEFAULT=your_password
@@ -144,6 +154,7 @@ The toolkit resolves credentials in this priority order:
 5. **Default environment variables** (Lowest) - `NW_USER_DEFAULT` and `NW_PASSWORD_DEFAULT`
 
 This precedence allows you to:
+
 - Set global defaults with `NW_USER_DEFAULT` and `NW_PASSWORD_DEFAULT`
 - Override entire groups with group-level credentials
 - Override specific devices with device-specific credentials
@@ -162,6 +173,7 @@ This error means `NW_PASSWORD_DEFAULT` is not set in any of the credential sourc
 ### Device-specific credentials not working
 
 Check that:
+
 1. The environment variable name matches the device name in `devices.yml`
 2. Hyphens in device names become underscores in environment variables
 3. Device names are converted to uppercase for environment variables
@@ -171,6 +183,7 @@ Check that:
 ### Group credentials not being applied
 
 Check that:
+
 1. The group name in the environment variable matches exactly the group name in `groups.yml`
 2. The device is actually a member of the group (check with `nw list-groups`)
 3. Use the correct format: `NW_USER_GROUPNAME` and `NW_PASSWORD_GROUPNAME`
@@ -179,6 +192,7 @@ Check that:
 ### Verification
 
 You can verify your environment variables are set correctly:
+
 ```bash
 # Check if default credentials are set
 echo "Default user: $NW_USER_DEFAULT"

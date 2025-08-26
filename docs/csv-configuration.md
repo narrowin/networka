@@ -1,10 +1,11 @@
 # CSV Configuration Guide
 
-This guide explains how to use CSV files for bulk device, group, and sequence management in Net-Worker.
+This guide explains how to use CSV files for bulk device, group, and sequence management in Networka.
 
 ## Overview
 
 CSV support allows you to:
+
 - Import device inventories from spreadsheets
 - Manage configurations with familiar tools (Excel, Google Sheets, etc.)
 - Bulk add devices, groups, and sequences
@@ -15,10 +16,12 @@ CSV support allows you to:
 ### Devices CSV
 
 **Required Headers:**
+
 - `name` - Unique device identifier
 - `host` - IP address or hostname
 
 **Optional Headers:**
+
 - `device_type` - Device type (default: mikrotik_routeros)
 - `description` - Human-readable description
 - `platform` - Hardware platform
@@ -27,6 +30,7 @@ CSV support allows you to:
 - `tags` - Semicolon-separated tags
 
 **Example:**
+
 ```csv
 name,host,device_type,description,platform,model,location,tags
 sw-01,192.168.1.1,mikrotik_routeros,Main Switch,mipsbe,CRS326,Rack A1,switch;core;critical
@@ -36,14 +40,17 @@ rtr-01,192.168.1.254,mikrotik_routeros,Edge Router,arm,RB4011,Network Closet,rou
 ### Groups CSV
 
 **Required Headers:**
+
 - `name` - Unique group identifier
 - `description` - Human-readable description
 
 **Optional Headers:**
+
 - `members` - Semicolon-separated device names
 - `match_tags` - Semicolon-separated tags for automatic membership
 
 **Example:**
+
 ```csv
 name,description,members,match_tags
 core_switches,Core network switches,sw-01;sw-02,switch;core
@@ -53,14 +60,17 @@ edge_devices,Edge routers and firewalls,,edge;firewall
 ### Sequences CSV
 
 **Required Headers:**
+
 - `name` - Unique sequence identifier
 - `description` - Human-readable description
 - `commands` - Semicolon-separated commands
 
 **Optional Headers:**
+
 - `tags` - Semicolon-separated tags for categorization
 
 **Example:**
+
 ```csv
 name,description,commands,tags
 health_check,Basic health check,/system/resource/print;/interface/print stats,monitoring;health
@@ -122,6 +132,7 @@ config/
 ## Validation and Testing
 
 ### Check CSV Format
+
 ```bash
 # Validate that CSV files are properly formatted
 head -5 config/devices/devices.csv
@@ -131,6 +142,7 @@ grep -c "," config/devices/devices.csv  # Should match number of headers
 ```
 
 ### Test Loading
+
 ```bash
 # Test configuration loading
 nw config-validate
@@ -155,12 +167,14 @@ nw info device-from-csv
 ### Mixing CSV and YAML
 
 You can use both formats together:
+
 - **CSV for bulk data**: Device inventories, simple groups
 - **YAML for complex configs**: Advanced device settings, complex sequences
 
 ### Dynamic Tag Assignment
 
 Use formulas in spreadsheets to automatically assign tags:
+
 ```
 =IF(FIND("SW",A2)>0,"switch","router")&";access"
 ```
@@ -168,6 +182,7 @@ Use formulas in spreadsheets to automatically assign tags:
 ### Conditional Device Configuration
 
 Create different CSV files for different environments and load them based on your needs:
+
 - `config/devices/production.csv`
 - `config/devices/testing.csv`
 - `config/devices/lab.csv`
@@ -184,6 +199,7 @@ Create different CSV files for different environments and load them based on you
 ### Duplicate Devices
 
 When using multiple CSV files, later files override earlier ones:
+
 1. **Main devices.csv** loads first
 2. **Subdirectory YAML files** load second
 3. **Subdirectory CSV files** load last (highest priority)

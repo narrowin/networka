@@ -11,6 +11,7 @@ from typing import Annotated
 
 import typer
 
+from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.config import NetworkConfig, load_config
 from network_toolkit.sequence_manager import SequenceManager
 
@@ -130,7 +131,7 @@ def register(app: typer.Typer) -> None:
         ],
         config_file: Annotated[
             Path, typer.Option("--config", "-c", help="Configuration file path")
-        ] = Path("devices.yml"),
+        ] = DEFAULT_CONFIG_PATH,
         device: Annotated[
             str | None,
             typer.Option(

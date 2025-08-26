@@ -147,7 +147,9 @@ class NornirNetmikoTransport:
             execution_time=execution_time,
             error_context=(
                 {
-                    "exception": str(device_result.exception) if device_result.exception else None,
+                    "exception": str(device_result.exception)
+                    if device_result.exception
+                    else None,
                     "host": device_result.host.name if device_result.host else None,
                 }
                 if device_result.failed
@@ -204,7 +206,9 @@ class NornirNetmikoTransport:
 
         return results
 
-    def send_interactive(self, interact_events: list[tuple[str, str, bool]], timeout_ops: float) -> str:
+    def send_interactive(
+        self, interact_events: list[tuple[str, str, bool]], timeout_ops: float
+    ) -> str:
         """Send interactive command with prompts and responses."""
         # This is more complex with Netmiko, would need custom implementation
         # For now, raise NotImplementedError
@@ -229,7 +233,9 @@ class NornirNetmikoTransport:
         """Check if the connection is still active."""
         return self._connected
 
-    def execute_on_group(self, device_names: list[str], command: str) -> dict[str, CommandResult]:
+    def execute_on_group(
+        self, device_names: list[str], command: str
+    ) -> dict[str, CommandResult]:
         """Execute command on multiple devices efficiently using Nornir's parallel execution."""
         try:
             from nornir_netmiko.tasks import netmiko_send_command

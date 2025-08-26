@@ -428,7 +428,7 @@ class TestHandleFileDownloads(unittest.TestCase):
             config=self.mock_config,
         )
 
-        # Verify console.print was called with correct messages
+        # Verify console.print was called with correct messages (without color markup)
         expected_calls = [
             call("[cyan]Downloading test.rsc from test-device...[/cyan]"),
             call("[green]OK Downloaded test.rsc to /srv/backups/test.rsc[/green]"),
@@ -449,7 +449,7 @@ class TestHandleFileDownloads(unittest.TestCase):
             config=self.mock_config,
         )
 
-        # Verify console.print was called with correct messages
+        # Verify console.print was called with correct messages (without color markup)
         expected_calls = [
             call("[cyan]Downloading missing.rsc from test-device...[/cyan]"),
             call("[red]FAIL Failed to download missing.rsc[/red]"),
@@ -470,7 +470,7 @@ class TestHandleFileDownloads(unittest.TestCase):
             config=self.mock_config,
         )
 
-        # Verify console.print was called with correct messages
+        # Verify console.print was called with correct messages (without color markup)
         expected_calls = [
             call("[cyan]Downloading error.rsc from test-device...[/cyan]"),
             call("[red]FAIL Error downloading error.rsc: Network timeout[/red]"),

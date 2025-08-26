@@ -13,19 +13,30 @@ Design goals:
 
 from __future__ import annotations
 
+# Standard library imports
 import datetime
+import os
 import shlex
 import shutil
+import tempfile
+import threading
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Annotated, Any
 
+# Third-party imports
 import typer
 
+# For test compatibility
+from rich.console import Console
+
+# Local application imports
 from network_toolkit.commands.ssh_fallback import open_sequential_ssh_sessions
 from network_toolkit.commands.ssh_platform import get_platform_capabilities
-from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.command_helpers import CommandContext
+from network_toolkit.common.logging import setup_logging
+from network_toolkit.common.output import OutputMode
 from network_toolkit.common.resolver import DeviceResolver
 from network_toolkit.config import NetworkConfig, load_config
 from network_toolkit.exceptions import NetworkToolkitError
@@ -36,16 +47,18 @@ from network_toolkit.ip_device import (
     is_ip_list,
 )
 
+console = Console()
+
 app_help = (
     "Open tmux with SSH panes for a device or group.\n\n"
-    "Quick tmux keys (defaults):\n"
-    "- Prefix: Ctrl-b\n"
-    "- Pane navigation: Prefix + Arrow keys\n"
-    '- Split pane: Prefix + % (vertical), Prefix + " (horizontal)\n'
-    "- Cycle layouts: Prefix + Space\n"
-    "- Synchronize panes: Prefix + : then 'set synchronize-panes on|off'\n"
-    "- Detach: Ctrl-b then d\n\n"
-    "Tip: Use --sync/--no-sync to control synchronized typing from nw."
+    "Synchronized typing is ENABLED by default - keystrokes go to all panes.\n"
+    "Use --no-sync to disable at startup.\n\n"
+    "Quick controls:\n"
+    "- Ctrl+b, z: Zoom/unzoom focused pane (exits/enters sync mode)\n"
+    "- Ctrl+b + Arrow keys: Navigate panes\n"
+    "- Click any pane to focus it\n"
+    "- Ctrl+b, d: Detach session\n\n"
+    "When sync is on, all panes show red borders."
 )
 
 
@@ -91,7 +104,9 @@ def _ensure_libtmux() -> Any:
     return libtmux
 
 
-def _resolve_targets(config: NetworkConfig, targets: str) -> Target:
+def _resolve_targets(
+    config: NetworkConfig, targets: str, ctx: CommandContext
+) -> Target:
     """Resolve comma-separated targets to a list of devices."""
     resolver = DeviceResolver(config)
     devices, unknowns = resolver.resolve_targets(targets)
@@ -99,7 +114,7 @@ def _resolve_targets(config: NetworkConfig, targets: str) -> Target:
     if unknowns:
         # Be tolerant and warn about unknowns but continue
         unknowns_str = ", ".join(unknowns)
-        console.print(f"[yellow]Warning: Unknown targets: {unknowns_str}[/yellow]")
+        ctx.print_warning(f"Unknown targets: {unknowns_str}")
 
     if not devices:
         msg = f"No valid devices found in targets: {targets}"
@@ -118,6 +133,62 @@ class AuthMode(str, Enum):
     INTERACTIVE = "interactive"  # let ssh prompt per-pane
 
 
+def _secure_tmpdir() -> Path:
+    """Return a secure, user-only temp directory for transient secrets.
+
+    Prefers XDG_RUNTIME_DIR (0700 tmpfs) else ~/.cache/networka/sshpass (0700),
+    else a namespaced dir under system temp (0700).
+    """
+    xdg = os.environ.get("XDG_RUNTIME_DIR")
+    if xdg:
+        p = Path(xdg) / "networka"
+    else:
+        p = Path.home() / ".cache" / "networka" / "sshpass"
+    try:
+        p.mkdir(parents=True, exist_ok=True)
+        p.chmod(0o700)
+    except Exception:
+        p = Path(tempfile.gettempdir()) / "networka_sshpass"
+        p.mkdir(parents=True, exist_ok=True)
+        try:
+            p.chmod(0o700)
+        except Exception:
+            pass
+    return p
+
+
+def _prepare_sshpass_fifo(password: str) -> str:
+    """Create a secure FIFO and start a writer thread to feed sshpass.
+
+    No plaintext is stored at rest; the FIFO node is removed after writing.
+    Returns the FIFO path.
+    """
+    dirpath = _secure_tmpdir()
+    ts_ms = int(datetime.datetime.now(tz=datetime.UTC).timestamp() * 1000)
+    fifo_path = dirpath / f"pw_{os.getpid()}_{ts_ms}.fifo"
+    try:
+        os.mkfifo(fifo_path, 0o600)
+    except FileExistsError:
+        ts_ms += 1
+        fifo_path = dirpath / f"pw_{os.getpid()}_{ts_ms}.fifo"
+        os.mkfifo(fifo_path, 0o600)
+
+    def _writer() -> None:
+        try:
+            with open(fifo_path, "w", encoding="utf-8", buffering=1) as f:
+                f.write(password)
+        except Exception:
+            pass
+        finally:
+            try:
+                os.remove(fifo_path)
+            except Exception:
+                pass
+
+    threading.Thread(target=_writer, daemon=True).start()
+    return str(fifo_path)
+
+
 def _build_ssh_cmd(
     *,
     host: str,
@@ -125,6 +196,7 @@ def _build_ssh_cmd(
     port: int = 22,
     auth: AuthMode = AuthMode.KEY_FIRST,
     password: str | None = None,
+    ctx: CommandContext,
 ) -> str:
     base = [
         "ssh",
@@ -147,15 +219,34 @@ def _build_ssh_cmd(
                 "use env/config credentials."
             )
             raise NetworkToolkitError(msg)
-        # Use SSHPASS environment variable to avoid password in command line/history
-        # This requires setting the environment variable before executing the command
-        sshpass_cmd = f"SSHPASS={shlex.quote(str(password))} sshpass -e "
+        # Use sshpass reading from a secure FIFO to avoid env/cmdline/plain files
+        if not shutil.which("sshpass"):
+            msg = (
+                "sshpass is required for password authentication but was not found.\n"
+                "Install it with: sudo apt install sshpass (Ubuntu/Debian) or "
+                "brew install hudochenkov/sshpass/sshpass (macOS)"
+            )
+            raise NetworkToolkitError(msg)
+        fifo = _prepare_sshpass_fifo(password)
+        sshpass_cmd = f"sshpass -f {shlex.quote(fifo)} "
         return sshpass_cmd + " ".join(shlex.quote(p) for p in base)
 
     if auth == AuthMode.KEY_FIRST and password:
-        # For key-first mode with password available, we still try keys first
-        # but SSH will naturally fall back to password if keys fail
-        return " ".join(shlex.quote(p) for p in base)
+        # For key-first mode with password available, use sshpass if available
+        if shutil.which("sshpass"):
+            fifo = _prepare_sshpass_fifo(password)
+            sshpass_cmd = f"sshpass -f {shlex.quote(fifo)} "
+            return sshpass_cmd + " ".join(shlex.quote(p) for p in base)
+        else:
+            # If sshpass not available, provide helpful message
+            ctx.print_warning(
+                "sshpass not found. SSH will prompt for password interactively."
+            )
+            ctx.print_info(
+                "To automate password entry, install sshpass: "
+                "sudo apt install sshpass (Ubuntu/Debian) or "
+                "brew install hudochenkov/sshpass/sshpass (macOS)"
+            )
 
     return " ".join(shlex.quote(p) for p in base)
 
@@ -213,12 +304,11 @@ def register(app: typer.Typer) -> None:
         window_name: Annotated[
             str | None, typer.Option("--window-name", help="Custom window name")
         ] = None,
-        reuse: Annotated[
-            bool, typer.Option("--reuse", help="Reuse existing session if it exists")
-        ] = False,
         sync: Annotated[
             bool,
-            typer.Option("--sync/--no-sync", help="Enable tmux synchronize-panes"),
+            typer.Option(
+                "--sync/--no-sync", help="Enable synchronized typing (default: on)"
+            ),
         ] = True,
         use_sshpass: Annotated[
             bool,
@@ -233,12 +323,12 @@ def register(app: typer.Typer) -> None:
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable debug logging")
         ] = False,
-        platform: Annotated[
+        device_type: Annotated[
             str | None,
             typer.Option(
                 "--platform",
                 "-p",
-                help="Platform type when using IP addresses (e.g., mikrotik_routeros)",
+                help="Device type when using IP addresses (e.g., mikrotik_routeros). Note: This specifies the network driver type, not hardware platform.",
             ),
         ] = None,
         port: Annotated[
@@ -246,6 +336,14 @@ def register(app: typer.Typer) -> None:
             typer.Option(
                 "--port",
                 help="SSH port when using IP addresses (default: 22)",
+            ),
+        ] = None,
+        transport_type: Annotated[
+            str | None,
+            typer.Option(
+                "--transport",
+                "-t",
+                help="Transport type for connections (scrapli, nornir_netmiko). Defaults to configuration or scrapli.",
             ),
         ] = None,
     ) -> None:
@@ -261,12 +359,31 @@ def register(app: typer.Typer) -> None:
         - nw ssh sw-acc1,access_switches
         """
 
+        # Validate transport type if provided
+        if transport_type is not None:
+            from network_toolkit.transport.factory import get_transport_factory
+
+            try:
+                # This will raise ValueError if transport_type is invalid
+                get_transport_factory(transport_type)
+            except ValueError as e:
+                # Use module-level console before style_manager is created
+                from rich.console import Console
+
+                Console().print(f"[red]Error:[/red] {e}")
+                raise typer.Exit(1) from e
+
         setup_logging("DEBUG" if verbose else "INFO")
+
+        # Create command context for centralized output management
+        ctx = CommandContext(
+            output_mode=OutputMode.DEFAULT, verbose=verbose, config_file=config_file
+        )
 
         try:
             libtmux = _ensure_libtmux()
         except Exception as e:  # pragma: no cover - trivial failures
-            console.print(f"[red]{e}[/red]")
+            ctx.print_error(str(e))
             raise typer.Exit(1) from None
 
         try:
@@ -274,26 +391,24 @@ def register(app: typer.Typer) -> None:
 
             # Handle IP addresses if platform is provided
             if is_ip_list(target):
-                if platform is None:
+                if device_type is None:
                     supported_platforms = get_supported_platforms()
                     platform_list = "\n".join(
                         [f"  {k}: {v}" for k, v in supported_platforms.items()]
                     )
-                    console.print(
-                        "[red]Error: When using IP addresses, "
-                        "--platform is required[/red]\n"
-                        f"[yellow]Supported platforms:[/yellow]\n{platform_list}"
-                    )
+                    ctx.print_error("When using IP addresses, --platform is required")
+                    ctx.print_warning(f"Supported platforms:\n{platform_list}")
                     raise typer.Exit(1)
 
                 ips = extract_ips_from_target(target)
-                config = create_ip_based_config(ips, platform, config, port=port)
-                console.print(
-                    f"[cyan]Using IP addresses with platform '{platform}': "
-                    f"{', '.join(ips)}[/cyan]"
+                config = create_ip_based_config(
+                    ips, device_type, config, port=port, transport_type=transport_type
+                )
+                ctx.print_info(
+                    f"Using IP addresses with platform '{device_type}': {', '.join(ips)}"
                 )
 
-            resolver = DeviceResolver(config, platform, port)
+            resolver = DeviceResolver(config, device_type, port, transport_type)
             tgt = Target(name=target, devices=resolver.resolve_targets(target)[0])
 
             # Check platform capabilities after we have config and targets
@@ -301,27 +416,25 @@ def register(app: typer.Typer) -> None:
             capabilities = platform_caps.get_fallback_options()
 
             if not capabilities["can_do_tmux_fanout"]:
-                console.print(
-                    "[yellow]tmux-based SSH fanout not available on this platform.[/yellow]"
+                ctx.print_warning(
+                    "tmux-based SSH fanout not available on this platform."
                 )
 
                 if not capabilities["tmux_available"]:
-                    console.print("[yellow]Reason: tmux not available[/yellow]")
+                    ctx.print_warning("Reason: tmux not available")
                     platform_caps.suggest_alternatives()
 
                 if capabilities["can_do_sequential_ssh"]:
-                    console.print(
-                        "[cyan]Falling back to sequential SSH connections...[/cyan]"
-                    )
+                    ctx.print_info("Falling back to sequential SSH connections...")
                     # Use fallback implementation
                     open_sequential_ssh_sessions(tgt.devices, config)
                     return
                 else:
-                    console.print("[red]No SSH client available[/red]")
+                    ctx.print_error("No SSH client available")
                     platform_caps.suggest_alternatives()
                     raise typer.Exit(1)
         except Exception as e:
-            console.print(f"[red]Failed to load config or resolve target: {e}[/red]")
+            ctx.print_error(f"Failed to load config or resolve target: {e}")
             raise typer.Exit(1) from None
 
         # Resolve effective auth mode with legacy flag support
@@ -329,15 +442,16 @@ def register(app: typer.Typer) -> None:
 
         # Prepare connection params and SSH commands per device
         device_cmds: list[tuple[str, str]] = []  # (device_name, ssh_cmd)
-        sshpass_required = False
         for dev in tgt.devices:
-            params = config.get_device_connection_params(dev)
+            params = config.get_device_connection_params(
+                dev, user_override, password_override
+            )
             try:
                 # Determine credentials
-                user = user_override or str(params.get("auth_username"))
+                user = str(params.get("auth_username"))
                 host = str(params.get("host"))
                 port = int(params.get("port", 22))
-                pw = password_override or params.get("auth_password")
+                pw = params.get("auth_password")
 
                 # Decide auth mode if KEY_FIRST or legacy flag set
                 mode = effective_auth
@@ -347,8 +461,8 @@ def register(app: typer.Typer) -> None:
                     mode = AuthMode.KEY_FIRST
                 if use_sshpass:
                     mode = AuthMode.PASSWORD
-                if mode == AuthMode.PASSWORD:
-                    sshpass_required = True
+
+                # Note: We no longer strictly require sshpass since we have pexpect fallback
 
                 ssh_cmd = _build_ssh_cmd(
                     host=host,
@@ -356,48 +470,33 @@ def register(app: typer.Typer) -> None:
                     port=port,
                     auth=mode,
                     password=str(pw) if pw is not None else None,
+                    ctx=ctx,
                 )
             except Exception as e:
-                console.print(f"[red]Skipping {dev}: {e}[/red]")
+                ctx.print_error(f"Skipping {dev}: {e}")
                 continue
             device_cmds.append((dev, ssh_cmd))
 
         if not device_cmds:
-            console.print("[red]No valid devices to connect to.[/red]")
+            ctx.print_error("No valid devices to connect to.")
             raise typer.Exit(1)
 
-        # If any pane needs password mode, ensure sshpass exists
-        if sshpass_required and not shutil.which("sshpass"):
-            console.print(
-                "[red]sshpass is required for password authentication "
-                "but was not found.\n"
-                "Install it (e.g., apt install sshpass) or use --auth key "
-                "/ --auth interactive, or provide SSH keys.[/red]"
-            )
-            raise typer.Exit(1)
-
-        # Create or reuse tmux session
+        # Always create a new tmux session for clean behavior
         server = libtmux.Server()
         sname = session_name or _session_name(tgt.name)
         sname = _sanitize_session_name(sname)
 
-        session = server.find_where({"session_name": sname})
-        if session is None:
-            session = server.new_session(session_name=sname, attach=False)
-        elif not reuse:
-            # Create a new unique session to avoid clobber
-            sname = _sanitize_session_name(_session_name(tgt.name))
-            session = server.new_session(session_name=sname, attach=False)
+        # Always create a new unique session name to avoid conflicts
+        sname = _sanitize_session_name(_session_name(tgt.name))
+        session = server.new_session(session_name=sname, attach=False)
 
         wname = window_name or tgt.name
-        window = getattr(session, "attached_window", None)
-        if window is None:
-            window = session.new_window(attach=True, window_name=wname)
-        else:
+        window = session.active_window
+        if wname != window.name:
             try:
                 window.rename_window(wname)
             except Exception as exc:  # pragma: no cover - rename failure is non-fatal
-                console.log(f"Could not rename tmux window: {exc}")
+                ctx.console.log(f"Could not rename tmux window: {exc}")
 
         # Ensure we start with a single pane
         # Create panes for each device
@@ -406,7 +505,7 @@ def register(app: typer.Typer) -> None:
             pane0 = window.split_window(attach=False)
             panes.append(pane0)
         else:
-            panes.append(window.attached_pane)
+            panes.append(window.active_pane)
 
         for idx in range(1, len(device_cmds)):
             vertical = idx % 2 == 1
@@ -416,22 +515,27 @@ def register(app: typer.Typer) -> None:
         if layout in LAYOUT_CHOICES:
             window.select_layout(layout)
 
-        # Send ssh commands
+        # Send ssh commands to all panes first
         for (dev_name, cmd), pane in zip(device_cmds, window.panes, strict=True):
             _ = dev_name  # name not used but kept for future labels
             pane.send_keys(cmd, enter=True)
 
-        # Synchronize panes if requested
-        try:
-            window.set_option("synchronize-panes", bool(sync))
-        except Exception as exc:  # pragma: no cover - non-critical
-            console.log(f"Could not set synchronize-panes: {exc}")
+        # Simple sync setup using direct tmux commands
+        if sync:
+            try:
+                window.cmd("set-window-option", "synchronize-panes", "on")
+            except Exception as exc:
+                ctx.console.log(f"Could not enable sync: {exc}")
 
-        console.print(
-            "[green]Created tmux session[/green] "
-            f"[bold]{sname}[/bold] with {len(device_cmds)} pane(s)."
-        )
-        console.print("Use tmux to navigate. Press Ctrl-b d to detach.")
+        # Enable mouse support using direct command
+        try:
+            session.cmd("set-option", "mouse", "on")
+        except Exception as exc:
+            ctx.console.log(f"Could not enable mouse: {exc}")
+
+        print("Created tmux session")
+        print(f"Session: {sname} with {len(device_cmds)} pane(s).")
+        print("Use tmux to navigate. Press Ctrl-b d to detach.")
 
         if attach:
             # Use libtmux to attach directly instead of subprocess
@@ -439,7 +543,6 @@ def register(app: typer.Typer) -> None:
                 # Attach using libtmux server
                 session.attach_session()
             except Exception:
-                console.print(
-                    "[yellow]Failed to attach automatically. "
-                    f"Run: tmux attach -t {sname}[/yellow]"
+                ctx.print_warning(
+                    f"Failed to attach automatically. Run: tmux attach -t {sname}"
                 )

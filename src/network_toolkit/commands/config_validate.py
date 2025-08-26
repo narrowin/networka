@@ -8,7 +8,14 @@ from typing import Annotated
 
 import typer
 
-from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
+from network_toolkit.common.logging import setup_logging
+from network_toolkit.common.output import (
+    OutputMode,
+    get_output_manager,
+    get_output_manager_with_config,
+    set_output_mode,
+)
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 
@@ -16,45 +23,80 @@ from network_toolkit.exceptions import NetworkToolkitError
 def register(app: typer.Typer) -> None:
     @app.command("config-validate", rich_help_panel="Info & Configuration")
     def config_validate(
-        config_file: Annotated[Path, typer.Option("--config", "-c", help="Configuration file path")] = Path(
-            "devices.yml"
-        ),
+        config_file: Annotated[
+            Path, typer.Option("--config", "-c", help="Configuration file path")
+        ] = DEFAULT_CONFIG_PATH,
+        output_mode: Annotated[
+            OutputMode | None,
+            typer.Option(
+                "--output-mode",
+                "-o",
+                help="Output decoration mode: default, light, dark, no-color, raw",
+                show_default=False,
+            ),
+        ] = None,
         verbose: Annotated[
             bool,
-            typer.Option("--verbose", "-v", help="Show detailed validation information"),
+            typer.Option(
+                "--verbose", "-v", help="Show detailed validation information"
+            ),
         ] = False,
     ) -> None:
         """Validate the configuration file and show any issues."""
         setup_logging("DEBUG" if verbose else "INFO")
 
+        output_manager = None
         try:
-            console.print(f"[bold blue]Validating Configuration: {config_file}[/bold blue]")
-            console.print()
-
             config = load_config(config_file)
 
-            console.print("[bold green]OK Configuration is valid![/bold green]")
-            console.print()
+            # Handle output mode configuration
+            if output_mode is not None:
+                set_output_mode(output_mode)
+                output_manager = get_output_manager()
+            else:
+                # Use config-based output mode
+                output_manager = get_output_manager_with_config(
+                    config.general.output_mode
+                )
+
+            output_manager.print_info(f"Validating Configuration: {config_file}")
+            output_manager.print_blank_line()
+
+            output_manager.print_success("Configuration is valid!")
+            output_manager.print_blank_line()
 
             device_count = len(config.devices) if config.devices else 0
             group_count = len(config.device_groups) if config.device_groups else 0
-            global_seq_count = len(config.global_command_sequences) if config.global_command_sequences else 0
+            global_seq_count = (
+                len(config.global_command_sequences)
+                if config.global_command_sequences
+                else 0
+            )
 
-            console.print(f"📱 Devices: {device_count}")
-            console.print(f"👥 Device Groups: {group_count}")
-            console.print(f"🔄 Global Sequences: {global_seq_count}")
+            output_manager.print_info(f"Devices: {device_count}")
+            output_manager.print_info(f"Device Groups: {group_count}")
+            output_manager.print_info(f"Global Sequences: {global_seq_count}")
 
             if verbose and device_count > 0 and config.devices:
-                console.print("\n[bold]Device Summary:[/bold]")
+                output_manager.print_blank_line()
+                output_manager.print_info("Device Summary:")
                 for name, device in config.devices.items():
-                    console.print(f"  • {name} ({device.host}) - {device.device_type}")
+                    output_manager.print_info(
+                        f"  • {name} ({device.host}) - {device.device_type}"
+                    )
 
         except NetworkToolkitError as e:
-            console.print("[red]FAIL Configuration validation failed![/red]")
-            console.print(f"[red]Error: {e.message}[/red]")
+            # Initialize output_manager if not already set
+            if output_manager is None:
+                output_manager = get_output_manager()
+            output_manager.print_error("Configuration validation failed!")
+            output_manager.print_error(f"Error: {e.message}")
             if verbose and e.details:
-                console.print(f"[red]Details: {e.details}[/red]")
+                output_manager.print_error(f"Details: {e.details}")
             raise typer.Exit(1) from None
         except Exception as e:  # pragma: no cover - unexpected
-            console.print(f"[red]FAIL Unexpected error during validation: {e}[/red]")
+            # Initialize output_manager if not already set
+            if output_manager is None:
+                output_manager = get_output_manager()
+            output_manager.print_error(f"Unexpected error during validation: {e}")
             raise typer.Exit(1) from None

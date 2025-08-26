@@ -12,13 +12,15 @@ from time import perf_counter
 from typing import Annotated, Any
 
 import typer
-from rich.table import Table
 
+# Tables and printing routed via OutputManager helpers
+from network_toolkit.common.command import CommandContext
 from network_toolkit.common.credentials import prompt_for_credentials
+from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import (
     OutputMode,
-    get_output_manager,
+    get_output_mode_from_config,
     set_output_mode,
 )
 from network_toolkit.config import load_config
@@ -64,8 +66,9 @@ def register(app: typer.Typer) -> None:
         ],
         *,
         config_file: Annotated[
-            Path, typer.Option("--config", "-c", help="Configuration file path")
-        ] = Path("devices.yml"),
+            Path,
+            typer.Option("--config", "-c", help="Configuration directory or file path"),
+        ] = DEFAULT_CONFIG_PATH,
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
         ] = False,
@@ -104,12 +107,12 @@ def register(app: typer.Typer) -> None:
                 help="Prompt for username and password interactively",
             ),
         ] = False,
-        platform: Annotated[
+        device_type: Annotated[
             str | None,
             typer.Option(
                 "--platform",
                 "-p",
-                help="Platform type when using IP addresses (e.g., mikrotik_routeros)",
+                help="Device type when using IP addresses (e.g., mikrotik_routeros). Note: This specifies the network driver type, not hardware platform.",
             ),
         ] = None,
         port: Annotated[
@@ -119,47 +122,57 @@ def register(app: typer.Typer) -> None:
                 help="SSH port when using IP addresses (default: 22)",
             ),
         ] = None,
+        transport_type: Annotated[
+            str | None,
+            typer.Option(
+                "--transport",
+                "-t",
+                help="Transport type to use for connections (scrapli, nornir_netmiko). Defaults to configuration or scrapli.",
+            ),
+        ] = None,
     ) -> None:
         """Execute a single command or a sequence on a device or a group."""
-        # Handle output mode configuration
+        # Validate transport type if provided
+        if transport_type is not None:
+            from network_toolkit.transport.factory import get_transport_factory
+
+            try:
+                # This will raise ValueError if transport_type is invalid
+                get_transport_factory(transport_type)
+            except ValueError as e:
+                print(f"Error: {e}")
+                raise typer.Exit(1)
+
+        # Handle legacy raw mode mapping
         if raw is not None:
-            # Legacy raw mode support - map to new output mode
             output_mode = OutputMode.RAW
-        elif output_mode is None:
-            # Default to normal mode if nothing specified
-            output_mode = OutputMode.DEFAULT
 
-        # Set the global output mode for this command
-        set_output_mode(output_mode)
-
-        # Get the console from the output manager
-        console = get_output_manager().console
-
-        # Raw mode suppresses all logging setup
-        if output_mode != OutputMode.RAW:
-            setup_logging("DEBUG" if verbose else "INFO")
+        # Create command context with proper styling/logging
+        ctx = CommandContext(
+            output_mode=output_mode,
+            verbose=verbose,
+            config_file=config_file,
+        )
 
         # Handle interactive authentication if requested
         interactive_creds = None
         if interactive_auth:
-            if raw is None:
-                console.print(
-                    "[yellow]Interactive authentication mode enabled[/yellow]"
-                )
+            if ctx.output.mode != OutputMode.RAW:
+                ctx.print_info("Interactive authentication mode enabled")
             interactive_creds = prompt_for_credentials(
                 "Enter username for devices",
                 "Enter password for devices",
                 "admin",  # Default username suggestion
             )
-            if raw is None:
-                console.print(
-                    f"[green]Will use username: {interactive_creds.username}[/green]"
-                )
+            if ctx.output.mode != OutputMode.RAW:
+                ctx.print_success(f"Will use username: {interactive_creds.username}")
 
         # Track run timing & reporting state
         started_at = perf_counter()
         printed_results_dir = False
-        output_mgr = get_output_manager()
+        output_mgr = (
+            ctx.output
+        )  # Use context's output manager (may update after config)
 
         def _print_results_dir_once(results_mgr: ResultsManager) -> None:
             """Print the results directory once if storing is enabled."""
@@ -210,13 +223,18 @@ def register(app: typer.Typer) -> None:
             cmd: str,
             username_override: str | None = None,
             password_override: str | None = None,
+            transport_override: str | None = None,
         ) -> tuple[str, str | None, str | None]:
             # Late import to allow tests to patch `network_toolkit.cli.DeviceSession`
             from network_toolkit.cli import DeviceSession
 
             try:
                 with DeviceSession(
-                    device_name, config, username_override, password_override
+                    device_name,
+                    config,
+                    username_override,
+                    password_override,
+                    transport_override,
                 ) as session:
                     result = session.execute_command(cmd)
                     return (device_name, result, None)
@@ -239,13 +257,18 @@ def register(app: typer.Typer) -> None:
             seq_name: str,
             username_override: str | None = None,
             password_override: str | None = None,
+            transport_override: str | None = None,
         ) -> tuple[str, dict[str, str] | None, str | None]:
             # Import DeviceSession from cli to preserve tests' patch path
             from network_toolkit.cli import DeviceSession
 
             try:
                 with DeviceSession(
-                    device_name, config, username_override, password_override
+                    device_name,
+                    config,
+                    username_override,
+                    password_override,
+                    transport_override,
                 ) as session:
                     # Use vendor-aware sequence resolution
                     sm = SequenceManager(config)
@@ -271,40 +294,49 @@ def register(app: typer.Typer) -> None:
         try:
             config = load_config(config_file)
 
+            # If no CLI output mode given, honor config/general output mode
+            # Keep OutputManager as the single source of truth for theming
+            if output_mode is None:
+                chosen_mode = get_output_mode_from_config(
+                    getattr(getattr(config, "general", None), "output_mode", None)
+                )
+                output_mgr = set_output_mode(chosen_mode)
+
+            # Use output manager for all prints
+
             # Check if target is IP addresses and handle accordingly
             if is_ip_list(target):
-                if platform is None:
+                if device_type is None:
                     supported_platforms = get_supported_platforms()
                     platform_list = "\n".join(
                         [f"  {k}: {v}" for k, v in supported_platforms.items()]
                     )
                     if raw is None:
-                        console.print(
-                            "[red]Error: When using IP addresses, "
-                            "--platform is required[/red]\n"
-                            f"[yellow]Supported platforms:[/yellow]\n{platform_list}"
+                        ctx.print_error(
+                            "When using IP addresses, --platform is required"
                         )
+                        ctx.print_info(f"Supported platforms:\n{platform_list}")
                     raise typer.Exit(1)
 
-                if not validate_platform(platform):
+                if not validate_platform(device_type):
                     supported_platforms = get_supported_platforms()
                     platform_list = "\n".join(
                         [f"  {k}: {v}" for k, v in supported_platforms.items()]
                     )
                     if raw is None:
-                        console.print(
-                            f"[red]Error: Invalid platform '{platform}'[/red]\n"
-                            f"[yellow]Supported platforms:[/yellow]\n{platform_list}"
-                        )
+                        ctx.print_error(f"Invalid device type '{device_type}'")
+                        ctx.print_info(f"Supported platforms:\n{platform_list}")
                     raise typer.Exit(1)
 
                 # Extract IP addresses and create dynamic config
                 ips = extract_ips_from_target(target)
-                config = create_ip_based_config(ips, platform, config, port=port)
+                config = create_ip_based_config(
+                    ips, device_type, config, port=port, transport_type=transport_type
+                )
 
                 if raw is None:
-                    console.print(
-                        f"[cyan]Using IP addresses with platform '{platform}': {', '.join(ips)}[/cyan]"
+                    ctx.print_info(
+                        f"Using IP addresses with device type '{device_type}': {', '.join(ips)}"
                     )
 
             sm = SequenceManager(config)
@@ -356,13 +388,13 @@ def register(app: typer.Typer) -> None:
 
             if unknown_targets and not resolved_devices:
                 if raw is None:
-                    console.print(
-                        f"[red]Error: target(s) not found: {', '.join(unknown_targets)}[/red]"
+                    output_mgr.print_error(
+                        f"target(s) not found: {', '.join(unknown_targets)}"
                     )
                 raise typer.Exit(1)
             elif unknown_targets and raw is None:
-                console.print(
-                    f"[yellow]Warning: ignoring unknown target(s): {', '.join(unknown_targets)}[/yellow]"
+                ctx.print_warning(
+                    f"Warning: ignoring unknown target(s): {', '.join(unknown_targets)}"
                 )
 
             # Determine target mode
@@ -382,10 +414,10 @@ def register(app: typer.Typer) -> None:
             if is_sequence:
                 if is_single_device:
                     if raw is None:
-                        console.print(
-                            f"[bold blue]Executing sequence '{command_or_sequence}' on device {target}[/bold blue]"
+                        ctx.print_info(
+                            f"Executing sequence '{command_or_sequence}' on device {target}"
                         )
-                        console.print()
+                        output_mgr.print_blank_line()
 
                     # Single concrete device
                     device_target = resolved_devices[0]
@@ -403,11 +435,12 @@ def register(app: typer.Typer) -> None:
                         command_or_sequence,
                         username_override,
                         password_override,
+                        transport_type,
                     )
 
                     if error:
                         if raw is None:
-                            console.print(f"[red]Error: {error}[/red]")
+                            ctx.print_error(f"Error: {error}")
                         raise typer.Exit(1)
 
                     if results_map:
@@ -429,24 +462,23 @@ def register(app: typer.Typer) -> None:
                                     )
                                     sys.stdout.write(f"{output}\n")
                         else:
-                            console.print(
-                                f"[bold green]Sequence Results ({len(results_map)} commands):[/bold green]"
+                            ctx.print_success(
+                                f"Sequence Results ({len(results_map)} commands):"
                             )
-                            console.print()
+                            output_mgr.print_blank_line()
                             for i, (cmd, output) in enumerate(results_map.items(), 1):
-                                console.print(
-                                    f"[bold cyan]Command {i}:[/bold cyan] {cmd}"
-                                )
-                                console.print(f"[white]{output}[/white]")
-                                console.print("-" * 80)
+                                output_mgr.print_info(f"Command {i}: {cmd}")
+                                output_mgr.print_output(output)
+                                output_mgr.print_separator()
 
                             if results_mgr.store_results:
                                 stored_paths = results_mgr.store_sequence_results(
                                     device_target, command_or_sequence, results_map
                                 )
                                 if stored_paths:
-                                    console.print(
-                                        f"\n[dim]Results stored: {stored_paths[-1]}[/dim]"
+                                    output_mgr.print_blank_line()
+                                    output_mgr.print_info(
+                                        f"Results stored: {stored_paths[-1]}"
                                     )
                                     _print_results_dir_once(results_mgr)
 
@@ -475,21 +507,16 @@ def register(app: typer.Typer) -> None:
                     group_members = resolved_devices
                     if not group_members:
                         if raw is None:
-                            console.print(
-                                f"[yellow]Warning: No devices resolved for '{target}'.[/yellow]"
-                            )
+                            ctx.print_warning(f"No devices resolved for '{target}'.")
                         return
 
                     if raw is None:
-                        console.print(
-                            f"[bold blue]Executing sequence "
-                            f"'{command_or_sequence}' on targets '{target}' "
-                            f"({len(group_members)} devices)[/bold blue]"
+                        ctx.print_info(
+                            f"Executing sequence '{command_or_sequence}' on targets '{target}' "
+                            f"({len(group_members)} devices)"
                         )
-                        console.print(
-                            f"[cyan]Members:[/cyan] {', '.join(group_members)}"
-                        )
-                        console.print()
+                        ctx.print_info(f"Members: {', '.join(group_members)}")
+                        output_mgr.print_blank_line()
 
                     with ThreadPoolExecutor(max_workers=len(group_members)) as executor:
                         # Get credential overrides if in interactive mode
@@ -508,6 +535,7 @@ def register(app: typer.Typer) -> None:
                                 command_or_sequence,
                                 username_override,
                                 password_override,
+                                transport_type,
                             ): device
                             for device in group_members
                         }
@@ -543,43 +571,22 @@ def register(app: typer.Typer) -> None:
                                     )
                                     sys.stdout.write(f"{output}\n")
                     else:
-                        console.print("[bold green]Group Sequence Results[/bold green]")
+                        ctx.print_success("Group Sequence Results")
                         for device_name, device_results, error in all_results:
-                            table = Table(
-                                title=f"Device: {device_name}",
-                                box=None,
-                                show_header=False,
-                            )
+                            # Print a simple device header and status lines (no tables)
+                            output_mgr.print_separator()
+                            output_mgr.print_info(f"Device: {device_name}")
                             if error:
-                                table.add_row(
-                                    "[bold red]Status[/bold red]", "[red]Failed[/red]"
-                                )
-                                table.add_row(
-                                    "[bold red]Error[/bold red]", f"[red]{error}[/red]"
-                                )
+                                output_mgr.print_error("Failed", device_name)
+                                output_mgr.print_error(str(error), device_name)
                             else:
-                                table.add_row(
-                                    "[bold green]Status[/bold green]",
-                                    "[green]Success[/green]",
-                                )
+                                output_mgr.print_success("Success", device_name)
                                 if device_results:
-                                    table.add_row(
-                                        "[bold cyan]Commands[/bold cyan]",
-                                        f"[cyan]{len(device_results)} executed[/cyan]",
+                                    output_mgr.print_info(
+                                        f"Commands executed: {len(device_results)}",
+                                        device_name,
                                     )
-                                    first_output = next(
-                                        iter(device_results.values()),
-                                        "",
-                                    )
-                                    preview = first_output[:PREVIEW_LEN] + (
-                                        "..." if len(first_output) > PREVIEW_LEN else ""
-                                    )
-                                    table.add_row(
-                                        "[bold cyan]Preview[/bold cyan]",
-                                        f"[white]{preview}[/white]",
-                                    )
-                            console.print(table)
-                            console.print("-" * 80)
+                            output_mgr.print_blank_line()
 
                     if results_mgr.store_results:
                         # Store per-device results and a group summary file
@@ -631,11 +638,9 @@ def register(app: typer.Typer) -> None:
             if is_single_device:
                 if raw is None:
                     device_target = resolved_devices[0]
-                    console.print(
-                        f"[bold blue]Executing command on device {device_target}[/bold blue]"
-                    )
-                    console.print(f"[cyan]Command:[/cyan] {command_or_sequence}")
-                    console.print()
+                    ctx.print_info(f"Executing command on device {device_target}")
+                    ctx.print_info(f"Command: {command_or_sequence}")
+                    output_mgr.print_blank_line()
 
                 device_target = resolved_devices[0]
                 # Get credential overrides if in interactive mode
@@ -652,6 +657,7 @@ def register(app: typer.Typer) -> None:
                     command_or_sequence,
                     username_override,
                     password_override,
+                    transport_type,
                 )
                 if error:
                     raise typer.Exit(1)
@@ -668,11 +674,11 @@ def register(app: typer.Typer) -> None:
                         )
                     else:
                         output_mgr.print_command_output(
-                            device_target, command_or_sequence, result
+                            device_target, command_or_sequence, result or ""
                         )
                 else:
                     output_mgr.print_command_output(
-                        device_target, command_or_sequence, result
+                        device_target, command_or_sequence, result or ""
                     )
 
                 if results_mgr.store_results and raw is None and result:
@@ -680,7 +686,8 @@ def register(app: typer.Typer) -> None:
                         device_target, command_or_sequence, result
                     )
                     if stored_path:
-                        console.print(f"\n[dim]Results stored: {stored_path}[/dim]")
+                        output_mgr.print_blank_line()
+                        output_mgr.print_info(f"Results stored: {stored_path}")
                         _print_results_dir_once(results_mgr)
 
                 duration = perf_counter() - started_at
@@ -709,18 +716,17 @@ def register(app: typer.Typer) -> None:
                 members = resolved_devices
                 if not members:
                     if raw is None:
-                        console.print(
-                            f"[yellow]Warning: No devices resolved for '{target}'.[/yellow]"
-                        )
+                        ctx.print_warning(f"No devices resolved for '{target}'.")
                     return
 
                 if raw is None:
-                    console.print(
-                        f"[bold blue]Executing command on targets '{target}' ({len(members)} devices)[/bold blue]"
+                    ctx.print_info(
+                        f"Executing command on targets '{target}' "
+                        f"({len(members)} devices)"
                     )
-                    console.print(f"[cyan]Command:[/cyan] {command_or_sequence}")
-                    console.print(f"[cyan]Members:[/cyan] {', '.join(members)}")
-                    console.print()
+                    ctx.print_info(f"Command: {command_or_sequence}")
+                    ctx.print_info(f"Members: {', '.join(members)}")
+                    output_mgr.print_blank_line()
 
                 with ThreadPoolExecutor(max_workers=len(members)) as executor:
                     # Get credential overrides if in interactive mode
@@ -739,6 +745,7 @@ def register(app: typer.Typer) -> None:
                             command_or_sequence,
                             username_override,
                             password_override,
+                            transport_type,
                         ): device
                         for device in members
                     }
@@ -767,29 +774,20 @@ def register(app: typer.Typer) -> None:
                             )
                             sys.stdout.write(f"{out_text}\n")
                 else:
-                    console.print("[bold green]Group Command Results:[/bold green]")
+                    ctx.print_success("Group Command Results:")
                     for device_name, out_text, error in group_results:
-                        table = Table(
-                            title=f"Device: {device_name}", box=None, show_header=False
-                        )
+                        # Print a simple device header and status lines (no tables)
+                        output_mgr.print_separator()
+                        output_mgr.print_info(f"Device: {device_name}")
                         if error:
-                            table.add_row(
-                                "[bold red]Status[/bold red]", "[red]Failed[/red]"
-                            )
-                            table.add_row(
-                                "[bold red]Error[/bold red]", f"[red]{error}[/red]"
-                            )
+                            output_mgr.print_error("Failed", device_name)
+                            output_mgr.print_error(str(error), device_name)
                         else:
-                            table.add_row(
-                                "[bold green]Status[/bold green]",
-                                "[green]Success[/green]",
-                            )
-                            table.add_row(
-                                "[bold cyan]Output[/bold cyan]",
-                                f"[white]{out_text}[/white]",
-                            )
-                        console.print(table)
-                        console.print("-" * 80)
+                            output_mgr.print_success("Success", device_name)
+                            if out_text:
+                                output_mgr.print_blank_line()
+                                output_mgr.print_output(out_text)
+                        output_mgr.print_blank_line()
 
                 if results_mgr.store_results:
                     # Store per-device results and a group summary file
@@ -837,11 +835,14 @@ def register(app: typer.Typer) -> None:
 
         except NetworkToolkitError as e:
             if raw is None:
-                console.print(f"[red]Error: {e.message}[/red]")
+                output_mgr.print_error(f"Error: {e.message}")
                 if verbose and e.details:
-                    console.print(f"[red]Details: {e.details}[/red]")
+                    output_mgr.print_error(f"Details: {e.details}")
             raise typer.Exit(1) from None
+        except typer.Exit:
+            # Re-raise typer.Exit without catching it as an unexpected error
+            raise
         except Exception as e:  # pragma: no cover - unexpected
             if raw is None:
-                console.print(f"[red]Unexpected error: {e}[/red]")
+                output_mgr.print_error(f"Unexpected error: {e}")
             raise typer.Exit(1) from None

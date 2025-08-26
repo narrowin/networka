@@ -1,0 +1,729 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Groups Collection Configuration",
+  "description": "Schema for group collection files (config/groups/*.yml)",
+  "type": "object",
+  "properties": {
+    "groups": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/DeviceGroup"
+      },
+      "description": "Dictionary of device group configurations keyed by group name"
+    }
+  },
+  "required": [
+    "groups"
+  ],
+  "$defs": {
+    "CommandSequence": {
+      "description": "Global command sequence definition.",
+      "properties": {
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "commands": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Commands",
+          "type": "array"
+        },
+        "tags": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tags"
+        },
+        "file_operations": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "File Operations"
+        }
+      },
+      "required": [
+        "description",
+        "commands"
+      ],
+      "title": "CommandSequence",
+      "type": "object"
+    },
+    "CommandSequenceGroup": {
+      "description": "Command sequence group definition.",
+      "properties": {
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "match_tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Match Tags",
+          "type": "array"
+        }
+      },
+      "required": [
+        "description",
+        "match_tags"
+      ],
+      "title": "CommandSequenceGroup",
+      "type": "object"
+    },
+    "DeviceConfig": {
+      "description": "Configuration for a single network device.\n\nAttributes\n----------\ndevice_type : SupportedDeviceType\n    Network driver type for connection establishment and command execution.\n    Determines which Scrapli/Netmiko platform driver to use for network operations.\n    Examples: 'mikrotik_routeros', 'cisco_iosxe', 'juniper_junos'\n\nplatform : str | None\n    Hardware architecture platform for firmware operations.\n    Used to select correct firmware images for upgrades and hardware-specific operations.\n    Examples: 'x86', 'x86_64', 'arm', 'tile', 'mipsbe'\n    Optional - only required for firmware upgrade operations.",
+      "properties": {
+        "host": {
+          "title": "Host",
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "device_type": {
+          "default": "mikrotik_routeros",
+          "title": "Device Type",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "platform": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Platform"
+        },
+        "location": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Location"
+        },
+        "user": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "User"
+        },
+        "password": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Password"
+        },
+        "port": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Port"
+        },
+        "transport_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Transport Type"
+        },
+        "tags": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tags"
+        },
+        "overrides": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DeviceOverrides"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "command_sequences": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Command Sequences"
+        }
+      },
+      "required": [
+        "host"
+      ],
+      "title": "DeviceConfig",
+      "type": "object"
+    },
+    "DeviceGroup": {
+      "description": "Configuration for a device group.",
+      "properties": {
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "members": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Members"
+        },
+        "match_tags": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Match Tags"
+        },
+        "credentials": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GroupCredentials"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "description"
+      ],
+      "title": "DeviceGroup",
+      "type": "object"
+    },
+    "DeviceOverrides": {
+      "description": "Device-specific configuration overrides.",
+      "properties": {
+        "user": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "User"
+        },
+        "password": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Password"
+        },
+        "port": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Port"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout"
+        },
+        "transport": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Transport"
+        },
+        "command_timeout": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Command Timeout"
+        },
+        "transfer_timeout": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Transfer Timeout"
+        }
+      },
+      "title": "DeviceOverrides",
+      "type": "object"
+    },
+    "FileOperationConfig": {
+      "description": "File operation configuration.",
+      "properties": {
+        "local_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Local Path"
+        },
+        "remote_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Remote Path"
+        },
+        "verify_checksum": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Verify Checksum"
+        },
+        "backup_before_upgrade": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Backup Before Upgrade"
+        },
+        "remote_files": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Remote Files"
+        },
+        "compress": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Compress"
+        },
+        "file_pattern": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "File Pattern"
+        }
+      },
+      "title": "FileOperationConfig",
+      "type": "object"
+    },
+    "GeneralConfig": {
+      "description": "General configuration settings.",
+      "properties": {
+        "firmware_dir": {
+          "default": "/tmp/firmware",
+          "title": "Firmware Dir",
+          "type": "string"
+        },
+        "backup_dir": {
+          "default": "/tmp/backups",
+          "title": "Backup Dir",
+          "type": "string"
+        },
+        "logs_dir": {
+          "default": "/tmp/logs",
+          "title": "Logs Dir",
+          "type": "string"
+        },
+        "results_dir": {
+          "default": "/tmp/results",
+          "title": "Results Dir",
+          "type": "string"
+        },
+        "transport": {
+          "default": "ssh",
+          "title": "Transport",
+          "type": "string"
+        },
+        "port": {
+          "default": 22,
+          "title": "Port",
+          "type": "integer"
+        },
+        "timeout": {
+          "default": 30,
+          "title": "Timeout",
+          "type": "integer"
+        },
+        "default_transport_type": {
+          "default": "scrapli",
+          "title": "Default Transport Type",
+          "type": "string"
+        },
+        "connection_retries": {
+          "default": 3,
+          "title": "Connection Retries",
+          "type": "integer"
+        },
+        "retry_delay": {
+          "default": 5,
+          "title": "Retry Delay",
+          "type": "integer"
+        },
+        "transfer_timeout": {
+          "default": 300,
+          "title": "Transfer Timeout",
+          "type": "integer"
+        },
+        "verify_checksums": {
+          "default": true,
+          "title": "Verify Checksums",
+          "type": "boolean"
+        },
+        "command_timeout": {
+          "default": 60,
+          "title": "Command Timeout",
+          "type": "integer"
+        },
+        "enable_logging": {
+          "default": true,
+          "title": "Enable Logging",
+          "type": "boolean"
+        },
+        "log_level": {
+          "default": "INFO",
+          "title": "Log Level",
+          "type": "string"
+        },
+        "backup_retention_days": {
+          "default": 30,
+          "title": "Backup Retention Days",
+          "type": "integer"
+        },
+        "max_backups_per_device": {
+          "default": 10,
+          "title": "Max Backups Per Device",
+          "type": "integer"
+        },
+        "store_results": {
+          "default": false,
+          "title": "Store Results",
+          "type": "boolean"
+        },
+        "results_format": {
+          "default": "txt",
+          "title": "Results Format",
+          "type": "string"
+        },
+        "results_include_timestamp": {
+          "default": true,
+          "title": "Results Include Timestamp",
+          "type": "boolean"
+        },
+        "results_include_command": {
+          "default": true,
+          "title": "Results Include Command",
+          "type": "boolean"
+        },
+        "output_mode": {
+          "default": "default",
+          "title": "Output Mode",
+          "type": "string"
+        }
+      },
+      "title": "GeneralConfig",
+      "type": "object"
+    },
+    "GroupCredentials": {
+      "description": "Group-level credential configuration.",
+      "properties": {
+        "user": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "User"
+        },
+        "password": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Password"
+        }
+      },
+      "title": "GroupCredentials",
+      "type": "object"
+    },
+    "VendorPlatformConfig": {
+      "description": "Configuration for vendor platform support.",
+      "properties": {
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "sequence_path": {
+          "title": "Sequence Path",
+          "type": "string"
+        },
+        "default_files": {
+          "default": [
+            "common.yml"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "title": "Default Files",
+          "type": "array"
+        }
+      },
+      "required": [
+        "description",
+        "sequence_path"
+      ],
+      "title": "VendorPlatformConfig",
+      "type": "object"
+    },
+    "VendorSequence": {
+      "description": "Vendor-specific command sequence definition.",
+      "properties": {
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Category"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout"
+        },
+        "device_types": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Device Types"
+        },
+        "commands": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Commands",
+          "type": "array"
+        }
+      },
+      "required": [
+        "description",
+        "commands"
+      ],
+      "title": "VendorSequence",
+      "type": "object"
+    }
+  }
+}

@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 import typer
-from rich.table import Table
 
 from network_toolkit.common.command import CommandContext, handle_toolkit_errors
 from network_toolkit.common.credentials import prompt_for_credentials
@@ -88,58 +87,51 @@ def register(app: typer.Typer) -> None:
         devices, unknowns = resolver.resolve_targets(targets)
 
         if unknowns:
-            ctx.print_warning(f"Unknown targets: {', '.join(unknowns)}")
+            ctx.output.print_unknown_warning(unknowns)
 
         if not devices:
-            ctx.print_error("No valid devices found in targets")
+            ctx.output.print_error("No valid devices found in targets")
             raise typer.Exit(1) from None
 
-        ctx.console.print(
-            f"[bold blue]Device Information ({len(devices)} devices)[/bold blue]"
-        )
+        ctx.output.print_info(f"Device Information ({len(devices)} devices)")
 
         # Show info for each resolved device
         for i, device in enumerate(devices):
             if i > 0:
-                ctx.console.print()  # Blank line between devices
+                ctx.output.print_blank_line()  # Blank line between devices
 
             if not ctx.config.devices or device not in ctx.config.devices:
-                ctx.print_error(f"Device '{device}' not found in configuration")
+                ctx.output.print_error(f"Device '{device}' not found in configuration")
                 continue
 
             device_config = ctx.config.devices[device]
 
             # Create device info table
-            table = Table(
+            table = ctx.output.create_table(
                 title=f"Device: {device}",
-                box=None,
                 show_header=False,
-                padding=(0, 1),
+                box=None,
             )
 
             # Basic device information
-            table.add_row("[bold cyan]Host[/bold cyan]", str(device_config.host))
-            table.add_row("[bold cyan]Type[/bold cyan]", device_config.device_type)
+            table.add_row("Host", str(device_config.host))
+            table.add_row("Type", device_config.device_type)
 
             if device_config.description:
-                table.add_row(
-                    "[bold cyan]Description[/bold cyan]", device_config.description
-                )
+                table.add_row("Description", device_config.description)
 
             if device_config.tags:
-                table.add_row(
-                    "[bold cyan]Tags[/bold cyan]", ", ".join(device_config.tags)
-                )
+                table.add_row("Tags", ", ".join(device_config.tags))
 
-            if hasattr(device_config, "platform") and device_config.platform:
-                table.add_row("[bold cyan]Platform[/bold cyan]", device_config.platform)
+            if device_config.platform:
+                table.add_row("Platform", device_config.platform)
 
-            if hasattr(device_config, "model") and device_config.model:
-                table.add_row("[bold cyan]Model[/bold cyan]", device_config.model)
+            if device_config.model:
+                table.add_row("Model", device_config.model)
 
             # Transport information
             transport_type = getattr(device_config, "transport_type", "scrapli")
-            table.add_row("[bold cyan]Transport[/bold cyan]", transport_type)
+            table.add_row("Transport", transport_type)
 
             # Connection test
             try:
@@ -157,24 +149,20 @@ def register(app: typer.Typer) -> None:
                     device, ctx.config, username_override, password_override
                 ) as session:
                     identity_result = session.execute_command("/system/identity/print")
-                    table.add_row(
-                        "[bold green]Status[/bold green]", "[green]Connected OK[/green]"
-                    )
+                    table.add_row("Status", "Connected OK")
                     if identity_result:
                         lines = identity_result.strip().split("\n")
                         if lines:
                             identity = lines[0].strip()
-                            table.add_row("[bold cyan]Identity[/bold cyan]", identity)
+                            table.add_row("Identity", identity)
 
             except NetworkToolkitError as e:
-                table.add_row("[bold red]Status[/bold red]", "[red]Failed FAIL[/red]")
-                table.add_row("[bold red]Error[/bold red]", f"[red]{e.message}[/red]")
+                table.add_row("Status", "Failed")
+                table.add_row("Error", e.message)
                 if ctx.verbose and e.details:
-                    table.add_row(
-                        "[bold red]Details[/bold red]", f"[red]{e.details}[/red]"
-                    )
+                    table.add_row("Details", str(e.details))
             except Exception as e:
-                table.add_row("[bold red]Status[/bold red]", "[red]Failed FAIL[/red]")
-                table.add_row("[bold red]Error[/bold red]", f"[red]{e!s}[/red]")
+                table.add_row("Status", "Failed")
+                table.add_row("Error", str(e))
 
-            ctx.console.print(table)
+            ctx.output.print_table(table)

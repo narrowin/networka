@@ -45,7 +45,7 @@ class TestErrorFormatting:
 
         print_error(console, "Test error")
 
-        console.print.assert_called_once_with("[red]Error: Test error[/red]")
+        console.print.assert_called_once_with("[error]Error: Test error[/error]")
 
     def test_print_error_with_context(self) -> None:
         """Test print_error function with context."""
@@ -53,7 +53,9 @@ class TestErrorFormatting:
 
         print_error(console, "Test error", context="device1")
 
-        console.print.assert_called_once_with("[red]Error: [device1] Test error[/red]")
+        console.print.assert_called_once_with(
+            "[error]Error: [device1] Test error[/error]"
+        )
 
     def test_print_error_with_details(self) -> None:
         """Test print_error function with details."""
@@ -63,7 +65,7 @@ class TestErrorFormatting:
         print_error(console, "Test error", details=details)
 
         console.print.assert_called_once_with(
-            "[red]Error: Test error (host=192.168.1.1)[/red]"
+            "[error]Error: Test error (host=192.168.1.1)[/error]"
         )
 
     def test_print_warning(self) -> None:
@@ -72,7 +74,9 @@ class TestErrorFormatting:
 
         print_warning(console, "Test warning")
 
-        console.print.assert_called_once_with("[yellow]Warning: Test warning[/yellow]")
+        console.print.assert_called_once_with(
+            "[warning]Warning: Test warning[/warning]"
+        )
 
     def test_print_warning_with_context(self) -> None:
         """Test print_warning function with context."""
@@ -81,7 +85,7 @@ class TestErrorFormatting:
         print_warning(console, "Test warning", context="device1")
 
         console.print.assert_called_once_with(
-            "[yellow]Warning: [device1] Test warning[/yellow]"
+            "[warning]Warning: [device1] Test warning[/warning]"
         )
 
     def test_print_warning_with_details(self) -> None:
@@ -92,7 +96,7 @@ class TestErrorFormatting:
         print_warning(console, "Test warning", details=details)
 
         console.print.assert_called_once_with(
-            "[yellow]Warning: Test warning (timeout=30)[/yellow]"
+            "[warning]Warning: Test warning (timeout=30)[/warning]"
         )
 
     def test_print_success(self) -> None:
@@ -101,7 +105,7 @@ class TestErrorFormatting:
 
         print_success(console, "Test success")
 
-        console.print.assert_called_once_with("[green]Test success[/green]")
+        console.print.assert_called_once_with("[success]Test success[/success]")
 
     def test_print_success_with_context(self) -> None:
         """Test print_success function with context."""
@@ -109,7 +113,9 @@ class TestErrorFormatting:
 
         print_success(console, "Test success", context="device1")
 
-        console.print.assert_called_once_with("[green][device1] Test success[/green]")
+        console.print.assert_called_once_with(
+            "[success][device1] Test success[/success]"
+        )
 
     def test_print_success_with_details(self) -> None:
         """Test print_success function with details."""
@@ -118,7 +124,9 @@ class TestErrorFormatting:
 
         print_success(console, "Test success", details=details)
 
-        console.print.assert_called_once_with("[green]Test success (files=3)[/green]")
+        console.print.assert_called_once_with(
+            "[success]Test success (files=3)[/success]"
+        )
 
     def test_format_error_message_empty_details(self) -> None:
         """Test error message formatting with empty details."""
@@ -137,9 +145,7 @@ class TestErrorFormatting:
 
         print_error(console, "Connection failed", details=details, context="device1")
 
-        expected_message = (
-            "[red]Error: [device1] Connection failed (host=192.168.1.1, port=22)[/red]"
-        )
+        expected_message = "[error]Error: [device1] Connection failed (host=192.168.1.1, port=22)[/error]"
         console.print.assert_called_once_with(expected_message)
 
     def test_print_warning_with_all_parameters(self) -> None:
@@ -152,7 +158,7 @@ class TestErrorFormatting:
         )
 
         expected_message = (
-            "[yellow]Warning: [device1] Retrying connection (retry=3)[/yellow]"
+            "[warning]Warning: [device1] Retrying connection (retry=3)[/warning]"
         )
         console.print.assert_called_once_with(expected_message)
 
@@ -166,6 +172,6 @@ class TestErrorFormatting:
         )
 
         expected_message = (
-            "[green][device1] Operation completed (duration=2.5s)[/green]"
+            "[success][device1] Operation completed (duration=2.5s)[/success]"
         )
         console.print.assert_called_once_with(expected_message)

@@ -295,7 +295,7 @@ class TestNetworkConfig:
             "timeout_socket": 30,
             "timeout_transport": 30,
             "transport": "ssh",
-            "platform": "mipsbe",
+            "platform": "mikrotik_routeros",  # Now correctly uses device_type, not hardware platform
         }
 
         assert params == expected

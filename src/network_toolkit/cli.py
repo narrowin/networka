@@ -19,6 +19,7 @@ from network_toolkit.commands.complete import register as register_complete
 # Command registration: import command factories that attach to `app`
 # Each module defines a `register(app)` function that adds its commands.
 from network_toolkit.commands.config_backup import register as register_config_backup
+from network_toolkit.commands.config_init import register as register_config_init
 from network_toolkit.commands.config_validate import (
     register as register_config_validate,
 )
@@ -35,13 +36,33 @@ from network_toolkit.commands.list_devices import register as register_list_devi
 from network_toolkit.commands.list_groups import register as register_list_groups
 from network_toolkit.commands.list_sequences import register as register_list_sequences
 from network_toolkit.commands.run import register as register_run
+from network_toolkit.commands.schema import register as register_schema
 from network_toolkit.commands.ssh import register as register_ssh
 from network_toolkit.commands.upload import register as register_upload
-from network_toolkit.common.logging import console, setup_logging
-from network_toolkit.common.output import OutputMode, set_output_mode
+from network_toolkit.commands.vendor_backup import register as register_vendor_backup
+from network_toolkit.commands.vendor_config_backup import (
+    register as register_vendor_config_backup,
+)
+from network_toolkit.common.logging import setup_logging
+from network_toolkit.common.output import get_output_manager
+
+
+class _DynamicConsoleProxy:
+    """Proxy that forwards attribute access to the current OutputManager console.
+
+    This avoids capturing a stale Console at import time so that changes to the
+    output mode (e.g., via --output-mode or config) are reflected everywhere.
+    """
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(get_output_manager().console, name)
+
+
+# Dynamic console that always reflects the active OutputManager
+console = _DynamicConsoleProxy()
 
 # Keep this import here to preserve tests that patch `network_toolkit.cli.DeviceSession`
-from network_toolkit.device import DeviceSession as _DeviceSession
+from network_toolkit.device import DeviceSession as _DeviceSession  # noqa: E402
 
 
 # Preserve insertion order and group commands under a single Commands section
@@ -57,7 +78,10 @@ class CategorizedHelpGroup(TyperGroup):
             "ssh",
             "upload",
             "download",
+        ]
+        vendor_names = [
             "config-backup",
+            "backup",
             "firmware-upgrade",
             "firmware-downgrade",
             "bios-upgrade",
@@ -67,6 +91,7 @@ class CategorizedHelpGroup(TyperGroup):
             "list-devices",
             "list-groups",
             "list-sequences",
+            "config-init",
             "config-validate",
             "diff",
         ]
@@ -86,11 +111,15 @@ class CategorizedHelpGroup(TyperGroup):
             return items
 
         exec_rows = rows(exec_names)
+        vendor_rows = rows(vendor_names)
         info_rows = rows(info_names)
 
         if exec_rows:
             formatter.write_text("\nExecuting Operations")
             formatter.write_dl(exec_rows)
+        if vendor_rows:
+            formatter.write_text("\nVendor-Specific Operations")
+            formatter.write_dl(vendor_rows)
         if info_rows:
             formatter.write_text("\nInfo & Configuration")
             formatter.write_dl(info_rows)
@@ -98,14 +127,14 @@ class CategorizedHelpGroup(TyperGroup):
 
 # Typer application instance
 help_text = (
-    "\n    Network Worker (nw)\n\n"
+    "\n    Networka (nw)\n\n"
     "    A powerful multi-vendor CLI tool for automating network devices based on ssh protocol.\n"
     "    Built with async/await support and type safety in mind.\n\n"
     "    QUICK START:\n"
     "      nw run sw-acc1 '/system/clock/print'  # Execute command\n"
     "      nw run office_switches system_info    # Run sequence on group\n\n"
     "    For detailed help on any command: nw <command> --help\n"
-    "    Default config directory: config/ (use --config to override)\n    "
+    "    Default config directory: system app config (use --config to override)\n    "
 )
 app = typer.Typer(
     name="nw",
@@ -128,7 +157,7 @@ def main(
 ) -> None:
     """Configure global settings for the network toolkit."""
     if version:
-        console.print(f"Network Worker (nw) version {__version__}")
+        console.print(f"Networka (nw) version {__version__}")
         raise typer.Exit()
 
     # If no command is invoked and no version flag, show help
@@ -208,6 +237,7 @@ def _handle_file_downloads(
         filename = replace_placeholders(local_filename_str)
         destination = local_dir / filename
 
+        # Keep console.print here for backward-compatible tests expecting direct console output
         console.print(f"[cyan]Downloading {remote_file} from {device_name}...[/cyan]")
 
         try:
@@ -237,15 +267,18 @@ register_run(app)
 register_list_devices(app)
 register_list_groups(app)
 register_list_sequences(app)
+register_config_init(app)
 register_config_validate(app)
 register_upload(app)
 register_download(app)
-register_config_backup(app)
+register_vendor_config_backup(app)
+register_vendor_backup(app)
 register_firmware_upgrade(app)
 register_firmware_downgrade(app)
 register_bios_upgrade(app)
 register_complete(app)
 register_diff(app)
+register_schema(app)
 register_ssh(app)
 
 

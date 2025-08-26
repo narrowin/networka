@@ -1,14 +1,39 @@
-# Net-Worker (nw)
+<div align="center">
+  <img src="docs/images/networka.png" alt="Networka Logo" width="320"/>
+</div>
 
-**The `Eierlegende Wollmilchsau` of network operations — optimized for your daily workflows.**
+<br/>
+
+**Networka: `Eierlegende Wollmilchsau` of network operations — optimized for your daily workflows.**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
-[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](https://github.com/narrowin/net-worker)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](https://github.com/narrowin/networka)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Type checked with mypy](https://img.shields.io/badge/mypy-checked-blue.svg)](http://mypy-lang.org/)
 
-Net-Worker is a modern async CLI tool for automating network devices across multiple vendors. Built with async/await patterns for high performance and reliability. Designed for network engineers who want fast, scalable automation with full cross-platform support.
+Networka is a modern async CLI tool for automating network devices across multiple vendors. Built with async/await patterns for high performance and reliability. Designed for network engineers who want fast, scalable automation with full cross-platform support.
+
+---
+
+## _The Networka Monologue_
+
+_“People ask the question…_ <br>
+**what’s a Networka?** <br>
+
+And I tell 'em — <br>
+it's **not** about cables, configs, and pings. <br>
+_Oh no._ <br>
+There’s more to it than that, my friend. <br>
+
+We all like a bit of the good life — <br>
+some the uptime, some the security, <br>
+others the automation, the visibility, or the compliance. <br>
+
+But a **Networka**, oh, they're different. <br>
+Why? <br>
+Because a real **Networka** wants the f\*ing lot.”<br><br>
+(inspired by: [RockNRolla](https://www.youtube.com/watch?v=s4YLBqMJYOo))
 
 ## Getting Started
 
@@ -23,8 +48,9 @@ Net-Worker is a modern async CLI tool for automating network devices across mult
 
 - **Cross-platform**: Full support for Linux, macOS, and Windows
 - **Multi-vendor support**: MikroTik RouterOS, Cisco IOS-XE/NX-OS, Arista EOS, Juniper JunOS, and more
-- **Modern async architecture**: Built with async/await for high performance
 - **Device/Group operations**: Execute commands across devices or groups concurrently
+- **Flexible config options**: Device and group configs can be done in yaml or csv with powerful tag and group options
+- **Modern async architecture**: Built with async/await for high performance
 - **Command sequences**: Vendor-aware predefined command sets
 - **Results management**: Organized storage with multiple output formats
 - **Type safety**: Full type checking with mypy for reliability
@@ -32,6 +58,7 @@ Net-Worker is a modern async CLI tool for automating network devices across mult
 ## Installation
 
 ### System Requirements
+
 - **Operating System**: Linux, macOS, or Windows
 - **Python**: 3.11, 3.12, or 3.13
 - **Network Access**: SSH connectivity to target devices
@@ -41,12 +68,12 @@ Net-Worker is a modern async CLI tool for automating network devices across mult
 
 ```bash
 # Easiest (user-wide, isolated)
-uv tool install git+https://github.com/narrowin/net-worker.git
+uv tool install git+https://github.com/narrowin/networka.git
 # or
-pipx install git+https://github.com/narrowin/net-worker.git
+pipx install git+https://github.com/narrowin/networka.git
 
 # If you prefer plain pip (user-wide, no sudo)
-pip install --user git+https://github.com/narrowin/net-worker.git
+pip install --user git+https://github.com/narrowin/networka.git
 # ensure ~/.local/bin (or platform-specific bin) is on PATH
 
 # Verify installation works
@@ -57,128 +84,110 @@ nw --help
 
 ```bash
 # Upgrade to latest version
-uv tool upgrade net-worker
+uv tool upgrade networka
 # or
-pipx upgrade net-worker
+pipx upgrade networka
 # or
-pip install --user --upgrade git+https://github.com/narrowin/net-worker.git
+pip install --user --upgrade git+https://github.com/narrowin/networka.git
 
 # Remove installation
-uv tool uninstall net-worker
+uv tool uninstall networka
 # or
-pipx uninstall net-worker
+pipx uninstall networka
 # or
-pip uninstall net-worker
+pip uninstall networka
 ```
 
 ### Platform-Specific Notes
 
 **Linux/macOS**: No additional dependencies required
 
-**Windows**: All dependencies include pre-built wheels for seamless installation
-
-### Development Installation
-
-```bash
-# Clone repository
-git clone https://github.com/narrowin/net-worker.git
-cd net-worker
-
-# Install with uv (recommended)
-uv sync --all-extras
-
-# Or with pip
-pip install -e ".[dev]"
-
-# Verify installation
-nw --help
-```
-
-### Alternative Installation Methods
-
-```bash
-# Install specific version
-pip install git+https://github.com/narrowin/net-worker.git@v0.1.0
-
-# Install from local clone
-git clone https://github.com/narrowin/net-worker.git
-cd net-worker
-uv pip install .
-```
+**Windows**: Scrapli (the default transport) does not officially support native Windows. While it may work with Paramiko or ssh2-python drivers, the recommended approach is to run Networka on WSL2 (Ubuntu) for a fully supported POSIX environment. Native Windows usage is best-effort.
 
 ## Quick Start
 
-Get up and running in 3 steps:
+Get up and running with config-init command:
 
 ```bash
-# 1. Set up credentials (automatically loaded)
-cp .env.example .env
-nano .env  # Add your actual device credentials
+# 1. Initialize your configuration environment
+nw config-init
+# This creates: .env, config/config.yml, config/devices/, config/groups/, config/sequences/
 
-# 2. Configure your devices
-nano config/devices/devices.yml
+# 2. Update credentials and device IPs
+nano .env                           # Add your actual credentials
+nano config/devices/mikrotik.yml    # Update device IP addresses
 
 # 3. Start managing your network
-nw run sw-acc1 "/system/identity/print"
-nw run office_switches system_info
+nw run sw-office-01 system_info
+nw run office_switches "/system/identity/print"
 ```
+
+## Terminology: device_type vs hardware platform vs transport
+
+- device_type: Network OS driver used for connections and commands (Scrapli "platform"). Examples: mikrotik_routeros, cisco_iosxe, arista_eos, juniper_junos. Set per device and used to resolve vendor-aware sequences.
+- platform (hardware/firmware): Hardware architecture used for firmware-related operations. Examples: x86, x86_64, arm, mipsbe, tile. Not used for SSH connections or command execution.
+- transport: Connection backend used by Networka. Default is scrapli; nornir-netmiko transport is planned (not yet supported).
+
+Note about flags: When targeting IP addresses directly, the CLI flag --platform refers to the network driver (device_type), not the hardware architecture.
+
+## Connection transports
+
+- Default: Scrapli (stable)
+- CLI override: use --transport to select the connection backend per run
+- Planned: nornir-netmiko integration. Note: nornir-netmiko is not yet supported but coming soon.
 
 ## CLI overview
 
 ```
 Usage: nw [OPTIONS] COMMAND [ARGS]...
 
-🌐 Network Worker (nw)
+ Networka (nw)
 
-A powerful multi-vendor CLI tool for automating network devices based on ssh protocol.
-Built with async/await support and type safety in mind.
+ A powerful multi-vendor CLI tool for automating network devices based on ssh protocol.
+ Built with async/await support and type safety in mind.
 
-📋 QUICK START:
-  nw run sw-acc1 '/system/clock/print'  # Execute command
-  nw run office_switches system_info    # Run sequence on group
+ QUICK START:
+   nw run sw-acc1 '/system/clock/print'  # Execute command
+   nw run office_switches system_info    # Run sequence on group
 
-📖 For detailed help on any command: nw <command> --help
-📁 Default config directory: config/ (use --config to override)
+ For detailed help on any command: nw <command> --help
+ Default config directory: config/ (use --config to override)
 
-╭─ Options ──────────────────────────────────────────────────────────────────╮
-│ --help  -h        Show this message and exit.                              │
-╰────────────────────────────────────────────────────────────────────────────╯
-╭─ Commands ─────────────────────────────────────────────────────────────────╮
-│ ssh                  Open tmux with SSH panes for a device or group.       │
-╰────────────────────────────────────────────────────────────────────────────╯
-╭─ Info & Configuration ─────────────────────────────────────────────────────╮
-│ info                 Show comprehensive device information and connection  │
-│                      status.                                               │
-│ list-devices         List all configured network devices.                  │
-│ list-groups          List all configured device groups and their members.  │
-│ list-sequences       List all available command sequences, optionally      │
-│                      filtered by vendor or category.                       │
-│ config-validate      Validate the configuration file and show any issues.  │
-│ diff                 Diff config, a command, or a sequence.               │
-╰────────────────────────────────────────────────────────────────────────────╯
-╭─ Executing Operations ─────────────────────────────────────────────────────╮
-│ run                  Execute a single command or a sequence on a device or │
-│                      a group.                                              │
-│ upload               Upload a file to a device or to all devices in a      │
-│                      group.                                                │
-│ download             Download a file from a device or all devices in a     │
-│                      group.                                                │
-│ config-backup        Create configuration backup                           │
-│ backup               Create device backup                                  │
-│ firmware-upgrade     Upload firmware package and reboot device to apply    │
-│                      it.                                                   │
-│ firmware-downgrade   Upload older firmware package, schedule downgrade,    │
-│                      and reboot to apply.                                  │
-│ bios-upgrade         Upgrade RouterBOARD (RouterBOOT/BIOS) and reboot to   │
-│                      apply.                                                │
-╰────────────────────────────────────────────────────────────────────────────╯
+Options:
+  --version            Show version information
+  --help     -h        Show this message and exit.
+
+Commands:
+  ssh                  Open tmux with SSH panes for a device or group.
+
+Info & Configuration:
+  info                 Show comprehensive device information and connection status.
+  list-devices         List all configured network devices.
+  list-groups          List all configured device groups and their members.
+  list-sequences       List all available command sequences, optionally filtered by vendor or category.
+  config-init          Initialize a minimal working configuration environment.
+  config-validate      Validate the configuration file and show any issues.
+  diff                 Diff config, a command, or a sequence.
+
+Executing Operations:
+  run                  Execute a single command or a sequence on a device or a group.
+  upload               Upload a file to a device or to all devices in a group.
+  download             Download a file from a device or all devices in a group.
+
+Vendor-Specific Operations:
+  config-backup        Create device configuration backup using vendor-specific commands.
+  backup               Create comprehensive device backup using vendor-specific commands.
+  firmware-upgrade     Upload firmware package and reboot device to apply it.
+  firmware-downgrade   Upload older firmware package, schedule downgrade, and reboot to apply.
+  bios-upgrade         Upgrade device BIOS/RouterBOOT and reboot to apply.
 ```
 
-## Quick Start
+## networka environment
 
-### 1. Set up credentials
+### 1. Set up credentials for network device logins
 
 **Option A: Use .env file (Recommended)**
+
 ```bash
 # Copy and edit the example file
 cp .env.example .env
@@ -186,6 +195,7 @@ nano .env  # Add your actual credentials
 ```
 
 **Option B: Export environment variables**
+
 ```bash
 # Set environment variables for security
 export NW_USER_DEFAULT="admin"
@@ -246,7 +256,7 @@ nw run sw-acc1 health_check --store-results
 
 ## Configuration
 
-Net-Worker uses a flexible configuration system supporting both YAML and CSV formats, with hierarchical loading from directories and subdirectories.
+Networka uses a flexible configuration system supporting both YAML and CSV formats, with hierarchical loading from directories and subdirectories.
 
 ### Enhanced Configuration Features
 
@@ -281,6 +291,7 @@ export NW_PASSWORD_SW_ACC1="switch1_password"  # pragma: allowlist secret
 ### Configuration Structure
 
 #### Modular Directory Structure
+
 ```
 config/
 ├── config.yml              # Main configuration (required)
@@ -307,18 +318,26 @@ config/
 #### CSV Format Reference
 
 **Devices CSV Headers:**
+
 ```csv
 name,host,device_type,description,platform,model,location,tags
 sw-01,192.168.1.1,mikrotik_routeros,Lab Switch,mipsbe,CRS326,Lab,switch;access;lab
 ```
 
+Notes:
+
+- device_type = network driver (Scrapli platform); controls connection behavior and command semantics
+- platform = hardware architecture for firmware tasks (upgrade/downgrade/bootloader)
+
 **Groups CSV Headers:**
+
 ```csv
 name,description,members,match_tags
 lab_devices,Lab environment,sw-01;sw-02,lab;test
 ```
 
 **Sequences CSV Headers:**
+
 ```csv
 name,description,commands,tags
 system_info,Get system info,/system/identity/print;/system/clock/print,system;info
@@ -327,34 +346,39 @@ system_info,Get system info,/system/identity/print;/system/clock/print,system;in
 ### Configuration file structure
 
 **Main Configuration (`config/config.yml`):**
+
 ```yaml
 general:
   results_dir: "./results"
   timeout: 30
-  output_mode: "dark"  # default, light, dark, no-color, raw
+  output_mode: "dark" # default, light, dark, no-color, raw
 ```
 
 **Device Configuration (`config/devices/*.yml`):**
+
 ```yaml
 devices:
   device_name:
     host: "IP_ADDRESS"
-    device_type: "mikrotik_routeros"  # or cisco_iosxe, arista_eos, juniper_junos
+  device_type: "mikrotik_routeros" # network driver (Scrapli platform): cisco_iosxe, arista_eos, juniper_junos, ...
+  # platform: "mipsbe"            # hardware architecture for firmware ops (optional)
     description: "Device description"
     tags: ["tag1", "tag2"]
 ```
 
 **Group Configuration (`config/groups/*.yml`):**
+
 ```yaml
 groups:
   group_name:
     description: "Group description"
-    match_tags: ["tag1"]  # Include devices with these tags
+    match_tags: ["tag1"] # Include devices with these tags
     # OR
-    members: ["device1", "device2"]  # Explicit device list
+    members: ["device1", "device2"] # Explicit device list
 ```
 
 **Sequence Configuration (`config/sequences/*.yml`):**
+
 ```yaml
 sequences:
   sequence_name:
@@ -369,9 +393,9 @@ sequences:
 
 Configuration files are loaded from their respective subdirectories. All files in each subdirectory are combined (later files override earlier ones):
 
-1. **Device files**: All files in `config/devices/` (*.yml, *.yaml, *.csv)
-2. **Group files**: All files in `config/groups/` (*.yml, *.yaml, *.csv)
-3. **Sequence files**: All files in `config/sequences/` (*.yml, *.yaml, *.csv)
+1. **Device files**: All files in `config/devices/` (_.yml, _.yaml, \*.csv)
+2. **Group files**: All files in `config/groups/` (_.yml, _.yaml, \*.csv)
+3. **Sequence files**: All files in `config/sequences/` (_.yml, _.yaml, \*.csv)
 
 Within each directory, files are loaded alphabetically, so later files can override earlier ones.
 
@@ -393,10 +417,11 @@ Control colors and formatting with the `output_mode` setting:
 
 ```yaml
 general:
-  output_mode: "dark"  # default, light, dark, no-color, raw
+  output_mode: "dark" # default, light, dark, no-color, raw
 ```
 
 **Modes:**
+
 - `default` - Rich's built-in styling (adapts to terminal)
 - `light` - Dark colors optimized for light terminal themes
 - `dark` - Bright colors optimized for dark terminal themes
@@ -404,6 +429,7 @@ general:
 - `raw` - Machine-readable format for scripts/automation
 
 **Override precedence:**
+
 1. CLI flag: `nw info device1 --output-mode raw`
 2. Environment: `export NW_OUTPUT_MODE=light`
 3. Config file: `general.output_mode`
@@ -461,16 +487,42 @@ nw run sw-acc1 diagnostic --results-dir ./maintenance-2025-08
 nw run sw-acc1 system_info --store-results --results-format json
 ```
 
+### Vendor-specific backup operations
+
+Networka provides vendor-specific backup operations that automatically use the correct commands and file formats for each platform:
+
+```bash
+# Configuration backup (text-only configuration export)
+nw config-backup sw-acc1                    # MikroTik: /export commands
+nw config-backup cisco-sw1                  # Cisco: show running-config
+nw config-backup --no-download sw-acc1      # Create but don't download files
+
+# Comprehensive backup (configuration + system data)
+nw backup sw-acc1                           # MikroTik: /export + /system/backup
+nw backup cisco-sw1                         # Cisco: show commands (running/startup/version/inventory)
+nw backup office_switches                   # Run on device group
+
+# Options for backup operations
+nw config-backup sw-acc1 --delete-remote    # Remove remote files after download
+nw backup sw-acc1 --verbose                 # Detailed operation logging
+```
+
+**Platform-specific behavior:**
+
+- **MikroTik RouterOS**: Creates .rsc (export) and .backup (system) files
+- **Cisco IOS/IOS-XE**: Displays configuration and system information (typically not saved to files)
+- **Download handling**: Automatically determines which files to download based on platform
+
 ## Community & support
 
 - Visit our [documentation](docs/) for detailed guides and examples
-- Create [GitHub Issues](https://github.com/narrowin/net-worker/issues) for bug reports and feature requests
+- Create [GitHub Issues](https://github.com/narrowin/networka/issues) for bug reports and feature requests
 - See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines
 - Check [SECURITY.md](SECURITY.md) for security policy and reporting vulnerabilities
 
 ## Contributing
 
-Have a look through existing [Issues](https://github.com/narrowin/net-worker/issues) and [Pull Requests](https://github.com/narrowin/net-worker/pulls) that you could help with. If you'd like to request a feature or report a bug, please create a GitHub Issue using one of the templates provided.
+Have a look through existing [Issues](https://github.com/narrowin/networka/issues) and [Pull Requests](https://github.com/narrowin/networka/pulls) that you could help with. If you'd like to request a feature or report a bug, please create a GitHub Issue using one of the templates provided.
 
 [See contribution guide →](CONTRIBUTING.md)
 
@@ -479,6 +531,8 @@ Have a look through existing [Issues](https://github.com/narrowin/net-worker/iss
 - [Platform Compatibility](docs/platform-compatibility.md) - Cross-platform support details
 - [Development Guide](docs/development.md) - Contributing and extending the toolkit
 - [Multi-Vendor Support](docs/multi-vendor-support.md) - Using multiple network vendors
+- [IP Address Support](docs/ip-address-support.md) - Run against ad-hoc IPs with --platform
+- [Transport Selection](docs/transport.md) - Choose Scrapli now; nornir-netmiko coming soon
 - [Environment Variables](docs/environment-variables.md) - Secure credential management
 - [File Upload Guide](docs/file_upload.md) - Firmware and configuration management
 - [Interactive Credentials](docs/interactive-credentials.md) - Alternative authentication methods
@@ -490,10 +544,12 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 ## Acknowledgments
 
 - [Scrapli](https://github.com/carlmontanari/scrapli) - Network device connections
+- [Nornir](https://github.com/nornir-automation/nornir) - Network automation framework
+- [Netmiko](https://github.com/ktbyers/netmiko) - Multi-vendor CLI connections to network devices
 - [Typer](https://github.com/tiangolo/typer) - CLI framework
 - [Pydantic](https://github.com/pydantic/pydantic) - Data validation
 - [Rich](https://github.com/Textualize/rich) - Terminal formatting
 
 ---
 
-*Built for network engineers who value clean, reliable automation*
+_Built for network engineers who value clean, reliable automation_

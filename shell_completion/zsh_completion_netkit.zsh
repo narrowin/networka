@@ -1,4 +1,4 @@
-#compdef nw net-worker network-toolkit
+#compdef nw networka network-toolkit
 
 _nw_complete() {
   local -a cmds opts values
@@ -84,4 +84,4 @@ _nw_complete() {
   return 0
 }
 
-compdef _nw_complete nw net-worker network-toolkit
+compdef _nw_complete nw networka network-toolkit
