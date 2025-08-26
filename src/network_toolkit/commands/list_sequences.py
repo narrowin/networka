@@ -170,7 +170,7 @@ def _show_vendor_sequences(
         style_manager.add_column(table, "Device Types", StyleName.ERROR)
 
     preview_limit = 3
-    for name, seq in filtered_sequences.items():
+    for name, seq in sorted(filtered_sequences.items()):
         commands_str = str(len(seq.commands)) + " commands"
         if verbose and len(seq.commands) <= preview_limit:
             commands_str = ", ".join(seq.commands[:3])
@@ -211,7 +211,7 @@ def _show_all_vendor_sequences(
         style_manager.format_message("Command Sequences by Vendor", StyleName.BOLD)
     )
 
-    for vendor, vendor_sequences in sequences.items():
+    for vendor, vendor_sequences in sorted(sequences.items()):
         vendor_title = vendor.replace("_", " ").title()
         output_manager.print_text(
             f"\n{style_manager.format_message(vendor_title, StyleName.DEVICE)}"
@@ -242,7 +242,7 @@ def _show_all_vendor_sequences(
         if verbose:
             style_manager.add_column(table, "Commands", StyleName.DIM)
 
-        for name, seq in filtered_sequences.items():
+        for name, seq in sorted(filtered_sequences.items()):
             row = [name, seq.description or "No description", seq.category or "general"]
             if verbose:
                 commands_str = str(len(seq.commands)) + " commands"
@@ -284,7 +284,7 @@ def _show_global_sequences(
         style_manager.add_column(table, "Tags", StyleName.WARNING)
 
     preview_limit = 3
-    for name, seq in filtered_sequences.items():
+    for name, seq in sorted(filtered_sequences.items()):
         commands_str = str(len(seq.commands)) + " commands"
         if verbose and len(seq.commands) <= preview_limit:
             commands_str = ", ".join(seq.commands[:3])
@@ -305,5 +305,4 @@ def _show_global_sequences(
 
         table.add_row(*row)
 
-    output_manager.print_table(table)
     output_manager.print_table(table)

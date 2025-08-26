@@ -38,8 +38,26 @@ _nw_complete() {
     args)
       case $words[2] in
         info)
-          values=(${(f)"$(nw __complete --for devices --config \"$cfg\" 2>/dev/null)"})
-          _describe -t devices 'devices' values && return ;;
+          # Offer devices, groups, and sequences for info command
+          local -a devices groups sequences annotated
+          devices=(${(f)"$(nw __complete --for devices --config \"$cfg\" 2>/dev/null)"})
+          groups=(${(f)"$(nw __complete --for groups --config \"$cfg\" 2>/dev/null)"})
+          sequences=(${(f)"$(nw __complete --for sequences --config \"$cfg\" 2>/dev/null)"})
+          annotated=()
+          local d g s
+          # Annotate device entries
+          for d in $devices; do
+            annotated+=("$d:device")
+          done
+          # Annotate group entries
+          for g in $groups; do
+            annotated+=("$g:group")
+          done
+          # Annotate sequence entries
+          for s in $sequences; do
+            annotated+=("$s:sequence")
+          done
+          _describe -t targets 'info targets' annotated && return ;;
         run)
           if (( CURRENT == 3 )); then
             # Groups first, then devices for better UX, annotate entries

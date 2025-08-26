@@ -172,7 +172,12 @@ _nw() {
     case "$cmd" in
         info)
             if [[ ${COMP_CWORD} -eq 2 ]]; then
-                _opts "$(_nw_list devices)"
+                # Offer devices, groups, and sequences for info command
+                local devices groups sequences
+                devices=$(_nw_list devices)
+                groups=$(_nw_list groups)
+                sequences=$(_nw_list sequences)
+                _opts "$devices $groups $sequences"
             else
                 _opts "$info_opts"
             fi

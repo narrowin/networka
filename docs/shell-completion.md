@@ -93,11 +93,13 @@ nw list-<TAB><TAB>
 # Shows: list-devices list-sequences list-groups ...
 ```
 
-### Device Name Completion
+### Device, Group, and Sequence Name Completion
 
 ```bash
 nw info <TAB><TAB>
-# Shows: core1br core2br vpn1br sw-acc1 sw-dist1 ...
+# Shows: core1br core2br vpn1br sw-acc1 sw-dist1 ... (devices)
+#        access_switches core_devices dmz_devices ... (groups)
+#        system_info backup_config health_check ... (sequences)
 
 nw run sw-<TAB><TAB>
 # Shows: sw-acc1 sw-acc2 sw-dist1

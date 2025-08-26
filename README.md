@@ -161,7 +161,7 @@ Commands:
   ssh                  Open tmux with SSH panes for a device or group.
 
 Info & Configuration:
-  info                 Show comprehensive device information and connection status.
+  info                 Show comprehensive information for devices, groups, or sequences.
   list-devices         List all configured network devices.
   list-groups          List all configured device groups and their members.
   list-sequences       List all available command sequences, optionally filtered by vendor or category.
@@ -435,6 +435,22 @@ general:
 3. Config file: `general.output_mode`
 
 ## Examples
+
+### Information and discovery
+
+```bash
+# Show device information and connection details
+nw info sw-acc1
+
+# Show group information and members
+nw info access_switches
+
+# Show sequence information and commands
+nw info health_check
+
+# Show information for multiple targets
+nw info sw-acc1,access_switches,health_check
+```
 
 ### Single device operations
 
