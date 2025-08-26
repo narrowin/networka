@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 import time
 from typing import Any
 
 from network_toolkit.tui.constants import STARTUP_NOTICE
+from network_toolkit.tui.models import CancellationToken
 
 
 class TuiController:
@@ -78,7 +80,7 @@ class TuiController:
             pass
         # Record UI thread identity for safe callback dispatching
         try:
-            app._ui_thread_ident = threading.get_ident()  # type: ignore[name-defined]
+            app._ui_thread_ident = threading.get_ident()
         except Exception:
             app._ui_thread_ident = -1
         # Toggling states
@@ -93,6 +95,13 @@ class TuiController:
         app._output_filter = ""
         app._output_lines = []
         app._refresh_bottom_visibility()
+        # Async task + cancellation token for active run
+        app._run_task = None
+        app._cancel_token = None
+        app._bg_tasks = set()
+        # Prompt state for confirming cancellation when a run is already active
+        app._cancel_prompt_active = False
+        app._cancel_mode_prompt_active = False
 
     async def on_input_changed(self, event: Any) -> None:
         app = self.app
@@ -167,6 +176,40 @@ class TuiController:
         app = self.app
         service = self.service
         state = self.state
+        # Disallow starting a new run if one is active
+        if getattr(app, "_run_active", False):
+            # Show visual feedback and ask user if they want to cancel the running job
+            try:
+                # Avoid stacking prompts
+                if not getattr(app, "_cancel_prompt_active", False):
+                    app._cancel_prompt_active = True
+                    try:
+                        # Prefer a toast/notification if available
+                        self.compat.notify(
+                            app,
+                            "A job is already running. Cancel it? [y/N]",
+                            timeout=5,
+                            severity="warning",
+                        )
+                    except Exception:
+                        pass
+                    try:
+                        app._show_bottom_panel()
+                        status = app.query_one("#run-status")
+                        status.update(
+                            "Status: running — A job is already in progress. Cancel it? [y/N]"
+                        )
+                        app._refresh_bottom_visibility()
+                    except Exception:
+                        pass
+                    app._add_meta(
+                        "Run already in progress — press 'y' to cancel, 'n' or Enter to continue."
+                    )
+            except Exception:
+                pass
+            return
+
+        # Prepare UI for a new run
         out_log = app.query_one("#output-log")
         if hasattr(out_log, "clear"):
             out_log.clear()
@@ -176,7 +219,6 @@ class TuiController:
             pass
         app._errors = []
         app._meta = []
-        start_ts: float | None = None
         try:
             app.query_one("#run-summary").update("")
             app._hide_summary_panel()
@@ -184,110 +226,196 @@ class TuiController:
         except Exception:
             pass
         app._add_meta("Starting run...")
-        logging.disable(logging.CRITICAL)
-        try:
-            app._run_active = True
-            app._set_inputs_enabled(False)
-            app._set_run_enabled(False)
-            start_ts = time.monotonic()
-            app._collect_state()
-            devices = await asyncio.to_thread(
-                service.resolve_devices, state.devices, state.groups
-            )
-            if not devices:
-                app._render_summary("No devices selected.")
-                try:
-                    msg = "Status: idle — No devices selected."
-                    app.query_one("#run-status").update(msg)
-                    app._refresh_bottom_visibility()
-                except Exception:
-                    pass
-                return
-            plan = service.build_plan(devices, state.sequences, state.command_text)
-            if not plan:
-                app._render_summary("No sequences or commands provided.")
-                try:
-                    msg = "Status: idle — No sequences or commands provided."
-                    app.query_one("#run-status").update(msg)
-                    app._refresh_bottom_visibility()
-                except Exception:
-                    pass
-                return
-            total = len(plan)
-            try:
-                app._show_bottom_panel()
-                app.query_one("#run-status").update(f"Status: running 0/{total}")
-            except Exception:
-                pass
-            from network_toolkit.tui.models import RunCallbacks
+        app._run_active = True
+        app._cancel_token = CancellationToken()
+        app._set_inputs_enabled(False)
+        app._set_run_enabled(False)
 
-            summary_result = await service.run_plan(
-                plan,
-                RunCallbacks(
-                    on_output=lambda m: app._dispatch_ui(app._output_append, m),
-                    on_error=lambda m: app._dispatch_ui(app._add_error, m),
-                    on_meta=lambda m: app._dispatch_ui(app._add_meta, m),
-                ),
-            )
+        async def _runner() -> None:
+            start_ts: float | None = None
             try:
-                if getattr(app, "_output_lines", None):
-                    app._show_output_panel()
+                logging.disable(logging.CRITICAL)
+                start_ts = time.monotonic()
+                app._collect_state()
+                devices = await asyncio.to_thread(
+                    service.resolve_devices, state.devices, state.groups
+                )
+                if not devices:
+                    app._dispatch_ui(app._render_summary, "No devices selected.")
                     try:
-                        out_log = app.query_one("#output-log")
-                        if hasattr(out_log, "clear"):
-                            out_log.clear()
-                        filt = (
-                            (getattr(app, "_output_filter", "") or "").strip().lower()
-                        )
-                        lines: list[str] = [
-                            str(x) for x in (getattr(app, "_output_lines", []) or [])
-                        ]
-                        for line in lines:
-                            if not filt or (filt in line.lower()):
-                                from network_toolkit.tui.helpers import log_write
-
-                                log_write(out_log, line)
+                        msg = "Status: idle — No devices selected."
+                        app.query_one("#run-status").update(msg)
+                        app._refresh_bottom_visibility()
                     except Exception:
                         pass
-                elapsed = time.monotonic() - start_ts
-                summary_with_time = (
-                    f"{summary_result.human_summary()} (duration: {elapsed:.2f}s)"
-                )
-                app._render_summary(summary_with_time)
+                    return
+                plan = service.build_plan(devices, state.sequences, state.command_text)
+                if not plan:
+                    app._dispatch_ui(
+                        app._render_summary, "No sequences or commands provided."
+                    )
+                    try:
+                        msg = "Status: idle — No sequences or commands provided."
+                        app.query_one("#run-status").update(msg)
+                        app._refresh_bottom_visibility()
+                    except Exception:
+                        pass
+                    return
+                total = len(plan)
                 try:
-                    err_count = len(getattr(app, "_errors", []) or [])
+                    app._show_bottom_panel()
+                    app.query_one("#run-status").update(
+                        f"Status: running 0/{total} (press Ctrl+C to cancel)"
+                    )
                 except Exception:
-                    err_count = 0
-                status_msg = f"Status: idle — {summary_with_time}"
-                if err_count:
-                    status_msg += " — errors available (press s)"
-                app.query_one("#run-status").update(status_msg)
-                app._refresh_bottom_visibility()
-            except Exception:
-                pass
-        except Exception as e:  # noqa: BLE001
-            try:
-                elapsed = (
-                    (time.monotonic() - start_ts) if (start_ts is not None) else 0.0
+                    pass
+                from network_toolkit.tui.models import RunCallbacks
+
+                summary_result = await service.run_plan(
+                    plan,
+                    RunCallbacks(
+                        on_output=lambda m: app._dispatch_ui(app._output_append, m),
+                        on_error=lambda m: app._dispatch_ui(app._add_error, m),
+                        on_meta=lambda m: app._dispatch_ui(app._add_meta, m),
+                    ),
+                    cancel=app._cancel_token,
                 )
-            except Exception:
-                elapsed = 0.0
-            app._render_summary(f"Run failed: {e} (after {elapsed:.2f}s)")
-            try:
-                app.query_one("#run-status").update(f"Status: idle — Run failed: {e}")
-                if getattr(app, "_output_lines", None):
-                    app._show_output_panel()
-                app._refresh_bottom_visibility()
-            except Exception:
-                pass
-        finally:
-            logging.disable(logging.NOTSET)
-            try:
-                app._run_active = False
-                app._set_inputs_enabled(True)
-                app._set_run_enabled(True)
-            except Exception:
-                pass
+                try:
+                    if getattr(app, "_output_lines", None):
+                        app._show_output_panel()
+                        try:
+                            out_log = app.query_one("#output-log")
+                            if hasattr(out_log, "clear"):
+                                out_log.clear()
+                            filt = (
+                                (getattr(app, "_output_filter", "") or "")
+                                .strip()
+                                .lower()
+                            )
+                            lines: list[str] = [
+                                str(x)
+                                for x in (getattr(app, "_output_lines", []) or [])
+                            ]
+                            for line in lines:
+                                if not filt or (filt in line.lower()):
+                                    from network_toolkit.tui.helpers import log_write
+
+                                    log_write(out_log, line)
+                        except Exception:
+                            pass
+                    elapsed = time.monotonic() - start_ts
+                    summary_with_time = (
+                        f"{summary_result.human_summary()} (duration: {elapsed:.2f}s)"
+                    )
+                    app._render_summary(summary_with_time)
+                    try:
+                        err_count = len(getattr(app, "_errors", []) or [])
+                    except Exception:
+                        err_count = 0
+                    status_msg = f"Status: idle — {summary_with_time}"
+                    if err_count:
+                        status_msg += " — errors available (press s)"
+                    app.query_one("#run-status").update(status_msg)
+                    app._refresh_bottom_visibility()
+                except Exception:
+                    pass
+            except Exception as e:  # noqa: BLE001
+                try:
+                    elapsed = (
+                        (time.monotonic() - start_ts) if (start_ts is not None) else 0.0
+                    )
+                except Exception:
+                    elapsed = 0.0
+                app._dispatch_ui(
+                    app._render_summary, f"Run failed: {e} (after {elapsed:.2f}s)"
+                )
+                try:
+                    app.query_one("#run-status").update(
+                        f"Status: idle — Run failed: {e}"
+                    )
+                    if getattr(app, "_output_lines", None):
+                        app._show_output_panel()
+                    app._refresh_bottom_visibility()
+                except Exception:
+                    pass
+            finally:
+                logging.disable(logging.NOTSET)
+                try:
+                    app._run_active = False
+                    app._set_inputs_enabled(True)
+                    app._set_run_enabled(True)
+                    app._cancel_token = None
+                    app._run_task = None
+                    app._cancel_prompt_active = False
+                    # After run completes, clear any selections in the UI
+                    try:
+                        app._dispatch_ui(app._clear_all_selections)
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+
+        # Schedule runner without blocking UI loop
+        try:
+            loop = asyncio.get_running_loop()
+            app._run_task = loop.create_task(_runner())
+        except Exception:
+            # Fallback: run inline (still async) if loop is not accessible
+            await _runner()
+
+    async def action_cancel(self) -> None:
+        app = self.app
+        # Trigger cooperative cancellation and update UI; do nothing if idle
+        try:
+            token = getattr(app, "_cancel_token", None)
+            if token is not None:
+                token.set()
+                app._add_meta("Cancellation requested")
+                try:
+                    status = app.query_one("#run-status")
+                    status.update("Status: cancelling…")
+                except Exception:
+                    pass
+                try:
+                    app._cancel_prompt_active = False
+                    app._cancel_mode_prompt_active = False
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    async def action_cancel_hard(self) -> None:
+        """Hard cancel: set token and aggressively disconnect active sessions."""
+        app = self.app
+        try:
+            token = getattr(app, "_cancel_token", None)
+            if token is not None:
+                try:
+                    token.set()
+                except Exception:
+                    pass
+                try:
+                    # Ask the service to close active sessions to interrupt blocking calls
+                    self.service.request_hard_cancel(token)
+                except Exception:
+                    pass
+                app._add_meta(
+                    "Hard cancellation requested — connections will be terminated."
+                )
+                try:
+                    status = app.query_one("#run-status")
+                    status.update(
+                        "Status: cancelling (hard) — connections will be terminated; in-flight operations may be partially applied"
+                    )
+                except Exception:
+                    pass
+                try:
+                    app._cancel_prompt_active = False
+                    app._cancel_mode_prompt_active = False
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
     async def on_input_submitted(self, event: Any) -> None:
         try:
@@ -319,6 +447,101 @@ class TuiController:
             key = str(getattr(event, "key", "")).lower()
         except Exception:
             key = ""
+        # Handle pending cancel prompt (default No)
+        try:
+            if getattr(app, "_cancel_prompt_active", False):
+                if key in {"y"}:
+                    # Confirm cancellation; show mode selection prompt next
+                    try:
+                        app._cancel_prompt_active = False
+                        app._cancel_mode_prompt_active = True
+                        # Show options dialog in status area (compact)
+                        app.open_cancel_mode_dialog()
+                    except Exception:
+                        pass
+                    try:
+                        if hasattr(event, "stop"):
+                            event.stop()
+                    except Exception:
+                        pass
+                    return
+                if key in {"n", "enter", "return", "escape"}:
+                    # Continue running without cancelling (default)
+                    try:
+                        app._cancel_prompt_active = False
+                        status = app.query_one("#run-status")
+                        status.update("Status: running — Continuing current run")
+                        app._refresh_bottom_visibility()
+                    except Exception:
+                        pass
+                    try:
+                        if hasattr(event, "stop"):
+                            event.stop()
+                    except Exception:
+                        pass
+                    return
+            # Handle cancel mode selection prompt
+            if getattr(app, "_cancel_mode_prompt_active", False):
+                if key in {"s", "enter", "return"}:  # default soft
+                    try:
+                        app._cancel_mode_prompt_active = False
+                    except Exception:
+                        pass
+                    try:
+                        task = asyncio.create_task(self.action_cancel())
+                        try:
+                            self.app._bg_tasks.add(task)
+                            task.add_done_callback(self.app._bg_tasks.discard)
+                        except Exception:
+                            pass
+                    except Exception:
+                        pass
+                    try:
+                        if hasattr(event, "stop"):
+                            event.stop()
+                    except Exception:
+                        pass
+                    return
+                if key in {"h"}:
+                    try:
+                        app._cancel_mode_prompt_active = False
+                    except Exception:
+                        pass
+                    try:
+                        task = asyncio.create_task(self.action_cancel_hard())
+                        try:
+                            self.app._bg_tasks.add(task)
+                            task.add_done_callback(self.app._bg_tasks.discard)
+                        except Exception:
+                            pass
+                    except Exception:
+                        pass
+                    try:
+                        if hasattr(event, "stop"):
+                            event.stop()
+                    except Exception:
+                        pass
+                    return
+                if key in {"n", "escape"}:  # abort cancel entirely
+                    try:
+                        app._cancel_mode_prompt_active = False
+                        status = app.query_one("#run-status")
+                        status.update("Status: running — Continuing current run")
+                        app._refresh_bottom_visibility()
+                    except Exception:
+                        pass
+                    try:
+                        app.close_cancel_mode_dialog()
+                    except Exception:
+                        pass
+                    try:
+                        if hasattr(event, "stop"):
+                            event.stop()
+                    except Exception:
+                        pass
+                    return
+        except Exception:
+            pass
         if key == "q":
             # Always close overlays; never quit on 'q'
             try:
@@ -365,6 +588,17 @@ class TuiController:
         elif key == "h":
             try:
                 app.action_toggle_help()
+                if hasattr(event, "stop"):
+                    event.stop()
+            except Exception:
+                pass
+        elif key in {"ctrl+c"}:
+            # Ctrl+C opens the same cancel type dialog (soft/hard)
+            try:
+                if getattr(app, "_run_active", False):
+                    app._cancel_prompt_active = False
+                    app._cancel_mode_prompt_active = True
+                    app.open_cancel_mode_dialog()
                 if hasattr(event, "stop"):
                     event.stop()
             except Exception:

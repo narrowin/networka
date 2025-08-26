@@ -6,6 +6,7 @@ without importing the UI framework at module import time.
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Callable, Iterable
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -66,3 +67,25 @@ def iter_commands(text: str) -> Iterable[str]:
         stripped = line.strip()
         if stripped:
             yield stripped
+
+
+class CancellationToken:
+    """Thread-safe cooperative cancellation primitive.
+
+    Intended to be shared between async and thread-executed code. Supports
+    non-blocking checks from threads and async tasks via ``is_set``.
+    """
+
+    __slots__ = ("_e",)
+
+    def __init__(self) -> None:
+        self._e = threading.Event()
+
+    def set(self) -> None:
+        self._e.set()
+
+    def is_set(self) -> bool:
+        return self._e.is_set()
+
+    def wait(self, timeout: float | None = None) -> bool:
+        return self._e.wait(timeout if timeout is not None else -1)

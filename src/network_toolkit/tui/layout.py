@@ -11,6 +11,7 @@ from typing import Any
 from network_toolkit.tui.constants import (
     ID_ACTIONS_TABS,
     ID_BOTTOM,
+    ID_CANCEL_DIALOG,
     ID_FILTER_DEVICES,
     ID_FILTER_GROUPS,
     ID_FILTER_OUTPUT,
@@ -35,6 +36,7 @@ from network_toolkit.tui.constants import (
     ID_TAB_SEQUENCES,
     ID_TARGETS_TABS,
     LBL_ACTIONS,
+    LBL_CANCEL,
     LBL_HELP,
     LBL_OUTPUT,
     LBL_PRESS_ENTER,
@@ -88,6 +90,13 @@ def compose_root(compat: Any) -> Any:
                 yield compat.Button(LBL_RUN, id=ID_RUN_BUTTON)
         with vertical(id=ID_BOTTOM):
             yield static("Status: idle", id=ID_RUN_STATUS)
+            # Center overlay dialog (hidden by default)
+            with vertical(id=ID_CANCEL_DIALOG, classes="panel hidden"):
+                yield static(LBL_CANCEL, classes="pane-title title")
+                yield static(
+                    "A job is already running. Cancel it — Soft [s] (recommended) or Hard [h]?",
+                    id="cancel-dialog-text",
+                )
             with vertical(classes="panel hidden", id=ID_SUMMARY_PANEL):
                 yield static(LBL_SUMMARY, classes="pane-title title")
                 yield compat.TextLogClass(id=ID_RUN_SUMMARY, classes="scroll")

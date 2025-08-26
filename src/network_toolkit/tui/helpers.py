@@ -9,6 +9,11 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
+try:  # optional rich
+    from rich.markup import escape as _escape_markup
+except Exception:  # pragma: no cover - rich optional
+    _escape_markup = None  # type: ignore
+
 
 def log_write(log_widget: Any, message: str) -> None:
     """Best-effort write to a Textual Log/RichLog-like widget.
@@ -17,6 +22,9 @@ def log_write(log_widget: Any, message: str) -> None:
     """
     try:
         msg = str(message)
+        # Escape markup if the widget interprets Rich markup to avoid injection
+        if _escape_markup is not None:
+            msg = _escape_markup(msg)
         if hasattr(log_widget, "write"):
             log_widget.write(msg)
         elif hasattr(log_widget, "write_line"):

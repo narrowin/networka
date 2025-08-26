@@ -21,7 +21,7 @@ class KeyBinding(NamedTuple):
 # Default keymap for the TUI
 KEYMAP: list[KeyBinding] = [
     KeyBinding("q", "close_overlays", "Close panel", True, None, True),
-    KeyBinding("ctrl+c", "quit", "Quit", True, None, True),
+    KeyBinding("ctrl+c", "cancel", "Cancel run", True, None, True),
     KeyBinding("h", "toggle_help", "Help", True, None, True),
     KeyBinding("r", "confirm", "Run"),
     # Priority toggles so they work during input and runs

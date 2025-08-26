@@ -8,6 +8,7 @@ Execution is not wired yet; we only collect selections and show a preview.
 from __future__ import annotations
 
 import logging
+import threading
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -103,20 +104,39 @@ def run(config: str | Path = "config") -> None:
         async def on_button_pressed(self, event: Any) -> None:
             await self._controller.on_button_pressed(event)
 
+        async def action_cancel(self) -> None:
+            await self._controller.action_cancel()
+
         def _dispatch_ui(self, fn: Any, *args: Any, **kwargs: Any) -> None:
             """Invoke a UI-mutating function safely from any thread.
 
             If called from the UI thread, call directly. Otherwise, use
             call_from_thread when available. Fallback to direct call.
             """
-            # Prefer scheduling via call_from_thread when available to ensure UI paints
+            # If we are already on the UI thread, call directly
+            try:
+                ui_ident = getattr(self, "_ui_thread_ident", None)
+            except Exception:
+                ui_ident = None
+            current_ident = None
+            try:
+                current_ident = threading.get_ident()
+            except Exception:
+                pass
+            if ui_ident is not None and current_ident == ui_ident:
+                try:
+                    fn(*args, **kwargs)
+                    return
+                except Exception as exc:
+                    logging.debug(f"UI dispatch direct call failed: {exc}")
+            # Otherwise schedule on UI thread if possible
             try:
                 if hasattr(self, "call_from_thread"):
                     self.call_from_thread(fn, *args, **kwargs)
                     return
             except Exception:
                 pass
-            # Fallback: attempt direct call
+            # Last resort
             try:
                 fn(*args, **kwargs)
             except Exception as exc:
@@ -257,6 +277,81 @@ def run(config: str | Path = "config") -> None:
                             break
                         except Exception as exc:
                             logging.debug(f"Selecting value via {method} failed: {exc}")
+
+        def _clear_selection_list(self, widget_id: str) -> None:
+            """Deselect all options in a SelectionList with broad API compatibility."""
+            try:
+                sel = self.query_one(f"#{widget_id}")
+            except Exception:
+                return
+            # Try explicit clearing methods first
+            for method in (
+                "clear_selection",
+                "clear_selected",
+                "deselect_all",
+                "select_none",
+            ):
+                if hasattr(sel, method):
+                    try:
+                        getattr(sel, method)()
+                        return
+                    except Exception as exc:
+                        logging.debug(f"{method} failed on {widget_id}: {exc}")
+            # Next, try setting empty value/selected list
+            for attr, _ in (("set_value", []), ("selected", [])):
+                try:
+                    if hasattr(sel, attr):
+                        if attr == "set_value":
+                            sel.set_value([])
+                        else:
+                            setattr(sel, attr, [])
+                        return
+                except Exception as exc:
+                    logging.debug(f"Clearing via {attr} failed on {widget_id}: {exc}")
+            # Fallback: toggle off currently selected values
+            try:
+                current: set[str] = self._selected_values(sel)
+            except Exception:
+                current = set()
+            if not current:
+                return
+            for val in list(current):
+                for method in (
+                    "deselect",
+                    "deselect_by_value",
+                    "unselect",
+                    "toggle_value",
+                ):
+                    if hasattr(sel, method):
+                        try:
+                            getattr(sel, method)(val)
+                            break
+                        except Exception as exc:
+                            logging.debug(
+                                f"Deselecting value via {method} failed on {widget_id}: {exc}"
+                            )
+
+        def _clear_all_selections(self) -> None:
+            """Deselect all currently selected devices, groups, and sequences."""
+            try:
+                self._clear_selection_list("list-devices")
+            except Exception:
+                pass
+            try:
+                self._clear_selection_list("list-groups")
+            except Exception:
+                pass
+            try:
+                self._clear_selection_list("list-sequences")
+            except Exception:
+                pass
+            # Also clear state model selections
+            try:
+                state.devices.clear()
+                state.groups.clear()
+                state.sequences.clear()
+            except Exception:
+                pass
 
         # Device resolution, plan building, and execution handled by services layer
 
@@ -1025,6 +1120,63 @@ def run(config: str | Path = "config") -> None:
             except Exception:
                 pass
             # Fallback: no-op; CSS uses theme vars so best effort only
+
+        # Lightweight modal emulation using bottom panel status
+        def open_cancel_mode_dialog(self) -> None:
+            try:
+                # Show a center overlay panel acting as a modal
+                dlg = self.query_one("#cancel-dialog-text")
+                dlg.update(
+                    "A job is already running. Cancel it — Soft [s] (recommended) or Hard [h]? Hard will close sessions immediately and may leave devices in a partial state."
+                )
+                panel = self.query_one("#cancel-dialog")
+                if hasattr(panel, "remove_class"):
+                    panel.remove_class("hidden")
+                # Ensure bottom is visible to render the overlay container
+                self._show_bottom_panel()
+                self._refresh_bottom_visibility()
+            except Exception:
+                # Fallback to status line only
+                try:
+                    self._show_bottom_panel()
+                    self.query_one("#run-status").update(
+                        "Cancel type? Soft [s] (recommended) or Hard [h]. Hard will close sessions immediately and may leave devices in a partial state."
+                    )
+                    self._refresh_bottom_visibility()
+                except Exception:
+                    pass
+
+        def close_cancel_mode_dialog(self) -> None:
+            try:
+                panel = self.query_one("#cancel-dialog")
+                if hasattr(panel, "add_class"):
+                    panel.add_class("hidden")
+                self._refresh_bottom_visibility()
+            except Exception:
+                pass
+
+        # Dynamic action guards to reflect availability in Footer and prevent invalid runs
+        def check_action(
+            self, action: str, parameters: tuple[object, ...]
+        ) -> bool | None:
+            try:
+                running = bool(getattr(self, "_run_active", False))
+            except Exception:
+                running = False
+            if action == "confirm" and running:
+                # Allow confirm to surface the cancel prompt while a run is active
+                return True
+            if action == "cancel" and not running:
+                # Disable cancel when idle
+                return None
+            return True
+
+        # Ensure Ctrl+C default (help_quit) triggers cancel rather than quitting
+        async def action_help_quit(self) -> None:
+            try:
+                await self.action_cancel()
+            except Exception:
+                pass
 
     # Helpers are provided by network_toolkit.tui.helpers
 
