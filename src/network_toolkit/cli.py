@@ -13,16 +13,13 @@ import typer
 from typer.core import TyperGroup
 
 from network_toolkit import __version__
-from network_toolkit.commands.bios_upgrade import register as register_bios_upgrade
-from network_toolkit.commands.complete import register as register_complete
 
 # Command registration: import command factories that attach to `app`
 # Each module defines a `register(app)` function that adds its commands.
+from network_toolkit.commands.bios_upgrade import register as register_bios_upgrade
+from network_toolkit.commands.complete import register as register_complete
+from network_toolkit.commands.config import register as register_config
 from network_toolkit.commands.config_backup import register as register_config_backup
-from network_toolkit.commands.config_init import register as register_config_init
-from network_toolkit.commands.config_validate import (
-    register as register_config_validate,
-)
 from network_toolkit.commands.diff import register as register_diff
 from network_toolkit.commands.download import register as register_download
 from network_toolkit.commands.firmware_downgrade import (
@@ -34,7 +31,7 @@ from network_toolkit.commands.firmware_upgrade import (
 from network_toolkit.commands.info import register as register_info
 from network_toolkit.commands.list import register as register_list
 from network_toolkit.commands.run import register as register_run
-from network_toolkit.commands.schema import register as register_schema
+from network_toolkit.commands.schema_unified import register as register_schema
 from network_toolkit.commands.ssh import register as register_ssh
 from network_toolkit.commands.upload import register as register_upload
 from network_toolkit.commands.vendor_backup import register as register_vendor_backup
@@ -87,8 +84,8 @@ class CategorizedHelpGroup(TyperGroup):
         info_names = [
             "info",
             "list",
-            "config-init",
-            "config-validate",
+            "config",
+            "schema",
             "diff",
         ]
 
@@ -261,8 +258,8 @@ def _handle_file_downloads(
 register_info(app)
 register_list(app)
 register_run(app)
-register_config_init(app)
-register_config_validate(app)
+register_config(app)
+register_config_backup(app)
 register_upload(app)
 register_download(app)
 register_vendor_config_backup(app)

@@ -143,9 +143,11 @@ class TestCLI:
         assert result.exit_code == 0
 
     def test_config_validate_command(self, config_file: Path) -> None:
-        """Test config-validate command."""
+        """Test config validate command."""
         runner = CliRunner()
-        result = runner.invoke(app, ["config-validate", "--config", str(config_file)])
+        result = runner.invoke(
+            app, ["config", "validate", "--config", str(config_file)]
+        )
         # Config validation should succeed with valid test config
         assert result.exit_code == 0
         assert "valid" in result.output.lower() or "OK" in result.output

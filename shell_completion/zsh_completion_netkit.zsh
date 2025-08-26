@@ -87,6 +87,16 @@ _nw_complete() {
             values=($annotated)
             _describe -t targets 'targets (groups first)' values && return
           fi ;;
+        config)
+          if (( CURRENT == 3 )); then
+            values=("init:Initialize a network toolkit configuration" "validate:Validate the configuration file")
+            _describe -t subcommands 'config subcommands' values && return
+          fi ;;
+        schema)
+          if (( CURRENT == 3 )); then
+            values=("update:Update JSON schemas for YAML editor validation" "info:Display information about JSON schema files")
+            _describe -t subcommands 'schema subcommands' values && return
+          fi ;;
         upload|download|config-backup|backup|firmware-upgrade|firmware-downgrade|bios-upgrade|diff)
           if (( CURRENT == 3 )); then
             values=(${(f)"$(nw __complete --for devices --config \"$cfg\" 2>/dev/null)"} ${(f)"$(nw __complete --for groups --config \"$cfg\" 2>/dev/null)"})

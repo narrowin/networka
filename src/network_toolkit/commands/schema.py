@@ -111,3 +111,45 @@ def schema_info(
     else:
         output_manager.print_warning(f"{missing_count} schema file(s) missing.")
         output_manager.print_text("Run 'nw schema-update' to regenerate them.")
+
+
+def _schema_update_impl(verbose: bool = False) -> None:
+    """Implementation function for schema update that can be called from unified command.
+
+    This delegates to the original schema_update function by creating a temporary Typer app
+    and calling the registered command.
+    """
+    # Create a temporary app to get access to the registered command
+    temp_app = typer.Typer()
+    register(temp_app)
+
+    # Find and call the registered command function
+    for cmd_info in temp_app.registered_commands:
+        if cmd_info.name == "schema-update" and cmd_info.callback:
+            cmd_info.callback(verbose=verbose)
+            return
+
+    # This should never happen
+    error_msg = "Could not find schema-update command in registered commands"
+    raise RuntimeError(error_msg)
+
+
+def _schema_info_impl(verbose: bool = False) -> None:
+    """Implementation function for schema info that can be called from unified command.
+
+    This delegates to the original schema_info function by creating a temporary Typer app
+    and calling the registered command.
+    """
+    # Create a temporary app to get access to the registered command
+    temp_app = typer.Typer()
+    register(temp_app)
+
+    # Find and call the registered command function
+    for cmd_info in temp_app.registered_commands:
+        if cmd_info.name == "schema-info" and cmd_info.callback:
+            cmd_info.callback(verbose=verbose)
+            return
+
+    # This should never happen
+    error_msg = "Could not find schema-info command in registered commands"
+    raise RuntimeError(error_msg)

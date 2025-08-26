@@ -100,3 +100,32 @@ def register(app: typer.Typer) -> None:
                 output_manager = get_output_manager()
             output_manager.print_error(f"Unexpected error during validation: {e}")
             raise typer.Exit(1) from None
+
+
+def _config_validate_impl(
+    config_file: Path,
+    output_mode: OutputMode | None = None,
+    verbose: bool = False,
+) -> None:
+    """Implementation function for config validate that can be called from unified command.
+
+    This delegates to the original config_validate function by creating a temporary Typer app
+    and calling the registered command.
+    """
+    # Create a temporary app to get access to the registered command
+    temp_app = typer.Typer()
+    register(temp_app)
+
+    # Find and call the registered command function
+    for cmd_info in temp_app.registered_commands:
+        if cmd_info.name == "config-validate" and cmd_info.callback:
+            cmd_info.callback(
+                config_file=config_file,
+                output_mode=output_mode,
+                verbose=verbose,
+            )
+            return
+
+    # This should never happen
+    error_msg = "Could not find config-validate command in registered commands"
+    raise RuntimeError(error_msg)

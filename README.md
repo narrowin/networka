@@ -106,21 +106,11 @@ pip uninstall networka
 
 ## Quick Start
 
-Get up and running with config-init command:
+Get up and running with config init command:
 
 ```bash
-# 1. Initialize your configuration environment
-nw config-init
-# This creates: .env, config/config.yml, config/devices/, config/groups/, config/sequences/
-
-# 2. Update credentials and device IPs
-nano .env                           # Add your actual credentials
-nano config/devices/mikrotik.yml    # Update device IP addresses
-
-# 3. Start managing your network
-nw run sw-office-01 system_info
-nw run office_switches "/system/identity/print"
-```
+# Initialize in default location with interactive prompts
+nw config init
 
 ## Terminology: device_type vs hardware platform vs transport
 
@@ -139,48 +129,54 @@ Note about flags: When targeting IP addresses directly, the CLI flag --platform 
 ## CLI overview
 
 ```
+
 Usage: nw [OPTIONS] COMMAND [ARGS]...
 
- Networka (nw)
+Networka (nw)
 
- A powerful multi-vendor CLI tool for automating network devices based on ssh protocol.
- Built with async/await support and type safety in mind.
+A powerful multi-vendor CLI tool for automating network devices based on ssh protocol.
+Built with async/await support and type safety in mind.
 
- QUICK START:
-   nw run sw-acc1 '/system/clock/print'  # Execute command
-   nw run office_switches system_info    # Run sequence on group
+QUICK START:
+nw run sw-acc1 '/system/clock/print' # Execute command
+nw run office_switches system_info # Run sequence on group
 
- For detailed help on any command: nw <command> --help
- Default config directory: config/ (use --config to override)
+For detailed help on any command: nw <command> --help
+Default config directory: config/ (use --config to override)
 
 Options:
-  --version            Show version information
-  --help     -h        Show this message and exit.
+--version Show version information
+--help -h Show this message and exit.
 
 Commands:
-  ssh                  Open tmux with SSH panes for a device or group.
+ssh Open tmux with SSH panes for a device or group.
 
 Info & Configuration:
-  info                 Show comprehensive information for devices, groups, or sequences.
-  list-devices         List all configured network devices.
-  list-groups          List all configured device groups and their members.
-  list-sequences       List all available command sequences, optionally filtered by vendor or category.
-  config-init          Initialize a minimal working configuration environment.
-  config-validate      Validate the configuration file and show any issues.
-  diff                 Diff config, a command, or a sequence.
+info Show comprehensive information for devices, groups, or sequences.
+list-devices List all configured network devices.
+list-groups List all configured device groups and their members.
+list-sequences List all available command sequences, optionally filtered by vendor or category.
+config Configuration management commands
+init Initialize a minimal working configuration environment.
+validate Validate the configuration file and show any issues.
+schema JSON schema management commands
+update Update JSON schemas for YAML editor validation.
+info Display information about JSON schema files.
+diff Diff config, a command, or a sequence.
 
 Executing Operations:
-  run                  Execute a single command or a sequence on a device or a group.
-  upload               Upload a file to a device or to all devices in a group.
-  download             Download a file from a device or all devices in a group.
+run Execute a single command or a sequence on a device or a group.
+upload Upload a file to a device or to all devices in a group.
+download Download a file from a device or all devices in a group.
 
 Vendor-Specific Operations:
-  config-backup        Create device configuration backup using vendor-specific commands.
-  backup               Create comprehensive device backup using vendor-specific commands.
-  firmware-upgrade     Upload firmware package and reboot device to apply it.
-  firmware-downgrade   Upload older firmware package, schedule downgrade, and reboot to apply.
-  bios-upgrade         Upgrade device BIOS/RouterBOOT and reboot to apply.
-```
+config-backup Create device configuration backup using vendor-specific commands.
+backup Create comprehensive device backup using vendor-specific commands.
+firmware-upgrade Upload firmware package and reboot device to apply it.
+firmware-downgrade Upload older firmware package, schedule downgrade, and reboot to apply.
+bios-upgrade Upgrade device BIOS/RouterBOOT and reboot to apply.
+
+````
 
 ## networka environment
 
@@ -192,7 +188,7 @@ Vendor-Specific Operations:
 # Copy and edit the example file
 cp .env.example .env
 nano .env  # Add your actual credentials
-```
+````
 
 **Option B: Export environment variables**
 

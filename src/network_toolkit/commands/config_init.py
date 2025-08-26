@@ -809,3 +809,50 @@ def register(app: typer.Typer) -> None:
             ctx = CommandContext()
             ctx.print_error(f"Unexpected error: {e}")
             raise typer.Exit(1) from e
+
+
+def _config_init_impl(
+    target_dir: Path | None = None,
+    force: bool = False,
+    yes: bool = False,
+    dry_run: bool = False,
+    install_sequences: bool | None = None,
+    git_url: str | None = None,
+    git_ref: str = "main",
+    install_completions: bool | None = None,
+    shell: str | None = None,
+    activate_completions: bool | None = None,
+    install_schemas: bool | None = None,
+    verbose: bool = False,
+) -> None:
+    """Implementation function for config init that can be called from unified command.
+
+    This delegates to the original config_init function by creating a temporary Typer app
+    and calling the registered command.
+    """
+    # Create a temporary app to get access to the registered command
+    temp_app = typer.Typer()
+    register(temp_app)
+
+    # Find and call the registered command function
+    for cmd_info in temp_app.registered_commands:
+        if cmd_info.name == "config-init" and cmd_info.callback:
+            cmd_info.callback(
+                target_dir=target_dir,
+                force=force,
+                yes=yes,
+                dry_run=dry_run,
+                install_sequences=install_sequences,
+                git_url=git_url,
+                git_ref=git_ref,
+                install_completions=install_completions,
+                shell=shell,
+                activate_completions=activate_completions,
+                install_schemas=install_schemas,
+                verbose=verbose,
+            )
+            return
+
+    # This should never happen
+    error_msg = "Could not find config-init command in registered commands"
+    raise RuntimeError(error_msg)

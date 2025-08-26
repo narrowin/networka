@@ -217,7 +217,7 @@ The completion gracefully handles:
 1. **Verify YAML syntax:**
 
    ```bash
-   nw config-validate
+   nw config validate
    ```
 
 2. **Check file permissions:**
