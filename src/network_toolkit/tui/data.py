@@ -107,8 +107,11 @@ class TuiData:
         if cwd_found is not None:
             return cwd_found
 
-        # 3) From this file location
-        module_found = search_up(Path(__file__).resolve())
+        # 3) From path of the originally requested config (best-effort)
+        try:
+            module_found = search_up(original.resolve())
+        except Exception:
+            module_found = None
         if module_found is not None:
             return module_found
 

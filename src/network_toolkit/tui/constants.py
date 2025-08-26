@@ -15,7 +15,6 @@ ID_HELP_PANEL = "help-panel"
 ID_OUTPUT_LOG = "output-log"
 ID_RUN_STATUS = "run-status"
 ID_HELP_LOG = "help-log"
-ID_CANCEL_DIALOG = "cancel-dialog"
 
 ID_TARGETS_TABS = "targets-tabs"
 ID_ACTIONS_TABS = "actions-tabs"

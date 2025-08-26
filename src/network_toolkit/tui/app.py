@@ -1121,43 +1121,11 @@ def run(config: str | Path = "config") -> None:
                 pass
             # Fallback: no-op; CSS uses theme vars so best effort only
 
-        # Lightweight modal emulation using bottom panel status
-        def open_cancel_mode_dialog(self) -> None:
-            try:
-                # Show a center overlay panel acting as a modal
-                dlg = self.query_one("#cancel-dialog-text")
-                dlg.update(
-                    "A job is already running. Cancel it — Soft [s] (recommended) or Hard [h]? Hard will close sessions immediately and may leave devices in a partial state."
-                )
-                panel = self.query_one("#cancel-dialog")
-                if hasattr(panel, "remove_class"):
-                    panel.remove_class("hidden")
-                # Ensure bottom is visible to render the overlay container
-                self._show_bottom_panel()
-                self._refresh_bottom_visibility()
-            except Exception:
-                # Fallback to status line only
-                try:
-                    self._show_bottom_panel()
-                    self.query_one("#run-status").update(
-                        "Cancel type? Soft [s] (recommended) or Hard [h]. Hard will close sessions immediately and may leave devices in a partial state."
-                    )
-                    self._refresh_bottom_visibility()
-                except Exception:
-                    pass
-
-        def close_cancel_mode_dialog(self) -> None:
-            try:
-                panel = self.query_one("#cancel-dialog")
-                if hasattr(panel, "add_class"):
-                    panel.add_class("hidden")
-                self._refresh_bottom_visibility()
-            except Exception:
-                pass
+        # No modal emulation; cancellation uses toast prompts only
 
         # Dynamic action guards to reflect availability in Footer and prevent invalid runs
         def check_action(
-            self, action: str, parameters: tuple[object, ...]
+            self, action: str, _parameters: tuple[object, ...]
         ) -> bool | None:
             try:
                 running = bool(getattr(self, "_run_active", False))
