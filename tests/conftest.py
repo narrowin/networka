@@ -251,3 +251,27 @@ def mock_paramiko_ssh() -> MagicMock:
     ssh.open_sftp = MagicMock()
     ssh.close = MagicMock()
     return ssh
+
+
+# --- Test selection hooks ----------------------------------------------------
+
+
+def pytest_collection_modifyitems(
+    config: pytest.Config, items: list[pytest.Item]
+) -> None:
+    """Auto-mark TUI-related tests so they can be selected with '-m tui'.
+
+    Best practice is to use markers for groups of tests. Instead of editing each
+    file to add a marker, we tag any tests whose filenames start with
+    'test_tui_' or that live under a 'tui' test sub-folder.
+    """
+    tui_mark = pytest.mark.tui
+    for item in items:
+        try:
+            path = str(getattr(item, "fspath", ""))
+        except Exception:  # pragma: no cover - defensive
+            path = ""
+        p_norm = path.replace("\\", "/")
+        filename = p_norm.rsplit("/", 1)[-1]
+        if filename.startswith("test_tui_") or "/tui/" in p_norm:
+            item.add_marker(tui_mark)

@@ -14,7 +14,6 @@ from typing import Any
 
 from network_toolkit.tui.constants import STARTUP_NOTICE
 from network_toolkit.tui.models import CancellationToken
-from network_toolkit.tui.prompt import Prompt
 
 
 class TuiController:
@@ -68,9 +67,11 @@ class TuiController:
         # Async task + cancellation token for active run
         app._run_task = None
         app._cancel_token = None
+        # Background tasks and toast-prompt state flags
         app._bg_tasks = set()
-
-    # No prompt state flags needed with unified Prompt
+        app._cancel_prompt_active = False
+        app._cancel_mode_prompt_active = False
+        app._quit_prompt_active = False
 
     async def on_input_changed(self, event: Any) -> None:
         app = self.app
@@ -145,42 +146,21 @@ class TuiController:
         app = self.app
         service = self.service
         state = self.state
-        # Disallow starting a new run if one is active
+        # Disallow starting a new run if one is active: show toast and let on_key handle
         if getattr(app, "_run_active", False):
-            # Maintain legacy flag for tests while using unified Prompt
-            try:
-                app._cancel_prompt_active = True
-            except Exception:
-                pass
+            app._cancel_prompt_active = True
             app._add_meta(
                 "Run already in progress — press 'y' to cancel, 'n' or Enter to continue."
             )
             try:
-                do_cancel = await Prompt.ask_yes_no(
-                    app, "A job is already running. Cancel it? [y/N]", default_no=True
-                )
-            except Exception:
-                do_cancel = False
-            finally:
-                try:
-                    app._cancel_prompt_active = False
-                except Exception:
-                    pass
-            if not do_cancel:
-                return
-            # Ask if the user wants a hard cancel
-            try:
-                hard = await Prompt.ask_yes_no(
+                self.compat.notify(
                     app,
-                    "Hard cancel (disconnect sessions)? [y/N]",
-                    default_no=True,
+                    "A job is already running. Cancel it? [y/N]",
+                    timeout=5,
+                    severity="warning",
                 )
             except Exception:
-                hard = False
-            if hard:
-                await self.action_cancel_hard()
-            else:
-                await self.action_cancel()
+                pass
             return
 
         # Prepare UI for a new run
@@ -413,7 +393,102 @@ class TuiController:
             key = str(getattr(event, "key", "")).lower()
         except Exception:
             key = ""
-        # No inline prompt state handling needed with unified Prompt
+        # Handle toast-driven prompts first (cancel/quit flows)
+        try:
+            if getattr(app, "_cancel_prompt_active", False):
+                if key in {"y"}:
+                    app._cancel_prompt_active = False
+                    app._cancel_mode_prompt_active = True
+                    try:
+                        self.compat.notify(
+                            app,
+                            "Cancel type? Soft [s] (recommended) or Hard [h]. Hard will close sessions immediately and may leave devices in a partial state.",
+                            timeout=8,
+                            severity="warning",
+                        )
+                    except Exception:
+                        pass
+                    if hasattr(event, "stop"):
+                        event.stop()
+                    return
+                if key in {"n", "enter", "return", "escape"}:
+                    app._cancel_prompt_active = False
+                    try:
+                        status = app.query_one("#run-status")
+                        status.update("Status: running — Continuing current run")
+                        app._refresh_bottom_visibility()
+                    except Exception:
+                        try:
+                            self.compat.notify(
+                                app,
+                                "Continuing current run",
+                                timeout=2,
+                                severity="info",
+                            )
+                        except Exception:
+                            pass
+                    if hasattr(event, "stop"):
+                        event.stop()
+                    return
+            if getattr(app, "_cancel_mode_prompt_active", False):
+                if key in {"s", "enter", "return"}:  # default soft
+                    app._cancel_mode_prompt_active = False
+                    try:
+                        task = asyncio.create_task(self.action_cancel())
+                        self.app._bg_tasks.add(task)
+                        task.add_done_callback(self.app._bg_tasks.discard)
+                    except Exception:
+                        pass
+                    if hasattr(event, "stop"):
+                        event.stop()
+                    return
+                if key == "h":
+                    app._cancel_mode_prompt_active = False
+                    try:
+                        task = asyncio.create_task(self.action_cancel_hard())
+                        self.app._bg_tasks.add(task)
+                        task.add_done_callback(self.app._bg_tasks.discard)
+                    except Exception:
+                        pass
+                    if hasattr(event, "stop"):
+                        event.stop()
+                    return
+                if key in {"n", "escape"}:
+                    app._cancel_mode_prompt_active = False
+                    try:
+                        status = app.query_one("#run-status")
+                        status.update("Status: running — Continuing current run")
+                        app._refresh_bottom_visibility()
+                    except Exception:
+                        try:
+                            self.compat.notify(
+                                app,
+                                "Continuing current run",
+                                timeout=2,
+                                severity="info",
+                            )
+                        except Exception:
+                            pass
+                    if hasattr(event, "stop"):
+                        event.stop()
+                    return
+            if getattr(app, "_quit_prompt_active", False):
+                if key == "y":
+                    app._quit_prompt_active = False
+                    try:
+                        if hasattr(app, "exit"):
+                            app.exit()
+                        else:
+                            raise SystemExit(0)
+                    except Exception:
+                        raise SystemExit(0) from None
+                if key in {"n", "enter", "return", "escape"}:
+                    app._quit_prompt_active = False
+                    if hasattr(event, "stop"):
+                        event.stop()
+                    return
+        except Exception:
+            pass
         if key == "q":
             # If any overlay is visible, close it; otherwise ask to quit
             try:
@@ -438,30 +513,12 @@ class TuiController:
                     pass
                 return
 
-            # No overlays: prompt to quit using unified Prompt (async task)
-            async def _ask_quit() -> None:
-                try:
-                    do_quit = await Prompt.ask_yes_no(
-                        app, "Do you want to quit?", default_no=True
-                    )
-                except Exception:
-                    do_quit = False
-                if do_quit:
-                    try:
-                        if hasattr(app, "exit"):
-                            app.exit()
-                        else:
-                            raise SystemExit(0)
-                    except Exception as _exc:
-                        raise SystemExit(0) from None
-
+            # No overlays: ask to quit via toast and let on_key handle y/N
+            app._quit_prompt_active = True
             try:
-                task = asyncio.create_task(_ask_quit())
-                try:
-                    self.app._bg_tasks.add(task)
-                    task.add_done_callback(self.app._bg_tasks.discard)
-                except Exception:
-                    pass
+                self.compat.notify(
+                    app, "Do you want to quit? [y/N]", timeout=5, severity="warning"
+                )
             except Exception:
                 pass
             try:
@@ -513,35 +570,17 @@ class TuiController:
             except Exception:
                 pass
         elif key in {"ctrl+c"}:
-            # Ctrl+C asks to cancel the current run (soft by default)
+            # Ctrl+C: show cancel y/N toast; on_key will handle response and next step
             try:
                 if getattr(app, "_run_active", False):
-
-                    async def _ask_cancel() -> None:
-                        try:
-                            app._cancel_prompt_active = True
-                        except Exception:
-                            pass
-                        try:
-                            do_cancel = await Prompt.ask_yes_no(
-                                app,
-                                "A job is already running. Cancel it? [y/N]",
-                                default_no=True,
-                            )
-                        except Exception:
-                            do_cancel = False
-                        finally:
-                            try:
-                                app._cancel_prompt_active = False
-                            except Exception:
-                                pass
-                        if do_cancel:
-                            await self.action_cancel()
-
-                    task = asyncio.create_task(_ask_cancel())
+                    app._cancel_prompt_active = True
                     try:
-                        self.app._bg_tasks.add(task)
-                        task.add_done_callback(self.app._bg_tasks.discard)
+                        self.compat.notify(
+                            app,
+                            "A job is already running. Cancel it? [y/N]",
+                            timeout=5,
+                            severity="warning",
+                        )
                     except Exception:
                         pass
                 if hasattr(event, "stop"):
