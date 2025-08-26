@@ -172,27 +172,51 @@ nw --help
 
 ### Release process
 
-1. **Prepare release**
+**IMPORTANT**: Always use the release script. Manual tag creation will fail due to version validation.
+
+1. **Prepare for release**
 
    ```bash
-   # Update version in pyproject.toml
-   # Update CHANGELOG.md
-   # Commit changes
-   git add .
-   git commit -m "release: prepare v1.0.0"
+   # Ensure you're on main branch with clean working directory
+   git checkout main
+   git pull origin main
+   git status  # Should show no uncommitted changes
+
+   # Run quality checks
+   task test
+   task lint
+   task format
    ```
 
-2. **Create release tag**
+2. **Update CHANGELOG.md**
+
+   Manually update the changelog with new features, fixes, and changes for the upcoming version.
+
+3. **Execute release**
 
    ```bash
-   git tag v1.0.0
-   git push origin v1.0.0
+   # Test the release process first
+   ./scripts/release.sh --version 1.0.0 --dry-run
+
+   # Execute the actual release
+   ./scripts/release.sh --version 1.0.0
    ```
 
-3. **Automated release**
-   - GitHub Actions builds and tests the package
-   - Creates GitHub release with artifacts
-   - Publishes to PyPI (when configured)
+   The release script automatically:
+
+   - Updates version in `src/network_toolkit/__about__.py`
+   - Updates `CHANGELOG.md` with release date
+   - Commits changes with `chore: bump version to v1.0.0`
+   - Pushes the commit to main
+   - Creates and pushes the release tag
+
+4. **Automated GitHub Actions**
+   - Validates version consistency between tag and code
+   - Builds and tests package on multiple platforms (Linux, Windows, macOS)
+   - Creates GitHub release with build artifacts
+   - Attaches wheel and source distribution files
+
+**Never manually create release tags** - this will cause version mismatch errors in the build process.
 
 ## Project structure
 

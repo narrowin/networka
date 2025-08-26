@@ -179,39 +179,27 @@ tasks:
       - echo "⚠️ Documentation generation not yet implemented"
 
   release:dry:
-    desc: Dry run GitHub release process
+    desc: Test release script in dry-run mode
     interactive: true
     cmds:
-      - echo "🚀 Running GitHub release dry run..."
+      - echo "Testing release script..."
       - |
         read -p "Enter version (e.g., 1.0.0): " version
-        echo "Would create GitHub release v$version with built assets"
-        echo "Assets that would be attached:"
-        task build
-        ls -la dist/
+        ./scripts/release.sh --version "$version" --dry-run
 
   release:
-    desc: Create a GitHub release (interactive)
+    desc: Execute release using release script
     interactive: true
     cmds:
-      - echo "🚀 Creating GitHub release..."
-      - echo "⚠️ This will create a new GitHub release with built assets."
-      - echo "   Make sure you're on main branch with clean working directory."
+      - echo "WARNING - This will create a new release and push to GitHub"
+      - echo "Make sure you are on main branch with clean working directory"
       - |
         read -p "Enter version (e.g., 1.0.0): " version
-        read -p "Are you sure you want to release v$version to GitHub? (y/N): " confirm
+        read -p "Are you sure you want to release v$version? (y/N): " confirm
         if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
-          echo "Building release assets..."
-          task build
-          echo "✅ Assets built. Create GitHub release manually and attach:"
-          ls -la dist/
-          echo "📌 Instructions:"
-          echo "1. Go to https://github.com/narrowin/networka/releases/new"
-          echo "2. Tag: v$version"
-          echo "3. Attach files from dist/ directory"
-          echo "4. Write release notes"
+          ./scripts/release.sh --version "$version"
         else
-          echo "❌ Release cancelled"
+          echo "Release cancelled"
         fi
 
   dev:
