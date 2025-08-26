@@ -251,6 +251,49 @@ def run(config: str | Path = "config") -> None:
                 self._populate_selection_list("list-sequences", self._all_sequences)
             except Exception:
                 pass
+            # Brief startup notice that this TUI is a prototype/WIP
+            try:
+                msg = (
+                    "Prototype: This TUI is a work in progress — expect rough edges."
+                )
+                try:
+                    # Prefer modern Textual notify API with severity & timeout
+                    self.notify(msg, timeout=3, severity="warning")  # type: ignore[arg-type]
+                except TypeError:
+                    # Older Textual: severity param may not exist
+                    self.notify(msg, timeout=3)  # type: ignore[misc]
+                except AttributeError:
+                    # Fallback: temporarily show in status bar and restore after delay
+                    try:
+                        status = self.query_one("#run-status")
+                        # Save and restore prior content
+                        try:
+                            prev_text = getattr(getattr(status, "renderable", None), "plain", None) or "Status: idle"
+                        except Exception:
+                            prev_text = "Status: idle"
+                        try:
+                            status.update(msg)
+                        except Exception:
+                            pass
+                        try:
+                            # Use App timer if available
+                            self.set_timer(3.0, lambda: status.update(prev_text))  # type: ignore[attr-defined]
+                        except Exception:
+                            # Best-effort async sleep & restore
+                            async def _restore() -> None:
+                                try:
+                                    await asyncio.sleep(3)
+                                    status.update(prev_text)
+                                except Exception:
+                                    pass
+                            try:
+                                self.call_later(_restore)  # type: ignore[attr-defined]
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+            except Exception:
+                pass
             # Record UI thread identity for safe callback dispatching
             try:
                 self._ui_thread_ident = threading.get_ident()
