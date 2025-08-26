@@ -69,14 +69,14 @@ class TestListCommands:
             "run",
             "upload",
             "download",
-            "config-backup",
-            "firmware-upgrade",
-            "firmware-downgrade",
-            "bios-upgrade",
-            "list-devices",
-            "list-groups",
-            "list-sequences",
-            "config-validate",
+            "backup",
+            "firmware",
+            "list",
+            "config",
+            "schema",
+            "diff",
+            "ssh",
+            "complete",
         ]
 
         assert commands == expected_commands

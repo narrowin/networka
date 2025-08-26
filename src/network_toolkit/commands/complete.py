@@ -29,10 +29,12 @@ def _list_commands() -> list[str]:
         "download",
         "backup",
         "firmware",
-        "list-devices",
-        "list-groups",
-        "list-sequences",
-        "config-validate",
+        "ssh",
+        "diff",
+        "list",
+        "config",
+        "schema",
+        "complete",
     ]
 
 

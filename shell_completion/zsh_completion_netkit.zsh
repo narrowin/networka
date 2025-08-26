@@ -113,14 +113,19 @@ _nw_complete() {
             values=(${(f)"$(nw __complete --for devices --config \"$cfg\" 2>/dev/null)"} ${(f)"$(nw __complete --for groups --config \"$cfg\" 2>/dev/null)"})
             _describe -t targets 'targets' values && return
           fi ;;
+        list)
+          if (( CURRENT == 3 )); then
+            values=("devices:List all configured network devices" "groups:List all configured device groups" "sequences:List available sequences" "supported-types:List supported device types")
+            _describe -t subcommands 'list subcommands' values && return
+          fi ;;
+        complete)
+          # Handle completion command - mostly internal use
+          ;;
         upload|download|diff)
           if (( CURRENT == 3 )); then
             values=(${(f)"$(nw __complete --for devices --config \"$cfg\" 2>/dev/null)"} ${(f)"$(nw __complete --for groups --config \"$cfg\" 2>/dev/null)"})
             _describe -t targets 'targets' values && return
           fi ;;
-        list-sequences)
-          # options handled by _arguments; nothing positional
-          ;;
       esac
       ;;
   esac

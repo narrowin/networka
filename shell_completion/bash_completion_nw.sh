@@ -60,7 +60,7 @@ _nw() {
                 if [[ -n "$result" ]]; then
                     echo "$result"
                 else
-                    echo "info run upload download backup firmware ssh diff list config schema"
+                    echo "info run upload download backup firmware ssh diff list config schema complete"
                 fi
                 return ;;
             devices)
@@ -306,6 +306,10 @@ _nw() {
                 COMPREPLY=( $(compgen -W "init validate" -- "$cur") )
             fi
             ;;
+        complete)
+            # Handle completion command options
+            _opts "$common_opts --for --device"
+            ;;
         schema)
             # Handle schema subcommands
             if [[ $COMP_CWORD -gt 2 ]]; then
@@ -321,10 +325,6 @@ _nw() {
                 COMPREPLY=( $(compgen -W "update info" -- "$cur") )
             fi
             ;;
-        config-init)
-            _opts "$config_init_opts" ;;
-        config-validate)
-            _opts "$config_validate_opts" ;;
         *)
             # Fallback: suggest common opts
             if [[ $cur == -* ]]; then _opts "$common_opts"; fi ;;

@@ -59,9 +59,9 @@ class TestCLI:
 
     @pytest.mark.skip(reason="CLI test has exit code issues, needs investigation")
     def test_list_groups_command(self, config_file: Path) -> None:
-        """Test list-groups command."""
+        """Test list groups command."""
         runner = CliRunner()
-        result = runner.invoke(app, ["list-groups", "--config", str(config_file)])
+        result = runner.invoke(app, ["list", "groups", "--config", str(config_file)])
         assert result.exit_code == 0
         # Should show configured groups
         assert "all_switches" in result.output or "lab_devices" in result.output

@@ -175,15 +175,17 @@ ssh Open tmux with SSH panes for a device or group.
 
 Info & Configuration:
 info Show comprehensive information for devices, groups, or sequences.
-list-devices List all configured network devices.
-list-groups List all configured device groups and their members.
-list-sequences List all available command sequences, optionally filtered by vendor or category.
+list List network devices, groups, sequences, and platform information
+  devices List all configured network devices.
+  groups List all configured device groups and their members.
+  sequences List all available command sequences, optionally filtered by vendor or category.
+  supported-types List supported device types.
 config Configuration management commands
-init Initialize a minimal working configuration environment.
-validate Validate the configuration file and show any issues.
+  init Initialize a minimal working configuration environment.
+  validate Validate the configuration file and show any issues.
 schema JSON schema management commands
-update Update JSON schemas for YAML editor validation.
-info Display information about JSON schema files.
+  update Update JSON schemas for YAML editor validation.
+  info Display information about JSON schema files.
 diff Diff config, a command, or a sequence.
 
 Executing Operations:

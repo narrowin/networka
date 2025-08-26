@@ -39,7 +39,7 @@ class TestBasicCommandCoverage:
         assert result.exit_code == 0
 
     def test_list_sequences_basic_functionality(self, config_file: Path) -> None:
-        """Test list-sequences command basic path."""
+        """Test list sequences command basic path."""
         runner = CliRunner()
         result = runner.invoke(app, ["list", "sequences", "--config", str(config_file)])
         assert result.exit_code == 0
