@@ -246,7 +246,6 @@ class ExecutionService:
         ok = True
         # Collect output lines for return (not emitted here); we stream per-command chunks
         buf: list[str] = []
-        device_header_emitted = False
         try:
             # Import here to avoid making CLI a hard dependency of module import
             from network_toolkit.cli import DeviceSession
@@ -267,32 +266,33 @@ class ExecutionService:
                         cb.on_meta(f"{device}: cancelled")
                         ok = False
                         break
-                    # Build a per-command chunk: optional device header, the command echo, then output lines
-                    chunk_lines: list[str] = []
-                    if not device_header_emitted:
-                        chunk_lines.append(f"--- Device: {device} ---")
-                        buf.append(f"--- Device: {device} ---")
-                        device_header_emitted = True
-                    # Keep command echo as meta only; do not include in output chunk
+                    # Build a per-command chunk: header with device & command, raw output lines, then a footer
+                    header = f"-- {device}: {cmd} --"
+                    footer = f"-- finish {device}: {cmd} --"
                     cb.on_meta(f"{device}$ {cmd}")
                     try:
                         raw = session.execute_command(cmd)
                         text = raw if type(raw) is str else str(raw)
-                        out_strip = text.strip()
-                        if out_strip:
-                            for line in text.rstrip().splitlines():
-                                # Append raw lines without device prefix
-                                chunk_lines.append(line)
-                                buf.append(line)
-                        # Emit the complete command chunk atomically
-                        if chunk_lines:
-                            try:
-                                cb.on_output("\n".join(chunk_lines))
-                            except Exception:
-                                pass
+                        lines = text.rstrip().splitlines() if text else []
                     except Exception as e:  # noqa: BLE001
                         ok = False
                         cb.on_error(f"{device}: command error: {e}")
+                        lines = []
+                    # Emit the entire chunk atomically to preserve ordering
+                    try:
+                        chunk = [header]
+                        if lines:
+                            chunk.extend(lines)
+                        chunk.append(footer)
+                        payload = "\n".join(chunk)
+                        # Track in buffer for compatibility
+                        buf.extend(chunk)
+                        if getattr(cb, "on_device_output", None):
+                            cb.on_device_output(device, payload)  # type: ignore[misc]
+                        else:
+                            cb.on_output(payload)
+                    except Exception:
+                        pass
             # Ensure we unregister session on any exit path
             try:
                 self._unregister_session(session)
@@ -300,18 +300,24 @@ class ExecutionService:
                 pass
             if cancel and cancel.is_set():
                 cb.on_meta(f"{device}: cancelled done")
-                footer = f"--- Device: {device} cancelled done ---"
-                buf.append(footer)
+                dev_footer = f"--- Device: {device} cancelled done ---"
+                buf.append(dev_footer)
                 try:
-                    cb.on_output(footer)
+                    if getattr(cb, "on_device_output", None):
+                        cb.on_device_output(device, dev_footer)  # type: ignore[misc]
+                    else:
+                        cb.on_output(dev_footer)
                 except Exception:
                     pass
             else:
                 cb.on_meta(f"{device}: done")
-                footer = f"--- Device: {device} done ---"
-                buf.append(footer)
+                dev_footer = f"--- Device: {device} done ---"
+                buf.append(dev_footer)
                 try:
-                    cb.on_output(footer)
+                    if getattr(cb, "on_device_output", None):
+                        cb.on_device_output(device, dev_footer)  # type: ignore[misc]
+                    else:
+                        cb.on_output(dev_footer)
                 except Exception:
                     pass
             # Return empty output_lines to indicate streaming already handled output

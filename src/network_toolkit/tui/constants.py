@@ -10,9 +10,11 @@ ID_LAYOUT = "layout"
 ID_TOP = "top"
 ID_BOTTOM = "bottom"
 ID_OUTPUT_PANEL = "output-panel"
+ID_OUTPUT_TABS = "output-tabs"
 ID_SUMMARY_PANEL = "summary-panel"
 ID_HELP_PANEL = "help-panel"
-ID_OUTPUT_LOG = "output-log"
+ID_OUTPUT_LOG = "output-log"  # All-tab log retains legacy id
+ID_OUTPUT_TAB_ALL = "output-tab-all"
 ID_RUN_STATUS = "run-status"
 ID_HELP_LOG = "help-log"
 

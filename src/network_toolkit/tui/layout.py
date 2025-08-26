@@ -25,6 +25,8 @@ from network_toolkit.tui.constants import (
     ID_LIST_SEQUENCES,
     ID_OUTPUT_LOG,
     ID_OUTPUT_PANEL,
+    ID_OUTPUT_TAB_ALL,
+    ID_OUTPUT_TABS,
     ID_RUN_BUTTON,
     ID_RUN_STATUS,
     ID_RUN_SUMMARY,
@@ -98,7 +100,9 @@ def compose_root(compat: Any) -> Any:
                 yield compat.TextLogClass(id=ID_HELP_LOG, classes="scroll")
             with vertical(classes="panel hidden", id=ID_OUTPUT_PANEL):
                 yield static(LBL_OUTPUT, classes="pane-title title")
-                yield compat.TextLogClass(id=ID_OUTPUT_LOG, classes="scroll")
+                with tabbed_content(id=ID_OUTPUT_TABS):
+                    with tab_pane("All", id=ID_OUTPUT_TAB_ALL):
+                        yield compat.TextLogClass(id=ID_OUTPUT_LOG, classes="scroll")
                 yield _filter_input(compat, ID_FILTER_OUTPUT, "Filter output...")
     yield footer()
 

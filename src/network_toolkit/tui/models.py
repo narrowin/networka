@@ -59,6 +59,8 @@ class RunCallbacks(BaseModel):
     on_output: Callable[[str], None]
     on_error: Callable[[str], None]
     on_meta: Callable[[str], None]
+    # Optional per-device output; if provided, it will be preferred over on_output
+    on_device_output: Callable[[str, str], None] | None = None
 
 
 def iter_commands(text: str) -> Iterable[str]:

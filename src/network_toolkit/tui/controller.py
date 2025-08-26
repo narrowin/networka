@@ -128,26 +128,7 @@ class TuiController:
             app._render_summary()
             return
         if sender_id == "filter-output":
-            app._output_filter = value
-            try:
-                out_log = app.query_one("#output-log")
-            except Exception:
-                out_log = None
-            if out_log is not None:
-                try:
-                    if hasattr(out_log, "clear"):
-                        out_log.clear()
-                except Exception:
-                    pass
-                filt = (value or "").strip().lower()
-                lines: list[str] = [
-                    str(x) for x in (getattr(app, "_output_lines", []) or [])
-                ]
-                for line in lines:
-                    if not filt or (filt in line.lower()):
-                        from network_toolkit.tui.helpers import log_write
-
-                        log_write(out_log, line)
+            app._apply_output_filter(value)
 
     async def action_confirm(self) -> None:
         app = self.app
@@ -244,6 +225,9 @@ class TuiController:
                         on_output=lambda m: app._dispatch_ui(app._output_append, m),
                         on_error=lambda m: app._dispatch_ui(app._add_error, m),
                         on_meta=lambda m: app._dispatch_ui(app._add_meta, m),
+                        on_device_output=lambda d, m: app._dispatch_ui(
+                            app._output_append_device, d, m
+                        ),
                     ),
                     cancel=app._cancel_token,
                 )
