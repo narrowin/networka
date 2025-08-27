@@ -9,23 +9,32 @@ nav:
   - Home: index.md
   - Getting started:
       - Quickstart: getting-started.md
-      - Platform compatibility: platform-compatibility.md
-  - User guide:
-      - CSV configuration: csv-configuration.md
+      - Configuration:
+          - Overview: configuration.md
+          - YAML: configuration.md#yaml
+          - CSV: configuration.md#csv
       - Environment variables: environment-variables.md
       - Running commands: running-commands.md
-      - Results: results.md
-      - Output modes: output-modes.md
-      - Backups: backups.md
-      - Shell completion: shell-completion.md
-      - Interactive credentials: interactive-credentials.md
-      - Transport: transport.md
-      - IP address support: ip-address-support.md
-      - tmux SSH sessions: tmux-ssh.md
-      - Multi-vendor support: multi-vendor-support.md
-      - File upload: file_upload.md
-      - Troubleshooting: troubleshooting.md
-      - Examples (user sequences): examples/user_sequences/README.md
+      - Platform compatibility: platform-compatibility.md
+  - User guide:
+    - Configuration:
+      - Overview: configuration.md
+      - YAML: configuration.md#yaml
+      - CSV: configuration.md#csv
+    - Environment variables: environment-variables.md
+    - Running commands: running-commands.md
+    - Results: results.md
+    - Output modes: output-modes.md
+    - Backups: backups.md
+    - File upload: file_upload.md
+    - Multi-vendor support: multi-vendor-support.md
+    - Shell completion: shell-completion.md
+    - Interactive credentials: interactive-credentials.md
+    - Transport: transport.md
+    - IP address support: ip-address-support.md
+    - tmux SSH sessions: tmux-ssh.md
+    - Examples (user sequences): examples/user_sequences/README.md
+  - Troubleshooting: troubleshooting.md
   - Vendors:
       - Overview: vendors/index.md
       - MikroTik RouterOS: vendors/mikrotik/index.md

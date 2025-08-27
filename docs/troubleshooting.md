@@ -19,7 +19,7 @@
 ## Configuration loading
 - Check files are in the correct directories under `config/`.
 - For CSV, ensure headers match the documented schema.
-- See: CSV configuration.
+- See: Configuration (CSV).
 
 ## Output formatting and results
 - Use `--output-mode` to adjust styling.

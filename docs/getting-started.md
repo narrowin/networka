@@ -36,7 +36,9 @@ See User guide for configuration details.
 
 ## Next steps
 
-- Define more devices and groups → CSV configuration
+- Define more devices and groups → Configuration
+- Prefer YAML → Configuration (YAML)
+- Optionally import from spreadsheets → Configuration (CSV)
 - Learn how to run common operations → Running commands
 - Control formatting and capture outputs → Output modes and Results
 - Troubleshooting connection/auth issues → Troubleshooting
