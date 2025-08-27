@@ -37,7 +37,7 @@ nav:
     - CLI: reference/cli.md
     - API: reference/api.md
     - Project development: development.md
-  - Documentation guidelines: documentation-guidelines.md
+    - Documentation guidelines: documentation-guidelines.md
 
 theme:
   name: material
