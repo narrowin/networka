@@ -133,11 +133,15 @@ class TestShellCompletions:
 
     @patch("network_toolkit.commands.config._detect_repo_root")
     def test_install_shell_completions_no_repo(self, mock_repo: Mock) -> None:
-        """Test shell completion installation when repo not found."""
+        """Test shell completion installation when repo not found but packaged resources available."""
         mock_repo.return_value = None
 
         result = install_shell_completions("bash")
-        assert result == (None, None)
+        # Should succeed using packaged resources even when repo root not detected
+        assert result[0] is not None, (
+            "Should use packaged resources when repo not available"
+        )
+        assert result[1] is not None, "Should return rc file path"
 
     @patch("network_toolkit.commands.config._detect_repo_root")
     def test_install_shell_completions_invalid_shell(self, mock_repo: Mock) -> None:
@@ -400,6 +404,80 @@ class TestConfigInitImpl:
         mock_activate.assert_called_once_with(
             shell_type, Path("/fake/completion"), Path("/fake/.bashrc")
         )
+
+    @patch("network_toolkit.commands.config.install_shell_completions")
+    @patch("network_toolkit.commands.config.CommandContext")
+    def test_config_init_impl_with_completions_failure(
+        self, mock_ctx_class: Mock, mock_install: Mock, tmp_path: Path
+    ) -> None:
+        """Test config init when shell completion installation fails."""
+        # Mock shell completion installation to return None (failure)
+        mock_install.return_value = (None, None)
+
+        # Mock the CommandContext instance
+        mock_ctx = Mock()
+        mock_ctx_class.return_value = mock_ctx
+
+        shell_type = "bash"  # Extract to variable to avoid false positive lint warning
+        _config_init_impl(
+            target_dir=tmp_path,
+            yes=True,
+            install_completions=True,
+            shell=shell_type,
+            activate_completions=True,
+        )
+
+        mock_install.assert_called_once_with(shell_type)
+
+        # Verify that a warning message was printed
+        mock_ctx.print_warning.assert_called_with(
+            "Shell completion installation failed"
+        )
+
+    @patch("network_toolkit.commands.config.install_shell_completions")
+    @patch("network_toolkit.commands.config.activate_shell_completion")
+    def test_config_init_impl_completions_already_installed(
+        self, mock_activate: Mock, mock_install: Mock, tmp_path: Path
+    ) -> None:
+        """Test config init when shell completions are already installed (should overwrite)."""
+        # Simulate completions already installed - function should still succeed
+        existing_completion = Path(
+            "/home/user/.local/share/bash-completion/completions/nw"
+        )
+        existing_rc = Path("/home/user/.bashrc")
+        mock_install.return_value = (existing_completion, existing_rc)
+
+        shell_type = "bash"
+        _config_init_impl(
+            target_dir=tmp_path,
+            yes=True,
+            install_completions=True,
+            shell=shell_type,
+            activate_completions=True,
+        )
+
+        # Should still call installation (which handles overwriting internally)
+        mock_install.assert_called_once_with(shell_type)
+        mock_activate.assert_called_once_with(
+            shell_type, existing_completion, existing_rc
+        )
+
+    @patch("network_toolkit.commands.config._detect_repo_root")
+    def test_install_shell_completions_no_repo_but_packaged_resources_available(
+        self, mock_repo_detect: Mock
+    ) -> None:
+        """Test that shell completion works when repo root not detected but packaged resources exist."""
+        # Simulate no repo root detected (e.g., installed package, not dev environment)
+        mock_repo_detect.return_value = None
+
+        # This should NOT return (None, None) because packaged resources should be used
+        result = install_shell_completions("bash")
+
+        # Should succeed using packaged resources
+        assert result[0] is not None, (
+            "Should install completion using packaged resources"
+        )
+        assert result[1] is not None, "Should return rc file path"
 
     @patch("network_toolkit.commands.config.install_editor_schemas")
     def test_config_init_impl_with_schemas(

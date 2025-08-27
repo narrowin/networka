@@ -330,12 +330,6 @@ def install_shell_completions(selected: str) -> tuple[Path | None, Path | None]:
         msg = "Only bash and zsh shells are supported for completion installation"
         raise ConfigurationError(msg)
 
-    # Only install completions when running in a repo/dev context.
-    # Tests expect a no-op when repo root isn't detected.
-    repo_root = _detect_repo_root()
-    if not repo_root:
-        return (None, None)
-
     # Try packaged resources under network_toolkit.shell_completion first
     pkg_src: Path | None = None
     try:
@@ -354,18 +348,20 @@ def install_shell_completions(selected: str) -> tuple[Path | None, Path | None]:
     except Exception:  # pragma: no cover - safety
         pkg_src = None
 
-    # Fallback to repo-root scripts
+    # Fallback to repo-root scripts in development mode
     repo_src: Path | None = None
-    sc_dir = repo_root / "shell_completion"
-    if selected == "bash":
-        cand = sc_dir / "bash_completion_nw.sh"
-    else:
-        cand = sc_dir / "zsh_completion_netkit.zsh"
-    if cand.exists():
-        repo_src = cand
+    repo_root = _detect_repo_root()
+    if repo_root:
+        sc_dir = repo_root / "shell_completion"
+        if selected == "bash":
+            cand = sc_dir / "bash_completion_nw.sh"
+        else:
+            cand = sc_dir / "zsh_completion_netkit.zsh"
+        if cand.exists():
+            repo_src = cand
 
     if not pkg_src and not repo_src:
-        logger.warning("Completion scripts not found in repo; skipping")
+        logger.warning("Completion scripts not found; skipping")
         return (None, None)
 
     try:
