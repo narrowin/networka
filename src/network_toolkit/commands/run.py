@@ -138,7 +138,8 @@ def register(app: typer.Typer) -> None:
                 # This will raise ValueError if transport_type is invalid
                 get_transport_factory(transport_type)
             except ValueError as e:
-                print(f"Error: {e}")
+                # Use typer echo for early errors before CommandContext is available
+                typer.echo(f"Error: {e}", err=True)
                 raise typer.Exit(1)
 
         # Handle legacy raw mode mapping

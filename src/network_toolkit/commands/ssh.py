@@ -525,9 +525,9 @@ def register(app: typer.Typer) -> None:
         except Exception as exc:
             ctx.console.log(f"Could not enable mouse: {exc}")
 
-        print("Created tmux session")
-        print(f"Session: {sname} with {len(device_cmds)} pane(s).")
-        print("Use tmux to navigate. Press Ctrl-b d to detach.")
+        ctx.print_success("Created tmux session")
+        ctx.print_info(f"Session: {sname} with {len(device_cmds)} pane(s).")
+        ctx.print_info("Use tmux to navigate. Press Ctrl-b d to detach.")
 
         if attach:
             # Use libtmux to attach directly instead of subprocess
