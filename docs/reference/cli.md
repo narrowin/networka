@@ -4,7 +4,7 @@ This page is auto-generated from the actual CLI code so it always reflects the r
 
 ::: mkdocs-click
     :module: network_toolkit.cli
-    :command: cli
+    :command: app
     :depth: 2
     :style: table
 :::

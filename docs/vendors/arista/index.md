@@ -6,6 +6,25 @@ Supported identifiers: `arista_eos`
 
 Status: coming soon. Vendor-specific documentation for firmware management, backups, and sequences is being prepared.
 
+## Quickstart
+
+### Run
+
+```bash
+nw run --platform arista_eos 198.51.100.30 "show version" --interactive-auth
+```
+
+### Validate (expected output, trimmed)
+
+```
+Interactive authentication mode enabled
+Username: admin
+Password: ********
+Executing on 198.51.100.30: show version
+Arista ...
+Command completed successfully
+```
+
 ## Examples
 
 ```bash

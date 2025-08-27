@@ -16,15 +16,9 @@ Networka provides comprehensive cross-platform support, ensuring network enginee
 - **Python 3.12**: Full support
 - **Python 3.13**: Full support
 
-## Tested Configurations
+## Tested configurations
 
-All combinations have been thoroughly tested using automated CI/CD pipelines:
-
-| Platform           | Python 3.11 | Python 3.12 | Python 3.13 |
-| ------------------ | ----------- | ----------- | ----------- |
-| **Ubuntu Latest**  | ✅          | ✅          | ✅          |
-| **macOS Latest**   | ✅          | ✅          | ✅          |
-| **Windows Latest** | ✅          | ✅          | ✅          |
+CI validates Linux, macOS, and Windows runners across Python 3.11–3.13. For production usage, Linux and macOS are first-class; Windows is best-effort unless using WSL2.
 
 ## Installation Notes
 
@@ -33,24 +27,30 @@ All combinations have been thoroughly tested using automated CI/CD pipelines:
 - No additional system dependencies required
 - Works with all major package managers (apt, yum, dnf, pacman)
 - Container-ready for Docker deployments
+## Tested configurations
 
-### macOS
-
-- Native support for both Intel and Apple Silicon
-- All cryptographic dependencies include universal binaries
-- Homebrew integration available
-
-### Windows
-
+CI covers Linux, macOS, and Windows runners across Python 3.11–3.13. For production usage, Linux and macOS are first-class; Windows is best-effort unless using WSL2.
 - Scrapli (default transport) is not officially supported on native Windows. It may work via Paramiko or ssh2-python, but the strongly recommended setup is WSL2 (Ubuntu) to provide a POSIX environment.
 - Pre-built wheels for all C extensions
 - No Visual Studio Build Tools required
 - PowerShell and Command Prompt compatible (best-effort); WSL2 is preferred
 
-## Dependencies
 
-All platform-critical dependencies are thoroughly tested:
+- Scrapli (default transport) is not officially supported on native Windows. It may work via Paramiko or ssh2-python, but the strongly recommended setup is WSL2 (Ubuntu) to provide a POSIX environment.
+- PowerShell and Command Prompt are supported on a best-effort basis; prefer WSL2 for a smoother experience.
 
+#### WSL2 quickstart (recommended)
+
+1. Enable WSL and install Ubuntu from the Microsoft Store
+2. Open Ubuntu terminal
+3. Install uv and git, then install Networka from GitHub:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+exec $SHELL
+uv tool install git+https://github.com/narrowin/networka.git
+nw --help
+```
 ### Networking Libraries
 
 - **scrapli**: Multi-vendor SSH automation
@@ -64,8 +64,9 @@ All platform-critical dependencies are thoroughly tested:
 - **pynacl**: Networking and cryptography
 
 ### Performance
+## Performance notes
 
-- **uvloop**: High-performance event loop (Linux/macOS)
+Performance is comparable across Linux and macOS. On Windows, use WSL2 for best results.
 - **asyncio**: Cross-platform async support
 
 ## Known Platform Differences
@@ -122,17 +123,9 @@ sudo apt install python3.11
 sudo dnf install python3.11
 ```
 
-## Performance Benchmarks
+## Performance notes
 
-Relative performance across platforms (Linux = 100%):
-
-| Platform    | SSH Connection | Command Execution | File Transfer |
-| ----------- | -------------- | ----------------- | ------------- |
-| **Linux**   | 100%           | 100%              | 100%          |
-| **macOS**   | 98%            | 99%               | 97%           |
-| **Windows** | 95%            | 96%               | 94%           |
-
-_Note: Performance differences are minimal and within acceptable ranges for network automation tasks._
+Performance is comparable across Linux and macOS. On Windows, use WSL2 for best results.
 
 ## Container Support
 

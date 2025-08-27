@@ -102,6 +102,23 @@ pipx install git+https://github.com/narrowin/networka.git
 nw --help
 ```
 
+#### If `nw` is not found
+
+- Check: `command -v nw` (Linux/macOS) or `where nw` (Windows)
+- If using pipx: ensure PATH is set, then reload shell
+  ```bash
+  pipx ensurepath
+  exec $SHELL
+  ```
+- Linux/macOS: add user bin to PATH if needed
+  ```bash
+  echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc  # or ~/.zshrc
+  exec $SHELL
+  ```
+- Windows (native, best-effort): prefer WSL2; if native, run `pipx ensurepath` and restart the terminal
+
+More → PATH troubleshooting: https://narrowin.github.io/networka/troubleshooting/#path-nw-not-found
+
 ### Upgrade & Remove
 
 ```bash
@@ -121,6 +138,18 @@ pipx uninstall networka
 **Linux/macOS**: No additional dependencies required
 
 **Windows**: Scrapli (the default transport) does not officially support native Windows. While it may work with Paramiko or ssh2-python drivers, the recommended approach is to run Networka on WSL2 (Ubuntu) for a fully supported POSIX environment. Native Windows usage is best-effort.
+
+WSL2 quickstart (recommended):
+
+```bash
+# In Ubuntu on WSL2
+curl -LsSf https://astral.sh/uv/install.sh | sh
+exec $SHELL
+uv tool install git+https://github.com/narrowin/networka.git
+nw --help
+```
+
+Details → https://narrowin.github.io/networka/platform-compatibility/#wsl2-quickstart-recommended
 
 ## Quick Start
 

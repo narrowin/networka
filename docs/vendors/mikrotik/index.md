@@ -2,6 +2,53 @@
 
 This guide explains how Networka works with MikroTik RouterOS devices: identifiers, supported operations, firmware upgrade/downgrade/RouterBOARD (BIOS) handling, backups, and built-in sequences.
 
+## Quickstart
+
+### Run
+
+```bash
+nw run --platform mikrotik_routeros 192.0.2.10 "/system/identity/print" --interactive-auth
+```
+
+### Validate (expected output, trimmed)
+
+```
+Interactive authentication mode enabled
+Username: admin
+Password: ********
+Executing on 192.0.2.10: /system/identity/print
+name="MikroTik"
+Command completed successfully
+```
+
+### Sequence example
+
+```bash
+nw run router1 system_info
+```
+
+Expected output (trimmed):
+
+```
+router1: step 1/3 ... ok
+router1: step 2/3 ... ok
+router1: step 3/3 ... ok
+Sequence completed successfully
+```
+
+### Next steps
+
+- Learn more commands → Running commands
+- Store outputs → Results and Output modes
+- Backups and firmware → Backups
+- Credentials → Environment variables
+
+### Troubleshooting
+
+- Use `--interactive-auth` for ad-hoc credentials
+- Verify `device_type: mikrotik_routeros` when using named devices
+- Increase timeouts if devices are slow
+
 ## Platform identifiers
 
 - device_type: `mikrotik_routeros`

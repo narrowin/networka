@@ -2,6 +2,8 @@
 
 This guide explains how to define devices, groups, and sequences for Networka. YAML is the preferred and most expressive format. CSV is supported mainly for users who manage inventories in spreadsheets on Windows. You can mix formats; use YAML by default and add CSV where it makes workflow sense.
 
+Note on credentials: See Environment variables (TL;DR at the top) for how credentials are resolved and how to set defaults and overrides.
+
 ## Directory layout
 
 Place configuration under the `config/` directory:
@@ -128,3 +130,12 @@ Mixing is supported. If both YAML and CSV define the same device/group/sequence 
 - Set credentials and defaults → Environment variables
 - Run common tasks → Running commands
 - Inspect outputs and control formatting → Results and Output modes
+
+## Bootstrap configuration (CLI)
+
+Use the built-in `config` commands to inspect and manage configuration from the CLI. See the CLI reference for the full command set and options.
+
+- List known devices/groups: `nw list devices` / `nw list groups`
+- Validate config against schema: `nw schema validate`
+
+More: CLI reference → Configuration-related commands

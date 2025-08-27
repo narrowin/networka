@@ -7,6 +7,24 @@ TL;DR
 
 This document describes how to set up secure credential management using environment variables for Networka.
 
+Example precedence
+
+1) Run with interactive auth (highest):
+
+```bash
+nw run router1 system_info --interactive-auth
+```
+
+2) Use device-specific overrides when set (e.g., `NW_USER_ROUTER1`, `NW_PASSWORD_ROUTER1`)
+
+3) Fall back to defaults when no overrides exist:
+
+```bash
+export NW_USER_DEFAULT=admin
+export NW_PASSWORD_DEFAULT=secret
+nw run router1 system_info
+```
+
 ## Overview
 
 For security best practices, all device credentials have been moved from the `devices.yml` configuration file to environment variables. This prevents sensitive information from being stored in version control.

@@ -2,6 +2,52 @@
 
 This guide explains how Networka works with Cisco IOS and IOS-XE devices: identifiers, supported operations, firmware upgrade/downgrade handling, backups, and sequences.
 
+## Quickstart
+
+### Run
+
+```bash
+nw run --platform cisco_iosxe 198.51.100.20 "show version" --interactive-auth
+```
+
+### Validate (expected output, trimmed)
+
+```
+Interactive authentication mode enabled
+Username: admin
+Password: ********
+Executing on 198.51.100.20: show version
+Cisco IOS XE Software, Version ...
+Command completed successfully
+```
+
+### Sequence example
+
+```bash
+nw run switch1 interface_status
+```
+
+Expected output (trimmed):
+
+```
+switch1: step 1/2 ... ok
+switch1: step 2/2 ... ok
+Sequence completed successfully
+```
+
+### Next steps
+
+- Learn more commands → Running commands
+- Store outputs → Results and Output modes
+- Backups and firmware → Backups
+- Credentials → Environment variables
+
+### Troubleshooting
+
+- Use `--interactive-auth` for ad-hoc credentials
+- Verify `device_type: cisco_ios` or `cisco_iosxe` for named devices
+- Increase timeouts if devices are slow
+
 ## Platform identifiers
 
 - device_type: `cisco_ios`

@@ -2,6 +2,12 @@
 
 Modern async Python toolkit for network device automation.
 
+## Naming & terminology
+
+- Networka: the project and documentation
+- nw: the command-line interface (CLI)
+- network_toolkit: the Python module/package name
+
 ## 60-second success
 
 Goal: run a command against a device without creating any files.
