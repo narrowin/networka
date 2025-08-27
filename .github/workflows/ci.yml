@@ -109,13 +109,11 @@ jobs:
     - name: Set up Python
       run: uv python install 3.12
 
-    - name: Install dependencies
-      run: uv sync --group dev
+    - name: Install docs dependencies
+      run: uv sync --extra docs
 
-    - name: Check documentation links
-      run: |
-        # Add any documentation validation here
-        echo "Documentation validation placeholder"
+    - name: Build docs (strict)
+      run: uv run mkdocs build --strict
 
   build:
     name: Build distribution

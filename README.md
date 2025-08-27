@@ -1,5 +1,7 @@
 <div align="center">
-  <img src="docs/images/networka.png" alt="Networka Logo" width="320"/>
+  <img src="https://narrowin.github.io/networka/assets/images/networka.png" alt="Networka Logo" width="320"/>
+
+  <p><a href="https://narrowin.github.io/networka/">Full documentation →</a></p>
 </div>
 
 <br/>
@@ -37,13 +39,11 @@ Because a real **Networka** wants the f\*ing lot.”<br><br>
 
 ## Getting Started
 
-- [Installation instructions →](#installation)
-- [Platform compatibility →](docs/platform-compatibility.md)
-- [Shell completion setup →](docs/shell-completion.md)
-- [CLI overview →](#cli-overview)
-- [Quick Start guide →](#quick-start)
-- [Configuration →](#configuration)
-- [Examples →](#examples)
+- Installation: see the docs → https://narrowin.github.io/networka/getting-started/
+- Platform compatibility → https://narrowin.github.io/networka/platform-compatibility/
+- Shell completion → https://narrowin.github.io/networka/shell-completion/
+- CLI reference → https://narrowin.github.io/networka/reference/cli/
+- API reference → https://narrowin.github.io/networka/reference/api/
 
 ## Features
 
@@ -561,14 +561,15 @@ Have a look through existing [Issues](https://github.com/narrowin/networka/issue
 
 ## Documentation
 
-- [Platform Compatibility](docs/platform-compatibility.md) - Cross-platform support details
-- [Development Guide](docs/development.md) - Contributing and extending the toolkit
-- [Multi-Vendor Support](docs/multi-vendor-support.md) - Using multiple network vendors
-- [IP Address Support](docs/ip-address-support.md) - Run against ad-hoc IPs with --platform
-- [Transport Selection](docs/transport.md) - Choose Scrapli now; nornir-netmiko coming soon
-- [Environment Variables](docs/environment-variables.md) - Secure credential management
-- [File Upload Guide](docs/file_upload.md) - Firmware and configuration management
-- [Interactive Credentials](docs/interactive-credentials.md) - Alternative authentication methods
+- Docs Home → https://narrowin.github.io/networka/
+- Platform Compatibility → https://narrowin.github.io/networka/platform-compatibility/
+- Development Guide → https://narrowin.github.io/networka/development/
+- Multi-Vendor Support → https://narrowin.github.io/networka/multi-vendor-support/
+- IP Address Support → https://narrowin.github.io/networka/ip-address-support/
+- Transport Selection → https://narrowin.github.io/networka/transport/
+- Environment Variables → https://narrowin.github.io/networka/environment-variables/
+- File Upload Guide → https://narrowin.github.io/networka/file_upload/
+- Interactive Credentials → https://narrowin.github.io/networka/interactive-credentials/
 
 ## License
 

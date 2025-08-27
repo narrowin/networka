@@ -18,7 +18,7 @@ tasks:
   install:
     desc: Install development dependencies
     cmds:
-      - echo "🔧 Installing development dependencies..."
+      - echo "Installing development dependencies..."
       - uv sync --all-extras --group dev
     sources:
       - pyproject.toml
@@ -29,7 +29,7 @@ tasks:
   format:
     desc: Format code with ruff
     cmds:
-      - echo "🎨 Formatting code..."
+      - echo "Formatting code..."
       - uv run ruff format .
     sources:
       - src/**/*.py
@@ -38,7 +38,7 @@ tasks:
   lint:
     desc: Lint code with ruff
     cmds:
-      - echo "🔍 Linting code..."
+      - echo "Linting code..."
       - uv run ruff check .
     sources:
       - src/**/*.py
@@ -47,7 +47,7 @@ tasks:
   lint:fix:
     desc: Lint and fix code with ruff
     cmds:
-      - echo "🔧 Linting and fixing code..."
+      - echo "Linting and fixing code..."
       - uv run ruff check --fix .
     sources:
       - src/**/*.py
@@ -56,7 +56,7 @@ tasks:
   typecheck:
     desc: Type check with mypy
     cmds:
-      - echo "🔬 Type checking..."
+      - echo "Type checking..."
       - uv run mypy src/
     sources:
       - src/**/*.py
@@ -65,7 +65,7 @@ tasks:
   test:
     desc: Run tests
     cmds:
-      - echo "🧪 Running tests..."
+      - echo "Running tests..."
       - uv run pytest
     sources:
       - src/**/*.py
@@ -75,7 +75,7 @@ tasks:
   test:cov:
     desc: Run tests with coverage
     cmds:
-      - echo "📊 Running tests with coverage..."
+      - echo "Running tests with coverage..."
       - uv run pytest --cov={{.PACKAGE_NAME}} --cov-report=term-missing --cov-report=html
     sources:
       - src/**/*.py
@@ -87,7 +87,7 @@ tasks:
   test:fast:
     desc: Run tests in parallel
     cmds:
-      - echo "⚡ Running tests in parallel..."
+      - echo "Running tests in parallel..."
       - uv run pytest -n auto
     sources:
       - src/**/*.py
@@ -96,9 +96,9 @@ tasks:
   security:
     desc: Run security checks
     cmds:
-      - echo "🔒 Running security checks..."
+      - echo "Running security checks..."
       - uv run bandit -r src/ -f json -o bandit-report.json || true
-      - echo "✅ Security report saved to bandit-report.json"
+      - echo "Security report saved to bandit-report.json"
     sources:
       - src/**/*.py
     generates:
@@ -107,7 +107,7 @@ tasks:
   secrets:
     desc: Scan for secrets
     cmds:
-      - echo "🕵️ Scanning for secrets..."
+      - echo "Scanning for secrets..."
       - uv run detect-secrets scan --all-files --baseline .secrets.baseline
     sources:
       - "**/*.py"
@@ -122,15 +122,15 @@ tasks:
       - typecheck
       - test
     cmds:
-      - echo "✅ All checks passed!"
+      - echo "All checks passed!"
 
   build:
     desc: Build package for GitHub release
     cmds:
-      - echo "📦 Building package for GitHub distribution..."
+      - echo "Building package for GitHub distribution..."
       - rm -rf dist/
       - uv build
-      - echo "✅ Built files:"
+      - echo "Built files:"
       - ls -la dist/
     sources:
       - src/**/*.py
@@ -143,9 +143,9 @@ tasks:
   build:check:
     desc: Build and validate package structure
     cmds:
-      - echo "🔍 Building and validating package..."
+      - echo "Building and validating package..."
       - uv build
-      - echo "📋 Package structure check:"
+      - echo "Package structure check:"
       - tar -tzf dist/*.tar.gz | head -20
       - unzip -l dist/*.whl | head -20
     sources:
@@ -159,7 +159,7 @@ tasks:
   clean:
     desc: Clean build artifacts
     cmds:
-      - echo "🧹 Cleaning build artifacts..."
+      - echo "Cleaning build artifacts..."
       - rm -rf build/
       - rm -rf dist/
       - rm -rf *.egg-info/
@@ -170,13 +170,19 @@ tasks:
       - rm -rf .ruff_cache/
       - find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
       - find . -type f -name "*.pyc" -delete 2>/dev/null || true
-      - echo "✅ Clean complete!"
+      - echo "Clean complete!"
 
   docs:
     desc: Generate documentation
     cmds:
-      - echo "📚 Generating documentation..."
-      - echo "⚠️ Documentation generation not yet implemented"
+      - echo "Generating documentation..."
+      - uv run mkdocs build --strict
+
+  docs:serve:
+    desc: Serve documentation locally with live reload
+    cmds:
+      - echo "Serving documentation on http://127.0.0.1:8000 ..."
+      - uv run mkdocs serve -a 127.0.0.1:8000
 
   release:dry:
     desc: Test release script in dry-run mode
@@ -210,7 +216,7 @@ tasks:
       - typecheck
       - test
     cmds:
-      - echo "🎉 Development environment ready!"
+      - echo "Development environment ready!"
 
   ci:
     desc: Run CI checks locally
@@ -220,12 +226,12 @@ tasks:
       - test:cov
       - security
     cmds:
-      - echo "✅ CI checks completed!"
+      - echo "CI checks completed!"
 
   update:
     desc: Update dependencies
     cmds:
-      - echo "⬆️ Updating dependencies..."
+      - echo "Updating dependencies..."
       - uv sync --upgrade
     generates:
       - uv.lock
@@ -233,25 +239,25 @@ tasks:
   shell:
     desc: Open a shell in the virtual environment
     cmds:
-      - echo "🐚 Opening shell in virtual environment..."
+      - echo "Opening shell in virtual environment..."
       - uv shell
 
   run:
     desc: Run the CLI tool (nw --help)
     cmds:
-      - echo "🚀 Running networka CLI..."
+      - echo "Running networka CLI..."
       - uv run nw --help
 
   run:info:
     desc: Show CLI info command
     cmds:
-      - echo "ℹ️ Running nw info..."
+      - echo "Running nw info..."
       - uv run nw info || echo "No devices configured yet"
 
   run:version:
     desc: Show CLI version
     cmds:
-      - echo "📋 Showing version..."
+      - echo "Showing version..."
       - uv run nw version
 
   install:task:
@@ -259,7 +265,7 @@ tasks:
     cmds:
       - |
         if ! command -v task &> /dev/null; then
-          echo "📥 Installing go-task..."
+          echo "Installing go-task..."
           if command -v brew &> /dev/null; then
             brew install go-task
           elif command -v apt-get &> /dev/null; then
@@ -278,7 +284,7 @@ tasks:
             exit 1
           fi
         else
-          echo "✅ go-task is already installed"
+          echo "go-task is already installed"
         fi
     status:
       - command -v task
@@ -289,4 +295,4 @@ tasks:
       - install:task
       - install
     cmds:
-      - echo "🎯 Bootstrap complete! Run 'task dev' to set up development environment."
+      - echo "Bootstrap complete! Run 'task dev' to set up development environment."

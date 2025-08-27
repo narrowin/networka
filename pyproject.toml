@@ -71,6 +71,7 @@ docs = [
     "mkdocs>=1.5.0",
     "mkdocs-material>=9.0.0",
     "mkdocstrings[python]>=0.24.0",
+    "mkdocs-click>=0.9.0",
 ]
 tmux = [
     "libtmux>=0.21.0",
@@ -81,7 +82,7 @@ tui = [
 
 [project.urls]
 Homepage = "https://github.com/narrowin/networka"
-Documentation = "https://github.com/narrowin/networka#readme"
+Documentation = "https://narrowin.github.io/networka/"
 Repository = "https://github.com/narrowin/networka.git"
 "Bug Tracker" = "https://github.com/narrowin/networka/issues"
 Changelog = "https://github.com/narrowin/networka/blob/main/CHANGELOG.md"

@@ -1,0 +1,6 @@
+/* Minimal customizations hook for Material theme */
+/* Keeping a no-op rule to satisfy linters and allow quick overrides later */
+html[data-md-color-scheme] {
+  /* Example override: --md-primary-fg-color: #0b7285; */
+  outline: 0; /* no-op to satisfy linters */
+}
