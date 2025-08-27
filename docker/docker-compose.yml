@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  networka:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      network: host
+    container_name: networka
+    hostname: networka
+    
+    # SSH port mapping
+    ports:
+      - "2222:22"
+    
+    # Single data volume for all persistent data
+    volumes:
+      - networka_data:/app/data
+      
+    # Environment variables
+    environment:
+      - NW_USER_DEFAULT=${NW_USER_DEFAULT:-admin}
+      - NW_PASSWORD_DEFAULT=${NW_PASSWORD_DEFAULT:-}
+      - TZ=${TZ:-UTC}
+      - PYTHONUNBUFFERED=1
+      
+    # Interactive container
+    stdin_open: true
+    tty: true
+    
+    # Restart policy
+    restart: unless-stopped
+
+volumes:
+  networka_data:
