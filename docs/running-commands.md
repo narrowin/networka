@@ -13,6 +13,16 @@ nw info access_switches
 nw info health_check
 ```
 
+Expected output (device):
+
+```
+Device: device1
+Host: 192.0.2.10
+Port: 22
+Credentials: default or interactive
+Groups: access_switches
+```
+
 ## Run commands
 
 ```bash
@@ -26,6 +36,15 @@ nw run access_switches "show version"
 nw run device1,access_switches "/system/identity/print"
 ```
 
+Expected output (trimmed):
+
+```
+Executing on device1: /system/resource/print
+uptime=...
+free-memory=...
+Command completed successfully
+```
+
 ## Run sequences
 
 ```bash
@@ -34,6 +53,15 @@ nw run device1 health_check
 
 # On a group
 nw run core_switches audit
+```
+
+Expected output (trimmed):
+
+```
+device1: step 1/3 ... ok
+device1: step 2/3 ... ok
+device1: step 3/3 ... ok
+Sequence completed successfully
 ```
 
 ## Upload and download
@@ -58,6 +86,10 @@ nw run device1 system_info --store-results --results-format json --results-dir .
 # Adjust output styling
 nw info device1 --output-mode raw
 ```
+
+Notes:
+- Use `--results-format json|yaml|txt` to pick a format
+- Use `--results-dir <path>` to set an output directory
 
 ## Next steps
 

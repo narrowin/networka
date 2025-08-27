@@ -1,14 +1,18 @@
 # Quickstart
 
-## Installation
+## Installation (not on PyPI yet)
 
-Install with uv or pip:
+Install from GitHub using an isolated tool installer.
 
 ```bash
-uv pip install networka
+uv tool install git+https://github.com/narrowin/networka.git
 # or
-pip install networka
+pipx install git+https://github.com/narrowin/networka.git
 ```
+
+Short install video (30s):
+
+[asciinema placeholder – will be embedded here]
 
 ## Verify installation
 
@@ -32,13 +36,19 @@ Run a command:
 nw run router1 "/system/identity/print"
 ```
 
+Expected output (trimmed):
+
+```
+Executing on router1: /system/identity/print
+name="MikroTik"
+Command completed successfully
+```
+
 See User guide for configuration details.
 
 ## Next steps
 
 - Define more devices and groups → Configuration
-- Prefer YAML → Configuration (YAML)
-- Optionally import from spreadsheets → Configuration (CSV)
 - Learn how to run common operations → Running commands
 - Control formatting and capture outputs → Output modes and Results
 - Troubleshooting connection/auth issues → Troubleshooting

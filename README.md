@@ -1,4 +1,4 @@
-<div align="center">do    <img src="https://raw.githubusercontent.com/narrowin/networka/main/docs/assets/images/networka.png" alt="Networka Logo" width="320"/>
+<div align="center"><img src="https://raw.githubusercontent.com/narrowin/networka/main/docs/assets/images/networka.png" alt="Networka Logo" width="320"/>
 
   <p><a href="https://narrowin.github.io/networka/">Full documentation →</a></p>
 </div>
@@ -87,38 +87,33 @@ Because a real **Networka** wants the f\*ing lot.”<br><br>
 - **Network Access**: SSH connectivity to target devices
 - **Package Manager**: uv (recommended) or pip
 
-### Quick Install
+### Quick Install (recommended)
+
+Not on PyPI yet — install from GitHub.
 
 ```bash
-# Easiest (user-wide, isolated)
+# Recommended (isolated, user-wide)
 uv tool install git+https://github.com/narrowin/networka.git
-# or
+
+# Alternative
 pipx install git+https://github.com/narrowin/networka.git
 
-# If you prefer plain pip (user-wide, no sudo)
-pip install --user git+https://github.com/narrowin/networka.git
-# ensure ~/.local/bin (or platform-specific bin) is on PATH
-
-# Verify installation works
+# Verify installation
 nw --help
 ```
 
 ### Upgrade & Remove
 
 ```bash
-# Upgrade to latest version
-uv tool upgrade networka
+# Upgrade to latest version (from GitHub)
+uv tool install --force git+https://github.com/narrowin/networka.git
 # or
-pipx upgrade networka
-# or
-pip install --user --upgrade git+https://github.com/narrowin/networka.git
+pipx install --force git+https://github.com/narrowin/networka.git
 
 # Remove installation
-uv tool uninstall networka
+uv tool uninstall nw
 # or
 pipx uninstall networka
-# or
-pip uninstall networka
 ```
 
 ### Platform-Specific Notes

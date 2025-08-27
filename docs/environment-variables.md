@@ -1,6 +1,11 @@
 # Environment Variable Configuration
 
-This document describes how to set up secure credential management using environment variables for the Networka.
+TL;DR
+- Prefer interactive auth with `--interactive-auth` for ad‑hoc runs
+- Set `NW_USER_DEFAULT` and `NW_PASSWORD_DEFAULT` for shared defaults
+- Override per device/group with `NW_USER_*` and `NW_PASSWORD_*`
+
+This document describes how to set up secure credential management using environment variables for Networka.
 
 ## Overview
 

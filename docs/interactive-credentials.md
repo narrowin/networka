@@ -20,18 +20,18 @@ nw run sw-acc1,sw-acc2 '/system/clock/print' -i
 
 # Group operations with interactive auth
 nw run access_switches system_info --interactive-auth
+```bash
+# Execute command with interactive auth
+$ nw run sw-acc1 '/system/identity/print' -i
+Interactive authentication mode enabled
+Username [admin]: myuser
+Password: ********
+Will use username: myuser
+
+Executing on sw-acc1: /system/identity/print
+name="MikroTik"
+Command completed successfully on sw-acc1
 ```
-
-## Security Benefits
-
-- **No credential storage**: Credentials exist only in memory during execution
-- **Hidden password input**: Password entry is masked (not echoed to terminal)
-- **Override priority**: Interactive credentials override environment variables and config files
-- **Session-only**: Credentials are not saved or cached anywhere
-
-## Implementation Details
-
-### Core Components
 
 1. **`src/network_toolkit/common/credentials.py`** - New module providing:
    - `InteractiveCredentials` - Type-safe credential container (NamedTuple)
@@ -96,18 +96,18 @@ Device: sw-acc1
 ├─ Port: 22
 ├─ Credentials: Interactive (admin)
 └─ Groups: access_switches
-```
-
-### Run Command with Interactive Auth
-
 ```bash
-# Execute command with interactive auth
-$ nw run sw-acc1 '/system/identity/print' -i
+# Run on multiple devices
+$ nw run sw-acc1,sw-acc2 '/system/clock/print' --interactive-auth
 Interactive authentication mode enabled
-Username [admin]: myuser
+Username [admin]: admin
 Password: ********
-Will use username: myuser
+Will use username: admin
 
+Executing on sw-acc1,sw-acc2: '/system/clock/print'
+Command completed successfully on sw-acc1
+Command completed successfully on sw-acc2
+```
 Executing on sw-acc1: /system/identity/print
 name="MikroTik"
 ✓ Command completed successfully on sw-acc1

@@ -39,6 +39,7 @@ nav:
     - CLI: reference/cli.md
     - API: reference/api.md
     - Project development: development.md
+  - Documentation guidelines: documentation-guidelines.md
 
 theme:
   name: material
@@ -106,6 +107,10 @@ markdown_extensions:
   - pymdownx.snippets:
       check_paths: true
   - tables
+
+extra:
+  announcement: >-
+    Onboarding first: our docs aim to get you to your first successful `nw run` in minutes. If a step slows users down, we fix or remove it. Defaults should work, commands are copy‑pasteable, and every page shows the shortest path to success.
 
 watch:
   - src
