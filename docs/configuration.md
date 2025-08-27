@@ -71,7 +71,7 @@ health_check:
     - /interface/print stats
 ```
 
-## CSV (optional, mostly for Windows workflows) {#csv}
+## CSV {#csv}
 
 Use CSV if your source of truth is a spreadsheet. It’s convenient for bulk imports. Keep it simple and map columns to the same concepts as YAML.
 
