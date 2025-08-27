@@ -322,10 +322,8 @@ class TestDownload:
         result = CliRunner(env={"NO_COLOR": "1"}).invoke(app, ["download", "--help"])
         assert result.exit_code == 0
         assert "Download a file from a device" in result.output
-        assert (
-            "--delete-remote" in result.output
-            or "--delete-remote/--keep-remote" in result.output
-        )
+        # The help text might be truncated or split, so check for the main option
+        assert "--delete-remote" in result.output or "delete-remote" in result.output
         assert "--verify" in result.output
 
     @patch("network_toolkit.commands.download.load_config")

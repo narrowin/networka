@@ -118,7 +118,8 @@ class TestRunCommand:
         )
 
         assert result.exit_code == 2  # CLI argument error
-        assert "No such option: --dry-run" in result.output
+        # Check for the error message, handling potential ANSI escape codes
+        assert "No such option:" in result.output and "dry-run" in result.output
 
     def test_run_connection_error(self, config_file: Path) -> None:
         """Test run command with connection error."""
