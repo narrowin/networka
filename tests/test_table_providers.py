@@ -23,19 +23,11 @@ from network_toolkit.common.table_providers import (
 )
 from network_toolkit.config import (
     DeviceConfig,
+    DeviceGroup,
     GeneralConfig,
     NetworkConfig,
 )
 from network_toolkit.sequence_manager import SequenceRecord, SequenceSource
-
-# SPDX-License-Identifier: MIT
-"""Tests for centralized table providers system."""
-
-from __future__ import annotations
-
-from network_toolkit.config import (
-    DeviceGroup,
-)
 
 
 class TestDeviceListTableProvider:

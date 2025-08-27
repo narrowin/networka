@@ -269,7 +269,7 @@ class VendorSequencesTableProvider(BaseModel):
         if self.vendor_filter:
             sequences = vendor_sequences.get(self.vendor_filter, {})
             lines = []
-            for seq_name, sequence in sequences.items():
+            for seq_name, _sequence in sequences.items():
                 lines.append(f"vendor={self.vendor_filter} sequence={seq_name}")
             return "\n".join(lines)
         else:

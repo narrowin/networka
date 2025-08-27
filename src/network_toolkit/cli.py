@@ -175,7 +175,7 @@ def _handle_file_downloads(
     results: dict[str, str] = {}
 
     def replace_placeholders(text: str) -> str:
-        now = datetime.datetime.now()
+        now = datetime.datetime.now(datetime.UTC)
         return (
             text.replace("{date}", now.strftime("%Y%m%d"))
             .replace("{time}", now.strftime("%H%M%S"))

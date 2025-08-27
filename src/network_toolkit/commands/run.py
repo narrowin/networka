@@ -140,7 +140,7 @@ def register(app: typer.Typer) -> None:
             except ValueError as e:
                 # Use typer echo for early errors before CommandContext is available
                 typer.echo(f"Error: {e}", err=True)
-                raise typer.Exit(1)
+                raise typer.Exit(1) from e
 
         # Handle legacy raw mode mapping
         if raw is not None:

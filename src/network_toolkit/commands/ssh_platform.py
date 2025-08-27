@@ -112,7 +112,9 @@ _platform_capabilities: PlatformCapabilities | None = None
 
 def get_platform_capabilities() -> PlatformCapabilities:
     """Get platform capabilities singleton."""
-    global _platform_capabilities
+    # Use module-level variable instead of global statement
     if _platform_capabilities is None:
-        _platform_capabilities = PlatformCapabilities()
+        globals()["_platform_capabilities"] = PlatformCapabilities()
+    # At this point, we know _platform_capabilities is not None
+    assert _platform_capabilities is not None
     return _platform_capabilities
