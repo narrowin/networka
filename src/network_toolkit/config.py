@@ -912,6 +912,26 @@ def load_config(config_path: str | Path) -> NetworkConfig:
         # Also support nested "config/" directory inside the provided directory
         config_dir = config_path / "config"
     else:
+        # If pointing to a specific file, check if it's part of a modular config structure
+        config_dir = config_path.parent
+
+        # Special case: if pointing to config.yml, check if parent has modular structure
+        if config_path.name == "config.yml":
+            devices_dir = config_dir / "devices"
+            sequences_dir = config_dir / "sequences"
+            groups_dir = config_dir / "groups"
+
+            # If we find modular directories, treat as modular config
+            if (
+                (devices_dir.exists() and devices_dir.is_dir())
+                or (sequences_dir.exists() and sequences_dir.is_dir())
+                or (groups_dir.exists() and groups_dir.is_dir())
+            ):
+                config = load_modular_config(config_dir)
+                _auto_export_schemas_if_project()
+                return config
+
+        # Otherwise check for nested config/ directory
         config_dir = config_path.parent / "config"
 
     # Try modular config first (nested config/ next to provided path)
@@ -1184,60 +1204,153 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
 def _load_vendor_sequences(
     config_dir: Path, sequences_config: dict[str, Any]
 ) -> dict[str, dict[str, VendorSequence]]:
-    """Load vendor-specific sequences from sequences directory."""
+    """
+    Load vendor-specific sequences from sequences directory.
+
+    Uses explicit vendor_platforms configuration if available, otherwise
+    auto-discovers vendor directories for backward compatibility and
+    future-proof operation.
+    """
     vendor_sequences: dict[str, dict[str, VendorSequence]] = {}
 
     # Get vendor platform configurations
     vendor_platforms = sequences_config.get("vendor_platforms", {})
 
-    for platform_name, platform_config in vendor_platforms.items():
-        platform_sequences: dict[str, VendorSequence] = {}
-
-        # Build path to vendor sequences
-        sequence_path = config_dir / platform_config.get("sequence_path", "")
-
-        if not sequence_path.exists():
-            logging.debug(f"Vendor sequence path not found: {sequence_path}")
-            continue
-
-        # Load default sequence files for this vendor
-        default_files = platform_config.get("default_files", ["common.yml"])
-
-        for sequence_file in default_files:
-            vendor_file_path = sequence_path / sequence_file
-
-            if not vendor_file_path.exists():
-                logging.debug(f"Vendor sequence file not found: {vendor_file_path}")
-                continue
-
-            try:
-                with vendor_file_path.open("r", encoding="utf-8") as f:
-                    vendor_config: dict[str, Any] = yaml.safe_load(f) or {}
-
-                # Load sequences from the vendor file
-                sequences = vendor_config.get("sequences", {})
-                for seq_name, seq_data in sequences.items():
-                    platform_sequences[seq_name] = VendorSequence(**seq_data)
-
-                logging.debug(
-                    f"Loaded {len(sequences)} sequences for {platform_name} from {vendor_file_path}"
-                )
-
-            except yaml.YAMLError as e:
-                logging.warning(
-                    f"Invalid YAML in vendor sequence file {vendor_file_path}: {e}"
-                )
-                continue
-            except Exception as e:  # pragma: no cover - robustness
-                logging.warning(
-                    f"Failed to load vendor sequence file {vendor_file_path}: {e}"
-                )
-                continue
-
-        if platform_sequences:
-            vendor_sequences[platform_name] = platform_sequences
+    if vendor_platforms:
+        # Use explicit vendor platform configuration (preferred)
+        for platform_name, platform_config in vendor_platforms.items():
+            platform_sequences = _load_vendor_platform_sequences(
+                config_dir, platform_name, platform_config
+            )
+            if platform_sequences:
+                vendor_sequences[platform_name] = platform_sequences
+    else:
+        # Auto-discovery fallback for backward compatibility
+        vendor_sequences = _auto_discover_vendor_sequences(config_dir)
+        if vendor_sequences:
+            logging.debug(
+                f"Auto-discovered {len(vendor_sequences)} vendor platforms "
+                f"in {config_dir / 'sequences'}"
+            )
 
     return vendor_sequences
+
+
+def _load_vendor_platform_sequences(
+    config_dir: Path, platform_name: str, platform_config: dict[str, Any]
+) -> dict[str, VendorSequence]:
+    """Load sequences for a specific vendor platform using explicit configuration."""
+    platform_sequences: dict[str, VendorSequence] = {}
+
+    # Build path to vendor sequences
+    sequence_path = config_dir / platform_config.get("sequence_path", "")
+
+    if not sequence_path.exists():
+        logging.debug(f"Vendor sequence path not found: {sequence_path}")
+        return platform_sequences
+
+    # Load default sequence files for this vendor
+    default_files = platform_config.get("default_files", ["common.yml"])
+
+    for sequence_file in default_files:
+        vendor_file_path = sequence_path / sequence_file
+
+        if not vendor_file_path.exists():
+            logging.debug(f"Vendor sequence file not found: {vendor_file_path}")
+            continue
+
+        sequences = _load_sequence_file(vendor_file_path, platform_name)
+        platform_sequences.update(sequences)
+
+    return platform_sequences
+
+
+def _auto_discover_vendor_sequences(
+    config_dir: Path,
+) -> dict[str, dict[str, VendorSequence]]:
+    """
+    Auto-discover vendor sequences by scanning the sequences directory.
+
+    This provides backward compatibility when vendor_platforms is not configured
+    and future-proofs against missing configuration.
+    """
+    vendor_sequences: dict[str, dict[str, VendorSequence]] = {}
+    sequences_dir = config_dir / "sequences"
+
+    if not sequences_dir.exists():
+        logging.debug(f"Sequences directory not found: {sequences_dir}")
+        return vendor_sequences
+
+    # Scan for vendor subdirectories
+    for vendor_dir in sequences_dir.iterdir():
+        if not vendor_dir.is_dir() or vendor_dir.name.startswith("."):
+            continue
+
+        vendor_name = vendor_dir.name
+        platform_sequences: dict[str, VendorSequence] = {}
+
+        # Look for common sequence files
+        sequence_files = [
+            "common.yml",
+            "common.yaml",
+            f"{vendor_name}.yml",
+            f"{vendor_name}.yaml",
+        ]
+
+        for sequence_file in sequence_files:
+            vendor_file_path = vendor_dir / sequence_file
+            if vendor_file_path.exists():
+                sequences = _load_sequence_file(vendor_file_path, vendor_name)
+                platform_sequences.update(sequences)
+                break  # Use first found file
+
+        # Also scan for any other YAML files in the vendor directory
+        for yaml_file in vendor_dir.glob("*.yml"):
+            if yaml_file.name not in sequence_files:
+                sequences = _load_sequence_file(yaml_file, vendor_name)
+                platform_sequences.update(sequences)
+
+        for yaml_file in vendor_dir.glob("*.yaml"):
+            if yaml_file.name not in sequence_files:
+                sequences = _load_sequence_file(yaml_file, vendor_name)
+                platform_sequences.update(sequences)
+
+        if platform_sequences:
+            vendor_sequences[vendor_name] = platform_sequences
+            logging.debug(
+                f"Auto-discovered {len(platform_sequences)} sequences for {vendor_name}"
+            )
+
+    return vendor_sequences
+
+
+def _load_sequence_file(file_path: Path, vendor_name: str) -> dict[str, VendorSequence]:
+    """Load sequences from a single vendor sequence file."""
+    sequences: dict[str, VendorSequence] = {}
+
+    try:
+        with file_path.open("r", encoding="utf-8") as f:
+            vendor_config: dict[str, Any] = yaml.safe_load(f) or {}
+
+        # Load sequences from the vendor file
+        sequence_data = vendor_config.get("sequences", {})
+        for seq_name, seq_data in sequence_data.items():
+            try:
+                sequences[seq_name] = VendorSequence(**seq_data)
+            except Exception as e:
+                logging.warning(f"Invalid sequence '{seq_name}' in {file_path}: {e}")
+                continue
+
+        logging.debug(
+            f"Loaded {len(sequence_data)} sequences for {vendor_name} from {file_path}"
+        )
+
+    except yaml.YAMLError as e:
+        logging.warning(f"Invalid YAML in vendor sequence file {file_path}: {e}")
+    except Exception as e:  # pragma: no cover - robustness
+        logging.warning(f"Failed to load vendor sequence file {file_path}: {e}")
+
+    return sequences
 
 
 def load_legacy_config(config_path: Path) -> NetworkConfig:
