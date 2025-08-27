@@ -12,13 +12,17 @@ from typer.testing import CliRunner
 
 from network_toolkit.cli import app
 
+# Get the repository root directory (parent of tests directory)
+REPO_ROOT = Path(__file__).parent.parent
+CONFIG_DIR = REPO_ROOT / "config"
+
 
 class TestCLIWithRealConfig:
     """Test CLI commands work with actual config files."""
 
     def test_list_devices_with_config_yml_path(self):
         """Test that 'nw list devices -c config/config.yml' works."""
-        config_file = Path("config/config.yml")
+        config_file = CONFIG_DIR / "config.yml"
         if not config_file.exists():
             pytest.skip("Real config file not found")
 
@@ -29,8 +33,8 @@ class TestCLIWithRealConfig:
         assert result.exit_code == 0, f"CLI failed with: {result.output}"
 
         # Should not show "No devices configured" if devices exist
-        if Path("config/devices").exists() and any(
-            Path("config/devices").glob("*.yml")
+        if (CONFIG_DIR / "devices").exists() and any(
+            (CONFIG_DIR / "devices").glob("*.yml")
         ):
             assert "No devices configured" not in result.output, (
                 "Should find devices from config/devices/"
@@ -112,8 +116,8 @@ class TestCLIWithRealConfig:
 
         # Test different config loading scenarios
         test_cases = [
-            Path("config"),
-            Path("config/config.yml"),
+            CONFIG_DIR,
+            CONFIG_DIR / "config.yml",
         ]
 
         for config_path in test_cases:

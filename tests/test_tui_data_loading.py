@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from network_toolkit.tui.data import TuiData
+
+# Get the repository root directory (parent of tests directory)
+REPO_ROOT = Path(__file__).parent.parent
+CONFIG_DIR = REPO_ROOT / "config"
 
 
 def test_tui_data_loads_from_config_dir() -> None:
-    data = TuiData("config")
+    data = TuiData(str(CONFIG_DIR))
     targets = data.targets()
     actions = data.actions()
 

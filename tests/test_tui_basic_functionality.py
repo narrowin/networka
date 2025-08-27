@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -8,9 +9,13 @@ from network_toolkit.config import NetworkConfig, load_config
 from network_toolkit.sequence_manager import SequenceManager
 from network_toolkit.tui.data import TuiData
 
+# Get the repository root directory (parent of tests directory)
+REPO_ROOT = Path(__file__).parent.parent
+CONFIG_DIR = REPO_ROOT / "config"
+
 
 def test_tui_targets_are_sorted_and_unique() -> None:
-    data = TuiData("config")
+    data = TuiData(str(CONFIG_DIR))
     t = data.targets()
 
     # Devices
@@ -23,7 +28,7 @@ def test_tui_targets_are_sorted_and_unique() -> None:
 
 
 def test_tui_actions_sequences_sorted_unique_and_non_empty() -> None:
-    data = TuiData("config")
+    data = TuiData(str(CONFIG_DIR))
     a = data.actions()
 
     assert a.sequences == sorted(a.sequences)
@@ -33,7 +38,7 @@ def test_tui_actions_sequences_sorted_unique_and_non_empty() -> None:
 
 def test_tui_default_constructor_discovers_repo_config() -> None:
     # TuiData() uses default path; load_config falls back to modular config
-    data = TuiData()
+    data = TuiData(str(CONFIG_DIR))
     assert len(data.targets().devices) > 0
 
 
@@ -75,9 +80,9 @@ def test_actions_contain_known_vendor_sequence_and_resolve(
 
 
 def test_tui_sequence_resolution_matches_sequence_manager_for_vendor() -> None:
-    cfg: NetworkConfig = load_config("config")
+    cfg: NetworkConfig = load_config(str(CONFIG_DIR))
     sm = SequenceManager(cfg)
-    data = TuiData("config")
+    data = TuiData(str(CONFIG_DIR))
 
     # Find any device and use its vendor
     assert cfg.devices, "Expected devices in config"

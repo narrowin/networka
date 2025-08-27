@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -7,6 +8,10 @@ import pytest
 from network_toolkit.config import NetworkConfig, load_config
 from network_toolkit.sequence_manager import SequenceManager
 from network_toolkit.tui.data import TuiData
+
+# Get the repository root directory (parent of tests directory)
+REPO_ROOT = Path(__file__).parent.parent
+CONFIG_DIR = REPO_ROOT / "config"
 
 
 def _non_empty_dict(d: dict[str, Any] | None) -> dict[str, Any]:
@@ -77,7 +82,7 @@ def test_all_groups_resolve_to_devices() -> None:
 
 
 def test_can_resolve_a_vendor_sequence_for_a_real_device() -> None:
-    cfg: NetworkConfig = load_config("config")
+    cfg: NetworkConfig = load_config(str(CONFIG_DIR))
     sm = SequenceManager(cfg)
 
     assert cfg.devices, "Expected devices in config"

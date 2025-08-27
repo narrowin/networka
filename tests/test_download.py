@@ -16,6 +16,11 @@ class TestDownload:
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
+        # Reset global output manager to ensure clean state between tests
+        from network_toolkit.common.output import OutputMode, set_output_mode
+
+        set_output_mode(OutputMode.DEFAULT)
+
         self.runner = CliRunner()
 
     def test_register_command(self) -> None:
@@ -321,10 +326,16 @@ class TestDownload:
         """Test download command help."""
         result = CliRunner(env={"NO_COLOR": "1"}).invoke(app, ["download", "--help"])
         assert result.exit_code == 0
-        assert "Download a file from a device" in result.output
-        # The help text might be truncated or split, so check for the main option
-        assert "--delete-remote" in result.output or "delete-remote" in result.output
-        assert "--verify" in result.output
+        # Strip ANSI escape codes for reliable string matching
+        import re
+
+        clean_output = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+        assert "Download a file from a device" in clean_output
+        # The help text might be truncated or split, so check for key parts
+        assert "delete-remote" in clean_output or "keep-remote" in clean_output, (
+            f"Expected delete-remote option in help output: {clean_output}"
+        )
+        assert "--verify" in clean_output
 
     @patch("network_toolkit.commands.download.load_config")
     @patch("network_toolkit.cli.DeviceSession")

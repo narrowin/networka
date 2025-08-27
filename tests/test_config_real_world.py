@@ -12,17 +12,20 @@ import pytest
 
 from network_toolkit.config import load_config, load_modular_config
 
+# Get the repository root directory (parent of tests directory)
+REPO_ROOT = Path(__file__).parent.parent
+CONFIG_DIR = REPO_ROOT / "config"
+
 
 class TestRealWorldConfigLoading:
     """Test configuration loading with actual config files."""
 
     def test_load_config_with_directory_path(self):
         """Test loading config by pointing to the config directory."""
-        config_dir = Path("config")
-        if not config_dir.exists():
+        if not CONFIG_DIR.exists():
             pytest.skip("Config directory not found - test requires real config files")
 
-        config = load_config(config_dir)
+        config = load_config(CONFIG_DIR)
 
         # Verify basic structure loaded
         assert config.devices is not None, (
@@ -49,7 +52,7 @@ class TestRealWorldConfigLoading:
             "arista_eos",
         ]
         for vendor in expected_vendors:
-            vendor_dir = config_dir / "sequences" / vendor
+            vendor_dir = CONFIG_DIR / "sequences" / vendor
             if vendor_dir.exists():
                 assert vendor in config.vendor_sequences, (
                     f"Should auto-discover {vendor} sequences"
@@ -60,7 +63,7 @@ class TestRealWorldConfigLoading:
 
     def test_load_config_with_config_yml_path(self):
         """Test loading config by pointing to config.yml file - should detect modular structure."""
-        config_file = Path("config/config.yml")
+        config_file = CONFIG_DIR / "config.yml"
         if not config_file.exists():
             pytest.skip("Config file not found - test requires real config files")
 
