@@ -29,7 +29,7 @@ except Exception:  # pragma: no cover - textual not installed
     class _Vertical:  # type: ignore
         def __init__(self, *args: Any, **kwargs: Any) -> None: ...
 
-        def __enter__(self) -> _Vertical:
+        def __enter__(self) -> Any:  # Return Any to match imported Vertical
             return self
 
         def __exit__(self, *_: Any) -> Literal[False]:
@@ -60,9 +60,9 @@ class _PromptScreen(_ModalScreenBase):  # type: ignore[misc]
         self._on_close = on_close
 
     def compose(self) -> Any:
-        with _Vertical(id="nw-prompt"):
+        with _Vertical(id="nw-prompt"):  # type: ignore[misc]
             yield _Static(self._message, classes="title")
-            with _Vertical(classes="buttons"):
+            with _Vertical(classes="buttons"):  # type: ignore[misc]
                 if self._mode == "yesno":
                     yield _Button("Yes [y]", id="btn-yes")
                     yield _Button("No [N]/Esc", id="btn-no")

@@ -27,7 +27,7 @@ except Exception:  # pragma: no cover - textual not installed
     class _Vertical:  # type: ignore
         def __init__(self, *args: Any, **kwargs: Any) -> None: ...
 
-        def __enter__(self) -> _Vertical:
+        def __enter__(self) -> Any:  # Return Any to match imported Vertical
             return self
 
         def __exit__(self, *_: Any) -> Literal[False]:
@@ -50,9 +50,9 @@ class _ConfirmDialog(_ModalScreenBase):  # type: ignore[misc]
         self._on_no = on_no
 
     def compose(self) -> Any:
-        with _Vertical(id="nw-dialog"):
+        with _Vertical(id="nw-dialog"):  # type: ignore[misc]
             yield _Static(self._message, classes="title")
-            with _Vertical(classes="buttons"):
+            with _Vertical(classes="buttons"):  # type: ignore[misc]
                 yield _Button("Yes [y]", id="btn-yes")
                 yield _Button("No [N]/Esc", id="btn-no")
 
@@ -106,12 +106,12 @@ class _CancelModeDialog(_ModalScreenBase):  # type: ignore[misc]
         self._on_abort = on_abort
 
     def compose(self) -> Any:
-        with _Vertical(id="nw-dialog"):
+        with _Vertical(id="nw-dialog"):  # type: ignore[misc]
             yield _Static(
                 "Cancel type? Soft [s] (recommended) or Hard [h]. Hard will close sessions immediately and may leave devices in a partial state.",
                 classes="title",
             )
-            with _Vertical(classes="buttons"):
+            with _Vertical(classes="buttons"):  # type: ignore[misc]
                 yield _Button("Soft cancel [s]", id="btn-soft")
                 yield _Button("Hard cancel [h] (disconnect sessions)", id="btn-hard")
                 yield _Button("Keep running [N]/Esc", id="btn-no")

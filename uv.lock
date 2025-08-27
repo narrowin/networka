@@ -1230,11 +1230,13 @@ tmux = [
 [package.dev-dependencies]
 dev = [
     { name = "detect-secrets" },
+    { name = "mypy" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "pytest-mock" },
     { name = "pytest-xdist" },
+    { name = "ruff" },
     { name = "textual-dev" },
     { name = "types-paramiko" },
     { name = "types-pyyaml" },
@@ -1277,11 +1279,13 @@ provides-extras = ["dev", "docs", "tmux"]
 [package.metadata.requires-dev]
 dev = [
     { name = "detect-secrets", specifier = ">=1.5.0" },
+    { name = "mypy", specifier = "==1.17.1" },
     { name = "pytest", specifier = ">=8.4.1" },
     { name = "pytest-asyncio", specifier = ">=1.1.0" },
     { name = "pytest-cov", specifier = ">=6.2.1" },
     { name = "pytest-mock", specifier = ">=3.14.1" },
     { name = "pytest-xdist", specifier = ">=3.8.0" },
+    { name = "ruff", specifier = "==0.12.10" },
     { name = "textual-dev", specifier = ">=1.0.0" },
     { name = "types-paramiko", specifier = ">=3.0.0" },
     { name = "types-pyyaml", specifier = ">=6.0.0" },

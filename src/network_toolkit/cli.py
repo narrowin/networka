@@ -161,7 +161,7 @@ DeviceSession = _DeviceSession
 
 
 def _handle_file_downloads(
-    session: DeviceSession,
+    session: _DeviceSession,
     config: NetworkConfig,
     device_name: str,
     download_files: list[dict[str, Any]],
@@ -215,7 +215,7 @@ def _handle_file_downloads(
         ctx.output_manager.print_downloading(device_name, remote_file)
 
         try:
-            success = session.download_file(
+            success = session.download_file(  # type: ignore[attr-defined]
                 remote_filename=remote_file,
                 local_path=destination,
                 delete_remote=delete_remote,

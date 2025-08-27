@@ -21,8 +21,11 @@ from typing import Any
 
 try:  # Prefer platformdirs if available
     from platformdirs import PlatformDirs as _PlatformDirs  # type: ignore
+
+    _has_platformdirs = True
 except Exception:  # pragma: no cover - fallback only
-    _PlatformDirs = None
+    _PlatformDirs = None  # type: ignore[misc,assignment]
+    _has_platformdirs = False
 
 
 APP_NAME = "networka"
@@ -38,8 +41,8 @@ def default_config_root() -> Path:
 
     Returns the app root directory where both config/ and .env will be stored.
     """
-    if _PlatformDirs is not None:  # pragma: no branch
-        dirs: Any = _PlatformDirs(appname=APP_NAME, appauthor=APP_AUTHOR, roaming=True)
+    if _has_platformdirs:  # pragma: no branch
+        dirs: Any = _PlatformDirs(appname=APP_NAME, appauthor=APP_AUTHOR, roaming=True)  # type: ignore[misc]
         user_cfg = getattr(dirs, "user_config_dir", None)
         if user_cfg:
             return Path(str(user_cfg))

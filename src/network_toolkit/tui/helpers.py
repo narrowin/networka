@@ -12,7 +12,7 @@ from typing import Any
 try:  # optional rich
     from rich.markup import escape as _escape_markup
 except Exception:  # pragma: no cover - rich optional
-    _escape_markup = None
+    _escape_markup = None  # type: ignore[assignment]
 
 
 def log_write(log_widget: Any, message: str) -> None:

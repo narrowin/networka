@@ -1,7 +1,39 @@
 # Networka (nw) - LLM Development Guide
 
 NO MATTER WHAT RUN THE TESTS DIRECTLY THROUGH VS CODE TEST FEATURE, NOT TERMINAL!!!
+ALWAYS USE VS CODE TASKS FOR RUFF, MYPY, AND TESTS - NEVER USE TERMINAL COMMANDS!!!
 ALL IMPORTS ONLY GO TO THE TOP OF THE FILE, NO EXCEPTIONS!!!
+
+## MANDATORY VS CODE TASKS - NEVER USE TERMINAL COMMANDS
+
+**ALWAYS use run_task tool for these operations:**
+
+### Quality & Testing Tasks
+
+- **"shell: Run Tests"** - Instead of `uv run pytest tests/ -v`
+- **"shell: Run Tests with Coverage"** - Instead of `uv run pytest tests/ --cov=...`
+- **"shell: Lint with Ruff"** - Instead of `uv run ruff check src/ tests/`
+- **"shell: Format with Ruff"** - Instead of `uv run ruff format src/ tests/`
+- **"shell: Type Check with MyPy"** - Instead of `uv run mypy src/network_toolkit`
+- **"shell: MyPy Check (CI Match)"** - Instead of `uv run mypy src/ tests/`
+- **"shell: MyPy Check (Production Only)"** - Instead of `uv run mypy src/`
+- **"shell: Security Audit"** - Instead of `uv run pip-audit`
+
+### Build & Development Tasks
+
+- **"shell: Install Dependencies"** - Instead of `uv sync`
+- **"shell: Run Network Toolkit CLI"** - Instead of `uv run python -m network_toolkit.cli --help`
+- **"shell: Seed Environment"** - Instead of `bash .devcontainer/scripts/seed-env.sh`
+- **"shell: Export Outputs"** - Instead of `bash .devcontainer/scripts/export-outputs.sh`
+- **"shell: Export Outputs (Force)"** - Instead of `bash .devcontainer/scripts/export-outputs.sh --force`
+- **"shell: Setup Atuin"** - Instead of `bash .devcontainer/scripts/setup-atuin.sh`
+
+### Security & System Tasks
+
+- **"shell: Container Security Check"** - Instead of manual security checks
+- **"shell: Test Networking Tools"** - Instead of `bash .devcontainer/scripts/test-networking-tools.sh`
+
+**NEVER run these commands in terminal - ALWAYS use the corresponding VS Code task!**
 
 ## CRITICAL PRINCIPLES
 
@@ -10,6 +42,7 @@ ALL IMPORTS ONLY GO TO THE TOP OF THE FILE, NO EXCEPTIONS!!!
 3. **Production-ready code** - Not a prototype
 4. **No emojis or decorative symbols** in code, help text, or markdown
 5. **Test via VS Code test feature**, not terminal
+6. **Quality checks via VS Code tasks only** - Use run_task tool for Ruff, MyPy, tests
 
 ## QUALITY STANDARDS
 
@@ -31,6 +64,12 @@ ALL IMPORTS ONLY GO TO THE TOP OF THE FILE, NO EXCEPTIONS!!!
 ### Before Any Commit
 
 1. Run the actual commands and check output formatting
+2. Verify no duplicate or confusing messages
+3. Ensure proper exception handling separation
+4. Confirm tests cover real user scenarios
+
+## PROJECT CONTEXT
+
 2. Verify no duplicate or confusing messages
 3. Ensure proper exception handling separation
 4. Confirm tests cover real user scenarios

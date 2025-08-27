@@ -264,6 +264,7 @@ warn_no_return = true
 warn_unreachable = false
 strict_equality = true
 ignore_missing_imports = true
+explicit_package_bases = true
 exclude = [
     "tests/"
 ]
@@ -278,6 +279,9 @@ dev = [
     "pytest-xdist>=3.8.0",
     # Helper tooling for developing the Textual TUI (live reload, inspector)
     "textual-dev>=1.0.0",
+    # Type checking - pinned exactly for consistency (FastAPI approach)
+    "mypy==1.17.1",
+    "ruff==0.12.10",
     # Type stubs for mypy
     "types-PyYAML>=6.0.0",
     "types-paramiko>=3.0.0",
