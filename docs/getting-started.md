@@ -33,3 +33,10 @@ nw run router1 "/system/identity/print"
 ```
 
 See User guide for configuration details.
+
+## Next steps
+
+- Define more devices and groups → CSV configuration
+- Learn how to run common operations → Running commands
+- Control formatting and capture outputs → Output modes and Results
+- Troubleshooting connection/auth issues → Troubleshooting

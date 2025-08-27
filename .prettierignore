@@ -1,0 +1,3 @@
+# Avoid breaking mkdocs-click directive indentation
+# Ignore the CLI reference page so Prettier never formats it
+/docs/reference/cli.md
