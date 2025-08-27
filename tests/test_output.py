@@ -103,7 +103,7 @@ class TestFormatOutput:
 
     def test_format_output_no_color_empty_data(self):
         """Test no-color format with empty data."""
-        data = []
+        data: list[list[str]] = []
         headers = ["Name", "Host"]
         result = format_output(data, headers, "Test", OutputMode.NO_COLOR)
         assert "Test" in result

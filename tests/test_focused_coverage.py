@@ -152,6 +152,7 @@ devices:
 
         config = load_config(minimal_config)
         assert config.general.timeout == 30
+        assert config.devices is not None
         assert "test_device" in config.devices
 
     def test_config_with_sequences(self, tmp_path: Path) -> None:

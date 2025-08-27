@@ -16,6 +16,7 @@ from network_toolkit.common.credentials import (
 )
 from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import OutputMode
+from network_toolkit.common.table_generator import BaseTableProvider
 from network_toolkit.common.table_providers import (
     DeviceInfoTableProvider,
     DeviceTypesInfoTableProvider,
@@ -263,6 +264,8 @@ def _show_sequence_info(
     target: str, config: NetworkConfig, ctx: CommandContext, verbose: bool = False
 ) -> None:
     """Show detailed information for a sequence."""
+    provider: BaseTableProvider
+
     # Check global sequences first
     if config.global_command_sequences and target in config.global_command_sequences:
         sequence = config.global_command_sequences[target]

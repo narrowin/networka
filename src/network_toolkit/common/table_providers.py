@@ -8,7 +8,11 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel
 
 from network_toolkit.common.styles import StyleName
-from network_toolkit.common.table_generator import TableColumn, TableDefinition
+from network_toolkit.common.table_generator import (
+    BaseTableProvider,
+    TableColumn,
+    TableDefinition,
+)
 from network_toolkit.config import NetworkConfig, get_supported_device_types
 from network_toolkit.ip_device import (
     get_supported_device_types as get_device_descriptions,
@@ -21,7 +25,7 @@ if TYPE_CHECKING:
     pass
 
 
-class DeviceListTableProvider(BaseModel):
+class DeviceListTableProvider(BaseModel, BaseTableProvider):
     """Provides device list table data using Pydantic v2."""
 
     config: NetworkConfig
@@ -86,7 +90,7 @@ class DeviceListTableProvider(BaseModel):
         ]
 
 
-class GroupListTableProvider(BaseModel):
+class GroupListTableProvider(BaseModel, BaseTableProvider):
     """Provides group list table data using Pydantic v2."""
 
     config: NetworkConfig
@@ -156,7 +160,7 @@ class GroupListTableProvider(BaseModel):
         ]
 
 
-class TransportTypesTableProvider(BaseModel):
+class TransportTypesTableProvider(BaseModel, BaseTableProvider):
     """Provides transport types table data using Pydantic v2."""
 
     def get_table_definition(self) -> TableDefinition:
@@ -194,7 +198,7 @@ class TransportTypesTableProvider(BaseModel):
         ]
 
 
-class VendorSequencesTableProvider(BaseModel):
+class VendorSequencesTableProvider(BaseModel, BaseTableProvider):
     """Provider for vendor sequences table."""
 
     config: NetworkConfig
@@ -293,7 +297,7 @@ class VendorSequencesTableProvider(BaseModel):
             ]
 
 
-class GlobalSequencesTableProvider(BaseModel):
+class GlobalSequencesTableProvider(BaseModel, BaseTableProvider):
     """Provider for global sequences table."""
 
     config: NetworkConfig
@@ -355,7 +359,7 @@ class GlobalSequencesTableProvider(BaseModel):
         return [f"Total global sequences: {total_sequences}"]
 
 
-class SupportedPlatformsTableProvider(BaseModel):
+class SupportedPlatformsTableProvider(BaseModel, BaseTableProvider):
     """Provider for supported platforms table."""
 
     def get_table_definition(self) -> TableDefinition:
@@ -393,7 +397,7 @@ class SupportedPlatformsTableProvider(BaseModel):
         return ["Platforms supported by the network toolkit transport layer"]
 
 
-class GlobalSequenceInfoTableProvider(BaseModel):
+class GlobalSequenceInfoTableProvider(BaseModel, BaseTableProvider):
     """Provider for global sequence info table."""
 
     sequence_name: str
@@ -444,7 +448,7 @@ class GlobalSequenceInfoTableProvider(BaseModel):
         return [f"Global sequence '{self.sequence_name}' details"]
 
 
-class VendorSequenceInfoTableProvider(BaseModel):
+class VendorSequenceInfoTableProvider(BaseModel, BaseTableProvider):
     """Provider for vendor sequence info table."""
 
     sequence_name: str
@@ -503,7 +507,7 @@ class VendorSequenceInfoTableProvider(BaseModel):
         ]
 
 
-class TransportInfoTableProvider(BaseModel):
+class TransportInfoTableProvider(BaseModel, BaseTableProvider):
     """Provider for transport types information table."""
 
     def get_table_definition(self) -> TableDefinition:
@@ -539,7 +543,7 @@ class TransportInfoTableProvider(BaseModel):
         return ["Available transport types for device connections"]
 
 
-class DeviceTypesInfoTableProvider(BaseModel):
+class DeviceTypesInfoTableProvider(BaseModel, BaseTableProvider):
     """Provider for device types information table."""
 
     def get_table_definition(self) -> TableDefinition:
@@ -583,7 +587,7 @@ class DeviceTypesInfoTableProvider(BaseModel):
         return ["Supported device types and their capabilities"]
 
 
-class DeviceInfoTableProvider(BaseModel):
+class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
     """Provider for device information table."""
 
     config: NetworkConfig
@@ -663,7 +667,7 @@ class DeviceInfoTableProvider(BaseModel):
         return [f"Detailed information for device: {self.device_name}"]
 
 
-class GroupInfoTableProvider(BaseModel):
+class GroupInfoTableProvider(BaseModel, BaseTableProvider):
     """Provider for group information table."""
 
     config: NetworkConfig

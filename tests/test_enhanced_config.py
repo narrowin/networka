@@ -286,6 +286,7 @@ class TestModularConfigLoading:
 
         assert isinstance(config, NetworkConfig)
         assert config.general.timeout == 30
+        assert config.devices is not None
         assert "sw-01" in config.devices
         assert config.devices["sw-01"].host == "192.168.1.1"
 

@@ -264,6 +264,9 @@ warn_no_return = true
 warn_unreachable = false
 strict_equality = true
 ignore_missing_imports = true
+exclude = [
+    "tests/"
+]
 
 [dependency-groups]
 dev = [
