@@ -9,16 +9,11 @@ from typing import Annotated, Any, cast
 
 import typer
 
-# For test compatibility
-from rich.console import Console
-
 from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.logging import setup_logging
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
-
-console = Console()
 
 
 def register(app: typer.Typer) -> None:
@@ -97,23 +92,17 @@ def register(app: typer.Typer) -> None:
                 # Show summary
                 transport_type = config.get_transport_type(target_name)
                 ctx.print_info("File Download Details:")
-                ctx.output_manager.print_text(f"[bold]  Device: {target_name}[/bold]")
-                ctx.output_manager.print_text(
-                    f"[bold]  Transport: {transport_type}[/bold]"
+                ctx.print_detail_line("Device", target_name)
+                ctx.print_detail_line("Transport", transport_type)
+                ctx.print_detail_line("Remote file", remote_file)
+                ctx.print_detail_line("Local path", str(local_path))
+                ctx.print_detail_line(
+                    "Delete remote after download", "Yes" if delete_remote else "No"
                 )
-                ctx.output_manager.print_text(
-                    f"[bold]  Remote file: {remote_file}[/bold]"
+                ctx.print_detail_line(
+                    "Verify download", "Yes" if verify_download else "No"
                 )
-                ctx.output_manager.print_text(
-                    f"[bold]  Local path: {local_path}[/bold]"
-                )
-                ctx.output_manager.print_text(
-                    f"[bold]  Delete remote after download: {'Yes' if delete_remote else 'No'}[/bold]"
-                )
-                ctx.output_manager.print_text(
-                    f"[bold]  Verify download: {'Yes' if verify_download else 'No'}[/bold]"
-                )
-                ctx.output_manager.print_blank_line()
+                ctx.print_blank_line()
 
                 with ctx.output_manager.status(
                     f"Downloading {remote_file} from {target_name}..."
@@ -148,19 +137,18 @@ def register(app: typer.Typer) -> None:
                 raise typer.Exit(1)
 
             ctx.print_info("Group File Download Details:")
-            ctx.output_manager.print_text(f"[bold]  Group: {target_name}[/bold]")
-            ctx.output_manager.print_text(f"[bold]  Devices: {len(members)}[/bold]")
-            ctx.output_manager.print_text(f"[bold]  Remote file: {remote_file}[/bold]")
-            ctx.output_manager.print_text(
-                f"[bold]  Base path: {local_path} (files saved under <base>/<device>/{remote_file})[/bold]"
+            ctx.print_detail_line("Group", target_name)
+            ctx.print_detail_line("Devices", str(len(members)))
+            ctx.print_detail_line("Remote file", remote_file)
+            ctx.print_detail_line(
+                "Base path",
+                f"{local_path} (files saved under <base>/<device>/{remote_file})",
             )
-            ctx.output_manager.print_text(
-                f"[bold]  Delete remote after download: {'Yes' if delete_remote else 'No'}[/bold]"
+            ctx.print_detail_line(
+                "Delete remote after download", "Yes" if delete_remote else "No"
             )
-            ctx.output_manager.print_text(
-                f"[bold]  Verify download: {'Yes' if verify_download else 'No'}[/bold]"
-            )
-            ctx.output_manager.print_blank_line()
+            ctx.print_detail_line("Verify download", "Yes" if verify_download else "No")
+            ctx.print_blank_line()
 
             successes = 0
             results: dict[str, bool] = {}

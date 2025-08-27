@@ -136,3 +136,64 @@ class CommandContext:
     def should_suppress_colors(self) -> bool:
         """Check if colors should be suppressed."""
         return self.mode in [OutputMode.RAW, OutputMode.NO_COLOR]
+
+    def print_operation_header(
+        self, operation: str, target: str, target_type: str = "device"
+    ) -> None:
+        """Print operation start header with consistent formatting."""
+        if self.mode == OutputMode.RAW:
+            self.output_manager.print_info(
+                f"operation={operation} {target_type}={target}"
+            )
+        else:
+            self.output_manager.print_text(
+                f"[bold cyan]{operation}: {target}[/bold cyan]"
+            )
+
+    def print_operation_complete(self, operation: str, success: bool = True) -> None:
+        """Print operation completion status with consistent formatting."""
+        if success:
+            if self.mode == OutputMode.RAW:
+                self.output_manager.print_info("status=completed")
+            else:
+                self.output_manager.print_text(
+                    f"[bold green]{operation} completed successfully[/bold green]"
+                )
+        elif self.mode == OutputMode.RAW:
+            self.output_manager.print_info("status=failed")
+        else:
+            self.output_manager.print_text(f"[bold red]{operation} failed[/bold red]")
+
+    def print_detail_line(self, label: str, value: str) -> None:
+        """Print a detail line with consistent formatting."""
+        if self.mode == OutputMode.RAW:
+            key = label.lower().replace(" ", "_").replace(":", "")
+            self.output_manager.print_info(f"{key}={value}")
+        else:
+            self.output_manager.print_text(f"[bold]  {label}: {value}[/bold]")
+
+    def print_usage_examples_header(self) -> None:
+        """Print usage examples section header."""
+        if self.mode == OutputMode.RAW:
+            self.output_manager.print_info("section=usage_examples")
+        else:
+            self.output_manager.print_text(
+                "\n[bold yellow]Usage Examples:[/bold yellow]"
+            )
+
+    def print_separator(self) -> None:
+        """Print a separator line."""
+        self.output_manager.print_separator()
+
+    def print_blank_line(self) -> None:
+        """Print a blank line."""
+        self.output_manager.print_blank_line()
+
+    def print_code_block(self, text: str) -> None:
+        """Print a code block or configuration text."""
+        if self.mode == OutputMode.RAW:
+            # In raw mode, just print the text as-is
+            self.output_manager.print_output(text)
+        else:
+            # In styled modes, preserve any existing formatting
+            self.output_manager.print_text(text)

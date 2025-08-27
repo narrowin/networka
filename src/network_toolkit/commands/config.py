@@ -615,7 +615,7 @@ def _config_init_impl(
             ctx.output_manager.print_text(
                 "\nWhere should Networka store its configuration?"
             )
-            ctx.output_manager.print_text(f"[dim]Default: {default_path}[/dim]")
+            ctx.print_detail_line("Default", str(default_path))
             user_input = typer.prompt("Location", default=str(default_path))
             target_path = Path(user_input).expanduser().resolve()
 

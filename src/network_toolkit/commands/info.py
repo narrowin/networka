@@ -122,7 +122,7 @@ def register(app: typer.Typer) -> None:
             unknown_count = 0
             for i, target in enumerate(target_list):
                 if i > 0:
-                    ctx.output_manager.print_blank_line()
+                    ctx.print_blank_line()
 
                 target_type = _determine_target_type(target, config)
 
@@ -183,7 +183,7 @@ def _show_supported_types_impl(ctx: CommandContext, verbose: bool) -> None:
     transport_provider = TransportTypesTableProvider()
     ctx.render_table(transport_provider, False)
 
-    ctx.output_manager.print_blank_line()
+    ctx.print_blank_line()
 
     # Show supported device types
     device_types_provider = DeviceTypesInfoTableProvider()
@@ -191,24 +191,21 @@ def _show_supported_types_impl(ctx: CommandContext, verbose: bool) -> None:
 
     if verbose:
         # Show usage examples
-        ctx.output_manager.print_text("\n[bold yellow]Usage Examples:[/bold yellow]")
-        ctx.output_manager.print_text("  # Use in device configuration:")
-        ctx.output_manager.print_text("  devices:")
-        ctx.output_manager.print_text("    my_device:")
-        ctx.output_manager.print_text("      host: 192.168.1.1")
-        ctx.output_manager.print_text("      device_type: mikrotik_routeros")
-        ctx.output_manager.print_text(
-            "      transport_type: scrapli  # Optional, defaults to scrapli"
-        )
-        ctx.output_manager.print_text("")
-        ctx.output_manager.print_text("  # Use with IP addresses:")
-        ctx.output_manager.print_text(
-            '  nw run 192.168.1.1 "/system/identity/print" --platform mikrotik_routeros'
-        )
-        ctx.output_manager.print_text("")
-        ctx.output_manager.print_text("  # Transport selection via config:")
-        ctx.output_manager.print_text("  general:")
-        ctx.output_manager.print_text("    default_transport_type: scrapli")
+        ctx.print_usage_examples_header()
+        examples_text = """  # Use in device configuration:
+  devices:
+    my_device:
+      host: 192.168.1.1
+      device_type: mikrotik_routeros
+      transport_type: scrapli  # Optional, defaults to scrapli
+
+  # Use with IP addresses:
+  nw run 192.168.1.1 "/system/identity/print" --platform mikrotik_routeros
+
+  # Transport selection via config:
+  general:
+    default_transport_type: scrapli"""
+        ctx.print_code_block(examples_text)
 
 
 def _determine_target_type(target: str, config: NetworkConfig) -> str:

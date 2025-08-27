@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import difflib
 import re
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
@@ -462,8 +461,7 @@ def register(app: typer.Typer) -> None:
                     else:
                         ctx.print_error(f"- {name}: differences")
                         if res.output:
-                            sys.stdout.write(res.output)
-                            sys.stdout.write("\n")
+                            ctx.output.print_output(res.output)
 
                         if results_mgr.store_results and results_mgr.session_dir:
                             # Store diff output as a command result for visibility
