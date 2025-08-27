@@ -14,7 +14,7 @@ pip install networka
 
 ```bash
 nw --help
-nw version
+nw --version
 ```
 
 ## Minimal configuration

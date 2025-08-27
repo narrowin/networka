@@ -130,7 +130,7 @@ pip uninstall networka
 
 Get up and running with config init command:
 
-```bash
+````bash
 # Initialize in default location with interactive prompts
 nw config init
 
@@ -150,54 +150,9 @@ Note about flags: When targeting IP addresses directly, the CLI flag --platform 
 
 ## CLI overview
 
-```
-
-Usage: nw [OPTIONS] COMMAND [ARGS]...
-
-Networka (nw)
-
-A powerful multi-vendor CLI tool for automating network devices based on ssh protocol.
-Built with async/await support and type safety in mind.
-
-QUICK START:
-nw run sw-acc1 '/system/clock/print' # Execute command
-nw run office_switches system_info # Run sequence on group
-
-For detailed help on any command: nw <command> --help
-Default config directory: config/ (use --config to override)
-
-Options:
---version Show version information
---help -h Show this message and exit.
-
-Commands:
-ssh Open tmux with SSH panes for a device or group.
-
-Info & Configuration:
-info Show comprehensive information for devices, groups, or sequences.
-list List network devices, groups, sequences, and platform information
-devices List all configured network devices.
-groups List all configured device groups and their members.
-sequences List all available command sequences, optionally filtered by vendor or category.
-supported-types List supported device types.
-config Configuration management commands
-init Initialize a minimal working configuration environment.
-validate Validate the configuration file and show any issues.
-schema JSON schema management commands
-update Update JSON schemas for YAML editor validation.
-info Display information about JSON schema files.
-diff Diff config, a command, or a sequence.
-
-Executing Operations:
-run Execute a single command or a sequence on a device or a group.
-upload Upload a file to a device or to all devices in a group.
-download Download a file from a device or all devices in a group.
-
-Vendor-Specific Operations:
-backup Device backup operations (config and comprehensive)
-firmware Firmware and BIOS management operations
-
-````
+- For current usage and commands, see the CLI reference:
+  - https://narrowin.github.io/networka/reference/cli/
+  - Quick checks: `nw --help` and `nw --version`
 
 ## networka environment
 
