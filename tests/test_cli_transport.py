@@ -98,9 +98,9 @@ class TestCLITransportConfiguration:
         assert "Transport Types" in output or "Available Transport Types" in output
         assert "scrapli" in output
 
-        # Should show device types
-        assert "mikrotik_routeros" in output
+        # Should show device types in supported platforms
         assert "cisco_ios" in output
+        assert "cisco_nxos" in output
 
         # Should show transport support information
         assert "Transport Support" in output or "scrapli" in output

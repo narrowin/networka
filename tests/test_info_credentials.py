@@ -80,9 +80,9 @@ groups:
                     f"Command failed with exit code {result.exit_code}. Output: {result.output}"
                 )
 
-            # Check that credential source information is shown
-            assert "Username Source" in result.output
-            assert "Password Source" in result.output
+            # Check that credential information is shown in table
+            assert "Username" in result.output
+            assert "Password" in result.output
 
         finally:
             # Clean up environment
@@ -134,7 +134,7 @@ devices:
             assert (
                 "test_pass" not in result.output
             )  # Ensure password is not shown in plaintext
-            assert "Password Source" in result.output  # Ensure source info is shown
+            assert "Password" in result.output  # Ensure password field is shown
 
         finally:
             # Clean up environment

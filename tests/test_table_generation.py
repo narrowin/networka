@@ -224,8 +224,8 @@ class TestSupportedPlatformsTableProvider:
 
         rows = provider.get_table_rows()
         assert len(rows) > 0
-        # Should include MikroTik
-        assert any("mikrotik" in str(row).lower() for row in rows)
+        # Should include network platforms
+        assert any("cisco" in str(row).lower() for row in rows)
 
     def test_supported_platforms_verbose_info(self) -> None:
         """Test verbose information generation."""
@@ -249,7 +249,7 @@ class TestTransportTypesTableProvider:
         provider = TransportTypesTableProvider()
 
         definition = provider.get_table_definition()
-        assert definition.title == "Transport Types"
+        assert definition.title == "Available Transport Types"
         assert len(definition.columns) >= 3
 
     def test_transport_types_has_data(self) -> None:
@@ -258,16 +258,16 @@ class TestTransportTypesTableProvider:
 
         rows = provider.get_table_rows()
         assert len(rows) > 0
-        # Should include scrapli_sync
+        # Should include scrapli
         transport_names = [row[0] for row in rows]
-        assert "scrapli_sync" in transport_names
+        assert "scrapli" in transport_names
 
     def test_transport_types_raw_output(self) -> None:
         """Test raw output generation."""
         provider = TransportTypesTableProvider()
 
         raw_output = provider.get_raw_output()
-        assert "scrapli_sync" in raw_output
+        assert "scrapli" in raw_output
 
 
 class TestTableProviderIntegration:

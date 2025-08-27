@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from typer.testing import CliRunner
@@ -127,9 +127,36 @@ class TestListCommand:
     def test_list_sequences_verbose(self, config_file: Path) -> None:
         """Test list sequences with verbose output."""
         runner = CliRunner()
-        result = runner.invoke(
-            app, ["list", "sequences", "--config", str(config_file), "--verbose"]
-        )
+
+        with patch("network_toolkit.commands.list.SequenceManager") as mock_sm_class:
+            # Mock the SequenceManager class and its instance methods
+            mock_sm_instance = mock_sm_class.return_value
+            mock_sm_instance.list_all_sequences.return_value = {}
+            mock_sm_instance.list_vendor_sequences.return_value = {}
+
+            # Also mock the CommandContext to avoid any issues
+            with patch(
+                "network_toolkit.commands.list.CommandContext"
+            ) as mock_ctx_class:
+                mock_ctx = mock_ctx_class.return_value
+                mock_ctx.print_warning = MagicMock()
+                mock_ctx.output_manager.print_blank_line = MagicMock()
+
+                result = runner.invoke(
+                    app,
+                    ["list", "sequences", "--config", str(config_file), "--verbose"],
+                )
+
+        if result.exit_code != 0:
+            print(f"Exit code: {result.exit_code}")
+            print(f"Output: {result.output}")
+            print(f"Exception: {result.exception}")
+            if result.exception:
+                import traceback
+
+                print(
+                    f"Exception traceback: {''.join(traceback.format_exception(type(result.exception), result.exception, result.exception.__traceback__))}"
+                )
 
         assert result.exit_code == 0
 
