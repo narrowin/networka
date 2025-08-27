@@ -18,8 +18,8 @@ sequences:
     commands:
       - "/system/resource/print"
       - "/system/clock/print"
-      - "/interface/print stats"
-      - "/system/logging/print last=10"
+      - "/interface/print detail"
+      - '/log/print where topics~"error|critical|warning"'
 
   interface_status:
     description: "Detailed interface status and statistics"
@@ -27,19 +27,17 @@ sequences:
     timeout: 60
     commands:
       - "/interface/print detail"
-      - "/interface/print stats"
-      - "/interface/ethernet/print"
-      - "/interface/ethernet/print stats"
+      - "/interface/ethernet/print detail"
+      - "/interface/ethernet/monitor [find] once"
 
   routing_info:
     description: "Routing table and protocol information"
     category: "network"
     timeout: 60
     commands:
-      - "/ip/route/print"
+      - "/ip/route/print detail"
       - "/routing/ospf/neighbor/print"
-      - "/routing/bgp/peer/print"
-      - "/routing/rip/neighbor/print"
+      - "/routing/bgp/peer/print terse"
 
   security_audit:
     description: "Security configuration audit"
@@ -51,4 +49,4 @@ sequences:
       - "/ip/service/print"
       - "/ip/firewall/filter/print"
       - "/ip/firewall/nat/print"
-      - "/system/logging/print"
+      - '/log/print where topics~"account|critical|error|warning"'

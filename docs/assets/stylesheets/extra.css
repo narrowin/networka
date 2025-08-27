@@ -1,6 +1,23 @@
-/* Minimal customizations hook for Material theme */
-/* Keeping a no-op rule to satisfy linters and allow quick overrides later */
-html[data-md-color-scheme] {
-  /* Example override: --md-primary-fg-color: #0b7285; */
-  outline: 0; /* no-op to satisfy linters */
+/* Header logo sizing and spacing */
+.md-header__button.md-logo img {
+  height: 48px; /* desktop size */
+  width: auto;
+}
+
+/* Remove extra padding around the logo button and tighten gap */
+.md-header__button.md-logo {
+  padding: 0;
+  margin-right: 0.5rem;
+}
+
+/* Slightly reduce on small screens to keep header compact */
+@media (max-width: 600px) {
+  .md-header__button.md-logo img {
+    height: 40px;
+  }
+}
+
+/* Optional: tighten spacing between logo and title */
+.md-header__title {
+  margin-left: 0;
 }
