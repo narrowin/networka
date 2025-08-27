@@ -1,0 +1,9 @@
+# Example user-defined sequences for MikroTik RouterOS
+sequences:
+  my_quick_diag:
+    description: "Quick diagnostics"
+    category: "troubleshooting"
+    timeout: 30
+    commands:
+      - "/system/resource/print"
+      - "/interface/print brief"
