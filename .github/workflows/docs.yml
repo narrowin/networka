@@ -3,10 +3,6 @@ name: Docs
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'mkdocs.yml'
-      - 'docs/**'
-      - 'src/**'
   pull_request:
     branches: [ main ]
     paths:
