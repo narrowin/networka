@@ -37,10 +37,27 @@ theme:
   logo: assets/images/networka.png
   favicon: assets/images/networka.png
   custom_dir: docs/overrides
+  palette:
+    # Palette toggle for light mode
+    - scheme: default
+      primary: blue
+      accent: cyan
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - scheme: slate
+      primary: blue
+      accent: cyan
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
   features:
     - navigation.tabs
     - navigation.sections
     - navigation.top
+    - navigation.tracking
     - toc.integrate
     - content.code.copy
     - content.action.edit
