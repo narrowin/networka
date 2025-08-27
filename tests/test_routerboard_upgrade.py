@@ -25,10 +25,8 @@ class TestRouterboardUpgrade:
     @patch("network_toolkit.commands.routerboard_upgrade.setup_logging")
     @patch("network_toolkit.commands.routerboard_upgrade.load_config")
     @patch("network_toolkit.commands.routerboard_upgrade.import_module")
-    @patch("network_toolkit.commands.routerboard_upgrade.console")
     def test_routerboard_upgrade_command_execution(
         self,
-        mock_console: MagicMock,
         mock_import: MagicMock,
         mock_load_config: MagicMock,
         mock_setup_logging: MagicMock,
@@ -61,10 +59,8 @@ class TestRouterboardUpgrade:
     @patch("network_toolkit.commands.routerboard_upgrade.setup_logging")
     @patch("network_toolkit.commands.routerboard_upgrade.load_config")
     @patch("network_toolkit.commands.routerboard_upgrade.import_module")
-    @patch("network_toolkit.commands.routerboard_upgrade.console")
     def test_routerboard_upgrade_with_options(
         self,
-        mock_console: MagicMock,
         mock_import: MagicMock,
         mock_load_config: MagicMock,
         mock_setup_logging: MagicMock,
@@ -124,10 +120,8 @@ class TestRouterboardUpgrade:
     @patch("network_toolkit.commands.routerboard_upgrade.setup_logging")
     @patch("network_toolkit.commands.routerboard_upgrade.load_config")
     @patch("network_toolkit.commands.routerboard_upgrade.import_module")
-    @patch("network_toolkit.commands.routerboard_upgrade.console")
     def test_routerboard_upgrade_with_custom_config(
         self,
-        mock_console: MagicMock,
         mock_import: MagicMock,
         mock_load_config: MagicMock,
         mock_setup_logging: MagicMock,
@@ -159,10 +153,8 @@ class TestRouterboardUpgrade:
     @patch("network_toolkit.commands.routerboard_upgrade.setup_logging")
     @patch("network_toolkit.commands.routerboard_upgrade.load_config")
     @patch("network_toolkit.commands.routerboard_upgrade.import_module")
-    @patch("network_toolkit.commands.routerboard_upgrade.console")
     def test_routerboard_upgrade_group_processing(
         self,
-        mock_console: MagicMock,
         mock_import: MagicMock,
         mock_load_config: MagicMock,
         mock_setup_logging: MagicMock,
@@ -194,10 +186,8 @@ class TestRouterboardUpgrade:
     @patch("network_toolkit.commands.routerboard_upgrade.setup_logging")
     @patch("network_toolkit.commands.routerboard_upgrade.load_config")
     @patch("network_toolkit.commands.routerboard_upgrade.import_module")
-    @patch("network_toolkit.commands.routerboard_upgrade.console")
     def test_routerboard_upgrade_device_not_found(
         self,
-        mock_console: MagicMock,
         mock_import: MagicMock,
         mock_load_config: MagicMock,
         mock_setup_logging: MagicMock,

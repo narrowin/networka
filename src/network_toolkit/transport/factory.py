@@ -36,9 +36,9 @@ class ScrapliTransportFactory:
         """Create a Scrapli transport instance."""
         # Import Scrapli symbol from device module so unit tests that patch
         # `network_toolkit.device.Scrapli` continue to intercept driver creation.
-        # Also import the adapter symbol via device module to keep tests patchable.
+        # Also import the adapter symbol from transport module.
         from network_toolkit.device import Scrapli as DeviceScrapli
-        from network_toolkit.device import (
+        from network_toolkit.transport import (
             ScrapliSyncTransport as DeviceScrapliSyncTransport,
         )
 

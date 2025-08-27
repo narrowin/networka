@@ -22,10 +22,8 @@ class TestVendorConfigBackup:
 
     @patch("network_toolkit.commands.vendor_config_backup.load_config")
     @patch("network_toolkit.commands.vendor_config_backup.import_module")
-    @patch("network_toolkit.commands.vendor_config_backup.console")
     def test_config_backup_command_execution(
         self,
-        mock_console: MagicMock,
         mock_import: MagicMock,
         mock_load_config: MagicMock,
     ) -> None:
@@ -56,10 +54,8 @@ class TestVendorConfigBackup:
     @patch("network_toolkit.commands.vendor_config_backup.setup_logging")
     @patch("network_toolkit.commands.vendor_config_backup.load_config")
     @patch("network_toolkit.commands.vendor_config_backup.import_module")
-    @patch("network_toolkit.commands.vendor_config_backup.console")
     def test_config_backup_with_options(
         self,
-        mock_console: MagicMock,
         mock_import: MagicMock,
         mock_load_config: MagicMock,
         mock_setup_logging: MagicMock,
@@ -111,10 +107,8 @@ class TestVendorConfigBackup:
     @patch("network_toolkit.commands.vendor_config_backup.setup_logging")
     @patch("network_toolkit.commands.vendor_config_backup.load_config")
     @patch("network_toolkit.commands.vendor_config_backup.import_module")
-    @patch("network_toolkit.commands.vendor_config_backup.console")
     def test_config_backup_with_custom_config(
         self,
-        mock_console: MagicMock,
         mock_import: MagicMock,
         mock_load_config: MagicMock,
         mock_setup_logging: MagicMock,
@@ -143,10 +137,8 @@ class TestVendorConfigBackup:
     @patch("network_toolkit.commands.vendor_config_backup.setup_logging")
     @patch("network_toolkit.commands.vendor_config_backup.load_config")
     @patch("network_toolkit.commands.vendor_config_backup.import_module")
-    @patch("network_toolkit.commands.vendor_config_backup.console")
     def test_config_backup_group_processing(
         self,
-        mock_console: MagicMock,
         mock_import: MagicMock,
         mock_load_config: MagicMock,
         mock_setup_logging: MagicMock,
@@ -175,10 +167,8 @@ class TestVendorConfigBackup:
     @patch("network_toolkit.commands.vendor_config_backup.setup_logging")
     @patch("network_toolkit.commands.vendor_config_backup.load_config")
     @patch("network_toolkit.commands.vendor_config_backup.import_module")
-    @patch("network_toolkit.commands.vendor_config_backup.console")
     def test_config_backup_device_not_found(
         self,
-        mock_console: MagicMock,
         mock_import: MagicMock,
         mock_load_config: MagicMock,
         mock_setup_logging: MagicMock,
