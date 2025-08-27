@@ -108,7 +108,8 @@ class CategorizedHelpGroup(TyperGroup):
 # Typer application instance
 help_text = (
     "\n    Networka (nw)\n\n"
-    "    A powerful multi-vendor CLI tool for automating network devices based on ssh protocol.\n"
+    "    A powerful multi-vendor CLI tool for automating network devices based "
+    "on ssh protocol.\n"
     "    Built with async/await support and type safety in mind.\n\n"
     "    QUICK START:\n"
     "      nw run sw-acc1 '/system/clock/print'  # Execute command\n"

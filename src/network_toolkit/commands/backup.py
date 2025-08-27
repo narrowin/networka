@@ -11,8 +11,7 @@ import typer
 from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.logging import setup_logging
-from network_toolkit.common.styles import StyleName
-from network_toolkit.config import load_config
+from network_toolkit.config import NetworkConfig, load_config
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.platforms import (
     UnsupportedOperationError,
@@ -96,7 +95,9 @@ def config_backup(
                 ctx.print_info("Known groups: " + preview)
             raise typer.Exit(1)
 
-        def resolve_backup_sequence(config, device_name: str) -> list[str]:
+        def resolve_backup_sequence(
+            config: NetworkConfig, device_name: str
+        ) -> list[str]:
             """Resolve the backup sequence for a device."""
             seq_name = "backup_config"
             devices = config.devices or {}
@@ -188,7 +189,7 @@ def config_backup(
             ok = process_device(target_name)
             if not ok:
                 raise typer.Exit(1)
-            ctx.print_operation_complete("Backup", True)
+            ctx.print_operation_complete("Backup", success=True)
             return
 
         # Group path
@@ -288,7 +289,7 @@ def comprehensive_backup(
             raise typer.Exit(1)
 
         def resolve_comprehensive_backup_sequence(
-            config, device_name: str
+            config: NetworkConfig, device_name: str
         ) -> list[str]:
             """Resolve the comprehensive backup command sequence for a device."""
             devices = config.devices or {}
@@ -375,7 +376,7 @@ def comprehensive_backup(
             ok = process_device(target_name)
             if not ok:
                 raise typer.Exit(1)
-            ctx.print_operation_complete("Comprehensive Backup", True)
+            ctx.print_operation_complete("Comprehensive Backup", success=True)
             return
 
         # Group processing

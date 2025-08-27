@@ -13,7 +13,7 @@ class ScrapliSyncTransport:
     def __init__(self, driver: Scrapli) -> None:
         self._driver = driver
 
-    def open(self) -> None:  # pragma: no cover - passthrough  # noqa: A003
+    def open(self) -> None:  # pragma: no cover - passthrough
         self._driver.open()
 
     def close(self) -> None:  # pragma: no cover - passthrough

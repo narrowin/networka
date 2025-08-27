@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib.resources as importlib_resources
 import logging
 import os
 import shutil

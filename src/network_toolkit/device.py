@@ -11,7 +11,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import paramiko
 from scrapli import Scrapli
@@ -22,7 +22,6 @@ from network_toolkit.device_transfers import calculate_file_checksum, verify_fil
 from network_toolkit.exceptions import (
     DeviceConnectionError,
     DeviceExecutionError,
-    NetworkToolkitError,
 )
 from network_toolkit.platforms.mikrotik_routeros.confirmation_patterns import (
     MIKROTIK_PACKAGE_DOWNGRADE,
@@ -37,8 +36,6 @@ if TYPE_CHECKING:
 
     from network_toolkit.config import NetworkConfig
     from network_toolkit.transport.interfaces import Transport
-
-from network_toolkit.transport import ScrapliSyncTransport
 
 logger = logging.getLogger(__name__)
 

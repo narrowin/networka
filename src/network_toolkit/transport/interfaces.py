@@ -33,7 +33,7 @@ class ConnectionState:
 class Transport(Protocol):
     """Minimal sync transport contract."""
 
-    def open(self) -> None:  # pragma: no cover - thin adapter  # noqa: A003
+    def open(self) -> None:  # pragma: no cover - thin adapter
         ...
 
     def close(self) -> None:  # pragma: no cover - thin adapter

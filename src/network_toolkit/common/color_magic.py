@@ -6,7 +6,6 @@ from __future__ import annotations
 import functools
 import inspect
 from collections.abc import Callable
-from pathlib import Path
 from typing import Annotated, Any, TypeVar
 
 import typer
@@ -138,7 +137,7 @@ class LegacyConsoleWrapper:
         self.ctx = ctx
         self._console = ctx.console
 
-    def print(self, *args, **kwargs):  # noqa: A003
+    def print(self, *args, **kwargs):
         """Smart print that detects and converts hardcoded colors."""
         if args:
             text = str(args[0])

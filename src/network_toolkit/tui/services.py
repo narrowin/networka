@@ -115,11 +115,11 @@ class ExecutionService:
                         if out_strip:
                             for line in text.rstrip().splitlines():
                                 cb.on_output(line)
-                    except Exception as e:  # noqa: BLE001
+                    except Exception as e:
                         ok = False
                         cb.on_error(f"{device}: command error: {e}")
             cb.on_meta(f"{device}: done")
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             ok = False
             cb.on_error(f"{device}: Failed: {e}")
         return ok

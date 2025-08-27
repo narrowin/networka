@@ -16,7 +16,6 @@ from network_toolkit.common.credentials import (
 )
 from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import OutputMode
-from network_toolkit.common.styles import StyleName
 from network_toolkit.common.table_providers import (
     DeviceInfoTableProvider,
     DeviceTypesInfoTableProvider,
