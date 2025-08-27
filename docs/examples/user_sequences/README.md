@@ -4,13 +4,15 @@ Networka supports user-defined sequences layered on top of built-in and repo seq
 
 - Built-in: packaged defaults (no setup needed)
 - Repo: your project's `config/sequences/<vendor>/*.yml`
-- User: `~/.config/netkit/sequences/<vendor>/*.yml` (highest priority)
+- User: `~/.config/networka/sequences/<vendor>/*.yml` (highest priority)
 
 ## Create your first user sequence
 
 1. Create the directory:
-   - `mkdir -p ~/.config/netkit/sequences/mikrotik_routeros`
-2. Add a file `~/.config/netkit/sequences/mikrotik_routeros/custom.yml`:
+
+- `mkdir -p ~/.config/networka/sequences/mikrotik_routeros`
+
+2. Add a file `~/.config/networka/sequences/mikrotik_routeros/custom.yml`:
 
 ```yaml
 sequences:

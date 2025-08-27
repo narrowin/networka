@@ -11,6 +11,7 @@ from typing import Annotated, Any
 
 import typer
 from typer.core import TyperGroup
+from typer.main import get_command as _get_click_command
 
 from network_toolkit import __version__
 
@@ -66,7 +67,7 @@ class CategorizedHelpGroup(TyperGroup):
             "backup",
             "firmware",
         ]
-        vendor_names = []
+        vendor_names: list[str] = []
         info_names = [
             "info",
             "list",
@@ -125,6 +126,8 @@ app = typer.Typer(
     context_settings={"help_option_names": ["-h", "--help"]},
     invoke_without_command=True,
 )
+
+# Click-compatible command is created after all subcommands are registered below
 
 
 @app.callback()
@@ -254,11 +257,16 @@ register_diff(app)
 register_schema(app)
 register_ssh(app)
 
+# Expose a Click-compatible command for documentation tools (e.g., mkdocs-click)
+# Create this after all subcommands have been registered
+cli = _get_click_command(app)
+
 
 __all__ = [
     "DeviceSession",
     "_handle_file_downloads",
     "app",
+    "cli",
     "console",
     "setup_logging",
 ]

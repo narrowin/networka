@@ -17,20 +17,20 @@ sequences:
     timeout: 45
     commands:
       - "show processes top once"
-      - "show system memory"
+      - "show memory"
       - "show clock"
       - "show interfaces status"
-      - "show logging last 10 lines"
+      - "show logging last 10"
 
   interface_status:
     description: "Detailed interface status and statistics"
     category: "network"
     timeout: 60
     commands:
-      - "show interfaces"
       - "show interfaces status"
       - "show interfaces counters"
       - "show interfaces description"
+      - "show interfaces transceiver details"
 
   routing_info:
     description: "Routing table and protocol information"
@@ -47,7 +47,7 @@ sequences:
     category: "security"
     timeout: 120
     commands:
-      - "show running-config | section username"
+      - "show running-config section username"
       - "show aaa"
       - "show ip access-lists"
       - "show logging"

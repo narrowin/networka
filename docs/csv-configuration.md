@@ -1,6 +1,13 @@
 # CSV Configuration Guide
 
+# CSV configuration
 This guide explains how to use CSV files for bulk device, group, and sequence management in Networka.
+
+## Next steps
+
+- Set credentials via environment → Environment variables
+- Run common tasks → Running commands
+- Capture outputs and tune formatting → Results and Output modes
 
 ## Overview
 

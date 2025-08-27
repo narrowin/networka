@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+  branches: [ main, develop ]
   pull_request:
     branches: [ main ]
 
@@ -40,25 +40,25 @@ jobs:
     - name: Install dependencies
       run: uv sync --all-extras --group dev
 
-    # - name: Run ruff check
-    #   run: uv run ruff check .
+    - name: Run ruff check
+      run: uv run ruff check .
 
-    # - name: Run ruff format
-    #   run: uv run ruff format --check .
+    - name: Run ruff format (verify)
+      run: uv run ruff format --check .
 
-    # - name: Run mypy
-    #   run: uv run mypy src/
+    - name: Run mypy
+      run: uv run mypy src/ tests
 
-    # - name: Run tests with coverage
-    #   run: uv run pytest --cov=network_toolkit --cov-report=xml --cov-report=term-missing
+    - name: Run tests with coverage
+      run: uv run pytest --cov=network_toolkit --cov-report=xml --cov-report=term-missing
 
-    # - name: Upload coverage to Codecov
-    #   if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-    #   uses: codecov/codecov-action@v4
-    #   with:
-    #     file: ./coverage.xml
-    #     fail_ci_if_error: true
-    #     token: ${{ secrets.CODECOV_TOKEN }}
+    - name: Upload coverage to Codecov
+      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: true
+        token: ${{ secrets.CODECOV_TOKEN }}
 
   security:
     name: Security checks
@@ -109,13 +109,11 @@ jobs:
     - name: Set up Python
       run: uv python install 3.12
 
-    - name: Install dependencies
-      run: uv sync --group dev
+    - name: Install docs dependencies
+      run: uv sync --extra docs
 
-    - name: Check documentation links
-      run: |
-        # Add any documentation validation here
-        echo "Documentation validation placeholder"
+    - name: Build docs (strict)
+      run: uv run mkdocs build --strict
 
   build:
     name: Build distribution
