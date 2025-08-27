@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 
@@ -19,6 +19,9 @@ from network_toolkit.common.output import (
 from network_toolkit.common.styles import StyleManager
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
+
+if TYPE_CHECKING:
+    from network_toolkit.common.table_generator import TableDataProvider, TableGenerator
 
 
 def create_standard_options() -> dict[str, object]:
@@ -84,6 +87,21 @@ class CommandContext:
         # Expose commonly used objects
         self.console = self.style_manager.console
         self.mode = self.output_manager.mode
+
+    @property
+    def table_generator(self) -> TableGenerator:
+        """Get table generator for this context."""
+        if not hasattr(self, "_table_generator"):
+            from network_toolkit.common.table_generator import TableGenerator
+
+            self._table_generator = TableGenerator(
+                self.style_manager, self.output_manager
+            )
+        return self._table_generator
+
+    def render_table(self, provider: TableDataProvider, verbose: bool = False) -> None:
+        """Convenience method to render a table."""
+        self.table_generator.render_table(provider, verbose)
 
     def print_error(self, message: str, device_name: str | None = None) -> None:
         """Print an error message with proper styling."""

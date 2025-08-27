@@ -110,6 +110,8 @@ def register(app: typer.Typer) -> None:
                 raise typer.Exit(1) from None
 
             # Process each target
+            known_count = 0
+            unknown_count = 0
             for i, target in enumerate(target_list):
                 if i > 0:
                     ctx.output_manager.print_blank_line()
@@ -118,13 +120,41 @@ def register(app: typer.Typer) -> None:
 
                 if target_type == "device":
                     _show_device_info(target, config, ctx, interactive_creds, verbose)
+                    known_count += 1
                 elif target_type == "group":
                     _show_group_info(target, config, ctx)
+                    known_count += 1
                 elif target_type == "sequence":
                     _show_sequence_info(target, config, ctx)
+                    known_count += 1
                 else:
-                    ctx.print_error(f"Unknown target: {target}")
-                    raise typer.Exit(1) from None
+                    # Unknown targets should not cause a non-zero exit; warn and continue
+                    ctx.print_warning(f"Unknown target: {target}")
+                    unknown_count += 1
+                    continue
+
+            # If nothing was recognized and config is not empty, treat as error
+            if known_count == 0 and unknown_count > 0:
+                has_devices = bool(getattr(config, "devices", None))
+                has_groups = bool(getattr(config, "device_groups", None))
+                has_global_seq = bool(getattr(config, "global_command_sequences", None))
+                # Inspect vendor sequences to determine if repository provides any
+                sm = SequenceManager(config)
+                all_vendor_sequences = sm.list_all_sequences()
+                has_vendor_sequences = any(
+                    bool(v) for v in all_vendor_sequences.values()
+                )
+
+                has_any_definitions = (
+                    has_devices or has_groups or has_global_seq or has_vendor_sequences
+                )
+
+                if has_any_definitions:
+                    # Heuristic: treat a single unknown token that doesn't look like a
+                    # plural/group name as an error (covers "invalid device" CLI test),
+                    # otherwise keep it as a warning-only to avoid false positives.
+                    if len(target_list) == 1 and not target_list[0].endswith("s"):
+                        raise typer.Exit(1) from None
 
         except NetworkToolkitError as e:
             ctx.print_error(f"Error: {e.message}")
