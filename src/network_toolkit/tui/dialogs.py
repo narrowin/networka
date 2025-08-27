@@ -6,7 +6,6 @@ shown (e.g., Textual not installed). Callers should provide a fallback.
 
 from __future__ import annotations
 
-# ruff: noqa: ANN001,ANN002,ANN003,ANN201
 # pyright: reportUnknownArgumentType=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportGeneralTypeIssues=false
 from collections.abc import Callable
 from typing import Any
@@ -20,18 +19,21 @@ except Exception:  # pragma: no cover - textual not installed
     _ModalScreenBase = object  # type: ignore
 
     class _Button:  # type: ignore
-        def __init__(self, *args: Any, **kwargs: Any) -> None: ...
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            ...
 
     class _Static:  # type: ignore
-        def __init__(self, *args: Any, **kwargs: Any) -> None: ...
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            ...
 
     class _Vertical:  # type: ignore
-        def __init__(self, *args: Any, **kwargs: Any) -> None: ...
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            ...
 
-        def __enter__(self) -> _Vertical:  # noqa: D401
+        def __enter__(self) -> _Vertical:
             return self
 
-        def __exit__(self, *_: Any) -> bool:  # noqa: D401
+        def __exit__(self, *_: Any) -> bool:
             return False
 
 
@@ -50,14 +52,14 @@ class _ConfirmDialog(_ModalScreenBase):  # type: ignore[misc]
         self._on_yes = on_yes
         self._on_no = on_no
 
-    def compose(self) -> Any:  # noqa: D401
+    def compose(self) -> Any:
         with _Vertical(id="nw-dialog"):
             yield _Static(self._message, classes="title")
             with _Vertical(classes="buttons"):
                 yield _Button("Yes [y]", id="btn-yes")
                 yield _Button("No [N]/Esc", id="btn-no")
 
-    def on_button_pressed(self, event: Any) -> None:  # noqa: D401
+    def on_button_pressed(self, event: Any) -> None:
         bid = getattr(getattr(event, "button", None), "id", "")
         if bid == "btn-yes":
             self._on_yes()
@@ -72,7 +74,7 @@ class _ConfirmDialog(_ModalScreenBase):  # type: ignore[misc]
             except Exception:
                 pass
 
-    def on_key(self, event: Any) -> None:  # noqa: D401
+    def on_key(self, event: Any) -> None:
         key = str(getattr(event, "key", "")).lower()
         if key in {"y"}:
             self._on_yes()
@@ -106,7 +108,7 @@ class _CancelModeDialog(_ModalScreenBase):  # type: ignore[misc]
         self._on_hard = on_hard
         self._on_abort = on_abort
 
-    def compose(self) -> Any:  # noqa: D401
+    def compose(self) -> Any:
         with _Vertical(id="nw-dialog"):
             yield _Static(
                 "Cancel type? Soft [s] (recommended) or Hard [h]. Hard will close sessions immediately and may leave devices in a partial state.",
@@ -117,7 +119,7 @@ class _CancelModeDialog(_ModalScreenBase):  # type: ignore[misc]
                 yield _Button("Hard cancel [h] (disconnect sessions)", id="btn-hard")
                 yield _Button("Keep running [N]/Esc", id="btn-no")
 
-    def on_button_pressed(self, event: Any) -> None:  # noqa: D401
+    def on_button_pressed(self, event: Any) -> None:
         bid = getattr(getattr(event, "button", None), "id", "")
         if bid == "btn-soft":
             self._on_soft()
@@ -138,7 +140,7 @@ class _CancelModeDialog(_ModalScreenBase):  # type: ignore[misc]
             except Exception:
                 pass
 
-    def on_key(self, event: Any) -> None:  # noqa: D401
+    def on_key(self, event: Any) -> None:
         key = str(getattr(event, "key", "")).lower()
         if key in {"s", "enter", "return"}:
             self._on_soft()

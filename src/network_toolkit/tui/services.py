@@ -266,13 +266,10 @@ class ExecutionService:
                         cb.on_meta(f"{device}: cancelled")
                         ok = False
                         break
-                    # Build a per-command chunk: header with device & command, raw output lines, then a footer
-                    header = f"-- {device}: {cmd} --"
-                    footer = f"-- finish {device}: {cmd} --"
+                    # Execute command and process output
                     cb.on_meta(f"{device}$ {cmd}")
                     try:
-                        raw = session.execute_command(cmd)
-                        text = raw if isinstance(raw, str) else str(raw)
+                        text = session.execute_command(cmd)
                         out_strip = text.strip()
                         if out_strip:
                             for line in text.rstrip().splitlines():

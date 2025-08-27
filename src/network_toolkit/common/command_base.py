@@ -5,19 +5,17 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from functools import wraps
-from pathlib import Path
-from typing import Annotated, Any, TypeVar
+from typing import Any, TypeVar
 
 import typer
 
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import (
-    OutputMode,
     get_output_manager,
     set_output_mode,
 )
-from network_toolkit.common.styles import StyleManager, StyleName
+from network_toolkit.common.styles import StyleManager
 from network_toolkit.exceptions import NetworkToolkitError
 
 F = TypeVar("F", bound=Callable[..., Any])

@@ -109,7 +109,7 @@ class TuiData:
 
         # 3) From path of the originally requested config (best-effort)
         try:
-            module_found = search_up(original.resolve())
+            module_found = search_up(_original.resolve())
         except Exception:
             module_found = None
         if module_found is not None:

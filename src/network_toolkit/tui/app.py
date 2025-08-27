@@ -7,8 +7,10 @@ Execution is not wired yet; we only collect selections and show a preview.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import threading
+import time
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -19,7 +21,7 @@ from network_toolkit.tui.controller import TuiController
 from network_toolkit.tui.data import TuiData
 from network_toolkit.tui.keymap import KEYMAP
 from network_toolkit.tui.layout import compose_root
-from network_toolkit.tui.models import SelectionState
+from network_toolkit.tui.models import RunCallbacks, SelectionState
 from network_toolkit.tui.output_manager import OutputPanelManager
 from network_toolkit.tui.services import ExecutionService
 

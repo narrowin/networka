@@ -21,18 +21,21 @@ except Exception:  # pragma: no cover - textual not installed
     _ModalScreenBase = object  # type: ignore
 
     class _Button:  # type: ignore
-        def __init__(self, *args: Any, **kwargs: Any) -> None: ...
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            ...
 
     class _Static:  # type: ignore
-        def __init__(self, *args: Any, **kwargs: Any) -> None: ...
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            ...
 
     class _Vertical:  # type: ignore
-        def __init__(self, *args: Any, **kwargs: Any) -> None: ...
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            ...
 
-        def __enter__(self) -> _Vertical:  # noqa: D401
+        def __enter__(self) -> _Vertical:
             return self
 
-        def __exit__(self, *_: Any) -> bool:  # noqa: D401
+        def __exit__(self, *_: Any) -> bool:
             return False
 
 
@@ -59,7 +62,7 @@ class _PromptScreen(_ModalScreenBase):  # type: ignore[misc]
         self._on_no = on_no
         self._on_close = on_close
 
-    def compose(self) -> Any:  # noqa: D401
+    def compose(self) -> Any:
         with _Vertical(id="nw-prompt"):
             yield _Static(self._message, classes="title")
             with _Vertical(classes="buttons"):
@@ -69,7 +72,7 @@ class _PromptScreen(_ModalScreenBase):  # type: ignore[misc]
                 else:
                     yield _Button("OK [Enter]", id="btn-ok")
 
-    def on_button_pressed(self, event: Any) -> None:  # noqa: D401
+    def on_button_pressed(self, event: Any) -> None:
         bid = getattr(getattr(event, "button", None), "id", "")
         if bid == "btn-yes" and self._on_yes:
             self._on_yes()
@@ -83,7 +86,7 @@ class _PromptScreen(_ModalScreenBase):  # type: ignore[misc]
         except Exception:
             pass
 
-    def on_key(self, event: Any) -> None:  # noqa: D401
+    def on_key(self, event: Any) -> None:
         key = str(getattr(event, "key", "")).lower()
         if self._mode == "yesno":
             if key == "y" and self._on_yes:

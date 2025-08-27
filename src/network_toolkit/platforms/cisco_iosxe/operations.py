@@ -17,7 +17,7 @@ from network_toolkit.platforms.cisco_iosxe.constants import (
 )
 
 if TYPE_CHECKING:
-    from network_toolkit.device import DeviceSession
+    pass
 
 logger = logging.getLogger(__name__)
 

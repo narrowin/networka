@@ -17,7 +17,6 @@ from network_toolkit.platforms.mikrotik_routeros.confirmation_patterns import (
     MIKROTIK_ROUTERBOARD_UPGRADE,
 )
 from network_toolkit.platforms.mikrotik_routeros.constants import (
-    DEFAULT_BACKUP_DOWNLOADS,
     DEFAULT_BACKUP_SEQUENCE,
     DEVICE_TYPES,
     PLATFORM_NAME,
@@ -25,7 +24,7 @@ from network_toolkit.platforms.mikrotik_routeros.constants import (
 )
 
 if TYPE_CHECKING:
-    from network_toolkit.device import DeviceSession
+    pass
 
 logger = logging.getLogger(__name__)
 

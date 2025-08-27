@@ -274,7 +274,7 @@ class TuiController:
                     app._refresh_bottom_visibility()
                 except Exception:
                     pass
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 try:
                     elapsed = (
                         (time.monotonic() - start_ts) if (start_ts is not None) else 0.0

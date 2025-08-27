@@ -18,7 +18,7 @@ from network_toolkit.platforms.factory import (
 )
 
 if TYPE_CHECKING:
-    from network_toolkit.sequence_manager import SequenceRecord
+    pass
 
 
 class DeviceListTableProvider(BaseModel):
