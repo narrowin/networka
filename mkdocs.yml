@@ -9,18 +9,12 @@ nav:
   - Home: index.md
   - Getting started:
       - Quickstart: getting-started.md
-      - Configuration:
-          - Overview: configuration.md
-          - YAML: configuration.md#yaml
-          - CSV: configuration.md#csv
+      - Configuration: configuration.md
       - Environment variables: environment-variables.md
       - Running commands: running-commands.md
       - Platform compatibility: platform-compatibility.md
   - User guide:
-    - Configuration:
-      - Overview: configuration.md
-      - YAML: configuration.md#yaml
-      - CSV: configuration.md#csv
+    - Configuration: configuration.md
     - Environment variables: environment-variables.md
     - Running commands: running-commands.md
     - Results: results.md
@@ -86,7 +80,6 @@ extra_javascript:
 
 plugins:
   - search
-  - mkdocs-click
   - mkdocstrings:
       handlers:
         python:
@@ -105,6 +98,7 @@ plugins:
 markdown_extensions:
   - admonition
   - attr_list
+  - mkdocs-click
   - toc:
       permalink: true
   - pymdownx.details
