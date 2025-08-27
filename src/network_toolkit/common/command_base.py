@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from functools import wraps
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 import typer
 
@@ -44,7 +44,7 @@ def standardized_command(
 
     def decorator(func: F) -> F:
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             # Extract standard parameters from kwargs if they exist
             output_mode = kwargs.pop("output_mode", None)
             verbose = kwargs.pop("verbose", False)
@@ -86,7 +86,7 @@ def standardized_command(
                 output_manager.print_error(f"Unexpected error: {e}")
                 raise typer.Exit(1) from None
 
-        return wrapper
+        return cast(F, wrapper)
 
     return decorator
 

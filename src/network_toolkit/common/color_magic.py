@@ -6,7 +6,7 @@ from __future__ import annotations
 import functools
 import inspect
 from collections.abc import Callable
-from typing import Annotated, Any, TypeVar
+from typing import Annotated, Any, TypeVar, cast
 
 import typer
 
@@ -43,7 +43,7 @@ def with_color_support(func: F) -> F:
     )
 
     @functools.wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
         # Extract standard parameters
         output_mode = kwargs.pop("output_mode", None)
         verbose = kwargs.get("verbose", False)
@@ -74,13 +74,14 @@ def with_color_support(func: F) -> F:
             raise typer.Exit(1) from None
 
     # Dynamically add output_mode parameter if missing
+    wrapper_with_params = cast(F, wrapper)
     if not has_output_mode:
-        wrapper = add_output_mode_parameter(wrapper)
+        wrapper_with_params = add_output_mode_parameter(wrapper_with_params)
 
-    return wrapper
+    return wrapper_with_params
 
 
-def add_output_mode_parameter(func: Callable) -> Callable:
+def add_output_mode_parameter(func: F) -> F:
     """Dynamically add --output-mode parameter to a function."""
     # Get existing signature
     sig = inspect.signature(func)
@@ -112,7 +113,7 @@ def add_output_mode_parameter(func: Callable) -> Callable:
 
     # Create new signature
     new_sig = sig.replace(parameters=params)
-    func.__signature__ = new_sig
+    func.__signature__ = new_sig  # type: ignore[attr-defined]
 
     return func
 
@@ -137,7 +138,7 @@ class LegacyConsoleWrapper:
         self.ctx = ctx
         self._console = ctx.console
 
-    def print(self, *args, **kwargs):
+    def print(self, *args: Any, **kwargs: Any) -> None:
         """Smart print that detects and converts hardcoded colors."""
         if args:
             text = str(args[0])

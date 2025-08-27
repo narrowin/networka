@@ -22,6 +22,7 @@ from network_toolkit.device_transfers import calculate_file_checksum, verify_fil
 from network_toolkit.exceptions import (
     DeviceConnectionError,
     DeviceExecutionError,
+    FileTransferError,
 )
 from network_toolkit.platforms.mikrotik_routeros.confirmation_patterns import (
     MIKROTIK_PACKAGE_DOWNGRADE,
@@ -421,6 +422,9 @@ class DeviceSession:
 
             # Create SFTP client
             sftp = paramiko.SFTPClient.from_transport(transport)
+            if sftp is None:
+                msg = "Failed to create SFTP client"
+                raise FileTransferError(msg)
 
             # Upload the file to root directory
             remote_path = f"/{remote_filename}"
@@ -1506,6 +1510,9 @@ class DeviceSession:
 
             # Create SFTP client
             sftp = paramiko.SFTPClient.from_transport(transport)
+            if sftp is None:
+                msg = "Failed to create SFTP client"
+                raise FileTransferError(msg)
 
             # Download the file from root directory
             remote_path = f"/{remote_filename}"
