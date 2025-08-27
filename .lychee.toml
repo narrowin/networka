@@ -13,6 +13,7 @@ timeout = 20
 exclude = [
   "https://github.com/.+?/actions",
   "https://github.com/narrowin/networka/actions",
+  "https://narrowin.github.io/networka/.*",
 ]
 
 # Inputs can be passed via CLI args, but keep defaults sane here too

@@ -181,8 +181,24 @@ tasks:
   docs:serve:
     desc: Serve documentation locally with live reload
     cmds:
-      - echo "Serving documentation on http://127.0.0.1:8000 ..."
-      - uv run mkdocs serve -a 127.0.0.1:8000
+      - echo "Serving documentation on http://0.0.0.0:8000 ..."
+      - uv run mkdocs serve -a 0.0.0.0:8000
+
+  docs:check-links:
+    desc: Check documentation links locally (requires docs server to be running)
+    cmds:
+      - echo "Checking links with lychee via Docker..."
+      - docker run --rm --network host -v "$(pwd):/input:ro" lycheeverse/lychee:latest --config /input/.lychee.toml "/input/**/*.md"
+
+  docs:test:
+    desc: Build docs and check links
+    cmds:
+      - task: docs
+      - echo "Starting docs server in background..."
+      - nohup uv run mkdocs serve -a 0.0.0.0:8000 > /dev/null 2>&1 &
+      - sleep 3
+      - task: docs:check-links
+      - pkill -f "mkdocs serve" || true
 
   release:dry:
     desc: Test release script in dry-run mode
