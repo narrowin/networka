@@ -105,7 +105,117 @@ def run(config: str | Path = "config") -> None:
             await self._controller.on_input_changed(event)
 
         async def action_confirm(self) -> None:
-            await self._controller.action_confirm()
+            out_log = self.query_one("#output-log")
+            if hasattr(out_log, "clear"):
+                out_log.clear()
+            # reset buffered output lines for fresh run
+            try:
+                self._output_lines = []
+            except Exception:
+                pass
+            # reset summary and any previous errors
+            self._errors = []
+            self._meta = []
+            start_ts: float | None = None
+            try:
+                self.query_one("#run-summary").update("")
+                self._hide_summary_panel()
+                self._hide_output_panel()
+            except Exception:
+                pass
+            self._add_meta("Starting run...")
+            # Temporarily silence library logging to avoid background metadata
+            logging.disable(logging.CRITICAL)
+            try:
+                # Mark run active and disable inputs & run button to avoid focus capture
+                self._run_active = True
+                self._set_inputs_enabled(False)
+                self._set_run_enabled(False)
+                start_ts = time.monotonic()
+                self._collect_state()
+                devices = await asyncio.to_thread(
+                    service.resolve_devices, state.devices, state.groups
+                )
+                if not devices:
+                    self._render_summary("No devices selected.")
+                    try:
+                        msg = "Status: idle — No devices selected."
+                        self.query_one("#run-status").update(msg)
+                        self._refresh_bottom_visibility()
+                    except Exception:
+                        pass
+                    return
+                plan = service.build_plan(devices, state.sequences, state.command_text)
+                if not plan:
+                    self._render_summary("No sequences or commands provided.")
+                    try:
+                        msg = "Status: idle — No sequences or commands provided."
+                        self.query_one("#run-status").update(msg)
+                        self._refresh_bottom_visibility()
+                    except Exception:
+                        pass
+                    return
+                # Update status and run with streaming
+                total = len(plan)
+                try:
+                    self._show_bottom_panel()
+                    self.query_one("#run-status").update(f"Status: running 0/{total}")
+                except Exception:
+                    pass
+                summary_result = await service.run_plan(
+                    plan,
+                    RunCallbacks(
+                        on_output=lambda m: self.call_from_thread(
+                            self._output_append, m
+                        ),
+                        on_error=lambda m: self.call_from_thread(self._add_error, m),
+                        on_meta=lambda m: self.call_from_thread(self._add_meta, m),
+                    ),
+                )
+                # Update summary panel (include errors if any)
+                try:
+                    elapsed = time.monotonic() - start_ts
+                    summary_with_time = (
+                        f"{summary_result.human_summary()} (duration: {elapsed:.2f}s)"
+                    )
+                    self._render_summary(summary_with_time)
+                    # Reflect summary on the status line; hint about errors if present
+                    err_count = 0
+                    try:
+                        err_count = len(getattr(self, "_errors", []) or [])
+                    except Exception:
+                        err_count = 0
+                    status_msg = f"Status: idle — {summary_with_time}"
+                    if err_count:
+                        status_msg += " — errors available (press s)"
+                    self.query_one("#run-status").update(status_msg)
+                    self._refresh_bottom_visibility()
+                except Exception:
+                    pass
+            except Exception as e:
+                try:
+                    elapsed = (
+                        (time.monotonic() - start_ts) if (start_ts is not None) else 0.0
+                    )
+                except Exception:
+                    elapsed = 0.0
+                self._render_summary(f"Run failed: {e} (after {elapsed:.2f}s)")
+                try:
+                    self.query_one("#run-status").update(
+                        f"Status: idle — Run failed: {e}"
+                    )
+                    self._refresh_bottom_visibility()
+                except Exception:
+                    pass
+            finally:
+                logging.disable(logging.NOTSET)
+                # Re-enable controls after run
+                try:
+                    self._run_active = False
+                    self._set_inputs_enabled(True)
+                    self._set_run_enabled(True)
+                except Exception:
+                    pass
 
         async def on_input_submitted(self, event: Any) -> None:  # Textual Input submit
             await self._controller.on_input_submitted(event)

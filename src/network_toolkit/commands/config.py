@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, cast
 
 import typer
 
@@ -18,7 +19,7 @@ from network_toolkit.common.output import (
     get_output_manager_with_config,
     set_output_mode,
 )
-from network_toolkit.common.paths import default_config_root
+from network_toolkit.common.paths import default_config_root, default_modular_config_dir
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import (
     ConfigurationError,
@@ -27,6 +28,132 @@ from network_toolkit.exceptions import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _discover_config_metadata(original: Path) -> dict[str, object]:
+    """Discover where config was loaded from and which files are involved.
+
+    Mirrors the resolution logic in `load_config` to report:
+    - mode: "modular" or "legacy"
+    - root: Path of the modular root directory or the legacy file path
+    - files: list[Path] of relevant files that were validated
+    - display_name: user-facing name for the target (keep "config" when used)
+    """
+    # Keep the provided token for display (we want to show just "config" when used)
+    display_name = str(original)
+    path = Path(original)
+
+    # Helper: collect existing files under a directory with a stable, readable order
+    def collect_modular_files(root: Path) -> list[Path]:
+        files: list[Path] = []
+        for name in ("config.yml", "devices.yml", "groups.yml", "sequences.yml"):
+            p = root / name
+            if p.exists():
+                files.append(p)
+        # Include nested directories if present
+        for sub in ("devices", "groups", "sequences"):
+            d = root / sub
+            if d.exists() and d.is_dir():
+                # Collect YAML & CSV fragments, sorted for stable output
+                for ext in ("*.yml", "*.yaml", "*.csv"):
+                    files.extend(sorted(d.rglob(ext)))
+        return files
+
+    # Resolution logic (aligned with config.load_config)
+    # 1) Explicit "config" directory
+    if path.name in ["config", "config/"] and path.exists():
+        root = path
+        return {
+            "mode": "modular",
+            "root": root.resolve(),
+            "files": collect_modular_files(root),
+            "display_name": display_name,
+        }
+
+    # 2) Directory input with direct modular files
+    if path.exists() and path.is_dir():
+        direct_cfg = path / "config.yml"
+        direct_dev = path / "devices.yml"
+        if direct_cfg.exists() and direct_dev.exists():
+            root = path
+            return {
+                "mode": "modular",
+                "root": root.resolve(),
+                "files": collect_modular_files(root),
+                "display_name": display_name,
+            }
+        # Nested config directory next to provided path
+        cfg_dir = path / "config"
+        if cfg_dir.exists():
+            root = cfg_dir
+            return {
+                "mode": "modular",
+                "root": root.resolve(),
+                "files": collect_modular_files(root),
+                "display_name": display_name,
+            }
+
+    # 3) Legacy file directly
+    if path.exists() and path.is_file():
+        return {
+            "mode": "legacy",
+            "root": path.resolve(),
+            "files": [path.resolve()],
+            "display_name": display_name,
+        }
+
+    # 4) Fallbacks for default names (platform/user cwd)
+    if str(path) in ["config", "devices.yml"]:
+        # Prefer platform default modular directory
+        platform_default = default_modular_config_dir()
+        cfg_yaml = platform_default / "config.yml"
+        if cfg_yaml.exists():
+            root = platform_default
+            return {
+                "mode": "modular",
+                "root": root.resolve(),
+                "files": collect_modular_files(root),
+                "display_name": display_name,
+            }
+
+        # Current working directory fallbacks
+        cwd_cfg_yaml = Path("config/config.yml")
+        if cwd_cfg_yaml.exists():
+            root = cwd_cfg_yaml.parent
+            return {
+                "mode": "modular",
+                "root": root.resolve(),
+                "files": collect_modular_files(root),
+                "display_name": display_name,
+            }
+
+        cwd_legacy = Path("devices.yml")
+        if cwd_legacy.exists():
+            return {
+                "mode": "legacy",
+                "root": cwd_legacy.resolve(),
+                "files": [cwd_legacy.resolve()],
+                "display_name": display_name,
+            }
+
+    # 5) Final attempt similar to load_config last check
+    platform_default = default_modular_config_dir()
+    if (platform_default / "config.yml").exists():
+        root = platform_default
+        return {
+            "mode": "modular",
+            "root": root.resolve(),
+            "files": collect_modular_files(root),
+            "display_name": display_name,
+        }
+
+    # Unknown — return best-effort with the original path
+    return {
+        "mode": "unknown",
+        "root": path.resolve(),
+        "files": [],
+        "display_name": display_name,
+    }
 
 
 def create_env_file(target_dir: Path) -> None:
@@ -168,13 +295,18 @@ def _find_git_executable() -> str:
 
 
 def _detect_repo_root() -> Path | None:
-    """Detect the repository root directory."""
+    """Detect the repository root directory (development mode only)."""
+    # Look for a .git folder upwards as a strong signal
     here = Path(__file__).resolve()
-    parts = list(here.parents)
-    if len(parts) >= 4:
-        candidate = parts[3]
-        if (candidate / "shell_completion").exists():
-            return candidate
+    for parent in [here, *here.parents]:
+        if (parent / ".git").exists() and (parent / "shell_completion").exists():
+            return parent
+    # Fallback to pyproject presence
+    for parent in [here, *here.parents]:
+        if (parent / "pyproject.toml").exists() and (
+            parent / "shell_completion"
+        ).exists():
+            return parent
     return None
 
 
@@ -190,39 +322,63 @@ def detect_shell(shell: str | None = None) -> str | None:
 
 
 def install_shell_completions(selected: str) -> tuple[Path | None, Path | None]:
-    """Install shell completion scripts."""
+    """Install shell completion scripts.
+
+    Tries packaged resources first, then falls back to repo-root files in dev.
+    """
     if selected not in {"bash", "zsh"}:
         msg = "Only bash and zsh shells are supported for completion installation"
         raise ConfigurationError(msg)
 
+    # Only install completions when running in a repo/dev context.
+    # Tests expect a no-op when repo root isn't detected.
     repo_root = _detect_repo_root()
     if not repo_root:
-        logger.warning("Completion scripts not found; skipping")
         return (None, None)
 
+    # Try packaged resources under network_toolkit.shell_completion first
+    pkg_src: Path | None = None
+    try:
+        import importlib.resources as ir
+
+        if selected == "bash":
+            with ir.path(
+                "network_toolkit.shell_completion", "bash_completion_nw.sh"
+            ) as p:
+                pkg_src = p if p.exists() else None
+        else:
+            with ir.path(
+                "network_toolkit.shell_completion", "zsh_completion_nw.zsh"
+            ) as p:
+                pkg_src = p if p.exists() else None
+    except Exception:  # pragma: no cover - safety
+        pkg_src = None
+
+    # Fallback to repo-root scripts
+    repo_src: Path | None = None
     sc_dir = repo_root / "shell_completion"
-    if not sc_dir.exists():
-        logger.warning(f"Shell completion directory not found: {sc_dir}")
+    if selected == "bash":
+        cand = sc_dir / "bash_completion_nw.sh"
+    else:
+        cand = sc_dir / "zsh_completion_netkit.zsh"
+    if cand.exists():
+        repo_src = cand
+
+    if not pkg_src and not repo_src:
+        logger.warning("Completion scripts not found in repo; skipping")
         return (None, None)
 
     try:
-        import shutil
-
         home = Path.home()
+        # Pick packaged source first, otherwise repo source
+        src = pkg_src or repo_src
+        assert src is not None  # for type checkers
         if selected == "bash":
-            src = sc_dir / "bash_completion_nw.sh"
-            if not src.exists():
-                logger.warning(f"Bash completion script not found: {src}")
-                return (None, None)
             dest = home / ".local" / "share" / "bash-completion" / "completions" / "nw"
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dest)
             return (dest, home / ".bashrc")
         else:  # zsh
-            src = sc_dir / "zsh_completion_netkit.zsh"
-            if not src.exists():
-                logger.warning(f"Zsh completion script not found: {src}")
-                return (None, None)
             dest = home / ".zsh" / "completions" / "_nw"
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dest)
@@ -458,7 +614,7 @@ def _config_init_impl(
             ctx.output_manager.print_text(
                 "\nWhere should Networka store its configuration?"
             )
-            ctx.output_manager.print_text(f"[dim]Default: {default_path}[/dim]")
+            ctx.print_detail_line("Default", str(default_path))
             user_input = typer.prompt("Location", default=str(default_path))
             target_path = Path(user_input).expanduser().resolve()
 
@@ -632,7 +788,23 @@ def _config_validate_impl(
             # Use config-based output mode
             output_manager = get_output_manager_with_config(config.general.output_mode)
 
-        output_manager.print_info(f"Validating Configuration: {config_file}")
+        # Discover and display where the config was resolved from
+        meta = _discover_config_metadata(config_file)
+        display_name = str(meta.get("display_name", str(config_file)))
+        resolved_root = meta.get("root")
+        files = meta.get("files")
+        mode = meta.get("mode")
+
+        output_manager.print_info(f"Validating Configuration: {display_name}")
+        if isinstance(resolved_root, Path):
+            output_manager.print_info(f"Path: {resolved_root}")
+        if isinstance(mode, str) and mode in {"modular", "legacy"}:
+            output_manager.print_info(f"Mode: {mode}")
+        if isinstance(files, list) and files:
+            output_manager.print_info("Files:")
+            files_typed = cast(list[Path], files)
+            for f in files_typed:
+                output_manager.print_info(f"  - {f}")
         output_manager.print_blank_line()
 
         output_manager.print_success("Configuration is valid!")

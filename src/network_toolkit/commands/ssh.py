@@ -28,9 +28,6 @@ from typing import Annotated, Any
 # Third-party imports
 import typer
 
-# For test compatibility
-from rich.console import Console
-
 # Local application imports
 from network_toolkit.commands.ssh_fallback import open_sequential_ssh_sessions
 from network_toolkit.commands.ssh_platform import get_platform_capabilities
@@ -46,8 +43,6 @@ from network_toolkit.ip_device import (
     get_supported_platforms,
     is_ip_list,
 )
-
-console = Console()
 
 app_help = (
     "Open tmux with SSH panes for a device or group.\n\n"
@@ -359,6 +354,13 @@ def register(app: typer.Typer) -> None:
         - nw ssh sw-acc1,access_switches
         """
 
+        setup_logging("DEBUG" if verbose else "INFO")
+
+        # Create command context for centralized output management
+        ctx = CommandContext(
+            output_mode=OutputMode.DEFAULT, verbose=verbose, config_file=config_file
+        )
+
         # Validate transport type if provided
         if transport_type is not None:
             from network_toolkit.transport.factory import get_transport_factory
@@ -367,18 +369,8 @@ def register(app: typer.Typer) -> None:
                 # This will raise ValueError if transport_type is invalid
                 get_transport_factory(transport_type)
             except ValueError as e:
-                # Use module-level console before style_manager is created
-                from rich.console import Console
-
-                Console().print(f"[red]Error:[/red] {e}")
+                ctx.print_error(str(e))
                 raise typer.Exit(1) from e
-
-        setup_logging("DEBUG" if verbose else "INFO")
-
-        # Create command context for centralized output management
-        ctx = CommandContext(
-            output_mode=OutputMode.DEFAULT, verbose=verbose, config_file=config_file
-        )
 
         try:
             libtmux = _ensure_libtmux()
@@ -533,9 +525,9 @@ def register(app: typer.Typer) -> None:
         except Exception as exc:
             ctx.console.log(f"Could not enable mouse: {exc}")
 
-        print("Created tmux session")
-        print(f"Session: {sname} with {len(device_cmds)} pane(s).")
-        print("Use tmux to navigate. Press Ctrl-b d to detach.")
+        ctx.print_success("Created tmux session")
+        ctx.print_info(f"Session: {sname} with {len(device_cmds)} pane(s).")
+        ctx.print_info("Use tmux to navigate. Press Ctrl-b d to detach.")
 
         if attach:
             # Use libtmux to attach directly instead of subprocess

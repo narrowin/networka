@@ -157,9 +157,9 @@ class TestCommandLineUnsupportedOperations:
         for platform in cisco_platforms:
             for operation in unsupported_operations:
                 is_supported, error_msg = check_operation_support(platform, operation)
-                assert not is_supported, (
-                    f"{operation} should not be supported on {platform}"
-                )
+                assert (
+                    not is_supported
+                ), f"{operation} should not be supported on {platform}"
                 assert operation in error_msg
 
                 # Check that the platform name appears correctly in the error message

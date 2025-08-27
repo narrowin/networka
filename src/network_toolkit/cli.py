@@ -31,6 +31,7 @@ from network_toolkit.commands.ssh import register as register_ssh
 from network_toolkit.commands.upload import register as register_upload
 from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import get_output_manager
+from network_toolkit.config import NetworkConfig
 
 
 class _DynamicConsoleProxy:
@@ -108,7 +109,8 @@ class CategorizedHelpGroup(TyperGroup):
 # Typer application instance
 help_text = (
     "\n    Networka (nw)\n\n"
-    "    A powerful multi-vendor CLI tool for automating network devices based on ssh protocol.\n"
+    "    A powerful multi-vendor CLI tool for automating network devices based "
+    "on ssh protocol.\n"
     "    Built with async/await support and type safety in mind.\n\n"
     "    QUICK START:\n"
     "      nw run sw-acc1 '/system/clock/print'  # Execute command\n"
@@ -139,12 +141,18 @@ def main(
 ) -> None:
     """Configure global settings for the network toolkit."""
     if version:
-        console.print(f"Networka (nw) version {__version__}")
+        from network_toolkit.common.command_helpers import CommandContext
+
+        cmd_ctx = CommandContext()
+        cmd_ctx.print_info(f"Networka (nw) version {__version__}")
         raise typer.Exit()
 
     # If no command is invoked and no version flag, show help
     if ctx.invoked_subcommand is None:
-        console.print(ctx.get_help())
+        from network_toolkit.common.command_helpers import CommandContext
+
+        cmd_ctx = CommandContext()
+        cmd_ctx.output_manager.print_text(ctx.get_help())
         raise typer.Exit()
 
 
@@ -153,53 +161,37 @@ DeviceSession = _DeviceSession
 
 
 def _handle_file_downloads(
-    *,
-    session: Any,
+    session: DeviceSession,
+    config: NetworkConfig,
     device_name: str,
-    download_files: list[dict[str, Any]] | list[dict[str, str | bool]],
-    config: Any,
+    download_files: list[dict[str, Any]],
 ) -> dict[str, str]:
-    """Handle one or more file downloads using an existing device session.
+    """Handle file downloads from a device session using centralized output.
 
-    Parameters
-    ----------
-    session : DeviceSession-like
-        An active device session exposing `download_file`.
-    device_name : str
-        Name of the device (used for placeholder replacement and messages).
-    download_files : list[dict[str, Any]]
-        List of download specs. Each item may contain:
-        - remote_file (required)
-        - local_path (optional; defaults to config.general.backup_dir)
-        - local_filename (optional; defaults to remote_file)
-        - delete_remote (optional; bool)
-    config : NetworkConfig-like
-        Configuration object providing at least `general.backup_dir`.
-
-    Returns
-    -------
-    dict[str, str]
-        Mapping of remote_file -> result message.
+    Returns:
+        Dict mapping remote_file names to download status messages.
     """
+    from network_toolkit.common.command_helpers import CommandContext
+
+    # Create a context for centralized output
+    ctx = CommandContext()
 
     results: dict[str, str] = {}
 
-    if not download_files:
-        return results
-
-    # Helper for placeholder replacement
-    today = datetime.datetime.now(datetime.UTC).date().isoformat()
-
-    def replace_placeholders(value: str) -> str:
-        return value.replace("{date}", today).replace("{device}", device_name)
+    def replace_placeholders(text: str) -> str:
+        now = datetime.datetime.now(datetime.UTC)
+        return (
+            text.replace("{date}", now.strftime("%Y%m%d"))
+            .replace("{time}", now.strftime("%H%M%S"))
+            .replace("{datetime}", now.strftime("%Y%m%d_%H%M%S"))
+            .replace("{device}", device_name)
+        )
 
     def to_bool(val: Any) -> bool:
         if isinstance(val, bool):
             return val
         if isinstance(val, str):
-            return val.strip().lower() in {"1", "true", "yes", "y", "on"}
-        if isinstance(val, int):
-            return val != 0
+            return val.lower() in ("true", "yes", "1", "on")
         return bool(val)
 
     default_dir = getattr(getattr(config, "general", object()), "backup_dir", ".")
@@ -219,8 +211,8 @@ def _handle_file_downloads(
         filename = replace_placeholders(local_filename_str)
         destination = local_dir / filename
 
-        # Keep console.print here for backward-compatible tests expecting direct console output
-        console.print(f"[cyan]Downloading {remote_file} from {device_name}...[/cyan]")
+        # Use centralized output system
+        ctx.output_manager.print_downloading(device_name, remote_file)
 
         try:
             success = session.download_file(
@@ -229,15 +221,15 @@ def _handle_file_downloads(
                 delete_remote=delete_remote,
             )
             if success:
-                console.print(
-                    f"[green]OK Downloaded {remote_file} to {destination}[/green]"
+                ctx.output_manager.print_success(
+                    f"Downloaded {remote_file} to {destination}"
                 )
                 results[remote_file] = f"Downloaded to {destination}"
             else:
-                console.print(f"[red]FAIL Failed to download {remote_file}[/red]")
+                ctx.output_manager.print_error(f"Failed to download {remote_file}")
                 results[remote_file] = "Download failed"
         except Exception as e:  # DeviceExecutionError or unexpected
-            console.print(f"[red]FAIL Error downloading {remote_file}: {e}[/red]")
+            ctx.output_manager.print_error(f"Error downloading {remote_file}: {e}")
             results[remote_file] = f"Download error: {e}"
 
     return results

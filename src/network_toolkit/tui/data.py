@@ -74,7 +74,7 @@ class TuiData:
         self._config = cfg
         self._seq_mgr = SequenceManager(cfg)
 
-    def _resolve_fallback_config_path(self, original: Path) -> Path | None:
+    def _resolve_fallback_config_path(self, _original: Path) -> Path | None:
         """Best-effort fallback discovery for config directory.
 
         Attempts the following in order:

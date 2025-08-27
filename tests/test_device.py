@@ -159,7 +159,8 @@ class TestContextManager:
 
         with pytest.raises(ValueError):
             with DeviceSession("test_device1", sample_config):
-                raise ValueError("Test exception")
+                test_message = "Test exception"
+                raise ValueError(test_message)
 
         # Should still call close
         mock_driver.close.assert_called_once()

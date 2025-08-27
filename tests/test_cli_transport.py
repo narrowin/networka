@@ -18,7 +18,7 @@ class TestCLITransportConfiguration:
         # Mock the actual execution to avoid real network operations
         with (
             patch("network_toolkit.commands.run.load_config") as mock_load_config,
-            patch("network_toolkit.commands.run.SequenceManager") as mock_sm,
+            patch("network_toolkit.commands.run.SequenceManager"),
             patch(
                 "network_toolkit.commands.run.create_ip_based_config"
             ) as mock_create_ip,
@@ -58,7 +58,7 @@ class TestCLITransportConfiguration:
         # Mock the actual execution to avoid real network operations
         with (
             patch("network_toolkit.commands.ssh.load_config") as mock_load_config,
-            patch("network_toolkit.commands.ssh.DeviceResolver") as mock_resolver,
+            patch("network_toolkit.commands.ssh.DeviceResolver"),
             patch(
                 "network_toolkit.commands.ssh.create_ip_based_config"
             ) as mock_create_ip,
@@ -98,9 +98,9 @@ class TestCLITransportConfiguration:
         assert "Transport Types" in output or "Available Transport Types" in output
         assert "scrapli" in output
 
-        # Should show device types
-        assert "mikrotik_routeros" in output
+        # Should show device types in supported platforms
         assert "cisco_ios" in output
+        assert "cisco_nxos" in output
 
         # Should show transport support information
         assert "Transport Support" in output or "scrapli" in output

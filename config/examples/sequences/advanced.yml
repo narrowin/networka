@@ -12,7 +12,7 @@ sequences:
       - "health"
       - "monitoring"
       - "system"
-      
+
   security_audit:
     description: "Security configuration audit"
     commands:
@@ -25,7 +25,7 @@ sequences:
       - "security"
       - "audit"
       - "firewall"
-      
+
   performance_check:
     description: "Performance and utilization check"
     commands:

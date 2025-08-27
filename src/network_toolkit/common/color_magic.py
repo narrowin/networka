@@ -6,7 +6,6 @@ from __future__ import annotations
 import functools
 import inspect
 from collections.abc import Callable
-from pathlib import Path
 from typing import Annotated, Any, TypeVar
 
 import typer

@@ -9,8 +9,8 @@ from typing import Any
 
 from rich.console import Console
 
-from network_toolkit.common.styles import StyleManager, StyleName
 from network_toolkit.common.output import OutputMode
+from network_toolkit.common.styles import StyleManager, StyleName
 
 
 def format_error_message(
