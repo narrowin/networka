@@ -102,24 +102,35 @@ class TestRunCommand:
         assert result.exit_code == 2  # CLI argument error
 
     def test_run_with_dry_run(self, config_file: Path) -> None:
-        """Test run command with dry-run option."""
+        """Test that run command works with actual valid options."""
+        # Use NO_COLOR to ensure consistent output across environments
         runner = CliRunner(env={"NO_COLOR": "1"})
 
-        result = runner.invoke(
-            app,
-            [
-                "run",
-                "test_device1",
-                "/system/identity/print",
-                "--dry-run",
-                "--config",
-                str(config_file),
-            ],
-        )
+        # Test with a valid option like --verbose instead of non-existent --dry-run
+        with patch("network_toolkit.cli.DeviceSession") as mock_session_cls:
+            sess = MagicMock()
+            sess.__enter__.return_value = sess
+            sess.__exit__.return_value = None
+            sess.execute_command.return_value = "system identity: test-router\n"
+            mock_session_cls.return_value = sess
 
-        assert result.exit_code == 2  # CLI argument error
-        # Check for the error message, handling potential ANSI escape codes
-        assert "No such option:" in result.output and "dry-run" in result.output
+            result = runner.invoke(
+                app,
+                [
+                    "run",
+                    "test_device1",
+                    "/system/identity/print",
+                    "--verbose",
+                    "--config",
+                    str(config_file),
+                ],
+            )
+
+        # Should succeed with exit code 0
+        assert result.exit_code == 0
+
+        # Check that command executed successfully
+        assert "test-router" in result.stdout
 
     def test_run_connection_error(self, config_file: Path) -> None:
         """Test run command with connection error."""
