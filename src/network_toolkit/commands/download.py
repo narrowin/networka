@@ -178,12 +178,8 @@ def register(app: typer.Typer) -> None:
 
             total = len(members)
             ctx.print_info("Group Download Results:")
-            ctx.output_manager.print_text(
-                f"[success]  Successful: {successes}/{total}[/success]"
-            )
-            ctx.output_manager.print_text(
-                f"[error]  Failed: {total - successes}/{total}[/error]"
-            )
+            ctx.print_success(f"  Successful: {successes}/{total}")
+            ctx.print_error(f"  Failed: {total - successes}/{total}")
 
             if successes < total:
                 raise typer.Exit(1)

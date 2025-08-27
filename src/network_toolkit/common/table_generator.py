@@ -75,7 +75,7 @@ class TableGenerator:
             raw_output = provider.get_raw_output()
             if raw_output:
                 # Provider has custom raw output
-                print(raw_output, end="")
+                self.output_manager.print_output(raw_output.rstrip())
             else:
                 # Generate default raw output
                 self._print_default_raw(provider)
@@ -144,7 +144,7 @@ class TableGenerator:
                 # Escape spaces and special chars in values
                 clean_value = str(value).replace(" ", "_").replace(",", ";")
                 values.append(f"{key}={clean_value}")
-            print(" ".join(values))
+            self.output_manager.print_output(" ".join(values))
 
 
 class BaseTableProvider(ABC):

@@ -70,7 +70,10 @@ class OutputManager:
         elif self.mode == OutputMode.RAW:
             sys.stdout.write(f"device={device} {message}\n")
         else:
-            self._console.print(f"[device]{device}[/device]: {message}")
+            device_part = self._style_manager.format_message(
+                device, self._style_name.DEVICE
+            )
+            self._console.print(f"{device_part}: {message}")
 
     def print_command_output(self, device: str, command: str, output: str) -> None:
         """Print command output with appropriate formatting."""
@@ -115,9 +118,14 @@ class OutputManager:
             else:
                 sys.stdout.write(f"success: {message}\n")
         elif context:
-            self._console.print(f"[success]OK[/success] [{context}] {message}")
+            ok_part = self._style_manager.format_message("OK", self._style_name.SUCCESS)
+            context_part = self._style_manager.format_message(
+                context, self._style_name.DEVICE
+            )
+            self._console.print(f"{ok_part} [{context_part}] {message}")
         else:
-            self._console.print(f"[success]OK[/success] {message}")
+            ok_part = self._style_manager.format_message("OK", self._style_name.SUCCESS)
+            self._console.print(f"{ok_part} {message}")
 
     def print_error(self, message: str, context: str | None = None) -> None:
         """Print an error message."""
@@ -132,9 +140,18 @@ class OutputManager:
             else:
                 sys.stdout.write(f"error: {message}\n")
         elif context:
-            self._console.print(f"[error]FAIL[/error] [{context}] {message}")
+            fail_part = self._style_manager.format_message(
+                "FAIL", self._style_name.ERROR
+            )
+            context_part = self._style_manager.format_message(
+                context, self._style_name.DEVICE
+            )
+            self._console.print(f"{fail_part} [{context_part}] {message}")
         else:
-            self._console.print(f"[error]FAIL[/error] {message}")
+            fail_part = self._style_manager.format_message(
+                "FAIL", self._style_name.ERROR
+            )
+            self._console.print(f"{fail_part} {message}")
 
     def print_warning(self, message: str, context: str | None = None) -> None:
         """Print a warning message."""
@@ -149,9 +166,18 @@ class OutputManager:
             else:
                 sys.stdout.write(f"warning: {message}\n")
         elif context:
-            self._console.print(f"[warning]WARN[/warning] [{context}] {message}")
+            warn_part = self._style_manager.format_message(
+                "WARN", self._style_name.WARNING
+            )
+            context_part = self._style_manager.format_message(
+                context, self._style_name.DEVICE
+            )
+            self._console.print(f"{warn_part} [{context_part}] {message}")
         else:
-            self._console.print(f"[warning]WARN[/warning] {message}")
+            warn_part = self._style_manager.format_message(
+                "WARN", self._style_name.WARNING
+            )
+            self._console.print(f"{warn_part} {message}")
 
     def print_info(self, message: str, context: str | None = None) -> None:
         """Print an informational message."""
@@ -334,7 +360,10 @@ class OutputManager:
         if self.mode == OutputMode.RAW:
             sys.stdout.write(f"{text}\n")
         else:
-            self._console.print(f"[output]{text}[/output]")
+            styled_text = self._style_manager.format_message(
+                text, self._style_name.OUTPUT
+            )
+            self._console.print(styled_text)
 
     def create_table(
         self, *, title: str = "", show_header: bool = False, box: Any | None = None
@@ -383,14 +412,20 @@ class OutputManager:
         if self.mode == OutputMode.RAW:
             sys.stdout.write(f"transport={transport_type}\n")
         else:
-            self._console.print(f"[transport]Transport:[/transport] {transport_type}")
+            transport_label = self._style_manager.format_message(
+                "Transport:", self._style_name.TRANSPORT
+            )
+            self._console.print(f"{transport_label} {transport_type}")
 
     def print_running_command(self, command: str) -> None:
         """Print information about a running command."""
         if self.mode == OutputMode.RAW:
             sys.stdout.write(f"running={command}\n")
         else:
-            self._console.print(f"[running]Running:[/running] {command}")
+            running_label = self._style_manager.format_message(
+                "Running:", self._style_name.RUNNING
+            )
+            self._console.print(f"{running_label} {command}")
 
     def print_connection_status(self, device: str, connected: bool) -> None:
         """Print connection status."""
@@ -398,25 +433,36 @@ class OutputManager:
             status = "connected" if connected else "failed"
             sys.stdout.write(f"device={device} status={status}\n")
         elif connected:
-            self._console.print(f"[connected]OK Connected to {device}[/connected]")
+            ok_part = self._style_manager.format_message(
+                "OK", self._style_name.CONNECTED
+            )
+            self._console.print(f"{ok_part} Connected to {device}")
         else:
-            self._console.print(f"[failed]FAIL Failed to connect to {device}[/failed]")
+            fail_part = self._style_manager.format_message(
+                "FAIL", self._style_name.FAILED
+            )
+            self._console.print(f"{fail_part} Failed to connect to {device}")
 
     def print_downloading(self, device: str, filename: str) -> None:
         """Print download progress."""
         if self.mode == OutputMode.RAW:
             sys.stdout.write(f"device={device} downloading={filename}\n")
         else:
-            self._console.print(
-                f"[downloading]Downloading {filename} from {device}...[/downloading]"
+            message = f"Downloading {filename} from {device}..."
+            styled_message = self._style_manager.format_message(
+                message, self._style_name.DOWNLOADING
             )
+            self._console.print(styled_message)
 
     def print_credential_info(self, message: str) -> None:
         """Print credential-related information."""
         if self.mode == OutputMode.RAW:
             sys.stdout.write(f"credential: {message}\n")
         else:
-            self._console.print(f"[credential]{message}[/credential]")
+            styled_message = self._style_manager.format_message(
+                message, self._style_name.CREDENTIAL
+            )
+            self._console.print(styled_message)
 
     def print_unknown_warning(self, unknowns: list[str]) -> None:
         """Print warning about unknown targets."""
@@ -424,9 +470,11 @@ class OutputManager:
         if self.mode == OutputMode.RAW:
             sys.stdout.write(f"warning: unknown targets: {unknowns_str}\n")
         else:
-            self._console.print(
-                f"[unknown]Warning: Unknown targets: {unknowns_str}[/unknown]"
+            message = f"Warning: Unknown targets: {unknowns_str}"
+            styled_message = self._style_manager.format_message(
+                message, self._style_name.UNKNOWN
             )
+            self._console.print(styled_message)
 
 
 def get_output_mode_from_env() -> OutputMode:
