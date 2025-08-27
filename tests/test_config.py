@@ -6,9 +6,7 @@
 from __future__ import annotations
 
 import os
-import tempfile
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 import yaml
@@ -1459,9 +1457,9 @@ class TestGroupCredentials:
         """Test getting group credentials from environment variables."""
         # Set up test environment variables
         os.environ["NW_USER_PRODUCTION"] = "env_prod_user"
-        os.environ[
-            "NW_PASSWORD_PRODUCTION"
-        ] = "env_prod_pass"  # pragma: allowlist secret
+        os.environ["NW_PASSWORD_PRODUCTION"] = (
+            "env_prod_pass"  # pragma: allowlist secret
+        )
 
         try:
             config_data = {
@@ -1574,9 +1572,9 @@ class TestGroupCredentials:
         os.environ["NW_USER_DEFAULT"] = "default_user"
         os.environ["NW_PASSWORD_DEFAULT"] = "default_pass"  # pragma: allowlist secret
         os.environ["NW_USER_DEVICE1"] = "env_device_user"
-        os.environ[
-            "NW_PASSWORD_DEVICE1"
-        ] = "env_device_pass"  # pragma: allowlist secret
+        os.environ["NW_PASSWORD_DEVICE1"] = (
+            "env_device_pass"  # pragma: allowlist secret
+        )
 
         try:
             config_data = {

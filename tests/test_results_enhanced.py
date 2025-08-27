@@ -1,12 +1,7 @@
 """Tests for results_enhanced module."""
 
-import json
-import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, mock_open, patch
-
-import pytest
-import yaml
 
 from network_toolkit.results_enhanced import ResultsManager
 

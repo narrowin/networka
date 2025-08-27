@@ -13,7 +13,6 @@ from network_toolkit.device import DeviceSession
 from network_toolkit.exceptions import (
     DeviceConnectionError,
     DeviceExecutionError,
-    NetworkToolkitError,
 )
 from network_toolkit.transport import ScrapliSyncTransport
 

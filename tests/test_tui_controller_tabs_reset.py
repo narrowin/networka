@@ -65,16 +65,16 @@ class _FakeApp:
     def _reset_output_tabs(self) -> None:
         self.reset_calls += 1
 
-    def _collect_state(self) -> None:  # noqa: D401
+    def _collect_state(self) -> None:
         pass
 
     def _dispatch_ui(self, fn: Any, *args: Any, **kwargs: Any) -> None:
         fn(*args, **kwargs)
 
-    def _set_inputs_enabled(self, enabled: bool) -> None:  # noqa: ARG002
+    def _set_inputs_enabled(self, enabled: bool) -> None:
         pass
 
-    def _set_run_enabled(self, enabled: bool) -> None:  # noqa: ARG002
+    def _set_run_enabled(self, enabled: bool) -> None:
         pass
 
     def _render_summary(self, base_summary: str | None = None) -> None:

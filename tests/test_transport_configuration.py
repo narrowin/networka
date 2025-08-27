@@ -1,7 +1,5 @@
 """Test transport configuration at all levels."""
 
-import pytest
-
 from network_toolkit.config import DeviceConfig, GeneralConfig, NetworkConfig
 from network_toolkit.ip_device import create_ip_based_config, create_ip_device_config
 

@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: MIT
-"""Simple utility tests for additional coverage."""
+"""Utility tests for code coverage of edge cases and error conditions."""
 
 from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 

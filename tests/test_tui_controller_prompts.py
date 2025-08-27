@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-# ruff: noqa: SLF001
 # pyright: reportPrivateUsage=false, reportAttributeAccessIssue=false
 import asyncio
 from typing import Any

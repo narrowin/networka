@@ -215,17 +215,17 @@ class TestModuleStructure:
         if config_dir.exists():
             # Check main config file
             main_config = config_dir / "config.yml"
-            assert (
-                main_config.exists()
-            ), f"Required config file not found: {main_config}"
+            assert main_config.exists(), (
+                f"Required config file not found: {main_config}"
+            )
 
             # Check that subdirectories exist (they may be empty but should exist)
             subdirs = ["devices", "groups", "sequences", "examples"]
             for subdir in subdirs:
                 subdir_path = config_dir / subdir
-                assert (
-                    subdir_path.exists()
-                ), f"Required config subdirectory not found: {subdir_path}"
+                assert subdir_path.exists(), (
+                    f"Required config subdirectory not found: {subdir_path}"
+                )
             return
 
         # Fall back to legacy config files
@@ -240,7 +240,9 @@ class TestModuleStructure:
                 found_config = True
                 break
 
-        assert found_config, "No example config file found (neither modular config/ nor legacy devices.yml)"
+        assert found_config, (
+            "No example config file found (neither modular config/ nor legacy devices.yml)"
+        )
 
 
 class TestEndToEndWorkflow:

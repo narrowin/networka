@@ -32,13 +32,13 @@ class TestCLIWithRealConfig:
         if Path("config/devices").exists() and any(
             Path("config/devices").glob("*.yml")
         ):
-            assert (
-                "No devices configured" not in result.output
-            ), "Should find devices from config/devices/"
+            assert "No devices configured" not in result.output, (
+                "Should find devices from config/devices/"
+            )
             # Should show actual devices
-            assert (
-                "Device" in result.output or "host" in result.output
-            ), "Should show device information"
+            assert "Device" in result.output or "host" in result.output, (
+                "Should show device information"
+            )
 
     def test_list_sequences_with_config_yml_path(self):
         """Test that 'nw list sequences -c config/config.yml' works."""
@@ -56,9 +56,9 @@ class TestCLIWithRealConfig:
         if Path("config/sequences").exists() and any(
             Path("config/sequences").iterdir()
         ):
-            assert (
-                "No data available" not in result.output
-            ), "Should find sequences from config/sequences/"
+            assert "No data available" not in result.output, (
+                "Should find sequences from config/sequences/"
+            )
             assert "Vendor Sequences" in result.output, "Should show vendor sequences"
 
     def test_list_devices_with_config_directory(self):
@@ -150,24 +150,24 @@ class TestCLIWithRealConfig:
 
         # Test devices
         devices_result = runner.invoke(app, ["list", "devices", "-c", str(config_file)])
-        assert (
-            devices_result.exit_code == 0
-        ), f"Devices CLI failed: {devices_result.output}"
+        assert devices_result.exit_code == 0, (
+            f"Devices CLI failed: {devices_result.output}"
+        )
 
         if device_count > 0:
-            assert (
-                "No devices configured" not in devices_result.output
-            ), "CLI should match config loading"
+            assert "No devices configured" not in devices_result.output, (
+                "CLI should match config loading"
+            )
 
         # Test sequences
         sequences_result = runner.invoke(
             app, ["list", "sequences", "-c", str(config_file)]
         )
-        assert (
-            sequences_result.exit_code == 0
-        ), f"Sequences CLI failed: {sequences_result.output}"
+        assert sequences_result.exit_code == 0, (
+            f"Sequences CLI failed: {sequences_result.output}"
+        )
 
         if sequence_count > 0:
-            assert (
-                "No data available" not in sequences_result.output
-            ), "CLI should match config loading"
+            assert "No data available" not in sequences_result.output, (
+                "CLI should match config loading"
+            )

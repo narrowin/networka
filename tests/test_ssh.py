@@ -89,7 +89,7 @@ class FakeServer:
         name = query.get("session_name", "")
         return self.sessions.get(name)
 
-    def new_session(self, session_name: str, attach: bool = False) -> FakeSession:  # noqa: FBT001, FBT002
+    def new_session(self, session_name: str, attach: bool = False) -> FakeSession:  # noqa: FBT002
         _ = attach
         s = FakeSession(session_name)
         self.sessions[session_name] = s

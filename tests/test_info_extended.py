@@ -107,9 +107,9 @@ class TestInfoExtendedFunctionality:
             "Mikrotik Routeros, Arista Eos" in result.output
             or "Arista Eos, Mikrotik Routeros" in result.output
         )
-        assert (
-            output_contains_vendors
-        ), f"Expected multiple vendors in output: {result.output}"
+        assert output_contains_vendors, (
+            f"Expected multiple vendors in output: {result.output}"
+        )
         assert "Built-in vendor sequences" in result.output
         assert "system" in result.output  # Category
 

@@ -1,11 +1,7 @@
 # SPDX-License-Identifier: MIT
-"""Tests for centralized table generation system."""
+"""Tests for table generation and formatting functionality."""
 
 from __future__ import annotations
-
-from unittest.mock import Mock
-
-import pytest
 
 from network_toolkit.common.table_providers import (
     DeviceListTableProvider,

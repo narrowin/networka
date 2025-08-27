@@ -6,7 +6,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from network_toolkit.exceptions import DeviceConnectionError, DeviceExecutionError
-from network_toolkit.platforms.base import UnsupportedOperationError
 from network_toolkit.platforms.mikrotik_routeros.operations import (
     MikroTikRouterOSOperations,
 )

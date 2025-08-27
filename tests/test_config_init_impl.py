@@ -23,7 +23,7 @@ from network_toolkit.commands.config import (
     install_sequences_from_repo,
     install_shell_completions,
 )
-from network_toolkit.exceptions import ConfigurationError, FileTransferError
+from network_toolkit.exceptions import ConfigurationError
 
 
 class TestConfigInitCore:

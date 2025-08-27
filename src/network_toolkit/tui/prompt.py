@@ -21,16 +21,13 @@ except Exception:  # pragma: no cover - textual not installed
     _ModalScreenBase = object  # type: ignore
 
     class _Button:  # type: ignore
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            ...
+        def __init__(self, *args: Any, **kwargs: Any) -> None: ...
 
     class _Static:  # type: ignore
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            ...
+        def __init__(self, *args: Any, **kwargs: Any) -> None: ...
 
     class _Vertical:  # type: ignore
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            ...
+        def __init__(self, *args: Any, **kwargs: Any) -> None: ...
 
         def __enter__(self) -> _Vertical:
             return self

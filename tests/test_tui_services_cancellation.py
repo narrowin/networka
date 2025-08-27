@@ -27,7 +27,7 @@ async def test_service_respects_pre_start_cancellation(monkeypatch: Any) -> None
         cb: RunCallbacks,
         cancel: CancellationToken | None = None,
     ) -> Any:  # type: ignore[override]
-        return await ExecutionService.run_plan(svc, plan, cb, cancel=cancel)  # noqa: PIE804
+        return await ExecutionService.run_plan(svc, plan, cb, cancel=cancel)
 
     # Use real implementation; cancellation is handled inside run_plan
     result = await svc.run_plan(

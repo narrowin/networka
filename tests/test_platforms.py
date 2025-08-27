@@ -1,6 +1,5 @@
 """Tests for platform abstraction layer."""
 
-from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 

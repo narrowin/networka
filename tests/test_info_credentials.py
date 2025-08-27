@@ -1,7 +1,6 @@
 """Test info command credential source display."""
 
 import os
-import tempfile
 from pathlib import Path
 
 import pytest

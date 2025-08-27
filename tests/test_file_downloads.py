@@ -17,7 +17,6 @@ without requiring actual devices. It tests all edge cases, parameter
 validation, placeholder replacement, and error conditions.
 """
 
-import datetime
 import tempfile
 import unittest
 from pathlib import Path

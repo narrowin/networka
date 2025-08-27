@@ -1,11 +1,9 @@
 # SPDX-License-Identifier: MIT
-"""Tests for centralized table providers system."""
+"""Test table providers for different device types."""
 
 from __future__ import annotations
 
-from unittest.mock import Mock, patch
-
-import pytest
+from unittest.mock import Mock
 
 from network_toolkit.common.table_providers import (
     DeviceInfoTableProvider,

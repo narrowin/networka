@@ -9,12 +9,12 @@ def test_tui_data_loads_from_config_dir() -> None:
     actions = data.actions()
 
     # Basic sanity: our repo has non-empty config/devices, config/groups, and vendor sequences
-    assert (
-        len(targets.devices) > 0
-    ), "Expected devices to be discovered from config/devices/*.yml"
-    assert (
-        len(targets.groups) > 0
-    ), "Expected groups to be discovered from config/groups/*.yml"
-    assert (
-        len(actions.sequences) > 0
-    ), "Expected sequences to be discovered from config/sequences/**/*.yml"
+    assert len(targets.devices) > 0, (
+        "Expected devices to be discovered from config/devices/*.yml"
+    )
+    assert len(targets.groups) > 0, (
+        "Expected groups to be discovered from config/groups/*.yml"
+    )
+    assert len(actions.sequences) > 0, (
+        "Expected sequences to be discovered from config/sequences/**/*.yml"
+    )

@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from concurrent.futures import Future
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, call, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -13,7 +12,6 @@ from network_toolkit.device import DeviceSession
 from network_toolkit.exceptions import (
     DeviceConnectionError,
     DeviceExecutionError,
-    NetworkToolkitError,
 )
 
 

@@ -165,6 +165,6 @@ class TestCommandContextIntegration:
                 # This is a basic check to ensure major cleanup was done
                 count = source.count(pattern)
                 # Allow some minimal usage but flag if there are many instances
-                assert (
-                    count < 5
-                ), f"Module {module.__name__} still has {count} instances of {pattern}"
+                assert count < 5, (
+                    f"Module {module.__name__} still has {count} instances of {pattern}"
+                )

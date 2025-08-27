@@ -1,9 +1,5 @@
 """Tests for enhanced configuration system with CSV support and subdirectory discovery."""
 
-import tempfile
-from pathlib import Path
-from unittest.mock import patch
-
 import pytest
 import yaml
 

@@ -235,8 +235,8 @@ known-first-party = ["network_toolkit"]
 ban-relative-imports = "all"
 
 [tool.ruff.lint.per-file-ignores]
-# Tests can use magic values, assertions, and relative imports
-"tests/**/*" = ["PLR2004", "S101", "TID252", "S105", "S106", "S107"]
+# Tests can use magic values, assertions, and relative imports, and boolean arguments
+"tests/**/*" = ["PLR2004", "S101", "TID252", "S105", "S106", "S107", "FBT001"]
 # CLI commands using Typer often need boolean flags and default arguments
 "src/network_toolkit/commands/**/*" = ["FBT001", "FBT002"]
 "src/network_toolkit/cli.py" = ["FBT002"]
