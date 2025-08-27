@@ -22,11 +22,13 @@ class TestInfoCommandCredentials:
 
         # Create main config.yml file (required for modular config)
         config_file = config_dir / "config.yml"
-        config_file.write_text("""
+        config_file.write_text(
+            """
 general:
   timeout: 30
   port: 22
-""")
+"""
+        )
 
         # Create devices.yml directly in config directory (not in subdirectory)
         devices_file = config_dir / "devices.yml"
@@ -47,7 +49,8 @@ general:
 
         # Create groups config
         groups_config = groups_dir / "groups.yml"
-        groups_config.write_text("""
+        groups_config.write_text(
+            """
 groups:
   test_group:
     description: "Test group"
@@ -55,7 +58,8 @@ groups:
     credentials:
       user: "group_user"
       password: "group_pass"
-""")
+"""
+        )
 
         # Set environment variables
         os.environ["NW_USER_DEFAULT"] = "default_user"
@@ -102,21 +106,25 @@ groups:
 
         # Create main config.yml file (required for modular config)
         config_file = config_dir / "config.yml"
-        config_file.write_text("""
+        config_file.write_text(
+            """
 general:
   timeout: 30
   port: 22
-""")
+"""
+        )
 
         # Create devices.yml directly in config directory (not in subdirectory)
         devices_config = config_dir / "devices.yml"
-        devices_config.write_text("""
+        devices_config.write_text(
+            """
 devices:
   test_device1:
     host: "192.168.1.1"
     device_type: "mikrotik_routeros"
     platform: "arm"
-""")
+"""
+        )
 
         # Set minimal environment
         os.environ["NW_USER_DEFAULT"] = "test_user"

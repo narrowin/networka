@@ -25,20 +25,20 @@ class TestRealWorldConfigLoading:
         config = load_config(config_dir)
 
         # Verify basic structure loaded
-        assert config.devices is not None, (
-            "Devices should be loaded from config/devices/"
-        )
-        assert config.device_groups is not None, (
-            "Groups should be loaded from config/groups/"
-        )
+        assert (
+            config.devices is not None
+        ), "Devices should be loaded from config/devices/"
+        assert (
+            config.device_groups is not None
+        ), "Groups should be loaded from config/groups/"
 
         # Verify vendor sequences are auto-discovered
-        assert config.vendor_sequences is not None, (
-            "Vendor sequences should be auto-discovered"
-        )
-        assert len(config.vendor_sequences) > 0, (
-            "Should discover vendor sequences from config/sequences/"
-        )
+        assert (
+            config.vendor_sequences is not None
+        ), "Vendor sequences should be auto-discovered"
+        assert (
+            len(config.vendor_sequences) > 0
+        ), "Should discover vendor sequences from config/sequences/"
 
         # Verify specific vendors we know exist
         expected_vendors = [
@@ -51,12 +51,12 @@ class TestRealWorldConfigLoading:
         for vendor in expected_vendors:
             vendor_dir = config_dir / "sequences" / vendor
             if vendor_dir.exists():
-                assert vendor in config.vendor_sequences, (
-                    f"Should auto-discover {vendor} sequences"
-                )
-                assert len(config.vendor_sequences[vendor]) > 0, (
-                    f"Should load sequences for {vendor}"
-                )
+                assert (
+                    vendor in config.vendor_sequences
+                ), f"Should auto-discover {vendor} sequences"
+                assert (
+                    len(config.vendor_sequences[vendor]) > 0
+                ), f"Should load sequences for {vendor}"
 
     def test_load_config_with_config_yml_path(self):
         """Test loading config by pointing to config.yml file - should detect modular structure."""
@@ -67,17 +67,17 @@ class TestRealWorldConfigLoading:
         config = load_config(config_file)
 
         # Should detect that this is part of a modular config and load everything
-        assert config.devices is not None, (
-            "Should load devices even when pointing to config.yml"
-        )
+        assert (
+            config.devices is not None
+        ), "Should load devices even when pointing to config.yml"
         assert len(config.devices) > 0, "Should find devices in config/devices/"
 
-        assert config.vendor_sequences is not None, (
-            "Should auto-discover vendor sequences"
-        )
-        assert len(config.vendor_sequences) > 0, (
-            "Should find vendor sequences in config/sequences/"
-        )
+        assert (
+            config.vendor_sequences is not None
+        ), "Should auto-discover vendor sequences"
+        assert (
+            len(config.vendor_sequences) > 0
+        ), "Should find vendor sequences in config/sequences/"
 
     def test_vendor_sequence_auto_discovery(self):
         """Test that vendor sequence auto-discovery works correctly."""
@@ -96,29 +96,29 @@ class TestRealWorldConfigLoading:
 
                     # Should have auto-discovered this vendor
                     assert config.vendor_sequences is not None
-                    assert vendor_name in config.vendor_sequences, (
-                        f"Should auto-discover {vendor_name}"
-                    )
+                    assert (
+                        vendor_name in config.vendor_sequences
+                    ), f"Should auto-discover {vendor_name}"
 
                     # Check for common.yml file and verify sequences loaded
                     common_file = vendor_dir / "common.yml"
                     if common_file.exists():
                         vendor_sequences = config.vendor_sequences[vendor_name]
-                        assert len(vendor_sequences) > 0, (
-                            f"Should load sequences from {common_file}"
-                        )
+                        assert (
+                            len(vendor_sequences) > 0
+                        ), f"Should load sequences from {common_file}"
 
                         # Verify sequences have required attributes
                         for seq_name, sequence in vendor_sequences.items():
-                            assert hasattr(sequence, "description"), (
-                                f"Sequence {seq_name} should have description"
-                            )
-                            assert hasattr(sequence, "commands"), (
-                                f"Sequence {seq_name} should have commands"
-                            )
-                            assert len(sequence.commands) > 0, (
-                                f"Sequence {seq_name} should have commands"
-                            )
+                            assert hasattr(
+                                sequence, "description"
+                            ), f"Sequence {seq_name} should have description"
+                            assert hasattr(
+                                sequence, "commands"
+                            ), f"Sequence {seq_name} should have commands"
+                            assert (
+                                len(sequence.commands) > 0
+                            ), f"Sequence {seq_name} should have commands"
 
     def test_cli_list_sequences_works_after_fix(self):
         """Test that CLI list sequences command works after the fix."""
@@ -132,9 +132,9 @@ class TestRealWorldConfigLoading:
         result = runner.invoke(app, ["list", "sequences", "--config", "config"])
 
         # Should not fail and should show sequences
-        assert result.exit_code == 0, (
-            f"CLI should work after fix. Output: {result.output}"
-        )
+        assert (
+            result.exit_code == 0
+        ), f"CLI should work after fix. Output: {result.output}"
         assert "No data available" not in result.output, "Should find sequences"
         assert "Vendor Sequences" in result.output, "Should show vendor sequences"
 
@@ -155,9 +155,9 @@ class TestRealWorldConfigLoading:
             # Verify device structure
             for device_name, device in config.devices.items():
                 assert hasattr(device, "host"), f"Device {device_name} should have host"
-                assert hasattr(device, "device_type"), (
-                    f"Device {device_name} should have device_type"
-                )
+                assert hasattr(
+                    device, "device_type"
+                ), f"Device {device_name} should have device_type"
 
     def test_groups_loading_from_real_config(self):
         """Test that groups are loaded from the real config files."""
@@ -190,7 +190,7 @@ class TestRealWorldConfigLoading:
         if sequences_dir.exists() and any(
             d.is_dir() for d in sequences_dir.iterdir() if not d.name.startswith(".")
         ):
-            assert config.vendor_sequences is not None, (
-                "Should auto-discover vendor sequences"
-            )
+            assert (
+                config.vendor_sequences is not None
+            ), "Should auto-discover vendor sequences"
             assert len(config.vendor_sequences) > 0, "Should find vendor sequences"

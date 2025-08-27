@@ -138,7 +138,7 @@ class LegacyConsoleWrapper:
         self.ctx = ctx
         self._console = ctx.console
 
-    def print(self, *args, **kwargs):
+    def print(self, *args, **kwargs):  # noqa: A003
         """Smart print that detects and converts hardcoded colors."""
         if args:
             text = str(args[0])

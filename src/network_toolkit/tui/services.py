@@ -110,7 +110,7 @@ class ExecutionService:
                     cb.on_meta(f"{device}$ {cmd}")
                     try:
                         raw = session.execute_command(cmd)
-                        text = raw if type(raw) is str else str(raw)
+                        text = raw if isinstance(raw, str) else str(raw)
                         out_strip = text.strip()
                         if out_strip:
                             for line in text.rstrip().splitlines():

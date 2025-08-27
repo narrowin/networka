@@ -27,7 +27,6 @@ from network_toolkit.sequence_manager import SequenceManager, SequenceRecord
 
 if TYPE_CHECKING:
     from network_toolkit.common.output import OutputManager
-    from network_toolkit.config import NetworkConfig
 
 
 def _list_devices_impl(

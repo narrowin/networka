@@ -38,9 +38,9 @@ class TestExactFailingCommands:
 
         if device_files:
             # If device files exist, CLI should NOT show "No devices configured"
-            assert "No devices configured" not in result.output, (
-                f"Found {len(device_files)} device files but CLI shows no devices. Output: {result.output}"
-            )
+            assert (
+                "No devices configured" not in result.output
+            ), f"Found {len(device_files)} device files but CLI shows no devices. Output: {result.output}"
         else:
             # If no device files, showing "No devices configured" is correct
             assert "No devices configured" in result.output
@@ -65,9 +65,9 @@ class TestExactFailingCommands:
 
         if sequences_exist:
             # If sequence dirs exist, CLI should NOT show "No data available"
-            assert "No data available" not in result.output, (
-                f"Found sequence directories but CLI shows no data. Output: {result.output}"
-            )
+            assert (
+                "No data available" not in result.output
+            ), f"Found sequence directories but CLI shows no data. Output: {result.output}"
         else:
             # If no sequences, showing "No data available" is correct
             assert "No data available" in result.output
@@ -110,9 +110,9 @@ class TestExactFailingCommands:
                     for d in Path("config/sequences").iterdir()
                     if not d.name.startswith(".")
                 ):
-                    assert sequence_count > 0, (
-                        f"Should load sequences from {config_path}"
-                    )
+                    assert (
+                        sequence_count > 0
+                    ), f"Should load sequences from {config_path}"
 
             except Exception as e:
                 pytest.fail(f"Config loading failed for {config_path}: {e}")

@@ -33,14 +33,16 @@ class ConnectionState:
 class Transport(Protocol):
     """Minimal sync transport contract."""
 
-    def open(self) -> None:  # pragma: no cover - thin adapter
+    def open(self) -> None:  # pragma: no cover - thin adapter  # noqa: A003
         ...
 
     def close(self) -> None:  # pragma: no cover - thin adapter
         ...
 
-    def send_command(self, command: str) -> CommandResult: ...
+    def send_command(self, command: str) -> CommandResult:
+        ...
 
     def send_interactive(
         self, interact_events: list[tuple[str, str, bool]], timeout_ops: float
-    ) -> str: ...
+    ) -> str:
+        ...

@@ -27,7 +27,7 @@ class SmartConsole:
         self.mode = mode
         self._rich_console = Console()
 
-    def print(self, content: Any, style: str | None = None) -> None:
+    def print(self, content: Any, style: str | None = None) -> None:  # noqa: A003
         """Print content with automatic mode handling."""
         if self.mode == OutputMode.NO_COLOR:
             # Strip any Rich markup and use plain print

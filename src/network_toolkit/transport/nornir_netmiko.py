@@ -42,7 +42,7 @@ class NornirNetmikoTransport:
         self._last_activity: float | None = None
         self._connected = False
 
-    def open(self) -> None:
+    def open(self) -> None:  # noqa: A003
         """Open the connection to the device."""
         # Nornir connections are managed automatically
         # We'll just mark as connected and test connectivity
