@@ -163,7 +163,7 @@ Note: When targeting IPs directly, `--platform` refers to the network driver (de
 
 - Getting started → https://narrowin.github.io/networka/getting-started/
 - Running commands → https://narrowin.github.io/networka/running-commands/
-- Configuration  → https://narrowin.github.io/networka/csv-configuration/
+- Configuration  → https://narrowin.github.io/networka/configuration/
 - Environment variables → https://narrowin.github.io/networka/environment-variables/
 - Results → https://narrowin.github.io/networka/results/
 - Output modes → https://narrowin.github.io/networka/output-modes/
