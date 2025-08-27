@@ -199,35 +199,29 @@ select = [
     "YTT",
 ]
 ignore = [
-    # Allow non-abstract empty methods in abstract base classes
-    "B027",
-    # Allow boolean positional values in function calls, like `dict.get(... True)`
-    "FBT003",
-    # Ignore checks for possible passwords
-    "S105", "S106", "S107",
-    # Ignore complexity
+    # Complexity rules - these are judgment calls
     "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915",
-    # Temporarily disable for build testing
-    "PLC0415",  # Import outside toplevel
-    "ARG002",   # Unused method argument
-    "S108",     # Probable insecure usage of temp file/directory
+    # Formatter conflicts
+    "ISC001",   # Implicit string concatenation (conflicts with formatter)
+    # Specific cases where we need flexibility
+    "S101",     # Use of assert detected (common in tests)
+    "T201",     # print found (sometimes needed for debugging)
+    "ARG001",   # Unused function argument (common in protocol implementations)
+    "ARG002",   # Unused method argument (common in protocol implementations)
+    "PLR2004",  # Magic value used in comparison (sometimes unavoidable)
+    # Import-related (some are unavoidable due to optional dependencies)
+    "PLC0415",  # Import outside toplevel (needed for optional imports)
+    # Test-specific
     "B017",     # pytest.raises without match parameter
-    "F401",     # Unused imports
-    "RUF100",   # Unused noqa directive
-    # Additional common issues
-    "T201",     # print found
-    "T203",     # pprint found
-    "FBT001",   # Boolean positional arg in function definition
-    "FBT002",   # Boolean default value in function definition
-    "PLR2004",  # Magic value used in comparison
-    "S101",     # Use of assert detected
-    "PLW2901",  # Redefined loop variable
-    "PLR0917",  # Too many positional arguments
-    "E501",     # Line too long
-    "ARG001",   # Unused function argument
-    "S603",     # subprocess call check for execution of untrusted input
-    "S110",     # try-except-pass detected
-    "F821",     # Undefined name
+    "S110",     # try-except-pass detected (sometimes needed in cleanup)
+    # Additional pragmatic ignores for mature codebase
+    "E501",     # Line too long (often unavoidable in CLI help text and URLs)
+    "FBT003",   # Boolean positional value in function call (often clear in context)
+    "S108",     # Hardcoded temp file paths (acceptable in configuration defaults)
+    "S603",     # subprocess without shell=True (often safer this way)
+    "S105",     # Hardcoded password (acceptable in tests and examples)
+    "S107",     # Hardcoded password default (acceptable in configuration)
+    "A003",     # Class attribute shadowing Python builtin (legitimate interface methods)
 ]
 unfixable = [
     # Don't touch unused imports
@@ -242,7 +236,18 @@ ban-relative-imports = "all"
 
 [tool.ruff.lint.per-file-ignores]
 # Tests can use magic values, assertions, and relative imports
-"tests/**/*" = ["PLR2004", "S101", "TID252"]
+"tests/**/*" = ["PLR2004", "S101", "TID252", "S105", "S106", "S107"]
+# CLI commands using Typer often need boolean flags and default arguments
+"src/network_toolkit/commands/**/*" = ["FBT001", "FBT002"]
+"src/network_toolkit/cli.py" = ["FBT002"]
+# TUI code often needs boolean parameters for theming and state
+"src/network_toolkit/tui/**/*" = ["FBT001"]
+# Platform operations often need boolean flags for hardware control
+"src/network_toolkit/platforms/**/*" = ["FBT001", "FBT002"]
+# Core device operations often need boolean flags for operational control
+"src/network_toolkit/device.py" = ["FBT001", "FBT002"]
+# Common library modules often need boolean parameters for flexibility
+"src/network_toolkit/common/**/*" = ["FBT001", "FBT002"]
 
 [tool.mypy]
 python_version = "3.11"

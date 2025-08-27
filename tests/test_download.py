@@ -391,10 +391,8 @@ class TestDownload:
     @patch("network_toolkit.commands.download.setup_logging")
     @patch("network_toolkit.commands.download.load_config")
     @patch("network_toolkit.commands.download.import_module")
-    @patch("network_toolkit.commands.download.console")
     def test_download_command_execution(
         self,
-        mock_console: MagicMock,
         mock_import: MagicMock,
         mock_load_config: MagicMock,
         mock_setup_logging: MagicMock,

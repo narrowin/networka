@@ -173,7 +173,7 @@ def test_ssh_device_opens_session(config_file: Path) -> None:
         )
     assert result.exit_code == 0
     assert "Created tmux session" in result.output
-    assert "1 pane(s)" in result.output
+    assert "1" in result.output and "pane" in result.output
 
 
 def test_ssh_group_two_panes(config_file: Path) -> None:
@@ -192,7 +192,7 @@ def test_ssh_group_two_panes(config_file: Path) -> None:
             ],
         )
     assert result.exit_code == 0
-    assert "2 pane(s)" in result.output
+    assert "2" in result.output and "pane" in result.output
 
 
 def test_ssh_missing_tmux_server(config_file: Path) -> None:

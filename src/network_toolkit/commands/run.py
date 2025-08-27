@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import json
-import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from enum import Enum
 from pathlib import Path
@@ -17,7 +15,6 @@ import typer
 from network_toolkit.common.command import CommandContext
 from network_toolkit.common.credentials import prompt_for_credentials
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
-from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import (
     OutputMode,
     get_output_mode_from_config,
@@ -140,8 +137,9 @@ def register(app: typer.Typer) -> None:
                 # This will raise ValueError if transport_type is invalid
                 get_transport_factory(transport_type)
             except ValueError as e:
-                print(f"Error: {e}")
-                raise typer.Exit(1)
+                # Use typer echo for early errors before CommandContext is available
+                typer.echo(f"Error: {e}", err=True)
+                raise typer.Exit(1) from e
 
         # Handle legacy raw mode mapping
         if raw is not None:
@@ -405,10 +403,6 @@ def register(app: typer.Typer) -> None:
 
             # Legacy single-target flags removed; use booleans above directly
 
-            # Helper for JSON emission
-            def _emit(event: dict[str, Any]) -> None:
-                sys.stdout.write(json.dumps(event) + "\n")
-
             json_mode = raw == RawFormat.JSON
 
             if is_sequence:
@@ -448,7 +442,7 @@ def register(app: typer.Typer) -> None:
                             # Print raw outputs with context per command
                             for cmd, output in results_map.items():
                                 if json_mode:
-                                    _emit(
+                                    output_mgr.print_json(
                                         {
                                             "event": "result",
                                             "device": device_target,
@@ -457,10 +451,9 @@ def register(app: typer.Typer) -> None:
                                         }
                                     )
                                 else:
-                                    sys.stdout.write(
-                                        f"device={device_target} cmd={cmd}\n"
+                                    output_mgr.print_command_output(
+                                        device_target, cmd, output
                                     )
-                                    sys.stdout.write(f"{output}\n")
                         else:
                             ctx.print_success(
                                 f"Sequence Results ({len(results_map)} commands):"
@@ -493,7 +486,7 @@ def register(app: typer.Typer) -> None:
                             raw_mode=raw is not None,
                         )
                         if json_mode:
-                            _emit(
+                            output_mgr.print_json(
                                 {
                                     "event": "summary",
                                     "target": device_target,
@@ -557,7 +550,7 @@ def register(app: typer.Typer) -> None:
                                 continue
                             for cmd, output in device_results.items():
                                 if json_mode:
-                                    _emit(
+                                    output_mgr.print_json(
                                         {
                                             "event": "result",
                                             "device": _device_name,
@@ -566,10 +559,9 @@ def register(app: typer.Typer) -> None:
                                         }
                                     )
                                 else:
-                                    sys.stdout.write(
-                                        f"device={_device_name} cmd={cmd}\n"
+                                    output_mgr.print_command_output(
+                                        _device_name, cmd, output
                                     )
-                                    sys.stdout.write(f"{output}\n")
                     else:
                         ctx.print_success("Group Sequence Results")
                         for device_name, device_results, error in all_results:
@@ -619,7 +611,7 @@ def register(app: typer.Typer) -> None:
                         raw_mode=raw is not None,
                     )
                     if json_mode:
-                        _emit(
+                        output_mgr.print_json(
                             {
                                 "event": "summary",
                                 "target": target,
@@ -664,7 +656,7 @@ def register(app: typer.Typer) -> None:
 
                 if raw is not None:
                     if json_mode:
-                        _emit(
+                        output_mgr.print_json(
                             {
                                 "event": "result",
                                 "device": device_target,
@@ -701,7 +693,7 @@ def register(app: typer.Typer) -> None:
                     raw_mode=raw is not None,
                 )
                 if json_mode:
-                    _emit(
+                    output_mgr.print_json(
                         {
                             "event": "summary",
                             "target": device_target,
@@ -760,7 +752,7 @@ def register(app: typer.Typer) -> None:
                         if error or out_text is None:
                             continue
                         if json_mode:
-                            _emit(
+                            output_mgr.print_json(
                                 {
                                     "event": "result",
                                     "device": device_name,
@@ -769,10 +761,9 @@ def register(app: typer.Typer) -> None:
                                 }
                             )
                         else:
-                            sys.stdout.write(
-                                f"device={device_name} cmd={command_or_sequence}\n"
+                            output_mgr.print_command_output(
+                                device_name, command_or_sequence, out_text
                             )
-                            sys.stdout.write(f"{out_text}\n")
                 else:
                     ctx.print_success("Group Command Results:")
                     for device_name, out_text, error in group_results:
@@ -820,7 +811,7 @@ def register(app: typer.Typer) -> None:
                     raw_mode=raw is not None,
                 )
                 if json_mode:
-                    _emit(
+                    output_mgr.print_json(
                         {
                             "event": "summary",
                             "target": target,

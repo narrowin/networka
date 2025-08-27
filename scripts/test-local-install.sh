@@ -60,12 +60,12 @@ if git rev-parse --git-dir > /dev/null 2>&1; then
     python -m venv .test-env-git
     source .test-env-git/bin/activate
     pip install --upgrade pip
-    
+
     # Install from current git repo
     pip install git+file://$(pwd)
     nw --help
     python -c "import network_toolkit; print('✅ Git install successful')"
-    
+
     deactivate
 fi
 

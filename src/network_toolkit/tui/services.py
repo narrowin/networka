@@ -88,7 +88,7 @@ class ExecutionService:
                 disc = getattr(s, "disconnect", None)
                 if callable(disc):
                     disc()
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logging.debug(f"Hard cancel disconnect failed: {e}")
 
     def resolve_devices(
@@ -209,7 +209,7 @@ class ExecutionService:
             for t in done:
                 try:
                     res = t.result()
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     # Treat unexpected task failure as a device failure
                     failures += 1
                     logging.debug("device task failed: %s", e)
@@ -272,57 +272,16 @@ class ExecutionService:
                     cb.on_meta(f"{device}$ {cmd}")
                     try:
                         raw = session.execute_command(cmd)
-                        text = raw if type(raw) is str else str(raw)
-                        lines = text.rstrip().splitlines() if text else []
-                    except Exception as e:  # noqa: BLE001
+                        text = raw if isinstance(raw, str) else str(raw)
+                        out_strip = text.strip()
+                        if out_strip:
+                            for line in text.rstrip().splitlines():
+                                cb.on_output(line)
+                    except Exception as e:
                         ok = False
                         cb.on_error(f"{device}: command error: {e}")
-                        lines = []
-                    # Emit the entire chunk atomically to preserve ordering
-                    try:
-                        chunk = [header]
-                        if lines:
-                            chunk.extend(lines)
-                        chunk.append(footer)
-                        payload = "\n".join(chunk)
-                        # Track in buffer for compatibility
-                        buf.extend(chunk)
-                        if getattr(cb, "on_device_output", None):
-                            cb.on_device_output(device, payload)  # type: ignore[misc]
-                        else:
-                            cb.on_output(payload)
-                    except Exception:
-                        pass
-            # Ensure we unregister session on any exit path
-            try:
-                self._unregister_session(session)
-            except Exception:
-                pass
-            if cancel and cancel.is_set():
-                cb.on_meta(f"{device}: cancelled done")
-                dev_footer = f"--- Device: {device} cancelled done ---"
-                buf.append(dev_footer)
-                try:
-                    if getattr(cb, "on_device_output", None):
-                        cb.on_device_output(device, dev_footer)  # type: ignore[misc]
-                    else:
-                        cb.on_output(dev_footer)
-                except Exception:
-                    pass
-            else:
-                cb.on_meta(f"{device}: done")
-                dev_footer = f"--- Device: {device} done ---"
-                buf.append(dev_footer)
-                try:
-                    if getattr(cb, "on_device_output", None):
-                        cb.on_device_output(device, dev_footer)  # type: ignore[misc]
-                    else:
-                        cb.on_output(dev_footer)
-                except Exception:
-                    pass
-            # Return empty output_lines to indicate streaming already handled output
-            return DeviceRunResult(device=device, ok=ok, output_lines=[])
-        except Exception as e:  # noqa: BLE001
+            cb.on_meta(f"{device}: done")
+        except Exception as e:
             ok = False
             cb.on_error(f"{device}: Failed: {e}")
         # Return whatever we collected (may be empty) on failure

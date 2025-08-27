@@ -66,7 +66,7 @@ config/
 Configuration files are loaded from their respective subdirectories and combined:
 
 1. **All device files**: `config/devices/*.{yml,yaml,csv}` (alphabetical order)
-2. **All group files**: `config/groups/*.{yml,yaml,csv}` (alphabetical order)  
+2. **All group files**: `config/groups/*.{yml,yaml,csv}` (alphabetical order)
 3. **All sequence files**: `config/sequences/*.{yml,yaml,csv}` (alphabetical order)
 
 Files loaded later can override configurations from earlier files.
@@ -113,7 +113,7 @@ Convert your device inventory spreadsheets to CSV format and place them in the a
 If you have existing `devices.yml`, `groups.yml`, `sequences.yml` files:
 
 1. **Move device configs**: `devices.yml` → `config/devices/devices.yml`
-2. **Move group configs**: `groups.yml` → `config/groups/groups.yml`  
+2. **Move group configs**: `groups.yml` → `config/groups/groups.yml`
 3. **Move sequence configs**: `sequences.yml` → `config/sequences/sequences.yml`
 4. **Split general config**: Extract `general:` section to `config/config.yml`
 

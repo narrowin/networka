@@ -74,21 +74,7 @@ class PlatformCapabilities:
         """Print platform-specific installation suggestions."""
         if ctx is None:
             # Temporary fallback for non-converted code
-            from network_toolkit.common.output import OutputManager, OutputMode
-
-            output_manager = OutputManager(mode=OutputMode.DEFAULT)
-
-            class TempContext:
-                def __init__(self, output_mgr: Any) -> None:
-                    self.output_manager = output_mgr
-
-                def print_warning(self, msg: str) -> None:
-                    self.output_manager.print_text(f"[yellow]Warning:[/yellow] {msg}")
-
-            ctx = TempContext(output_manager)  # type: ignore
-
-        # At this point ctx is guaranteed to not be None
-        assert ctx is not None
+            ctx = CommandContext()
 
         if not self.supports_tmux:
             if self.system == "Windows":
@@ -126,7 +112,9 @@ _platform_capabilities: PlatformCapabilities | None = None
 
 def get_platform_capabilities() -> PlatformCapabilities:
     """Get platform capabilities singleton."""
-    global _platform_capabilities
+    # Use module-level variable instead of global statement
     if _platform_capabilities is None:
-        _platform_capabilities = PlatformCapabilities()
+        globals()["_platform_capabilities"] = PlatformCapabilities()
+    # At this point, we know _platform_capabilities is not None
+    assert _platform_capabilities is not None
     return _platform_capabilities

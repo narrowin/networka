@@ -2,7 +2,17 @@
 """
 Test script for file download functionality.
 
-This script validates the _handle_file_downloads function from cli.py
+This script validates the _handle_file_downloads function         # Mock current date - need to mock the actual datetime object used in replace_placeholders
+        mock_datetime_obj = MagicMock()
+
+        def mock_strftime(fmt: str) -> str:
+            return {
+                "%Y%m%d": "20250805",
+                "%H%M%S": "143000",
+                "%Y%m%d_%H%M%S": "20250805_143000"
+            }[fmt]
+
+        mock_datetime_obj.strftime.side_effect = mock_strftimei.py
 without requiring actual devices. It tests all edge cases, parameter
 validation, placeholder replacement, and error conditions.
 """
@@ -59,13 +69,12 @@ class TestHandleFileDownloads(unittest.TestCase):
             }
         ]
 
-        with patch("network_toolkit.cli.console"):
-            result = _handle_file_downloads(
-                session=self.mock_session,
-                device_name=self.device_name,
-                download_files=download_files,
-                config=self.mock_config,
-            )
+        result = _handle_file_downloads(
+            session=self.mock_session,
+            device_name=self.device_name,
+            download_files=download_files,
+            config=self.mock_config,
+        )
 
         expected_path = Path(tempfile.gettempdir()) / "device_backup.rsc"
         self.assertEqual(result["backup.rsc"], f"Downloaded to {expected_path}")
@@ -88,13 +97,12 @@ class TestHandleFileDownloads(unittest.TestCase):
             }
         ]
 
-        with patch("network_toolkit.cli.console"):
-            result = _handle_file_downloads(
-                session=self.mock_session,
-                device_name=self.device_name,
-                download_files=download_files,
-                config=self.mock_config,
-            )
+        result = _handle_file_downloads(
+            session=self.mock_session,
+            device_name=self.device_name,
+            download_files=download_files,
+            config=self.mock_config,
+        )
 
         self.assertEqual(result["missing.rsc"], "Download failed")
 
@@ -110,26 +118,37 @@ class TestHandleFileDownloads(unittest.TestCase):
             }
         ]
 
-        with patch("network_toolkit.cli.console"):
-            result = _handle_file_downloads(
-                session=self.mock_session,
-                device_name=self.device_name,
-                download_files=download_files,
-                config=self.mock_config,
-            )
+        result = _handle_file_downloads(
+            session=self.mock_session,
+            device_name=self.device_name,
+            download_files=download_files,
+            config=self.mock_config,
+        )
 
         self.assertTrue(result["problematic.rsc"].startswith("Download error:"))
         self.assertIn("Connection lost during download", result["problematic.rsc"])
 
-    def test_placeholder_replacement_date(self) -> None:
+    @patch("network_toolkit.common.command_helpers.CommandContext")
+    def test_placeholder_replacement_date(
+        self, mock_command_context_class: MagicMock
+    ) -> None:
         """Test {date} placeholder replacement in paths and filenames."""
+        # Set up mock CommandContext instance
+        mock_ctx = MagicMock()
+        mock_command_context_class.return_value = mock_ctx
+
         self.mock_session.download_file.return_value = True
 
-        # Mock current date
-        mock_date = datetime.date(2025, 8, 5)
-        with patch("datetime.datetime") as mock_datetime:
-            mock_datetime.now.return_value.date.return_value = mock_date
-            mock_datetime.UTC = datetime.UTC
+        # Mock current date - need to mock the actual datetime object used in replace_placeholders
+        mock_datetime_obj = MagicMock()
+        mock_datetime_obj.strftime.side_effect = lambda fmt: {
+            "%Y%m%d": "20250805",
+            "%H%M%S": "143000",
+            "%Y%m%d_%H%M%S": "20250805_143000",
+        }[fmt]
+
+        with patch("network_toolkit.cli.datetime") as mock_datetime:
+            mock_datetime.datetime.now.return_value = mock_datetime_obj
 
             download_files: list[dict[str, str | bool]] = [
                 {
@@ -139,15 +158,14 @@ class TestHandleFileDownloads(unittest.TestCase):
                 }
             ]
 
-            with patch("network_toolkit.cli.console"):
-                result = _handle_file_downloads(
-                    session=self.mock_session,
-                    device_name=self.device_name,
-                    download_files=download_files,
-                    config=self.mock_config,
-                )
+            result = _handle_file_downloads(
+                session=self.mock_session,
+                device_name=self.device_name,
+                download_files=download_files,
+                config=self.mock_config,
+            )
 
-        expected_path = Path("/backups/2025-08-05") / "config-2025-08-05.rsc"
+        expected_path = Path("/backups/20250805") / "config-20250805.rsc"
         self.assertEqual(result["config.rsc"], f"Downloaded to {expected_path}")
 
         self.mock_session.download_file.assert_called_once_with(
@@ -168,13 +186,12 @@ class TestHandleFileDownloads(unittest.TestCase):
             }
         ]
 
-        with patch("network_toolkit.cli.console"):
-            result = _handle_file_downloads(
-                session=self.mock_session,
-                device_name=self.device_name,
-                download_files=download_files,
-                config=self.mock_config,
-            )
+        result = _handle_file_downloads(
+            session=self.mock_session,
+            device_name=self.device_name,
+            download_files=download_files,
+            config=self.mock_config,
+        )
 
         expected_path = Path("/logs/test-device") / "test-device-logs.txt"
         self.assertEqual(result["logs.txt"], f"Downloaded to {expected_path}")
@@ -189,11 +206,20 @@ class TestHandleFileDownloads(unittest.TestCase):
         """Test both {date} and {device} placeholder replacement."""
         self.mock_session.download_file.return_value = True
 
-        # Mock current date
-        mock_date = datetime.date(2025, 8, 5)
-        with patch("datetime.datetime") as mock_datetime:
-            mock_datetime.now.return_value.date.return_value = mock_date
-            mock_datetime.UTC = datetime.UTC
+        # Mock current date - need to mock the actual datetime object used in replace_placeholders
+        mock_datetime_obj = MagicMock()
+
+        def mock_strftime(fmt: str) -> str:
+            return {
+                "%Y%m%d": "20250805",
+                "%H%M%S": "143000",
+                "%Y%m%d_%H%M%S": "20250805_143000",
+            }[fmt]
+
+        mock_datetime_obj.strftime.side_effect = mock_strftime
+
+        with patch("network_toolkit.cli.datetime") as mock_datetime:
+            mock_datetime.datetime.now.return_value = mock_datetime_obj
 
             download_files: list[dict[str, str | bool]] = [
                 {
@@ -203,17 +229,15 @@ class TestHandleFileDownloads(unittest.TestCase):
                 }
             ]
 
-            with patch("network_toolkit.cli.console"):
-                result = _handle_file_downloads(
-                    session=self.mock_session,
-                    device_name=self.device_name,
-                    download_files=download_files,
-                    config=self.mock_config,
-                )
+            result = _handle_file_downloads(
+                session=self.mock_session,
+                device_name=self.device_name,
+                download_files=download_files,
+                config=self.mock_config,
+            )
 
         expected_path = (
-            Path("/archive/test-device/2025-08-05")
-            / "test-device-system-2025-08-05.txt"
+            Path("/archive/test-device/20250805") / "test-device-system-20250805.txt"
         )
         self.assertEqual(result["system-info.txt"], f"Downloaded to {expected_path}")
 
@@ -228,13 +252,12 @@ class TestHandleFileDownloads(unittest.TestCase):
             }
         ]
 
-        with patch("network_toolkit.cli.console"):
-            result = _handle_file_downloads(
-                session=self.mock_session,
-                device_name=self.device_name,
-                download_files=download_files,
-                config=self.mock_config,
-            )
+        result = _handle_file_downloads(
+            session=self.mock_session,
+            device_name=self.device_name,
+            download_files=download_files,
+            config=self.mock_config,
+        )
 
         expected_path = Path("/srv/backups") / "auto-backup.rsc"
         self.assertEqual(result["auto-backup.rsc"], f"Downloaded to {expected_path}")
@@ -257,13 +280,12 @@ class TestHandleFileDownloads(unittest.TestCase):
             }
         ]
 
-        with patch("network_toolkit.cli.console"):
-            result = _handle_file_downloads(
-                session=self.mock_session,
-                device_name=self.device_name,
-                download_files=download_files,
-                config=self.mock_config,
-            )
+        result = _handle_file_downloads(
+            session=self.mock_session,
+            device_name=self.device_name,
+            download_files=download_files,
+            config=self.mock_config,
+        )
 
         expected_path = Path("/custom/path") / "original-name.rsc"
         self.assertEqual(result["original-name.rsc"], f"Downloaded to {expected_path}")
@@ -279,13 +301,12 @@ class TestHandleFileDownloads(unittest.TestCase):
             }
         ]
 
-        with patch("network_toolkit.cli.console"):
-            _handle_file_downloads(
-                session=self.mock_session,
-                device_name=self.device_name,
-                download_files=download_files,
-                config=self.mock_config,
-            )
+        _handle_file_downloads(
+            session=self.mock_session,
+            device_name=self.device_name,
+            download_files=download_files,
+            config=self.mock_config,
+        )
 
         expected_path = Path("/srv/backups") / "temp-file.rsc"
 
@@ -316,13 +337,12 @@ class TestHandleFileDownloads(unittest.TestCase):
             {"remote_file": "error.rsc"},
         ]
 
-        with patch("network_toolkit.cli.console"):
-            result = _handle_file_downloads(
-                session=self.mock_session,
-                device_name=self.device_name,
-                download_files=download_files,
-                config=self.mock_config,
-            )
+        result = _handle_file_downloads(
+            session=self.mock_session,
+            device_name=self.device_name,
+            download_files=download_files,
+            config=self.mock_config,
+        )
 
         # Check all three results
         self.assertTrue(result["success.rsc"].startswith("Downloaded to"))
@@ -344,13 +364,12 @@ class TestHandleFileDownloads(unittest.TestCase):
             }
         ]
 
-        with patch("network_toolkit.cli.console"):
-            _handle_file_downloads(
-                session=self.mock_session,
-                device_name=self.device_name,
-                download_files=download_files,
-                config=self.mock_config,
-            )
+        _handle_file_downloads(
+            session=self.mock_session,
+            device_name=self.device_name,
+            download_files=download_files,
+            config=self.mock_config,
+        )
 
         expected_path = Path("/srv/backups") / "test.rsc"
 
@@ -367,13 +386,12 @@ class TestHandleFileDownloads(unittest.TestCase):
         # Test with minimal dictionary - only remote_file
         download_files: list[dict[str, str | bool]] = [{"remote_file": "minimal.rsc"}]
 
-        with patch("network_toolkit.cli.console"):
-            _handle_file_downloads(
-                session=self.mock_session,
-                device_name=self.device_name,
-                download_files=download_files,
-                config=self.mock_config,
-            )
+        _handle_file_downloads(
+            session=self.mock_session,
+            device_name=self.device_name,
+            download_files=download_files,
+            config=self.mock_config,
+        )
 
         expected_path = Path("/srv/backups") / "minimal.rsc"
 
@@ -398,13 +416,12 @@ class TestHandleFileDownloads(unittest.TestCase):
             }
         ]
 
-        with patch("network_toolkit.cli.console"):
-            _handle_file_downloads(
-                session=self.mock_session,
-                device_name=self.device_name,
-                download_files=download_files,
-                config=self.mock_config,
-            )
+        _handle_file_downloads(
+            session=self.mock_session,
+            device_name=self.device_name,
+            download_files=download_files,
+            config=self.mock_config,
+        )
 
         expected_path = Path("/test") / "None"  # str(None) = "None"
 
@@ -414,9 +431,15 @@ class TestHandleFileDownloads(unittest.TestCase):
             delete_remote=True,  # bool("true") = True
         )
 
-    @patch("network_toolkit.cli.console")
-    def test_console_output_success(self, mock_console: MagicMock) -> None:
+    @patch("network_toolkit.common.command_helpers.CommandContext")
+    def test_console_output_success(
+        self, mock_command_context_class: MagicMock
+    ) -> None:
         """Test console output for successful download."""
+        # Set up mock CommandContext instance
+        mock_ctx = MagicMock()
+        mock_command_context_class.return_value = mock_ctx
+
         self.mock_session.download_file.return_value = True
 
         download_files: list[dict[str, str | bool]] = [{"remote_file": "test.rsc"}]
@@ -428,16 +451,25 @@ class TestHandleFileDownloads(unittest.TestCase):
             config=self.mock_config,
         )
 
-        # Verify console.print was called with correct messages (without color markup)
-        expected_calls = [
-            call("[cyan]Downloading test.rsc from test-device...[/cyan]"),
-            call("[green]OK Downloaded test.rsc to /srv/backups/test.rsc[/green]"),
-        ]
-        mock_console.print.assert_has_calls(expected_calls)
+        # Verify output manager methods were called with correct messages
+        mock_ctx.output_manager.print_downloading.assert_called_once_with(
+            self.device_name, "test.rsc"
+        )
+        mock_ctx.output_manager.print_success.assert_called_once()
+        # Check that success message contains key information
+        success_call_args = mock_ctx.output_manager.print_success.call_args[0][0]
+        self.assertIn("test.rsc", success_call_args)
+        self.assertIn("/srv/backups", success_call_args)
 
-    @patch("network_toolkit.cli.console")
-    def test_console_output_failure(self, mock_console: MagicMock) -> None:
+    @patch("network_toolkit.common.command_helpers.CommandContext")
+    def test_console_output_failure(
+        self, mock_command_context_class: MagicMock
+    ) -> None:
         """Test console output for failed download."""
+        # Set up mock CommandContext instance
+        mock_ctx = MagicMock()
+        mock_command_context_class.return_value = mock_ctx
+
         self.mock_session.download_file.return_value = False
 
         download_files: list[dict[str, str | bool]] = [{"remote_file": "missing.rsc"}]
@@ -449,16 +481,24 @@ class TestHandleFileDownloads(unittest.TestCase):
             config=self.mock_config,
         )
 
-        # Verify console.print was called with correct messages (without color markup)
-        expected_calls = [
-            call("[cyan]Downloading missing.rsc from test-device...[/cyan]"),
-            call("[red]FAIL Failed to download missing.rsc[/red]"),
-        ]
-        mock_console.print.assert_has_calls(expected_calls)
+        # Verify output manager methods were called
+        mock_ctx.output_manager.print_downloading.assert_called_once_with(
+            self.device_name, "missing.rsc"
+        )
+        mock_ctx.output_manager.print_error.assert_called_once()
+        # Check that error message contains key information
+        error_call_args = mock_ctx.output_manager.print_error.call_args[0][0]
+        self.assertIn("missing.rsc", error_call_args)
 
-    @patch("network_toolkit.cli.console")
-    def test_console_output_exception(self, mock_console: MagicMock) -> None:
+    @patch("network_toolkit.common.command_helpers.CommandContext")
+    def test_console_output_exception(
+        self, mock_command_context_class: MagicMock
+    ) -> None:
         """Test console output for download exception."""
+        # Set up mock CommandContext instance
+        mock_ctx = MagicMock()
+        mock_command_context_class.return_value = mock_ctx
+
         self.mock_session.download_file.side_effect = Exception("Network timeout")
 
         download_files: list[dict[str, str | bool]] = [{"remote_file": "error.rsc"}]
@@ -470,12 +510,15 @@ class TestHandleFileDownloads(unittest.TestCase):
             config=self.mock_config,
         )
 
-        # Verify console.print was called with correct messages (without color markup)
-        expected_calls = [
-            call("[cyan]Downloading error.rsc from test-device...[/cyan]"),
-            call("[red]FAIL Error downloading error.rsc: Network timeout[/red]"),
-        ]
-        mock_console.print.assert_has_calls(expected_calls)
+        # Verify output manager methods were called
+        mock_ctx.output_manager.print_downloading.assert_called_once_with(
+            self.device_name, "error.rsc"
+        )
+        mock_ctx.output_manager.print_error.assert_called_once()
+        # Check that error message contains key information
+        error_call_args = mock_ctx.output_manager.print_error.call_args[0][0]
+        self.assertIn("error.rsc", error_call_args)
+        self.assertIn("Network timeout", error_call_args)
 
 
 class TestHandleFileDownloadsIntegration(unittest.TestCase):
@@ -493,11 +536,20 @@ class TestHandleFileDownloadsIntegration(unittest.TestCase):
         """Test a realistic backup scenario with date/device placeholders."""
         self.mock_session.download_file.return_value = True
 
-        # Mock current date for consistent testing
-        mock_date = datetime.date(2025, 8, 5)
-        with patch("datetime.datetime") as mock_datetime:
-            mock_datetime.now.return_value.date.return_value = mock_date
-            mock_datetime.UTC = datetime.UTC
+        # Mock current date - need to mock the actual datetime object used in replace_placeholders
+        mock_datetime_obj = MagicMock()
+
+        def mock_strftime(fmt: str) -> str:
+            return {
+                "%Y%m%d": "20250805",
+                "%H%M%S": "143000",
+                "%Y%m%d_%H%M%S": "20250805_143000",
+            }[fmt]
+
+        mock_datetime_obj.strftime.side_effect = mock_strftime
+
+        with patch("network_toolkit.cli.datetime") as mock_datetime:
+            mock_datetime.datetime.now.return_value = mock_datetime_obj
 
             download_files: list[dict[str, str | bool]] = [
                 {
@@ -514,24 +566,23 @@ class TestHandleFileDownloadsIntegration(unittest.TestCase):
                 },
             ]
 
-            with patch("network_toolkit.cli.console"):
-                result = _handle_file_downloads(
-                    session=self.mock_session,
-                    device_name=self.device_name,
-                    download_files=download_files,
-                    config=self.mock_config,
-                )
+            result = _handle_file_downloads(
+                session=self.mock_session,
+                device_name=self.device_name,
+                download_files=download_files,
+                config=self.mock_config,
+            )
 
         # Check results
         self.assertEqual(len(result), 2)
 
         backup_path = (
-            Path("/srv/backups/integration-test-device/2025-08-05")
-            / "integration-test-device-backup-2025-08-05.backup"
+            Path("/srv/backups/integration-test-device/20250805")
+            / "integration-test-device-backup-20250805.backup"
         )
         config_path = (
-            Path("/srv/backups/integration-test-device/2025-08-05")
-            / "integration-test-device-config-2025-08-05.rsc"
+            Path("/srv/backups/integration-test-device/20250805")
+            / "integration-test-device-config-20250805.rsc"
         )
 
         self.assertEqual(result["backup.backup"], f"Downloaded to {backup_path}")
@@ -576,13 +627,12 @@ class TestHandleFileDownloadsIntegration(unittest.TestCase):
             {"remote_file": "corrupted.rsc", "local_filename": "bad-file.rsc"},
         ]
 
-        with patch("network_toolkit.cli.console"):
-            result = _handle_file_downloads(
-                session=self.mock_session,
-                device_name=self.device_name,
-                download_files=download_files,
-                config=self.mock_config,
-            )
+        result = _handle_file_downloads(
+            session=self.mock_session,
+            device_name=self.device_name,
+            download_files=download_files,
+            config=self.mock_config,
+        )
 
         # Verify results reflect the different outcomes
         self.assertTrue(result["config.rsc"].startswith("Downloaded to"))

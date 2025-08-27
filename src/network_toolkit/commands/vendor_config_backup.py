@@ -15,7 +15,6 @@ import typer
 from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.logging import (
-    console,  # noqa: F401
     setup_logging,
 )
 from network_toolkit.common.styles import StyleName

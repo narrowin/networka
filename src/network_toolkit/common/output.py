@@ -12,7 +12,6 @@ from typing import Any
 
 from rich.console import Console
 from rich.table import Table
-from rich.theme import Theme
 
 
 class OutputMode(str, Enum):
@@ -43,99 +42,12 @@ class OutputManager:
             The output mode to use for formatting
         """
         self.mode = mode
-        self._console = self._create_console()
+        # Import here to avoid circular imports
+        from network_toolkit.common.styles import StyleManager, StyleName
 
-    def _create_console(self) -> Console:
-        """Create a console instance based on the current mode."""
-        if self.mode in (OutputMode.RAW, OutputMode.JSON):
-            # Raw/JSON modes use no styling at all
-            return Console(
-                color_system=None,
-                force_terminal=False,
-                stderr=False,
-                file=sys.stdout,
-                width=None,
-                height=None,
-            )
-        elif self.mode == OutputMode.NO_COLOR:
-            # No color mode disables colors but keeps other formatting
-            return Console(color_system=None, force_terminal=True, stderr=False)
-        elif self.mode == OutputMode.LIGHT:
-            # Light-optimized: stronger contrast on light terminals
-            light_theme = Theme(
-                {
-                    "info": "blue",
-                    "warning": "yellow",
-                    "error": "red",
-                    "success": "green",
-                    "device": "cyan",
-                    "command": "magenta",
-                    # Ensure readable plain output on light backgrounds
-                    "output": "#000000",
-                    "summary": "blue",
-                    # Avoid washed-out text on light themes
-                    "dim": "default",
-                    "bold": "bold",
-                    "transport": "magenta",
-                    "running": "blue",
-                    "connected": "green",
-                    "failed": "red",
-                    "downloading": "cyan",
-                    "credential": "cyan",
-                    "unknown": "yellow",
-                }
-            )
-            return Console(theme=light_theme, stderr=False, force_terminal=True)
-        elif self.mode == OutputMode.DARK:
-            # Dark uses defaults; also avoid dim to keep consistency
-            dark_theme = Theme(
-                {
-                    "info": "blue",
-                    "warning": "yellow",
-                    "error": "red",
-                    "success": "green",
-                    "device": "cyan",
-                    "command": "magenta",
-                    "output": "default",
-                    "summary": "blue",
-                    "dim": "default",
-                    "bold": "bold",
-                    "transport": "magenta",
-                    "running": "blue",
-                    "connected": "green",
-                    "failed": "red",
-                    "downloading": "cyan",
-                    "credential": "cyan",
-                    "unknown": "yellow",
-                }
-            )
-            return Console(theme=dark_theme, stderr=False, force_terminal=True)
-        else:
-            # Default mode uses Rich's default styling with our semantic colors
-            default_theme = Theme(
-                {
-                    "info": "blue",
-                    "warning": "yellow",
-                    "error": "red",
-                    "success": "green",
-                    "device": "cyan",
-                    "command": "magenta",
-                    "output": "default",
-                    "summary": "blue",
-                    # Avoid dim across themes for readability on light backgrounds
-                    "dim": "default",
-                    "bold": "bold",
-                    # Additional semantic colors for all use cases
-                    "transport": "magenta",
-                    "running": "blue",
-                    "connected": "green",
-                    "failed": "red",
-                    "downloading": "cyan",
-                    "credential": "cyan",
-                    "unknown": "yellow",
-                }
-            )
-            return Console(theme=default_theme, stderr=False, force_terminal=True)
+        self._style_manager = StyleManager(mode)
+        self._style_name = StyleName  # Store reference for use in methods
+        self._console = self._style_manager.console
 
     @property
     def console(self) -> Console:
@@ -158,7 +70,10 @@ class OutputManager:
         elif self.mode == OutputMode.RAW:
             sys.stdout.write(f"device={device} {message}\n")
         else:
-            self._console.print(f"[device]{device}[/device]: {message}")
+            device_part = self._style_manager.format_message(
+                device, self._style_name.DEVICE
+            )
+            self._console.print(f"{device_part}: {message}")
 
     def print_command_output(self, device: str, command: str, output: str) -> None:
         """Print command output with appropriate formatting."""
@@ -178,9 +93,22 @@ class OutputManager:
             sys.stdout.write(f"device={device} cmd={command}\n")
             sys.stdout.write(f"{output}\n")
         else:
-            self._console.print(f"[bold device]Device:[/bold device] {device}")
-            self._console.print(f"[bold command]Command:[/bold command] {command}")
-            self._console.print(f"[output]{output}[/output]")
+            # Use style manager for semantic styling
+            device_msg = self._style_manager.format_message(
+                "Device:", self._style_name.BOLD
+            )
+            device_msg += f" {device}"
+            command_msg = self._style_manager.format_message(
+                "Command:", self._style_name.BOLD
+            )
+            command_msg += f" {command}"
+            output_msg = self._style_manager.format_message(
+                output, self._style_name.OUTPUT
+            )
+
+            self._console.print(device_msg)
+            self._console.print(command_msg)
+            self._console.print(output_msg)
 
     def print_success(self, message: str, context: str | None = None) -> None:
         """Print a success message."""
@@ -190,9 +118,14 @@ class OutputManager:
             else:
                 sys.stdout.write(f"success: {message}\n")
         elif context:
-            self._console.print(f"[success]OK[/success] [{context}] {message}")
+            ok_part = self._style_manager.format_message("OK", self._style_name.SUCCESS)
+            context_part = self._style_manager.format_message(
+                context, self._style_name.DEVICE
+            )
+            self._console.print(f"{ok_part} [{context_part}] {message}")
         else:
-            self._console.print(f"[success]OK[/success] {message}")
+            ok_part = self._style_manager.format_message("OK", self._style_name.SUCCESS)
+            self._console.print(f"{ok_part} {message}")
 
     def print_error(self, message: str, context: str | None = None) -> None:
         """Print an error message."""
@@ -207,9 +140,18 @@ class OutputManager:
             else:
                 sys.stdout.write(f"error: {message}\n")
         elif context:
-            self._console.print(f"[error]FAIL[/error] [{context}] {message}")
+            fail_part = self._style_manager.format_message(
+                "FAIL", self._style_name.ERROR
+            )
+            context_part = self._style_manager.format_message(
+                context, self._style_name.DEVICE
+            )
+            self._console.print(f"{fail_part} [{context_part}] {message}")
         else:
-            self._console.print(f"[error]FAIL[/error] {message}")
+            fail_part = self._style_manager.format_message(
+                "FAIL", self._style_name.ERROR
+            )
+            self._console.print(f"{fail_part} {message}")
 
     def print_warning(self, message: str, context: str | None = None) -> None:
         """Print a warning message."""
@@ -224,9 +166,18 @@ class OutputManager:
             else:
                 sys.stdout.write(f"warning: {message}\n")
         elif context:
-            self._console.print(f"[warning]WARN[/warning] [{context}] {message}")
+            warn_part = self._style_manager.format_message(
+                "WARN", self._style_name.WARNING
+            )
+            context_part = self._style_manager.format_message(
+                context, self._style_name.DEVICE
+            )
+            self._console.print(f"{warn_part} [{context_part}] {message}")
         else:
-            self._console.print(f"[warning]WARN[/warning] {message}")
+            warn_part = self._style_manager.format_message(
+                "WARN", self._style_name.WARNING
+            )
+            self._console.print(f"{warn_part} {message}")
 
     def print_info(self, message: str, context: str | None = None) -> None:
         """Print an informational message."""
@@ -262,37 +213,108 @@ class OutputManager:
             # Raw mode skips summaries entirely
             return
 
-        self._console.print("\n[bold summary]Run Summary[/bold summary]")
+        # Use style manager for the header
+        header = self._style_manager.format_message(
+            "Run Summary", self._style_name.SUMMARY
+        )
+        header = self._style_manager.format_message(header, self._style_name.BOLD)
+        self._console.print(f"\n{header}")
 
         if is_group and totals:
             total, succeeded, failed = totals
-            self._console.print(
-                f"  [bold]Target:[/bold] {target} (group)\n"
-                f"  [bold]Type:[/bold] {operation_type}\n"
-                f"  [bold]Operation:[/bold] {name}\n"
-                f"  [bold]Devices:[/bold] {total} total | "
-                f"[success]{succeeded} succeeded[/success], "
-                f"[error]{failed} failed[/error]\n"
-                + (
-                    f"  [bold]Results dir:[/bold] {results_dir}\n"
-                    if results_dir
-                    else ""
-                )
-                + f"  [bold]Duration:[/bold] {duration:.2f}s"
+
+            # Build styled summary for group
+            target_line = (
+                self._style_manager.format_message("Target:", self._style_name.BOLD)
+                + f" {target} (group)"
             )
+            type_line = (
+                self._style_manager.format_message("Type:", self._style_name.BOLD)
+                + f" {operation_type}"
+            )
+            operation_line = (
+                self._style_manager.format_message("Operation:", self._style_name.BOLD)
+                + f" {name}"
+            )
+            devices_line = (
+                self._style_manager.format_message("Devices:", self._style_name.BOLD)
+                + f" {total} total | "
+            )
+
+            # Add success/failure counts with semantic styling
+            success_text = self._style_manager.format_message(
+                f"{succeeded} succeeded", self._style_name.SUCCESS
+            )
+            error_text = self._style_manager.format_message(
+                f"{failed} failed", self._style_name.ERROR
+            )
+            devices_line += f"{success_text}, {error_text}"
+
+            summary_lines = [
+                f"  {target_line}",
+                f"  {type_line}",
+                f"  {operation_line}",
+                f"  {devices_line}",
+            ]
+
+            if results_dir:
+                results_line = (
+                    self._style_manager.format_message(
+                        "Results dir:", self._style_name.BOLD
+                    )
+                    + f" {results_dir}"
+                )
+                summary_lines.append(f"  {results_line}")
+
+            duration_line = (
+                self._style_manager.format_message("Duration:", self._style_name.BOLD)
+                + f" {duration:.2f}s"
+            )
+            summary_lines.append(f"  {duration_line}")
+
+            self._console.print("\n".join(summary_lines))
         else:
-            self._console.print(
-                f"  [bold]Target:[/bold] {target}\n"
-                f"  [bold]Type:[/bold] {operation_type}\n"
-                f"  [bold]Operation:[/bold] {name}\n"
-                f"  [bold]Status:[/bold] {status}\n"
-                + (
-                    f"  [bold]Results dir:[/bold] {results_dir}\n"
-                    if results_dir
-                    else ""
-                )
-                + f"  [bold]Duration:[/bold] {duration:.2f}s"
+            # Build styled summary for single device
+            target_line = (
+                self._style_manager.format_message("Target:", self._style_name.BOLD)
+                + f" {target}"
             )
+            type_line = (
+                self._style_manager.format_message("Type:", self._style_name.BOLD)
+                + f" {operation_type}"
+            )
+            operation_line = (
+                self._style_manager.format_message("Operation:", self._style_name.BOLD)
+                + f" {name}"
+            )
+            status_line = (
+                self._style_manager.format_message("Status:", self._style_name.BOLD)
+                + f" {status}"
+            )
+
+            summary_lines = [
+                f"  {target_line}",
+                f"  {type_line}",
+                f"  {operation_line}",
+                f"  {status_line}",
+            ]
+
+            if results_dir:
+                results_line = (
+                    self._style_manager.format_message(
+                        "Results dir:", self._style_name.BOLD
+                    )
+                    + f" {results_dir}"
+                )
+                summary_lines.append(f"  {results_line}")
+
+            duration_line = (
+                self._style_manager.format_message("Duration:", self._style_name.BOLD)
+                + f" {duration:.2f}s"
+            )
+            summary_lines.append(f"  {duration_line}")
+
+            self._console.print("\n".join(summary_lines))
 
     def print_results_directory(self, results_dir: str) -> None:
         """Print the results directory information."""
@@ -300,7 +322,11 @@ class OutputManager:
             # Raw mode doesn't show results directory info
             return
 
-        self._console.print(f"\n[dim]Results directory: {results_dir}[/dim]")
+        # Use style manager for dim styling
+        msg = self._style_manager.format_message(
+            f"Results directory: {results_dir}", self._style_name.DIM
+        )
+        self._console.print(f"\n{msg}")
 
     def print_json(self, data: dict[str, Any]) -> None:
         """Print JSON data."""
@@ -334,7 +360,10 @@ class OutputManager:
         if self.mode == OutputMode.RAW:
             sys.stdout.write(f"{text}\n")
         else:
-            self._console.print(f"[output]{text}[/output]")
+            styled_text = self._style_manager.format_message(
+                text, self._style_name.OUTPUT
+            )
+            self._console.print(styled_text)
 
     def create_table(
         self, *, title: str = "", show_header: bool = False, box: Any | None = None
@@ -383,14 +412,20 @@ class OutputManager:
         if self.mode == OutputMode.RAW:
             sys.stdout.write(f"transport={transport_type}\n")
         else:
-            self._console.print(f"[transport]Transport:[/transport] {transport_type}")
+            transport_label = self._style_manager.format_message(
+                "Transport:", self._style_name.TRANSPORT
+            )
+            self._console.print(f"{transport_label} {transport_type}")
 
     def print_running_command(self, command: str) -> None:
         """Print information about a running command."""
         if self.mode == OutputMode.RAW:
             sys.stdout.write(f"running={command}\n")
         else:
-            self._console.print(f"[running]Running:[/running] {command}")
+            running_label = self._style_manager.format_message(
+                "Running:", self._style_name.RUNNING
+            )
+            self._console.print(f"{running_label} {command}")
 
     def print_connection_status(self, device: str, connected: bool) -> None:
         """Print connection status."""
@@ -398,25 +433,36 @@ class OutputManager:
             status = "connected" if connected else "failed"
             sys.stdout.write(f"device={device} status={status}\n")
         elif connected:
-            self._console.print(f"[connected]OK Connected to {device}[/connected]")
+            ok_part = self._style_manager.format_message(
+                "OK", self._style_name.CONNECTED
+            )
+            self._console.print(f"{ok_part} Connected to {device}")
         else:
-            self._console.print(f"[failed]FAIL Failed to connect to {device}[/failed]")
+            fail_part = self._style_manager.format_message(
+                "FAIL", self._style_name.FAILED
+            )
+            self._console.print(f"{fail_part} Failed to connect to {device}")
 
     def print_downloading(self, device: str, filename: str) -> None:
         """Print download progress."""
         if self.mode == OutputMode.RAW:
             sys.stdout.write(f"device={device} downloading={filename}\n")
         else:
-            self._console.print(
-                f"[downloading]Downloading {filename} from {device}...[/downloading]"
+            message = f"Downloading {filename} from {device}..."
+            styled_message = self._style_manager.format_message(
+                message, self._style_name.DOWNLOADING
             )
+            self._console.print(styled_message)
 
     def print_credential_info(self, message: str) -> None:
         """Print credential-related information."""
         if self.mode == OutputMode.RAW:
             sys.stdout.write(f"credential: {message}\n")
         else:
-            self._console.print(f"[credential]{message}[/credential]")
+            styled_message = self._style_manager.format_message(
+                message, self._style_name.CREDENTIAL
+            )
+            self._console.print(styled_message)
 
     def print_unknown_warning(self, unknowns: list[str]) -> None:
         """Print warning about unknown targets."""
@@ -424,9 +470,11 @@ class OutputManager:
         if self.mode == OutputMode.RAW:
             sys.stdout.write(f"warning: unknown targets: {unknowns_str}\n")
         else:
-            self._console.print(
-                f"[unknown]Warning: Unknown targets: {unknowns_str}[/unknown]"
+            message = f"Warning: Unknown targets: {unknowns_str}"
+            styled_message = self._style_manager.format_message(
+                message, self._style_name.UNKNOWN
             )
+            self._console.print(styled_message)
 
 
 def get_output_mode_from_env() -> OutputMode:

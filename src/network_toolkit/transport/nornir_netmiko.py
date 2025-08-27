@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from nornir import Nornir
-    from nornir.core.task import MultiResult, Result
 
 from network_toolkit.transport.interfaces import CommandResult, ConnectionState
 
@@ -123,7 +122,10 @@ class NornirNetmikoTransport:
         try:
             from nornir_netmiko.tasks import netmiko_send_command
         except ImportError as e:
-            error_msg = "nornir-netmiko package required. Install with: pip install nornir-netmiko"
+            error_msg = (
+                "nornir-netmiko package required. "
+                "Install with: pip install nornir-netmiko"
+            )
             raise ImportError(error_msg) from e
 
         start_time = time.time()
@@ -207,7 +209,9 @@ class NornirNetmikoTransport:
         return results
 
     def send_interactive(
-        self, interact_events: list[tuple[str, str, bool]], timeout_ops: float
+        self,
+        _interact_events: list[tuple[str, str, bool]],
+        _timeout_ops: float,
     ) -> str:
         """Send interactive command with prompts and responses."""
         # This is more complex with Netmiko, would need custom implementation
@@ -236,11 +240,15 @@ class NornirNetmikoTransport:
     def execute_on_group(
         self, device_names: list[str], command: str
     ) -> dict[str, CommandResult]:
-        """Execute command on multiple devices efficiently using Nornir's parallel execution."""
+        """Execute command on multiple devices efficiently using Nornir's
+        parallel execution."""
         try:
             from nornir_netmiko.tasks import netmiko_send_command
         except ImportError as e:
-            error_msg = "nornir-netmiko package required. Install with: pip install nornir-netmiko"
+            error_msg = (
+                "nornir-netmiko package required. "
+                "Install with: pip install nornir-netmiko"
+            )
             raise ImportError(error_msg) from e
 
         # Filter to target devices and run command in parallel

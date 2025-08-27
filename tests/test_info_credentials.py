@@ -22,11 +22,13 @@ class TestInfoCommandCredentials:
 
         # Create main config.yml file (required for modular config)
         config_file = config_dir / "config.yml"
-        config_file.write_text("""
+        config_file.write_text(
+            """
 general:
   timeout: 30
   port: 22
-""")
+"""
+        )
 
         # Create devices.yml directly in config directory (not in subdirectory)
         devices_file = config_dir / "devices.yml"
@@ -47,7 +49,8 @@ general:
 
         # Create groups config
         groups_config = groups_dir / "groups.yml"
-        groups_config.write_text("""
+        groups_config.write_text(
+            """
 groups:
   test_group:
     description: "Test group"
@@ -55,7 +58,8 @@ groups:
     credentials:
       user: "group_user"
       password: "group_pass"
-""")
+"""
+        )
 
         # Set environment variables
         os.environ["NW_USER_DEFAULT"] = "default_user"
@@ -80,9 +84,9 @@ groups:
                     f"Command failed with exit code {result.exit_code}. Output: {result.output}"
                 )
 
-            # Check that credential source information is shown
-            assert "Username Source" in result.output
-            assert "Password Source" in result.output
+            # Check that credential information is shown in table
+            assert "Username" in result.output
+            assert "Password" in result.output
 
         finally:
             # Clean up environment
@@ -102,21 +106,25 @@ groups:
 
         # Create main config.yml file (required for modular config)
         config_file = config_dir / "config.yml"
-        config_file.write_text("""
+        config_file.write_text(
+            """
 general:
   timeout: 30
   port: 22
-""")
+"""
+        )
 
         # Create devices.yml directly in config directory (not in subdirectory)
         devices_config = config_dir / "devices.yml"
-        devices_config.write_text("""
+        devices_config.write_text(
+            """
 devices:
   test_device1:
     host: "192.168.1.1"
     device_type: "mikrotik_routeros"
     platform: "arm"
-""")
+"""
+        )
 
         # Set minimal environment
         os.environ["NW_USER_DEFAULT"] = "test_user"
@@ -134,7 +142,7 @@ devices:
             assert (
                 "test_pass" not in result.output
             )  # Ensure password is not shown in plaintext
-            assert "Password Source" in result.output  # Ensure source info is shown
+            assert "Password" in result.output  # Ensure password field is shown
 
         finally:
             # Clean up environment

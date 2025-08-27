@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 
@@ -16,9 +16,12 @@ from network_toolkit.common.output import (
     get_output_manager_with_config,
     set_output_mode,
 )
-from network_toolkit.common.styles import StyleManager
+from network_toolkit.common.styles import StyleManager, StyleName
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
+
+if TYPE_CHECKING:
+    from network_toolkit.common.table_generator import TableDataProvider, TableGenerator
 
 
 def create_standard_options() -> dict[str, object]:
@@ -85,6 +88,21 @@ class CommandContext:
         self.console = self.style_manager.console
         self.mode = self.output_manager.mode
 
+    @property
+    def table_generator(self) -> TableGenerator:
+        """Get table generator for this context."""
+        if not hasattr(self, "_table_generator"):
+            from network_toolkit.common.table_generator import TableGenerator
+
+            self._table_generator = TableGenerator(
+                self.style_manager, self.output_manager
+            )
+        return self._table_generator
+
+    def render_table(self, provider: TableDataProvider, verbose: bool = False) -> None:
+        """Convenience method to render a table."""
+        self.table_generator.render_table(provider, verbose)
+
     def print_error(self, message: str, device_name: str | None = None) -> None:
         """Print an error message with proper styling."""
         self.output_manager.print_error(message, device_name)
@@ -118,3 +136,79 @@ class CommandContext:
     def should_suppress_colors(self) -> bool:
         """Check if colors should be suppressed."""
         return self.mode in [OutputMode.RAW, OutputMode.NO_COLOR]
+
+    def print_operation_header(
+        self, operation: str, target: str, target_type: str = "device"
+    ) -> None:
+        """Print operation start header with consistent formatting."""
+        if self.mode == OutputMode.RAW:
+            self.output_manager.print_info(
+                f"operation={operation} {target_type}={target}"
+            )
+        else:
+            # Use style manager to format the message properly
+            formatted_msg = self.style_manager.format_message(
+                f"{operation}: {target}", StyleName.INFO
+            )
+            # Make it bold for emphasis
+            formatted_msg = self.style_manager.format_message(
+                formatted_msg, StyleName.BOLD
+            )
+            self.output_manager.print_text(formatted_msg)
+
+    def print_operation_complete(self, operation: str, success: bool = True) -> None:
+        """Print operation completion status with consistent formatting."""
+        if success:
+            if self.mode == OutputMode.RAW:
+                self.output_manager.print_info("status=completed")
+            else:
+                # Use semantic success method
+                self.output_manager.print_success(f"{operation} completed successfully")
+        elif self.mode == OutputMode.RAW:
+            self.output_manager.print_info("status=failed")
+        else:
+            # Use semantic error method
+            self.output_manager.print_error(f"{operation} failed")
+
+    def print_detail_line(self, label: str, value: str) -> None:
+        """Print a detail line with consistent formatting."""
+        if self.mode == OutputMode.RAW:
+            key = label.lower().replace(" ", "_").replace(":", "")
+            self.output_manager.print_info(f"{key}={value}")
+        else:
+            # Use style manager for dim/subtle formatting
+            formatted_msg = self.style_manager.format_message(
+                f"  {label}: {value}", StyleName.DIM
+            )
+            self.output_manager.print_text(formatted_msg)
+
+    def print_usage_examples_header(self) -> None:
+        """Print usage examples section header."""
+        if self.mode == OutputMode.RAW:
+            self.output_manager.print_info("section=usage_examples")
+        else:
+            # Use style manager for warning color (yellow) and bold
+            formatted_msg = self.style_manager.format_message(
+                "\nUsage Examples:", StyleName.WARNING
+            )
+            formatted_msg = self.style_manager.format_message(
+                formatted_msg, StyleName.BOLD
+            )
+            self.output_manager.print_text(formatted_msg)
+
+    def print_separator(self) -> None:
+        """Print a separator line."""
+        self.output_manager.print_separator()
+
+    def print_blank_line(self) -> None:
+        """Print a blank line."""
+        self.output_manager.print_blank_line()
+
+    def print_code_block(self, text: str) -> None:
+        """Print a code block or configuration text."""
+        if self.mode == OutputMode.RAW:
+            # In raw mode, just print the text as-is
+            self.output_manager.print_output(text)
+        else:
+            # In styled modes, preserve any existing formatting
+            self.output_manager.print_text(text)

@@ -11,8 +11,7 @@ import typer
 from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.logging import setup_logging
-from network_toolkit.common.styles import StyleName
-from network_toolkit.config import load_config
+from network_toolkit.config import NetworkConfig, load_config
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.platforms import (
     UnsupportedOperationError,
@@ -96,7 +95,9 @@ def config_backup(
                 ctx.print_info("Known groups: " + preview)
             raise typer.Exit(1)
 
-        def resolve_backup_sequence(config, device_name: str) -> list[str]:
+        def resolve_backup_sequence(
+            config: NetworkConfig, device_name: str
+        ) -> list[str]:
             """Resolve the backup sequence for a device."""
             seq_name = "backup_config"
             devices = config.devices or {}
@@ -137,9 +138,7 @@ def config_backup(
                         )
                         return False
 
-                    ctx.output_manager.print_text(
-                        f"[bold cyan]Creating configuration backup on {dev}[/bold cyan]"
-                    )
+                    ctx.print_operation_header("Configuration Backup", dev, "device")
                     transport_type = config.get_transport_type(dev)
                     platform_name = platform_ops.get_platform_name()
                     ctx.print_info(f"Platform: {platform_name}")
@@ -190,7 +189,7 @@ def config_backup(
             ok = process_device(target_name)
             if not ok:
                 raise typer.Exit(1)
-            ctx.output_manager.print_text("[bold green]Backup completed[/bold green]")
+            ctx.print_operation_complete("Backup", success=True)
             return
 
         # Group path
@@ -206,18 +205,14 @@ def config_backup(
             ctx.print_error(f"No devices found in group '{target_name}'")
             raise typer.Exit(1)
 
-        ctx.output_manager.print_text(
-            f"[bold cyan]Starting backups for group:[/bold cyan] {target_name}"
-        )
+        ctx.print_operation_header("Backup", target_name, "group")
         failures = 0
         for dev in members:
             ok = process_device(dev)
             failures += 0 if ok else 1
 
         total = len(members)
-        ctx.output_manager.print_text(
-            f"[bold]Completed:[/bold] {total - failures}/{total} successful backups"
-        )
+        ctx.print_info(f"Completed: {total - failures}/{total} successful backups")
         if failures:
             raise typer.Exit(1)
 
@@ -294,7 +289,7 @@ def comprehensive_backup(
             raise typer.Exit(1)
 
         def resolve_comprehensive_backup_sequence(
-            config, device_name: str
+            config: NetworkConfig, device_name: str
         ) -> list[str]:
             """Resolve the comprehensive backup command sequence for a device."""
             devices = config.devices or {}
@@ -329,9 +324,7 @@ def comprehensive_backup(
                         )
                         return False
 
-                    ctx.output_manager.print_text(
-                        f"[bold cyan]Creating comprehensive backup on {dev}[/bold cyan]"
-                    )
+                    ctx.print_operation_header("Comprehensive Backup", dev, "device")
                     transport_type = config.get_transport_type(dev)
                     platform_name = platform_ops.get_platform_name()
                     ctx.print_info(f"Platform: {platform_name}")
@@ -383,9 +376,7 @@ def comprehensive_backup(
             ok = process_device(target_name)
             if not ok:
                 raise typer.Exit(1)
-            ctx.output_manager.print_text(
-                "[bold green]Comprehensive backup completed[/bold green]"
-            )
+            ctx.print_operation_complete("Comprehensive Backup", success=True)
             return
 
         # Group processing
@@ -401,18 +392,14 @@ def comprehensive_backup(
             ctx.print_error(f"No devices found in group '{target_name}'")
             raise typer.Exit(1)
 
-        ctx.output_manager.print_text(
-            f"[bold cyan]Starting comprehensive backups for group:[/bold cyan] {target_name}"
-        )
+        ctx.print_operation_header("Comprehensive Backup", target_name, "group")
         failures = 0
         for dev in members:
             ok = process_device(dev)
             failures += 0 if ok else 1
 
         total = len(members)
-        ctx.output_manager.print_text(
-            f"[bold]Completed:[/bold] {total - failures}/{total} successful backups"
-        )
+        ctx.print_info(f"Completed: {total - failures}/{total} successful backups")
         if failures:
             raise typer.Exit(1)
 

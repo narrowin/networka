@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib.resources as importlib_resources
 import logging
 import os
 import shutil
@@ -331,7 +330,13 @@ def install_shell_completions(selected: str) -> tuple[Path | None, Path | None]:
         msg = "Only bash and zsh shells are supported for completion installation"
         raise ConfigurationError(msg)
 
-    # Try packaged resources under network_toolkit.shell_completion
+    # Only install completions when running in a repo/dev context.
+    # Tests expect a no-op when repo root isn't detected.
+    repo_root = _detect_repo_root()
+    if not repo_root:
+        return (None, None)
+
+    # Try packaged resources under network_toolkit.shell_completion first
     pkg_src: Path | None = None
     try:
         import importlib.resources as ir
@@ -349,19 +354,18 @@ def install_shell_completions(selected: str) -> tuple[Path | None, Path | None]:
     except Exception:  # pragma: no cover - safety
         pkg_src = None
 
+    # Fallback to repo-root scripts
     repo_src: Path | None = None
-    repo_root = _detect_repo_root()
-    if repo_root:
-        sc_dir = repo_root / "shell_completion"
-        if selected == "bash":
-            cand = sc_dir / "bash_completion_nw.sh"
-        else:
-            cand = sc_dir / "zsh_completion_netkit.zsh"
-        if cand.exists():
-            repo_src = cand
+    sc_dir = repo_root / "shell_completion"
+    if selected == "bash":
+        cand = sc_dir / "bash_completion_nw.sh"
+    else:
+        cand = sc_dir / "zsh_completion_netkit.zsh"
+    if cand.exists():
+        repo_src = cand
 
     if not pkg_src and not repo_src:
-        logger.warning("Completion scripts not found; skipping")
+        logger.warning("Completion scripts not found in repo; skipping")
         return (None, None)
 
     try:
@@ -610,7 +614,7 @@ def _config_init_impl(
             ctx.output_manager.print_text(
                 "\nWhere should Networka store its configuration?"
             )
-            ctx.output_manager.print_text(f"[dim]Default: {default_path}[/dim]")
+            ctx.print_detail_line("Default", str(default_path))
             user_input = typer.prompt("Location", default=str(default_path))
             target_path = Path(user_input).expanduser().resolve()
 
