@@ -126,7 +126,7 @@ def create_ip_device_config(
     return DeviceConfig(
         host=ip,
         description=f"Dynamic device at {ip}",
-        device_type=device_type,  # type: ignore[arg-type]  # Validated above
+        device_type=device_type,  # Validated above
         platform=hardware_platform,
         port=port,
         transport_type=transport_type,

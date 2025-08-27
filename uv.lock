@@ -1236,6 +1236,8 @@ dev = [
     { name = "pytest-mock" },
     { name = "pytest-xdist" },
     { name = "textual-dev" },
+    { name = "types-paramiko" },
+    { name = "types-pyyaml" },
 ]
 
 [package.metadata]
@@ -1281,6 +1283,8 @@ dev = [
     { name = "pytest-mock", specifier = ">=3.14.1" },
     { name = "pytest-xdist", specifier = ">=3.8.0" },
     { name = "textual-dev", specifier = ">=1.0.0" },
+    { name = "types-paramiko", specifier = ">=3.0.0" },
+    { name = "types-pyyaml", specifier = ">=6.0.0" },
 ]
 
 [[package]]

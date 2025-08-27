@@ -10,7 +10,7 @@ Falls back gracefully (returns False) if Textual is not available.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Literal
 
 try:  # Optional at import time; provide stubs if unavailable
     from textual.containers import Vertical as _Vertical  # type: ignore
@@ -32,7 +32,7 @@ except Exception:  # pragma: no cover - textual not installed
         def __enter__(self) -> _Vertical:
             return self
 
-        def __exit__(self, *_: Any) -> bool:
+        def __exit__(self, *_: Any) -> Literal[False]:
             return False
 
 

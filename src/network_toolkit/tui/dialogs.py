@@ -8,13 +8,13 @@ from __future__ import annotations
 
 # pyright: reportUnknownArgumentType=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportGeneralTypeIssues=false
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Literal
 
 try:  # Optional at import time; provide stubs if unavailable
     from textual.containers import Vertical as _Vertical  # type: ignore
     from textual.screen import ModalScreen as _ModalScreenBase  # type: ignore
     from textual.widgets import Button as _Button  # type: ignore
-    from textual.widgets import Static as _Static
+    from textual.widgets import Static as _Static  # type: ignore
 except Exception:  # pragma: no cover - textual not installed
     _ModalScreenBase = object  # type: ignore
 
@@ -30,7 +30,7 @@ except Exception:  # pragma: no cover - textual not installed
         def __enter__(self) -> _Vertical:
             return self
 
-        def __exit__(self, *_: Any) -> bool:
+        def __exit__(self, *_: Any) -> Literal[False]:
             return False
 
 

@@ -101,7 +101,7 @@ class NornirNetmikoTransportFactory:
         inventory = build_nornir_inventory(config)
 
         # Create Nornir instance directly with inventory - simplest approach
-        nr = Nornir(inventory=inventory)  # type: ignore[call-arg]
+        nr = Nornir(inventory=inventory)
         return nr
 
 
