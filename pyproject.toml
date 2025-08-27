@@ -89,7 +89,7 @@ Changelog = "https://github.com/narrowin/networka/blob/main/CHANGELOG.md"
 
 [project.scripts]
 nw = "network_toolkit.cli:app"
-nw-tui = "network_toolkit.tui:run"
+# nw-tui = "network_toolkit.tui:run"  # TODO: Enable when TUI is ready for release
 
 [tool.hatch.version]
 path = "src/network_toolkit/__about__.py"
