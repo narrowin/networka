@@ -5,6 +5,6 @@ This page is auto-generated from the actual CLI code so it always reflects the r
 ::: mkdocs-click
     :module: network_toolkit.cli
     :command: cli
-    :depth: 1
+    :depth: 2
     :style: table
 :::

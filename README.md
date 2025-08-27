@@ -13,8 +13,8 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Type checked with mypy](https://img.shields.io/badge/mypy-checked-blue.svg)](http://mypy-lang.org/)
-[![CI](https://github.com/narrowin/networka/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/narrowin/networka/actions/workflows/ci.yml)
-[![Docs](https://img.shields.io/github/actions/workflow/status/narrowin/networka/docs.yml?branch=mkdoks&label=Docs&logo=github)](https://github.com/narrowin/networka/actions?query=workflow%3ADocs+branch%3Amkdoks)
+[![CI](https://github.com/narrowin/networka/actions/workflows/ci.yml/badge.svg)](https://github.com/narrowin/networka/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/github/actions/workflow/status/narrowin/networka/docs.yml?label=Docs&logo=github)](https://narrowin.github.io/networka/)
 
 Networka is a modern async CLI tool for automating network devices across multiple vendors. Built with async/await patterns for high performance and reliability. Designed for network engineers who want fast, scalable automation with full cross-platform support.
 
@@ -180,7 +180,7 @@ Note: When targeting IPs directly, `--platform` refers to the network driver (de
 
 ## Community & support
 
-- Visit our [documentation](docs/) for detailed guides and examples
+- Visit our [documentation](https://narrowin.github.io/networka/) for detailed guides and examples
 - Create [GitHub Issues](https://github.com/narrowin/networka/issues) for bug reports and feature requests
 - See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines
 - Check [SECURITY.md](SECURITY.md) for security policy and reporting vulnerabilities

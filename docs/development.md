@@ -21,9 +21,6 @@ cd networka
 uv sync
 
 # Install pre-commit hooks
-uv run pre-commit install
-
-# Verify setup
 uv run pytest --version
 uv run ruff --version
 uv run mypy --version
@@ -44,6 +41,20 @@ uv run pytest                   # Run tests
 # Or use task runner (if you have go-task installed)
 task dev                         # Complete development setup
 task test                        # Run tests
+### CI workflow checks locally
+
+- Lint workflows (fast):
+    - With Docker: `docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest`
+    - Or with act: `act pull_request -W .github/workflows/ci.yml -j workflow-lint`
+
+Why run as a PR? Pull requests trigger different paths/conditions (e.g., `pull_request` filters, PR-only jobs). Simulating PR avoids surprises that don’t appear on `push`.
+
+### Docs
+
+- Strict docs build:
+    - `uv run mkdocs build --strict`
+
+Link checking runs in CI only.
 task lint                        # Run linting
 task build                       # Build package
 ```
