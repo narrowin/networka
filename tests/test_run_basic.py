@@ -103,7 +103,7 @@ class TestRunCommand:
 
     def test_run_with_dry_run(self, config_file: Path) -> None:
         """Test run command with dry-run option."""
-        runner = CliRunner()
+        runner = CliRunner(env={"NO_COLOR": "1"})
 
         result = runner.invoke(
             app,

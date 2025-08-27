@@ -151,7 +151,7 @@ class TestOutputModeDetection:
 
         assert get_output_mode_from_env() == OutputMode.RICH
 
-    @patch.dict("os.environ", {"CI": "true"})
+    @patch.dict("os.environ", {"CI": "true"}, clear=True)
     def test_ci_env_detection(self):
         """Test CI environment detection."""
         from network_toolkit.common.output_clean import get_output_mode_from_env
