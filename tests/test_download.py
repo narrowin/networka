@@ -8,6 +8,7 @@ from typer.testing import CliRunner
 
 from network_toolkit.cli import app
 from network_toolkit.commands.download import register
+from network_toolkit.config import DeviceConfig, DeviceGroup, NetworkConfig
 from network_toolkit.exceptions import NetworkToolkitError
 
 
@@ -40,9 +41,14 @@ class TestDownload:
     ) -> None:
         """Test successful file download from a device."""
         # Mock configuration
-        mock_config = MagicMock()
-        mock_config.devices = {"test-device": MagicMock()}
-        mock_config.device_groups = {}
+        mock_config = NetworkConfig(
+            devices={
+                "test-device": DeviceConfig(
+                    host="192.168.1.1", device_type="mikrotik_routeros"
+                )
+            },
+            device_groups={},
+        )
         mock_load_config.return_value = mock_config
 
         # Mock device session
@@ -71,16 +77,21 @@ class TestDownload:
             verify_download=True,
         )
 
-    @patch("network_toolkit.common.command.load_config")
+    @patch("network_toolkit.common.config_manager.ConfigManager.load_config_safe")
     @patch("network_toolkit.cli.DeviceSession")
     def test_download_device_with_options(
         self, mock_session_class: MagicMock, mock_load_config: MagicMock
     ) -> None:
         """Test file download from a device with delete and no-verify options."""
         # Mock configuration
-        mock_config = MagicMock()
-        mock_config.devices = {"test-device": MagicMock()}
-        mock_config.device_groups = {}
+        mock_config = NetworkConfig(
+            devices={
+                "test-device": DeviceConfig(
+                    host="192.168.1.1", device_type="mikrotik_routeros"
+                )
+            },
+            device_groups={},
+        )
         mock_load_config.return_value = mock_config
 
         # Mock device session
@@ -110,16 +121,21 @@ class TestDownload:
             verify_download=False,
         )
 
-    @patch("network_toolkit.common.command.load_config")
+    @patch("network_toolkit.common.config_manager.ConfigManager.load_config_safe")
     @patch("network_toolkit.cli.DeviceSession")
     def test_download_device_failure(
         self, mock_session_class: MagicMock, mock_load_config: MagicMock
     ) -> None:
         """Test failed file download from a device."""
         # Mock configuration
-        mock_config = MagicMock()
-        mock_config.devices = {"test-device": MagicMock()}
-        mock_config.device_groups = {}
+        mock_config = NetworkConfig(
+            devices={
+                "test-device": DeviceConfig(
+                    host="192.168.1.1", device_type="mikrotik_routeros"
+                )
+            },
+            device_groups={},
+        )
         mock_load_config.return_value = mock_config
 
         # Mock device session
@@ -134,13 +150,14 @@ class TestDownload:
         assert result.exit_code == 1
         assert "Download failed!" in result.output
 
-    @patch("network_toolkit.common.command.load_config")
+    @patch("network_toolkit.common.config_manager.ConfigManager.load_config_safe")
     def test_download_device_not_found(self, mock_load_config: MagicMock) -> None:
         """Test download command with non-existent device."""
         # Mock configuration
-        mock_config = MagicMock()
-        mock_config.devices = {}
-        mock_config.device_groups = {}
+        mock_config = NetworkConfig(
+            devices={},
+            device_groups={},
+        )
         mock_load_config.return_value = mock_config
 
         result = self.runner.invoke(
@@ -150,22 +167,28 @@ class TestDownload:
         assert result.exit_code == 1
         assert "not found as device or group" in result.output
 
-    @patch("network_toolkit.common.command.load_config")
+    @patch("network_toolkit.common.config_manager.ConfigManager.load_config_safe")
     @patch("network_toolkit.cli.DeviceSession")
     def test_download_group_success(
         self, mock_session_class: MagicMock, mock_load_config: MagicMock
     ) -> None:
         """Test successful file download from a device group."""
         # Mock configuration
-        mock_config = MagicMock()
-        mock_config.devices = {
-            "device1": MagicMock(),
-            "device2": MagicMock(),
-        }
-        mock_group = MagicMock()
-        mock_group.members = ["device1", "device2"]
-        mock_config.device_groups = {"test-group": mock_group}
-        mock_config.get_group_members.return_value = ["device1", "device2"]
+        mock_config = NetworkConfig(
+            devices={
+                "device1": DeviceConfig(
+                    host="192.168.1.1", device_type="mikrotik_routeros"
+                ),
+                "device2": DeviceConfig(
+                    host="192.168.1.2", device_type="mikrotik_routeros"
+                ),
+            },
+            device_groups={
+                "test-group": DeviceGroup(
+                    description="Test group", members=["device1", "device2"]
+                )
+            },
+        )
         mock_load_config.return_value = mock_config
 
         # Mock device sessions
@@ -183,22 +206,28 @@ class TestDownload:
         assert "2" in result.output  # Check for the success count
         assert mock_session.download_file.call_count == 2
 
-    @patch("network_toolkit.common.command.load_config")
+    @patch("network_toolkit.common.config_manager.ConfigManager.load_config_safe")
     @patch("network_toolkit.cli.DeviceSession")
     def test_download_group_partial_failure(
         self, mock_session_class: MagicMock, mock_load_config: MagicMock
     ) -> None:
         """Test file download from a device group with partial failures."""
         # Mock configuration
-        mock_config = MagicMock()
-        mock_config.devices = {
-            "device1": MagicMock(),
-            "device2": MagicMock(),
-        }
-        mock_group = MagicMock()
-        mock_group.members = ["device1", "device2"]
-        mock_config.device_groups = {"test-group": mock_group}
-        mock_config.get_group_members.return_value = ["device1", "device2"]
+        mock_config = NetworkConfig(
+            devices={
+                "device1": DeviceConfig(
+                    host="192.168.1.1", device_type="mikrotik_routeros"
+                ),
+                "device2": DeviceConfig(
+                    host="192.168.1.2", device_type="mikrotik_routeros"
+                ),
+            },
+            device_groups={
+                "test-group": DeviceGroup(
+                    description="Test group", members=["device1", "device2"]
+                )
+            },
+        )
         mock_load_config.return_value = mock_config
 
         # Mock device sessions - first succeeds, second fails
@@ -216,19 +245,23 @@ class TestDownload:
         assert "Failed:" in result.output
         assert "1" in result.output  # Check for the counts
 
-    @patch("network_toolkit.common.command.load_config")
+    @patch("network_toolkit.common.config_manager.ConfigManager.load_config_safe")
     @patch("network_toolkit.cli.DeviceSession")
     def test_download_group_with_exception(
         self, mock_session_class: MagicMock, mock_load_config: MagicMock
     ) -> None:
         """Test file download from a device group with exception during download."""
         # Mock configuration
-        mock_config = MagicMock()
-        mock_config.devices = {"device1": MagicMock()}
-        mock_group = MagicMock()
-        mock_group.members = ["device1"]
-        mock_config.device_groups = {"test-group": mock_group}
-        mock_config.get_group_members.return_value = ["device1"]
+        mock_config = NetworkConfig(
+            devices={
+                "device1": DeviceConfig(
+                    host="192.168.1.1", device_type="mikrotik_routeros"
+                )
+            },
+            device_groups={
+                "test-group": DeviceGroup(description="Test group", members=["device1"])
+            },
+        )
         mock_load_config.return_value = mock_config
 
         # Mock device session to raise exception
@@ -243,16 +276,16 @@ class TestDownload:
         assert result.exit_code == 1
         assert "error during download" in result.output
 
-    @patch("network_toolkit.common.command.load_config")
+    @patch("network_toolkit.common.config_manager.ConfigManager.load_config_safe")
     def test_download_group_no_members(self, mock_load_config: MagicMock) -> None:
         """Test download command with group that has no members."""
         # Mock configuration
-        mock_config = MagicMock()
-        mock_config.devices = {}
-        mock_group = MagicMock()
-        mock_group.members = []
-        mock_config.device_groups = {"empty-group": mock_group}
-        mock_config.get_group_members.side_effect = Exception("No members")
+        mock_config = NetworkConfig(
+            devices={},
+            device_groups={
+                "empty-group": DeviceGroup(description="Empty group", members=[])
+            },
+        )
         mock_load_config.return_value = mock_config
 
         result = self.runner.invoke(
@@ -262,26 +295,7 @@ class TestDownload:
         assert result.exit_code == 1
         assert "No devices found in group" in result.output
 
-    @patch("network_toolkit.common.command.load_config")
-    def test_download_group_fallback_members(self, mock_load_config: MagicMock) -> None:
-        """Test download command with group when get_group_members fails."""
-        # Mock configuration
-        mock_config = MagicMock()
-        mock_config.devices = {}
-        mock_group = MagicMock()
-        mock_group.members = None
-        mock_config.device_groups = {"test-group": mock_group}
-        mock_config.get_group_members.side_effect = Exception("Method failed")
-        mock_load_config.return_value = mock_config
-
-        result = self.runner.invoke(
-            app, ["download", "test-group", "backup.rsc", "/tmp/backups"]
-        )
-
-        assert result.exit_code == 1
-        assert "No devices found in group" in result.output
-
-    @patch("network_toolkit.common.command.load_config")
+    @patch("network_toolkit.common.config_manager.ConfigManager.load_config_safe")
     def test_download_config_error(self, mock_load_config: MagicMock) -> None:
         """Test download command with configuration loading error."""
         mock_load_config.side_effect = NetworkToolkitError("Config file not found")
@@ -293,7 +307,7 @@ class TestDownload:
         assert result.exit_code == 1
         assert "Config file not found" in result.output
 
-    @patch("network_toolkit.common.command.load_config")
+    @patch("network_toolkit.common.config_manager.ConfigManager.load_config_safe")
     def test_download_config_error_with_details(
         self, mock_load_config: MagicMock
     ) -> None:
@@ -310,7 +324,7 @@ class TestDownload:
         assert result.exit_code == 1
         assert "Config file not found" in result.output
 
-    @patch("network_toolkit.common.command.load_config")
+    @patch("network_toolkit.common.config_manager.ConfigManager.load_config_safe")
     def test_download_unexpected_error(self, mock_load_config: MagicMock) -> None:
         """Test download command with unexpected error."""
         mock_load_config.side_effect = ValueError("Unexpected error")
@@ -337,16 +351,21 @@ class TestDownload:
         )
         assert "--verify" in clean_output
 
-    @patch("network_toolkit.common.command.load_config")
+    @patch("network_toolkit.common.config_manager.ConfigManager.load_config_safe")
     @patch("network_toolkit.cli.DeviceSession")
     def test_download_output_formatting(
         self, mock_session_class: MagicMock, mock_load_config: MagicMock
     ) -> None:
         """Test download command output formatting and status messages."""
         # Mock configuration
-        mock_config = MagicMock()
-        mock_config.devices = {"test-device": MagicMock()}
-        mock_config.device_groups = {}
+        mock_config = NetworkConfig(
+            devices={
+                "test-device": DeviceConfig(
+                    host="192.168.1.1", device_type="mikrotik_routeros"
+                )
+            },
+            device_groups={},
+        )
         mock_load_config.return_value = mock_config
 
         # Mock device session
@@ -367,19 +386,23 @@ class TestDownload:
         assert "Delete remote after download:" in result.output
         assert "Verify download:" in result.output
 
-    @patch("network_toolkit.common.command.load_config")
+    @patch("network_toolkit.common.config_manager.ConfigManager.load_config_safe")
     @patch("network_toolkit.cli.DeviceSession")
     def test_download_group_output_formatting(
         self, mock_session_class: MagicMock, mock_load_config: MagicMock
     ) -> None:
         """Test download command group output formatting."""
         # Mock configuration
-        mock_config = MagicMock()
-        mock_config.devices = {"device1": MagicMock()}
-        mock_group = MagicMock()
-        mock_group.members = ["device1"]
-        mock_config.device_groups = {"test-group": mock_group}
-        mock_config.get_group_members.return_value = ["device1"]
+        mock_config = NetworkConfig(
+            devices={
+                "device1": DeviceConfig(
+                    host="192.168.1.1", device_type="mikrotik_routeros"
+                )
+            },
+            device_groups={
+                "test-group": DeviceGroup(description="Test group", members=["device1"])
+            },
+        )
         mock_load_config.return_value = mock_config
 
         # Mock device session
@@ -398,37 +421,6 @@ class TestDownload:
         assert "Devices:" in result.output
         assert "Base path:" in result.output
         assert "Group Download Results:" in result.output
-
-    # Legacy tests for backward compatibility
-    @patch("network_toolkit.commands.download.setup_logging")
-    @patch("network_toolkit.common.command.load_config")
-    @patch("network_toolkit.commands.download.import_module")
-    def test_download_command_execution(
-        self,
-        mock_import: MagicMock,
-        mock_load_config: MagicMock,
-        mock_setup_logging: MagicMock,
-    ) -> None:
-        """Test download command execution through CLI runner."""
-        # Setup mocks
-        mock_config = MagicMock()
-        mock_load_config.return_value = mock_config
-
-        mock_module = MagicMock()
-        mock_import.return_value = mock_module
-
-        # Create app and register command
-        app = typer.Typer()
-        register(app)
-
-        runner = CliRunner()
-
-        # Test basic command execution with required parameters
-        runner.invoke(app, ["test_device", "/remote/file.txt", "/local/file.txt"])
-
-        # The command should at least attempt to load config and setup logging
-        mock_setup_logging.assert_called()
-        mock_load_config.assert_called()
 
     def test_import_functionality(self) -> None:
         """Test that the module can be imported successfully."""

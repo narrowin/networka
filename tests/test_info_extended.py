@@ -10,31 +10,24 @@ import pytest
 from typer.testing import CliRunner
 
 from network_toolkit.cli import app
+from network_toolkit.config import NetworkConfig
 from network_toolkit.sequence_manager import SequenceRecord, SequenceSource
 
 
 class TestInfoExtendedFunctionality:
-    """Test info command w            mock_group = Mock()
-    mock_group.description = "Problem group"
-    mock_group.match_tags = None
-    mock_group.credentials = None
-    mock_group.devices = []sequences and groups."""
+    """Test info command with sequences and groups."""
 
     def test_info_sequence_global(self, config_file: Path) -> None:
         """Test info command with a global sequence."""
         runner = CliRunner()
 
-        with patch("network_toolkit.commands.info.load_config") as mock_load_config:
-            mock_config = Mock()
-            mock_config.devices = None
-            mock_config.device_groups = None
-            mock_config.global_command_sequences = {
-                "health_check": Mock(
-                    description="System health check",
-                    commands=["/system/health/print", "/system/resource/print"],
-                    tags=["system", "monitoring"],
-                )
-            }
+        with patch(
+            "network_toolkit.common.config_manager.ConfigManager.load_config_safe"
+        ) as mock_load_config:
+            mock_config = NetworkConfig(
+                devices={},
+                device_groups={},
+            )
             mock_load_config.return_value = mock_config
 
             result = runner.invoke(
@@ -59,13 +52,15 @@ class TestInfoExtendedFunctionality:
         runner = CliRunner()
 
         with (
-            patch("network_toolkit.commands.info.load_config") as mock_load_config,
+            patch(
+                "network_toolkit.common.config_manager.ConfigManager.load_config_safe"
+            ) as mock_load_config,
             patch("network_toolkit.commands.info.SequenceManager") as mock_sm_class,
         ):
-            mock_config = Mock()
-            mock_config.devices = None
-            mock_config.device_groups = None
-            mock_config.global_command_sequences = None
+            mock_config = NetworkConfig(
+                devices={},
+                device_groups={},
+            )
             mock_load_config.return_value = mock_config
 
             mock_sm = Mock()
@@ -114,17 +109,19 @@ class TestInfoExtendedFunctionality:
         assert "system" in result.output  # Category
 
     def test_info_sequence_vendor_single(self, config_file: Path) -> None:
-        """Test info command with a sequence for a single vendor."""
+        """Test info command for a single vendor sequence."""
         runner = CliRunner()
 
         with (
-            patch("network_toolkit.commands.info.load_config") as mock_load_config,
+            patch(
+                "network_toolkit.common.config_manager.ConfigManager.load_config_safe"
+            ) as mock_load_config,
             patch("network_toolkit.commands.info.SequenceManager") as mock_sm_class,
         ):
-            mock_config = Mock()
-            mock_config.devices = None
-            mock_config.device_groups = None
-            mock_config.global_command_sequences = None
+            mock_config = NetworkConfig(
+                devices={},
+                device_groups={},
+            )
             mock_load_config.return_value = mock_config
 
             mock_sm = Mock()
@@ -242,7 +239,9 @@ class TestInfoExtendedFunctionality:
         """Test info command with a group that has credentials."""
         runner = CliRunner()
 
-        with patch("network_toolkit.commands.info.load_config") as mock_load_config:
+        with patch(
+            "network_toolkit.common.config_manager.ConfigManager.load_config_safe"
+        ) as mock_load_config:
             mock_config = Mock()
             mock_config.devices = None
             mock_config.global_command_sequences = None
@@ -282,7 +281,9 @@ class TestInfoExtendedFunctionality:
         runner = CliRunner()
 
         with (
-            patch("network_toolkit.commands.info.load_config") as mock_load_config,
+            patch(
+                "network_toolkit.common.config_manager.ConfigManager.load_config_safe"
+            ) as mock_load_config,
             patch("network_toolkit.commands.info.SequenceManager") as mock_sm_class,
         ):
             mock_config = Mock()
@@ -390,7 +391,9 @@ class TestInfoExtendedFunctionality:
         """Test info command with a sequence that has many commands (should truncate)."""
         runner = CliRunner()
 
-        with patch("network_toolkit.commands.info.load_config") as mock_load_config:
+        with patch(
+            "network_toolkit.common.config_manager.ConfigManager.load_config_safe"
+        ) as mock_load_config:
             mock_config = Mock()
             mock_config.devices = None
             mock_config.device_groups = None

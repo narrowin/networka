@@ -7,6 +7,7 @@ import typer
 from typer.testing import CliRunner
 
 from network_toolkit.commands.vendor_config_backup import register
+from network_toolkit.config import DeviceConfig, DeviceGroup, NetworkConfig
 
 
 class TestVendorConfigBackup:
@@ -20,7 +21,7 @@ class TestVendorConfigBackup:
         # Check if command was registered
         assert len(app.registered_commands) > 0
 
-    @patch("network_toolkit.commands.vendor_config_backup.load_config")
+    @patch("network_toolkit.common.config_manager.ConfigManager.load_config_safe")
     @patch("network_toolkit.commands.vendor_config_backup.import_module")
     def test_config_backup_command_execution(
         self,
@@ -29,12 +30,14 @@ class TestVendorConfigBackup:
     ) -> None:
         """Test config backup command execution through CLI runner."""
         # Setup mocks
-        mock_config = MagicMock()
-        mock_config.devices = {"test_device": MagicMock()}
-        mock_config.device_groups = {}
-        mock_config.global_command_sequences = {
-            "config_backup": MagicMock(commands=["/export file=test"])
-        }
+        mock_config = NetworkConfig(
+            devices={
+                "test_device": DeviceConfig(
+                    host="192.168.1.1", device_type="mikrotik_routeros"
+                )
+            },
+            device_groups={},
+        )
         mock_load_config.return_value = mock_config
 
         mock_module = MagicMock()
@@ -51,20 +54,23 @@ class TestVendorConfigBackup:
         # Test basic command execution
         runner.invoke(app, ["test_device"])
 
-    @patch("network_toolkit.commands.vendor_config_backup.setup_logging")
-    @patch("network_toolkit.commands.vendor_config_backup.load_config")
+    @patch("network_toolkit.common.config_manager.ConfigManager.load_config_safe")
     @patch("network_toolkit.commands.vendor_config_backup.import_module")
     def test_config_backup_with_options(
         self,
         mock_import: MagicMock,
         mock_load_config: MagicMock,
-        mock_setup_logging: MagicMock,
     ) -> None:
         """Test config backup with various options."""
         # Setup mocks
-        mock_config = MagicMock()
-        mock_config.devices = {"test_device": MagicMock()}
-        mock_config.device_groups = {}
+        mock_config = NetworkConfig(
+            devices={
+                "test_device": DeviceConfig(
+                    host="192.168.1.1", device_type="mikrotik_routeros"
+                )
+            },
+            device_groups={},
+        )
         mock_load_config.return_value = mock_config
 
         mock_module = MagicMock()
@@ -81,12 +87,10 @@ class TestVendorConfigBackup:
         # Test with options
         runner.invoke(app, ["test_device", "--download", "--verbose"])
 
-    @patch("network_toolkit.commands.vendor_config_backup.setup_logging")
-    @patch("network_toolkit.commands.vendor_config_backup.load_config")
+    @patch("network_toolkit.common.config_manager.ConfigManager.load_config_safe")
     def test_config_backup_config_error(
         self,
         mock_load_config: MagicMock,
-        mock_setup_logging: MagicMock,
     ) -> None:
         """Test config backup with configuration error."""
         from network_toolkit.exceptions import ConfigurationError
@@ -104,20 +108,23 @@ class TestVendorConfigBackup:
 
         assert result.exit_code != 0
 
-    @patch("network_toolkit.commands.vendor_config_backup.setup_logging")
-    @patch("network_toolkit.commands.vendor_config_backup.load_config")
+    @patch("network_toolkit.common.config_manager.ConfigManager.load_config_safe")
     @patch("network_toolkit.commands.vendor_config_backup.import_module")
     def test_config_backup_with_custom_config(
         self,
         mock_import: MagicMock,
         mock_load_config: MagicMock,
-        mock_setup_logging: MagicMock,
     ) -> None:
         """Test config backup with custom config file."""
         # Setup mocks
-        mock_config = MagicMock()
-        mock_config.devices = {"test_device": MagicMock()}
-        mock_config.device_groups = {}
+        mock_config = NetworkConfig(
+            devices={
+                "test_device": DeviceConfig(
+                    host="192.168.1.1", device_type="mikrotik_routeros"
+                )
+            },
+            device_groups={},
+        )
         mock_load_config.return_value = mock_config
 
         mock_module = MagicMock()
@@ -134,20 +141,21 @@ class TestVendorConfigBackup:
         # Test with custom config path
         runner.invoke(app, ["test_device", "-c", "/custom/config.yml"])
 
-    @patch("network_toolkit.commands.vendor_config_backup.setup_logging")
-    @patch("network_toolkit.commands.vendor_config_backup.load_config")
+    @patch("network_toolkit.common.config_manager.ConfigManager.load_config_safe")
     @patch("network_toolkit.commands.vendor_config_backup.import_module")
     def test_config_backup_group_processing(
         self,
         mock_import: MagicMock,
         mock_load_config: MagicMock,
-        mock_setup_logging: MagicMock,
     ) -> None:
         """Test config backup with device group."""
         # Setup mocks for group
-        mock_config = MagicMock()
-        mock_config.devices = {}
-        mock_config.device_groups = {"test_group": MagicMock()}
+        mock_config = NetworkConfig(
+            devices={},
+            device_groups={
+                "test_group": DeviceGroup(description="Test group", members=[])
+            },
+        )
         mock_load_config.return_value = mock_config
 
         mock_module = MagicMock()
@@ -164,20 +172,19 @@ class TestVendorConfigBackup:
         # Test with group
         runner.invoke(app, ["test_group"])
 
-    @patch("network_toolkit.commands.vendor_config_backup.setup_logging")
-    @patch("network_toolkit.commands.vendor_config_backup.load_config")
+    @patch("network_toolkit.common.config_manager.ConfigManager.load_config_safe")
     @patch("network_toolkit.commands.vendor_config_backup.import_module")
     def test_config_backup_device_not_found(
         self,
         mock_import: MagicMock,
         mock_load_config: MagicMock,
-        mock_setup_logging: MagicMock,
     ) -> None:
         """Test config backup with device not found."""
         # Setup mocks with empty devices and groups
-        mock_config = MagicMock()
-        mock_config.devices = {}
-        mock_config.device_groups = {}
+        mock_config = NetworkConfig(
+            devices={},
+            device_groups={},
+        )
         mock_load_config.return_value = mock_config
 
         mock_module = MagicMock()

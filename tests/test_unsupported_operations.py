@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
+from network_toolkit.config import DeviceConfig, NetworkConfig
 from network_toolkit.platforms import (
     check_operation_support,
     get_platform_file_extensions,
@@ -89,16 +90,16 @@ class TestUnsupportedOperations:
 class TestCommandLineUnsupportedOperations:
     """Test unsupported operations through command line interface."""
 
-    @patch("network_toolkit.commands.firmware.check_operation_support")
-    @patch("network_toolkit.commands.firmware.load_config")
-    @patch("network_toolkit.commands.firmware.setup_logging")
+    @patch("network_toolkit.platforms.check_operation_support")
+    @patch("network_toolkit.common.config_manager.ConfigManager.load_config_safe")
+    @patch("network_toolkit.common.command_helpers.CommandContext.from_standard_kwargs")
     @patch("pathlib.Path.exists")
     @patch("pathlib.Path.is_file")
     def test_firmware_upgrade_fails_fast_for_unsupported_platform(
         self,
         mock_is_file: MagicMock,
         mock_exists: MagicMock,
-        mock_setup_logging: MagicMock,
+        mock_from_standard_kwargs: MagicMock,
         mock_load_config: MagicMock,
         mock_check_support: MagicMock,
     ) -> None:
@@ -114,12 +115,22 @@ class TestCommandLineUnsupportedOperations:
         )
 
         # Mock config
-        mock_config = MagicMock()
-        mock_device_config = MagicMock()
-        mock_device_config.device_type = "test_platform"
-        mock_config.devices = {"test_device": mock_device_config}
-        mock_config.device_groups = {}
+        mock_config = NetworkConfig(
+            devices={
+                "test_device": DeviceConfig(
+                    host="192.168.1.1", device_type="test_platform"
+                )
+            },
+            device_groups={},
+        )
         mock_load_config.return_value = mock_config
+
+        # Mock CommandContext
+        mock_ctx = MagicMock()
+        mock_ctx.config = mock_config
+        mock_ctx.style_manager = MagicMock()
+        mock_ctx.output_manager = MagicMock()
+        mock_from_standard_kwargs.return_value = mock_ctx
 
         import typer
         from typer.testing import CliRunner
