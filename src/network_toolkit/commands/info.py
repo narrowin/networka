@@ -10,10 +10,8 @@ from typing import TYPE_CHECKING, Annotated
 import typer
 
 from network_toolkit.common.command_helpers import CommandContext
-from network_toolkit.common.credentials import (
-    InteractiveCredentials,
-    prompt_for_credentials,
-)
+from network_toolkit.common.config_context import ConfigContext
+from network_toolkit.common.credentials import InteractiveCredentials
 from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import OutputMode
 from network_toolkit.common.table_generator import BaseTableProvider
@@ -58,14 +56,6 @@ def register(app: typer.Typer) -> None:
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
         ] = False,
-        interactive_auth: Annotated[
-            bool,
-            typer.Option(
-                "--interactive-auth",
-                "-i",
-                help="Prompt for username and password interactively",
-            ),
-        ] = False,
     ) -> None:
         """
         Show comprehensive information for devices, groups, or sequences.
@@ -82,8 +72,6 @@ def register(app: typer.Typer) -> None:
         setup_logging("DEBUG" if verbose else "INFO")
 
         # Use centralized config context for intelligent path resolution
-        from network_toolkit.common.config_context import ConfigContext
-
         config_ctx = ConfigContext.from_path(config_file)
 
         # Use CommandContext for consistent output management
@@ -98,83 +86,70 @@ def register(app: typer.Typer) -> None:
 
             # Log config source for debugging
             if verbose and config_ctx.source_info:
-                ctx.print_info(f"Using configuration from: {config_ctx.source_info}")
+                ctx.print_info(f"Config loaded from: {config_ctx.source_info}")
 
-            # Handle interactive authentication if requested
-            interactive_creds = None
-            if interactive_auth:
-                ctx.print_warning("Interactive authentication mode enabled")
-                interactive_creds = prompt_for_credentials(
-                    "Enter username for devices",
-                    "Enter password for devices",
-                    "admin",  # Default username suggestion
-                )
-                ctx.print_info(f"Will use username: {interactive_creds.username}")
-
-            # Parse targets and determine types
+            # Process targets (split comma-separated values)
             target_list = [t.strip() for t in targets.split(",") if t.strip()]
-            if not target_list:
-                ctx.print_error("Error: No targets specified")
-                raise typer.Exit(1) from None
 
-            # Process each target
-            known_count = 0
-            unknown_count = 0
-            for i, target in enumerate(target_list):
-                if i > 0:
-                    ctx.print_blank_line()
-
-                target_type = _determine_target_type(target, config)
-
-                if target_type == "device":
-                    _show_device_info(target, config, ctx, interactive_creds, verbose)
-                    known_count += 1
-                elif target_type == "group":
-                    _show_group_info(target, config, ctx)
-                    known_count += 1
-                elif target_type == "sequence":
-                    _show_sequence_info(target, config, ctx, verbose)
-                    known_count += 1
+            for target_name in target_list:
+                if target_name == "supported-types":
+                    _show_supported_types_impl(ctx, verbose)
                 else:
-                    # Unknown targets should not cause a non-zero exit; warn and continue
-                    ctx.print_warning(f"Unknown target: {target}")
-                    unknown_count += 1
-                    continue
-
-            # If nothing was recognized and config is not empty, treat as error
-            if known_count == 0 and unknown_count > 0:
-                has_devices = bool(getattr(config, "devices", None))
-                has_groups = bool(getattr(config, "device_groups", None))
-                has_global_seq = bool(getattr(config, "global_command_sequences", None))
-                # Inspect vendor sequences to determine if repository provides any
-                sm = SequenceManager(config)
-                all_vendor_sequences = sm.list_all_sequences()
-                has_vendor_sequences = any(
-                    bool(v) for v in all_vendor_sequences.values()
-                )
-
-                has_any_definitions = (
-                    has_devices or has_groups or has_global_seq or has_vendor_sequences
-                )
-
-                if has_any_definitions:
-                    # Heuristic: treat a single unknown token that doesn't look like a
-                    # plural/group name as an error (covers "invalid device" CLI test),
-                    # otherwise keep it as a warning-only to avoid false positives.
-                    if len(target_list) == 1 and not target_list[0].endswith("s"):
-                        raise typer.Exit(1) from None
+                    _handle_info_target(target_name, config, ctx, verbose)
 
         except NetworkToolkitError as e:
-            ctx.print_error(f"Error: {e.message}")
-            if verbose and e.details:
-                ctx.print_error(f"Details: {e.details}")
+            ctx.print_error(str(e))
             raise typer.Exit(1) from None
-        except typer.Exit:
-            # Allow clean exits (e.g., user cancellation) to pass through
-            raise
-        except Exception as e:  # pragma: no cover - unexpected
-            ctx.print_error(f"Unexpected error: {e}")
-            raise typer.Exit(1) from None
+
+
+def _handle_info_target(
+    target: str,
+    config: NetworkConfig,
+    ctx: CommandContext,
+    verbose: bool,
+) -> None:
+    """Handle info for a single target (device, group, or sequence)."""
+    # Check if it's a device
+    if config.devices and target in config.devices:
+        _show_device_info(target, config, ctx)
+        return
+
+    # Check if it's a group
+    if config.device_groups and target in config.device_groups:
+        _show_group_info(target, config, ctx)
+        return
+
+    # Check if it's a global sequence
+    if config.global_command_sequences and target in config.global_command_sequences:
+        _show_sequence_info(target, config, ctx, verbose)
+        return
+
+    # Check if it's a vendor sequence
+    sequence_manager = SequenceManager(config)
+    try:
+        # Try all known vendor types to see if sequence exists
+        vendors = ["mikrotik_routeros", "cisco_ios", "cisco_nxos"]  # Add more as needed
+        for vendor in vendors:
+            vendor_sequences = sequence_manager.list_vendor_sequences(vendor)
+            if target in vendor_sequences:
+                _show_sequence_info(target, config, ctx, verbose)
+                return
+    except Exception:
+        pass  # If sequence manager fails, continue to show error
+
+    # If not found anywhere, show error
+    ctx.print_error(f"Target '{target}' not found in devices, groups, or sequences")
+    raise typer.Exit(1)
+
+
+def _show_device_info(device: str, config: NetworkConfig, ctx: CommandContext) -> None:
+    """Show detailed information for a device."""
+    if not config.devices or device not in config.devices:
+        ctx.print_error(f"Device '{device}' not found in configuration")
+        raise typer.Exit(1)
+
+    provider = DeviceInfoTableProvider(config=config, device_name=device)
+    ctx.render_table(provider, False)  # verbose not available in this context
 
 
 def _show_supported_types_impl(ctx: CommandContext, verbose: bool) -> None:
@@ -230,24 +205,6 @@ def _determine_target_type(target: str, config: NetworkConfig) -> str:
             return "sequence"
 
     return "unknown"
-
-
-def _show_device_info(
-    device: str,
-    config: NetworkConfig,
-    ctx: CommandContext,
-    interactive_creds: InteractiveCredentials | None,
-    verbose: bool,
-) -> None:
-    """Show detailed information for a device."""
-    if not config.devices or device not in config.devices:
-        ctx.print_error(f"Error: Device '{device}' not found in configuration")
-        return
-
-    provider = DeviceInfoTableProvider(
-        config=config, device_name=device, interactive_creds=interactive_creds
-    )
-    ctx.render_table(provider, verbose)
 
 
 def _show_group_info(target: str, config: NetworkConfig, ctx: CommandContext) -> None:

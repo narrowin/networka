@@ -25,7 +25,17 @@ if TYPE_CHECKING:
     pass
 
 
-class DeviceListTableProvider(BaseModel, BaseTableProvider):
+class LocalOnlyProvider(BaseModel, BaseTableProvider):
+    """Base class for providers that only work with local config data.
+
+    These providers never need network connectivity, credentials, or connection parameters.
+    They only display information from configuration files and local data.
+    """
+
+    pass
+
+
+class DeviceListTableProvider(LocalOnlyProvider):
     """Provides device list table data using Pydantic v2."""
 
     config: NetworkConfig
@@ -90,7 +100,7 @@ class DeviceListTableProvider(BaseModel, BaseTableProvider):
         ]
 
 
-class GroupListTableProvider(BaseModel, BaseTableProvider):
+class GroupListTableProvider(LocalOnlyProvider):
     """Provides group list table data using Pydantic v2."""
 
     config: NetworkConfig
@@ -160,7 +170,7 @@ class GroupListTableProvider(BaseModel, BaseTableProvider):
         ]
 
 
-class TransportTypesTableProvider(BaseModel, BaseTableProvider):
+class TransportTypesTableProvider(LocalOnlyProvider):
     """Provides transport types table data using Pydantic v2."""
 
     def get_table_definition(self) -> TableDefinition:
@@ -198,7 +208,7 @@ class TransportTypesTableProvider(BaseModel, BaseTableProvider):
         ]
 
 
-class VendorSequencesTableProvider(BaseModel, BaseTableProvider):
+class VendorSequencesTableProvider(LocalOnlyProvider):
     """Provider for vendor sequences table."""
 
     config: NetworkConfig
@@ -359,7 +369,7 @@ class GlobalSequencesTableProvider(BaseModel, BaseTableProvider):
         return [f"Total global sequences: {total_sequences}"]
 
 
-class SupportedPlatformsTableProvider(BaseModel, BaseTableProvider):
+class SupportedPlatformsTableProvider(LocalOnlyProvider):
     """Provider for supported platforms table."""
 
     def get_table_definition(self) -> TableDefinition:
@@ -397,7 +407,7 @@ class SupportedPlatformsTableProvider(BaseModel, BaseTableProvider):
         return ["Platforms supported by the network toolkit transport layer"]
 
 
-class GlobalSequenceInfoTableProvider(BaseModel, BaseTableProvider):
+class GlobalSequenceInfoTableProvider(LocalOnlyProvider):
     """Provider for global sequence info table."""
 
     sequence_name: str
@@ -448,7 +458,7 @@ class GlobalSequenceInfoTableProvider(BaseModel, BaseTableProvider):
         return [f"Global sequence '{self.sequence_name}' details"]
 
 
-class VendorSequenceInfoTableProvider(BaseModel, BaseTableProvider):
+class VendorSequenceInfoTableProvider(LocalOnlyProvider):
     """Provider for vendor sequence info table."""
 
     sequence_name: str
@@ -507,7 +517,7 @@ class VendorSequenceInfoTableProvider(BaseModel, BaseTableProvider):
         ]
 
 
-class TransportInfoTableProvider(BaseModel, BaseTableProvider):
+class TransportInfoTableProvider(LocalOnlyProvider):
     """Provider for transport types information table."""
 
     def get_table_definition(self) -> TableDefinition:
@@ -543,7 +553,7 @@ class TransportInfoTableProvider(BaseModel, BaseTableProvider):
         return ["Available transport types for device connections"]
 
 
-class DeviceTypesInfoTableProvider(BaseModel, BaseTableProvider):
+class DeviceTypesInfoTableProvider(LocalOnlyProvider):
     """Provider for device types information table."""
 
     def get_table_definition(self) -> TableDefinition:
@@ -587,12 +597,16 @@ class DeviceTypesInfoTableProvider(BaseModel, BaseTableProvider):
         return ["Supported device types and their capabilities"]
 
 
-class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
-    """Provider for device information table."""
+class DeviceInfoTableProvider(LocalOnlyProvider):
+    """Provider for device configuration information (local config only).
+
+    This provider shows only the device configuration data from local config files.
+    It does not require or display any connection parameters, credentials, or network-related information.
+    """
 
     config: NetworkConfig
     device_name: str
-    interactive_creds: Any | None = None
+    # Note: interactive_creds removed - not needed for local config display
 
     def get_table_definition(self) -> TableDefinition:
         return TableDefinition(
@@ -604,7 +618,7 @@ class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
         )
 
     def get_table_rows(self) -> list[list[str]]:
-        """Get device information data."""
+        """Get device configuration data (local config only)."""
         devices = self.config.devices or {}
         if self.device_name not in devices:
             return [["Error", f"Device '{self.device_name}' not found"]]
@@ -612,7 +626,8 @@ class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
         device_config = devices[self.device_name]
         rows = []
 
-        # Basic device information
+        # Device configuration information (from config files only)
+        rows.append(["Name", self.device_name])
         rows.append(["Host", device_config.host])
         rows.append(["Description", device_config.description or "N/A"])
         rows.append(["Device Type", device_config.device_type])
@@ -623,31 +638,6 @@ class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
             ["Tags", ", ".join(device_config.tags) if device_config.tags else "None"]
         )
 
-        # Connection parameters
-        username_override = (
-            getattr(self.interactive_creds, "username", None)
-            if self.interactive_creds
-            else None
-        )
-        password_override = (
-            getattr(self.interactive_creds, "password", None)
-            if self.interactive_creds
-            else None
-        )
-
-        conn_params = self.config.get_device_connection_params(
-            self.device_name, username_override, password_override
-        )
-
-        rows.append(["SSH Port", str(conn_params["port"])])
-        rows.append(["Username", conn_params["auth_username"]])
-        rows.append(["Password", "[hidden]"])  # Always hide passwords in tables
-        rows.append(["Timeout", f"{conn_params['timeout_socket']}s"])
-
-        # Transport type
-        transport_type = self.config.get_transport_type(self.device_name)
-        rows.append(["Transport Type", transport_type])
-
         return rows
 
     def get_raw_output(self) -> str | None:
@@ -657,17 +647,36 @@ class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
             return f"device={self.device_name} error=not_found"
 
         device_config = devices[self.device_name]
-        return f"device={self.device_name} host={device_config.host} type={device_config.device_type}"
+        lines = []
+        lines.append(f"name={self.device_name}")
+        lines.append(f"host={device_config.host}")
+        lines.append(f"device_type={device_config.device_type}")
+        if device_config.description:
+            lines.append(f"description={device_config.description}")
+        if device_config.model:
+            lines.append(f"model={device_config.model}")
+        if device_config.platform:
+            lines.append(f"platform={device_config.platform}")
+        if device_config.location:
+            lines.append(f"location={device_config.location}")
+        if device_config.tags:
+            lines.append(f"tags={','.join(device_config.tags)}")
+        return " ".join(lines)
 
     def get_verbose_info(self) -> list[str] | None:
         """Get additional verbose information."""
         devices = self.config.devices or {}
         if self.device_name not in devices:
-            return None
-        return [f"Detailed information for device: {self.device_name}"]
+            return [f"Device '{self.device_name}' not found in configuration"]
+
+        return [
+            f"Configuration loaded from: {self.config.source_info}",
+            "Device configuration shows static metadata only",
+            f"Use 'nw run {self.device_name} <command>' for live device operations",
+        ]
 
 
-class GroupInfoTableProvider(BaseModel, BaseTableProvider):
+class GroupInfoTableProvider(LocalOnlyProvider):
     """Provider for group information table."""
 
     config: NetworkConfig

@@ -83,9 +83,9 @@ groups:
                     f"Command failed with exit code {result.exit_code}. Output: {result.output}"
                 )
 
-            # Check that credential information is shown in table
-            assert "Username" in result.output
-            assert "Password" in result.output
+            # Check that credential source information is shown in table
+            assert "Credentials" in result.output
+            assert "Environment variables" in result.output
 
         finally:
             # Clean up environment
@@ -137,11 +137,13 @@ devices:
 
             assert result.exit_code == 0
             # When NW_SHOW_PLAINTEXT_PASSWORDS is not set, password should be hidden
-            # Currently it shows as blank instead of [hidden] - this is the actual behavior
+            # Ensure only credential source is shown, not actual credentials
+            assert "Credentials" in result.output
+            assert "Environment variables" in result.output
+            # Verify no actual credential values are shown
             assert (
                 "test_pass" not in result.output
             )  # Ensure password is not shown in plaintext
-            assert "Password" in result.output  # Ensure password field is shown
 
         finally:
             # Clean up environment

@@ -170,6 +170,10 @@ include = [
 [tool.ruff]
 target-version = "py311"
 line-length = 88
+exclude = [
+    "src-old/**",
+    "scripts/**",
+]
 
 [tool.ruff.lint]
 select = [
@@ -270,7 +274,9 @@ strict_equality = true
 ignore_missing_imports = true
 explicit_package_bases = true
 exclude = [
-    "tests/"
+    "tests/",
+    "src-old/",
+    "scripts/",
 ]
 
 [dependency-groups]
