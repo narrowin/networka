@@ -31,10 +31,9 @@ from typing import Annotated
 
 import typer
 
-from network_toolkit.common.command import CommandContext
+from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.output import OutputMode
-from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.results_enhanced import ResultsManager
 from network_toolkit.sequence_manager import SequenceManager
@@ -186,11 +185,9 @@ def register(app: typer.Typer) -> None:
           - nw diff sw-acc1,sw-acc2 "/system/resource/print"   # device-to-device
           - nw diff sw-acc1,sw-acc2 config                      # device-to-device
         """
-        # Create command context with proper styling
-        ctx = CommandContext(
-            output_mode=output_mode,
-            verbose=verbose,
-            config_file=config_file,
+        # Create command context with automatic config loading
+        ctx = CommandContext.from_standard_kwargs(
+            config_file=config_file, verbose=verbose, output_mode=output_mode
         )
 
         subj = subject.strip()
@@ -198,7 +195,7 @@ def register(app: typer.Typer) -> None:
         is_command = subj.startswith("/")
 
         try:
-            config = load_config(config_file)
+            config = ctx.config
         except Exception as e:  # pragma: no cover - load errors covered elsewhere
             ctx.print_error(f"Failed to load config: {e}")
             raise typer.Exit(2) from None
@@ -461,7 +458,7 @@ def register(app: typer.Typer) -> None:
                     else:
                         ctx.print_error(f"- {name}: differences")
                         if res.output:
-                            ctx.output.print_output(res.output)
+                            ctx.print_code_block(res.output)
 
                         if results_mgr.store_results and results_mgr.session_dir:
                             # Store diff output as a command result for visibility
@@ -469,7 +466,7 @@ def register(app: typer.Typer) -> None:
                                 dev, f"DIFF {name}", res.output or "(no diff)"
                             )
 
-                ctx.output.print_separator()
+                ctx.print_separator()
 
             if any_diffs:
                 ctx.print_info(

@@ -20,7 +20,6 @@ from network_toolkit.common.output import (
     get_output_mode_from_config,
     set_output_mode,
 )
-from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.ip_device import (
     create_ip_based_config,
@@ -145,11 +144,9 @@ def register(app: typer.Typer) -> None:
         if raw is not None:
             output_mode = OutputMode.RAW
 
-        # Create command context with proper styling/logging
-        ctx = CommandContext(
-            output_mode=output_mode,
-            verbose=verbose,
-            config_file=config_file,
+        # Create command context with automatic config loading
+        ctx = CommandContext.from_standard_kwargs(
+            config_file=config_file, verbose=verbose, output_mode=output_mode
         )
 
         # Handle interactive authentication if requested
@@ -290,7 +287,7 @@ def register(app: typer.Typer) -> None:
                 return (device_name, None, str(e))
 
         try:
-            config = load_config(config_file)
+            config = ctx.config
 
             # If no CLI output mode given, honor config/general output mode
             # Keep OutputManager as the single source of truth for theming

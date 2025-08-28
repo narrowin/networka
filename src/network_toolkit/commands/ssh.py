@@ -32,10 +32,9 @@ import typer
 from network_toolkit.commands.ssh_fallback import open_sequential_ssh_sessions
 from network_toolkit.commands.ssh_platform import get_platform_capabilities
 from network_toolkit.common.command_helpers import CommandContext
-from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import OutputMode
 from network_toolkit.common.resolver import DeviceResolver
-from network_toolkit.config import NetworkConfig, load_config
+from network_toolkit.config import NetworkConfig
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.ip_device import (
     create_ip_based_config,
@@ -318,6 +317,10 @@ def register(app: typer.Typer) -> None:
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable debug logging")
         ] = False,
+        output_mode: Annotated[
+            OutputMode | None,
+            typer.Option("--output-mode", "-o", help="Output decoration mode"),
+        ] = None,
         device_type: Annotated[
             str | None,
             typer.Option(
@@ -354,11 +357,11 @@ def register(app: typer.Typer) -> None:
         - nw ssh sw-acc1,access_switches
         """
 
-        setup_logging("DEBUG" if verbose else "INFO")
-
         # Create command context for centralized output management
-        ctx = CommandContext(
-            output_mode=OutputMode.DEFAULT, verbose=verbose, config_file=config_file
+        ctx = CommandContext.from_standard_kwargs(
+            config_file=config_file,
+            verbose=verbose,
+            output_mode=output_mode or OutputMode.DEFAULT,
         )
 
         # Validate transport type if provided
@@ -379,7 +382,7 @@ def register(app: typer.Typer) -> None:
             raise typer.Exit(1) from None
 
         try:
-            config = load_config(config_file)
+            config = ctx.config
 
             # Handle IP addresses if platform is provided
             if is_ip_list(target):

@@ -8,10 +8,9 @@ from typing import Annotated
 
 import typer
 
-from network_toolkit.common.command import CommandContext
+from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
-from network_toolkit.common.logging import setup_logging
-from network_toolkit.config import load_config
+from network_toolkit.common.output import OutputMode
 from network_toolkit.exceptions import NetworkToolkitError
 
 MAX_LIST_PREVIEW = 10
@@ -70,21 +69,19 @@ def register(app: typer.Typer) -> None:
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose output")
         ] = False,
+        output_mode: Annotated[
+            OutputMode | None,
+            typer.Option("--output-mode", "-o", help="Output decoration mode"),
+        ] = None,
     ) -> None:
         """Upload a file to a device or to all devices in a group."""
-        setup_logging("DEBUG" if verbose else "INFO")
-
-        # ACTION command - use global config theme
-        ctx = CommandContext(
-            config_file=config_file,
-            verbose=verbose,
-            output_mode=None,  # Use global config theme
+        # Create command context with automatic config loading
+        ctx = CommandContext.from_standard_kwargs(
+            config_file=config_file, verbose=verbose, output_mode=output_mode
         )
 
-        output = ctx.output
-
         try:
-            config = load_config(config_file)
+            config = ctx.config
 
             if not local_file.exists():
                 ctx.print_error(f"Local file not found: {local_file}")
@@ -138,9 +135,11 @@ def register(app: typer.Typer) -> None:
                 ctx.print_info(
                     f"  Checksum verify: {'Yes' if checksum_verify else 'No'}"
                 )
-                output.print_blank_line()
+                ctx.print_blank_line()
 
-                with output.status(f"Uploading {local_file.name} to {target_name}..."):
+                with ctx.output_manager.status(
+                    f"Uploading {local_file.name} to {target_name}..."
+                ):
                     with device_session(target_name, config) as session:
                         success = session.upload_file(
                             local_path=local_file,
@@ -182,9 +181,9 @@ def register(app: typer.Typer) -> None:
             ctx.print_info(f"  Max concurrent: {max_concurrent}")
             ctx.print_info(f"  Verify upload: {'Yes' if verify else 'No'}")
             ctx.print_info(f"  Checksum verify: {'Yes' if checksum_verify else 'No'}")
-            output.print_blank_line()
+            ctx.print_blank_line()
 
-            with output.status(
+            with ctx.output_manager.status(
                 f"Uploading {local_file.name} to {len(members)} devices...",
             ):
                 results = device_session.upload_file_to_devices(
@@ -204,7 +203,7 @@ def register(app: typer.Typer) -> None:
             ctx.print_success(f"  Successful: {successful}/{total}")
             if total - successful > 0:
                 ctx.print_error(f"  Failed: {total - successful}/{total}")
-            output.print_blank_line()
+            ctx.print_blank_line()
 
             ctx.print_info("Per-Device Results:")
             for dev in members:

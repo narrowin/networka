@@ -10,9 +10,8 @@ import typer
 
 from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
-from network_toolkit.common.logging import setup_logging
+from network_toolkit.common.output import OutputMode
 from network_toolkit.common.styles import StyleName
-from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.platforms import (
     check_operation_support,
@@ -46,13 +45,18 @@ def upgrade(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Enable verbose output")
     ] = False,
+    output_mode: Annotated[
+        OutputMode | None,
+        typer.Option("--output-mode", "-o", help="Output decoration mode"),
+    ] = None,
 ) -> None:
     """Upgrade firmware on network devices.
 
     Uploads and installs firmware upgrade on the specified device or group.
     """
-    setup_logging("DEBUG" if verbose else "INFO")
-    ctx = CommandContext(config_file=config_file, verbose=verbose, output_mode=None)
+    ctx = CommandContext.from_standard_kwargs(
+        config_file=config_file, verbose=verbose, output_mode=output_mode
+    )
     style_manager = ctx.style_manager
 
     try:
@@ -65,7 +69,7 @@ def upgrade(
             )
             raise typer.Exit(1)
 
-        config = load_config(config_file)
+        config = ctx.config
         module = import_module("network_toolkit.cli")
         device_session = cast(Any, module).DeviceSession
 
@@ -318,13 +322,18 @@ def downgrade(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Enable verbose output")
     ] = False,
+    output_mode: Annotated[
+        OutputMode | None,
+        typer.Option("--output-mode", "-o", help="Output decoration mode"),
+    ] = None,
 ) -> None:
     """Downgrade firmware on network devices.
 
     Uploads and installs firmware downgrade on the specified device or group.
     """
-    setup_logging("DEBUG" if verbose else "INFO")
-    ctx = CommandContext(config_file=config_file, verbose=verbose, output_mode=None)
+    ctx = CommandContext.from_standard_kwargs(
+        config_file=config_file, verbose=verbose, output_mode=output_mode
+    )
     style_manager = ctx.style_manager
 
     try:
@@ -337,7 +346,7 @@ def downgrade(
             )
             raise typer.Exit(1)
 
-        config = load_config(config_file)
+        config = ctx.config
         module = import_module("network_toolkit.cli")
         device_session = cast(Any, module).DeviceSession
 
@@ -553,17 +562,22 @@ def bios(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Enable verbose output")
     ] = False,
+    output_mode: Annotated[
+        OutputMode | None,
+        typer.Option("--output-mode", "-o", help="Output decoration mode"),
+    ] = None,
 ) -> None:
     """Upgrade BIOS on network devices.
 
     Upgrades device BIOS/RouterBOOT using platform-specific implementations.
     """
-    setup_logging("DEBUG" if verbose else "INFO")
-    ctx = CommandContext(config_file=config_file, verbose=verbose, output_mode=None)
+    ctx = CommandContext.from_standard_kwargs(
+        config_file=config_file, verbose=verbose, output_mode=output_mode
+    )
     style_manager = ctx.style_manager
 
     try:
-        config = load_config(config_file)
+        config = ctx.config
         module = import_module("network_toolkit.cli")
         device_session = cast(Any, module).DeviceSession
 

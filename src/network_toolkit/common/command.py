@@ -79,6 +79,21 @@ class CommandContext:
         self.verbose = verbose
         self.output_mode = output_mode or self.output.mode
 
+    @classmethod
+    def from_standard_kwargs(
+        cls,
+        config_file: Path,
+        verbose: bool = False,
+        output_mode: OutputMode | None = None,
+        **kwargs: Any,  # noqa: ARG003
+    ) -> CommandContext:
+        """Create CommandContext from standard command arguments."""
+        return cls(
+            config_file=config_file,
+            verbose=verbose,
+            output_mode=output_mode,
+        )
+
     def print_success(self, message: str, context: str | None = None) -> None:
         """Print success message using unified output."""
         self.output.print_success(message, context)

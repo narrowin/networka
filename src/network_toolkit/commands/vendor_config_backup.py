@@ -14,11 +14,9 @@ import typer
 
 from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
-from network_toolkit.common.logging import (
-    setup_logging,
-)
+from network_toolkit.common.output import OutputMode
 from network_toolkit.common.styles import StyleName
-from network_toolkit.config import DeviceConfig, NetworkConfig, load_config
+from network_toolkit.config import DeviceConfig, NetworkConfig
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.platforms import UnsupportedOperationError, get_platform_operations
 
@@ -85,6 +83,10 @@ def register(app: typer.Typer) -> None:
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose output")
         ] = False,
+        output_mode: Annotated[
+            OutputMode | None,
+            typer.Option("--output-mode", "-o", help="Output decoration mode"),
+        ] = None,
     ) -> None:
         """Create device configuration backup using vendor-specific commands.
 
@@ -95,14 +97,13 @@ def register(app: typer.Typer) -> None:
         MikroTik RouterOS: Uses /export commands
         Cisco IOS/IOS-XE: Uses show running-config commands
         """
-        setup_logging("DEBUG" if verbose else "INFO")
-
-        # Use standard command context for consistent theming/output
-        ctx = CommandContext(config_file=config_file, verbose=verbose, output_mode=None)
+        ctx = CommandContext.from_standard_kwargs(
+            config_file=config_file, verbose=verbose, output_mode=output_mode
+        )
         style_manager = ctx.style_manager
 
         try:
-            config = load_config(config_file)
+            config = ctx.config
 
             # Resolve DeviceSession from cli to preserve tests patching path
             module = import_module("network_toolkit.cli")
@@ -367,6 +368,10 @@ def register(app: typer.Typer) -> None:
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose output")
         ] = False,
+        output_mode: Annotated[
+            OutputMode | None,
+            typer.Option("--output-mode", "-o", help="Output decoration mode"),
+        ] = None,
     ) -> None:
         """Create device configuration backup using vendor-specific commands."""
         _config_backup_impl(
@@ -375,4 +380,5 @@ def register(app: typer.Typer) -> None:
             delete_remote=delete_remote,
             config_file=config_file,
             verbose=verbose,
+            output_mode=output_mode,
         )

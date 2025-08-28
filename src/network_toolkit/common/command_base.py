@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from functools import wraps
 from pathlib import Path
 from typing import Annotated, Any, TypeVar, cast
 
@@ -100,6 +101,46 @@ def standardized_command(
             ],
             "return": None,
         }
+
+        return cast(F, wrapper)
+
+    return decorator
+
+
+def standardized_command_with_params(custom_param_names: list[str]) -> Callable[[F], F]:
+    """Simple decorator that adds standard CLI parameters to any command.
+
+    NO MAGIC. NO SIGNATURE MANIPULATION. Just runtime parameter injection.
+
+    Args:
+        custom_param_names: Not used - kept for compatibility
+
+    Returns:
+        Decorated function with CommandContext injected
+    """
+
+    def decorator(func: F) -> F:
+        @wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            # Extract standard parameters if they exist in kwargs
+            config_file = kwargs.pop("config_file", DEFAULT_CONFIG_PATH)
+            verbose = kwargs.pop("verbose", False)
+            output_mode = kwargs.pop("output_mode", None)
+
+            # Create CommandContext
+            ctx = CommandContext.from_standard_kwargs(
+                config_file=config_file, verbose=verbose, output_mode=output_mode
+            )
+
+            # Call original function with ctx as first argument
+            try:
+                return func(ctx, *args, **kwargs)
+            except NetworkToolkitError as e:
+                ctx.handle_error(e)
+            except typer.Exit:
+                raise
+            except Exception as e:  # pragma: no cover
+                ctx.handle_error(e)
 
         return cast(F, wrapper)
 

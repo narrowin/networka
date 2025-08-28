@@ -33,7 +33,7 @@ class TestDownload:
         # Verify the module can be imported and register function exists
         assert callable(register)
 
-    @patch("network_toolkit.commands.download.load_config")
+    @patch("network_toolkit.common.config_manager.ConfigManager.load_config_safe")
     @patch("network_toolkit.cli.DeviceSession")
     def test_download_device_success(
         self, mock_session_class: MagicMock, mock_load_config: MagicMock
@@ -71,7 +71,7 @@ class TestDownload:
             verify_download=True,
         )
 
-    @patch("network_toolkit.commands.download.load_config")
+    @patch("network_toolkit.common.command.load_config")
     @patch("network_toolkit.cli.DeviceSession")
     def test_download_device_with_options(
         self, mock_session_class: MagicMock, mock_load_config: MagicMock
@@ -110,7 +110,7 @@ class TestDownload:
             verify_download=False,
         )
 
-    @patch("network_toolkit.commands.download.load_config")
+    @patch("network_toolkit.common.command.load_config")
     @patch("network_toolkit.cli.DeviceSession")
     def test_download_device_failure(
         self, mock_session_class: MagicMock, mock_load_config: MagicMock
@@ -134,7 +134,7 @@ class TestDownload:
         assert result.exit_code == 1
         assert "Download failed!" in result.output
 
-    @patch("network_toolkit.commands.download.load_config")
+    @patch("network_toolkit.common.command.load_config")
     def test_download_device_not_found(self, mock_load_config: MagicMock) -> None:
         """Test download command with non-existent device."""
         # Mock configuration
@@ -150,7 +150,7 @@ class TestDownload:
         assert result.exit_code == 1
         assert "not found as device or group" in result.output
 
-    @patch("network_toolkit.commands.download.load_config")
+    @patch("network_toolkit.common.command.load_config")
     @patch("network_toolkit.cli.DeviceSession")
     def test_download_group_success(
         self, mock_session_class: MagicMock, mock_load_config: MagicMock
@@ -183,7 +183,7 @@ class TestDownload:
         assert "2" in result.output  # Check for the success count
         assert mock_session.download_file.call_count == 2
 
-    @patch("network_toolkit.commands.download.load_config")
+    @patch("network_toolkit.common.command.load_config")
     @patch("network_toolkit.cli.DeviceSession")
     def test_download_group_partial_failure(
         self, mock_session_class: MagicMock, mock_load_config: MagicMock
@@ -216,7 +216,7 @@ class TestDownload:
         assert "Failed:" in result.output
         assert "1" in result.output  # Check for the counts
 
-    @patch("network_toolkit.commands.download.load_config")
+    @patch("network_toolkit.common.command.load_config")
     @patch("network_toolkit.cli.DeviceSession")
     def test_download_group_with_exception(
         self, mock_session_class: MagicMock, mock_load_config: MagicMock
@@ -243,7 +243,7 @@ class TestDownload:
         assert result.exit_code == 1
         assert "error during download" in result.output
 
-    @patch("network_toolkit.commands.download.load_config")
+    @patch("network_toolkit.common.command.load_config")
     def test_download_group_no_members(self, mock_load_config: MagicMock) -> None:
         """Test download command with group that has no members."""
         # Mock configuration
@@ -262,7 +262,7 @@ class TestDownload:
         assert result.exit_code == 1
         assert "No devices found in group" in result.output
 
-    @patch("network_toolkit.commands.download.load_config")
+    @patch("network_toolkit.common.command.load_config")
     def test_download_group_fallback_members(self, mock_load_config: MagicMock) -> None:
         """Test download command with group when get_group_members fails."""
         # Mock configuration
@@ -281,7 +281,7 @@ class TestDownload:
         assert result.exit_code == 1
         assert "No devices found in group" in result.output
 
-    @patch("network_toolkit.commands.download.load_config")
+    @patch("network_toolkit.common.command.load_config")
     def test_download_config_error(self, mock_load_config: MagicMock) -> None:
         """Test download command with configuration loading error."""
         mock_load_config.side_effect = NetworkToolkitError("Config file not found")
@@ -293,7 +293,7 @@ class TestDownload:
         assert result.exit_code == 1
         assert "Config file not found" in result.output
 
-    @patch("network_toolkit.commands.download.load_config")
+    @patch("network_toolkit.common.command.load_config")
     def test_download_config_error_with_details(
         self, mock_load_config: MagicMock
     ) -> None:
@@ -310,7 +310,7 @@ class TestDownload:
         assert result.exit_code == 1
         assert "Config file not found" in result.output
 
-    @patch("network_toolkit.commands.download.load_config")
+    @patch("network_toolkit.common.command.load_config")
     def test_download_unexpected_error(self, mock_load_config: MagicMock) -> None:
         """Test download command with unexpected error."""
         mock_load_config.side_effect = ValueError("Unexpected error")
@@ -337,7 +337,7 @@ class TestDownload:
         )
         assert "--verify" in clean_output
 
-    @patch("network_toolkit.commands.download.load_config")
+    @patch("network_toolkit.common.command.load_config")
     @patch("network_toolkit.cli.DeviceSession")
     def test_download_output_formatting(
         self, mock_session_class: MagicMock, mock_load_config: MagicMock
@@ -367,7 +367,7 @@ class TestDownload:
         assert "Delete remote after download:" in result.output
         assert "Verify download:" in result.output
 
-    @patch("network_toolkit.commands.download.load_config")
+    @patch("network_toolkit.common.command.load_config")
     @patch("network_toolkit.cli.DeviceSession")
     def test_download_group_output_formatting(
         self, mock_session_class: MagicMock, mock_load_config: MagicMock
@@ -401,7 +401,7 @@ class TestDownload:
 
     # Legacy tests for backward compatibility
     @patch("network_toolkit.commands.download.setup_logging")
-    @patch("network_toolkit.commands.download.load_config")
+    @patch("network_toolkit.common.command.load_config")
     @patch("network_toolkit.commands.download.import_module")
     def test_download_command_execution(
         self,

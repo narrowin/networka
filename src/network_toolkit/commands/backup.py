@@ -10,8 +10,8 @@ import typer
 
 from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
-from network_toolkit.common.logging import setup_logging
-from network_toolkit.config import NetworkConfig, load_config
+from network_toolkit.common.output import OutputMode
+from network_toolkit.config import NetworkConfig
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.platforms import (
     UnsupportedOperationError,
@@ -52,20 +52,21 @@ def config_backup(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Enable verbose output")
     ] = False,
+    output_mode: Annotated[
+        OutputMode | None,
+        typer.Option("--output-mode", "-o", help="Output decoration mode"),
+    ] = None,
 ) -> None:
     """Backup device configuration.
 
     Performs a configuration backup for the specified device or group.
     """
-    setup_logging("DEBUG" if verbose else "INFO")
-    ctx = CommandContext(
-        output_mode=None,  # Use global config theme
-        verbose=verbose,
-        config_file=config_file,
+    ctx = CommandContext.from_standard_kwargs(
+        config_file=config_file, verbose=verbose, output_mode=output_mode
     )
 
     try:
-        config = load_config(config_file)
+        config = ctx.config
 
         # Resolve DeviceSession from cli to preserve tests patching path
         module = import_module("network_toolkit.cli")
@@ -178,7 +179,7 @@ def config_backup(
                     return True
             except NetworkToolkitError as e:
                 ctx.print_error(f"Error on {dev}: {e.message}")
-                if verbose and e.details:
+                if ctx.verbose and e.details:
                     ctx.print_error(f"Details: {e.details}")
                 return False
             except Exception as e:  # pragma: no cover
@@ -245,21 +246,22 @@ def comprehensive_backup(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Enable verbose output")
     ] = False,
+    output_mode: Annotated[
+        OutputMode | None,
+        typer.Option("--output-mode", "-o", help="Output decoration mode"),
+    ] = None,
 ) -> None:
     """Perform comprehensive backup including vendor-specific data.
 
     Performs a comprehensive backup for the specified device or group,
     including vendor-specific configuration and operational data.
     """
-    setup_logging("DEBUG" if verbose else "INFO")
-    ctx = CommandContext(
-        config_file=config_file,
-        verbose=verbose,
-        output_mode=None,  # Use global config theme
+    ctx = CommandContext.from_standard_kwargs(
+        config_file=config_file, verbose=verbose, output_mode=output_mode
     )
 
     try:
-        config = load_config(config_file)
+        config = ctx.config
 
         module = import_module("network_toolkit.cli")
         device_session = cast(Any, module).DeviceSession
@@ -419,7 +421,9 @@ def show_vendors() -> None:
 
     platforms = get_supported_platforms()
 
-    ctx = CommandContext()
+    ctx = CommandContext.from_standard_kwargs(
+        config_file=DEFAULT_CONFIG_PATH, verbose=False, output_mode=None
+    )
     ctx.print_info("Vendor backup operation support:")
 
     operations = [

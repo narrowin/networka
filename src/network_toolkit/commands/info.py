@@ -10,9 +10,7 @@ from typing import TYPE_CHECKING, Annotated
 import typer
 
 from network_toolkit.common.command_helpers import CommandContext
-from network_toolkit.common.config_context import ConfigContext
 from network_toolkit.common.credentials import InteractiveCredentials
-from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import OutputMode
 from network_toolkit.common.table_generator import BaseTableProvider
 from network_toolkit.common.table_providers import (
@@ -69,24 +67,13 @@ def register(app: typer.Typer) -> None:
         - nw info system_info               # Show sequence info
         - nw info sw-acc1,access_switches,health_check  # Mixed types
         """
-        setup_logging("DEBUG" if verbose else "INFO")
-
-        # Use centralized config context for intelligent path resolution
-        config_ctx = ConfigContext.from_path(config_file)
-
-        # Use CommandContext for consistent output management
-        ctx = CommandContext(
-            config_file=config_file,
-            verbose=verbose,
-            output_mode=output_mode,
+        # Create command context with automatic config loading
+        ctx = CommandContext.from_standard_kwargs(
+            config_file=config_file, verbose=verbose, output_mode=output_mode
         )
 
         try:
-            config = config_ctx.config
-
-            # Log config source for debugging
-            if verbose and config_ctx.source_info:
-                ctx.print_info(f"Config loaded from: {config_ctx.source_info}")
+            config = ctx.config
 
             # Process targets (split comma-separated values)
             target_list = [t.strip() for t in targets.split(",") if t.strip()]

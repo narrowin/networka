@@ -10,9 +10,8 @@ from typing import Annotated, cast
 
 import typer
 
-from network_toolkit.common.command_helpers import CommandContext
+from network_toolkit.common.command import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
-from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import (
     OutputMode,
     get_output_manager,
@@ -631,7 +630,11 @@ def _config_init_impl(
 ) -> None:
     """Implementation logic for config init."""
     # Create command context for consistent output
-    ctx = CommandContext()
+    ctx = CommandContext.from_standard_kwargs(
+        config_file=Path("config"),  # Placeholder for init
+        verbose=verbose,
+        output_mode=OutputMode.DEFAULT,
+    )
 
     # Determine whether we prompt (interactive) or not
     interactive = target_dir is None and not yes
@@ -644,10 +647,8 @@ def _config_init_impl(
         if yes:
             target_path = default_path
         else:
-            ctx.output_manager.print_text(
-                "\nWhere should Networka store its configuration?"
-            )
-            ctx.print_detail_line("Default", str(default_path))
+            ctx.print_info("\nWhere should Networka store its configuration?")
+            ctx.print_info(f"Default: {default_path}")
             user_input = typer.prompt("Location", default=str(default_path))
             target_path = Path(user_input).expanduser().resolve()
 
@@ -955,6 +956,10 @@ def register(app: typer.Typer) -> None:
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
         ] = False,
+        output_mode: Annotated[
+            OutputMode | None,
+            typer.Option("--output-mode", "-o", help="Output decoration mode"),
+        ] = None,
     ) -> None:
         """Initialize a network toolkit configuration in OS-appropriate location.
 
@@ -975,7 +980,11 @@ def register(app: typer.Typer) -> None:
 
         The 'nw' command will automatically find configurations in these locations.
         """
-        setup_logging("DEBUG" if verbose else "INFO")
+        ctx = CommandContext.from_standard_kwargs(
+            config_file=Path("config"),  # Placeholder for init command
+            verbose=verbose,
+            output_mode=output_mode,
+        )
 
         try:
             # Use the local implementation
@@ -995,9 +1004,11 @@ def register(app: typer.Typer) -> None:
             )
 
         except NetworkToolkitError as e:
-            from network_toolkit.common.command_helpers import CommandContext
-
-            ctx = CommandContext()
+            ctx = CommandContext.from_standard_kwargs(
+                config_file=Path("config"),
+                verbose=False,
+                output_mode=OutputMode.DEFAULT,
+            )
             ctx.print_error(str(e))
             if verbose and hasattr(e, "details") and e.details:
                 ctx.print_error(f"Details: {e.details}")
@@ -1006,9 +1017,11 @@ def register(app: typer.Typer) -> None:
             # Allow clean exits (e.g., user cancellation) to pass through
             raise
         except Exception as e:  # pragma: no cover - unexpected
-            from network_toolkit.common.command_helpers import CommandContext
-
-            ctx = CommandContext()
+            ctx = CommandContext.from_standard_kwargs(
+                config_file=Path("config"),
+                verbose=False,
+                output_mode=OutputMode.DEFAULT,
+            )
             ctx.print_error(f"Unexpected error: {e}")
             raise typer.Exit(1) from None
 
@@ -1034,7 +1047,9 @@ def register(app: typer.Typer) -> None:
         ] = False,
     ) -> None:
         """Validate the configuration file and show any issues."""
-        setup_logging("DEBUG" if verbose else "INFO")
+        ctx = CommandContext.from_standard_kwargs(
+            config_file=config_file, verbose=verbose, output_mode=output_mode
+        )
 
         try:
             # Use the local implementation
@@ -1045,9 +1060,9 @@ def register(app: typer.Typer) -> None:
             )
 
         except NetworkToolkitError as e:
-            from network_toolkit.common.command_helpers import CommandContext
-
-            ctx = CommandContext()
+            ctx = CommandContext.from_standard_kwargs(
+                config_file=config_file, verbose=verbose, output_mode=output_mode
+            )
             ctx.print_error(str(e))
             if verbose and hasattr(e, "details") and e.details:
                 ctx.print_error(f"Details: {e.details}")
@@ -1056,9 +1071,9 @@ def register(app: typer.Typer) -> None:
             # Allow clean exits (e.g., user cancellation) to pass through
             raise
         except Exception as e:  # pragma: no cover - unexpected
-            from network_toolkit.common.command_helpers import CommandContext
-
-            ctx = CommandContext()
+            ctx = CommandContext.from_standard_kwargs(
+                config_file=config_file, verbose=verbose, output_mode=output_mode
+            )
             ctx.print_error(f"Unexpected error: {e}")
             raise typer.Exit(1) from None
 

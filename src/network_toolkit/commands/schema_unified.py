@@ -6,7 +6,8 @@ from typing import Annotated
 
 import typer
 
-from network_toolkit.common.logging import setup_logging
+from network_toolkit.common.command_helpers import CommandContext
+from network_toolkit.common.output import OutputMode
 from network_toolkit.exceptions import NetworkToolkitError
 
 
@@ -21,6 +22,10 @@ def register(app: typer.Typer) -> None:
     @schema_app.command("update")
     def update(
         verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
+        output_mode: Annotated[
+            OutputMode | None,
+            typer.Option("--output-mode", "-o", help="Output decoration mode"),
+        ] = None,
     ) -> None:
         """Update JSON schemas for YAML editor validation.
 
@@ -33,7 +38,7 @@ def register(app: typer.Typer) -> None:
         - schemas/groups-config.schema.json (group collections)
         - .vscode/settings.json (VS Code YAML validation)
         """
-        setup_logging("DEBUG" if verbose else "INFO")
+        ctx = CommandContext(verbose=verbose, output_mode=output_mode)
 
         try:
             from network_toolkit.commands.schema import _schema_update_impl
@@ -61,9 +66,13 @@ def register(app: typer.Typer) -> None:
     @schema_app.command("info")
     def info(
         verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
+        output_mode: Annotated[
+            OutputMode | None,
+            typer.Option("--output-mode", "-o", help="Output decoration mode"),
+        ] = None,
     ) -> None:
         """Display information about JSON schema files."""
-        setup_logging("DEBUG" if verbose else "INFO")
+        ctx = CommandContext(verbose=verbose, output_mode=output_mode)
 
         try:
             from network_toolkit.commands.schema import _schema_info_impl

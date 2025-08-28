@@ -11,8 +11,7 @@ import typer
 
 from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
-from network_toolkit.common.logging import setup_logging
-from network_toolkit.config import load_config
+from network_toolkit.common.output import OutputMode
 from network_toolkit.exceptions import NetworkToolkitError
 
 
@@ -59,19 +58,19 @@ def register(app: typer.Typer) -> None:
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose output")
         ] = False,
+        output_mode: Annotated[
+            OutputMode | None,
+            typer.Option("--output-mode", "-o", help="Output decoration mode"),
+        ] = None,
     ) -> None:
         """Download a file from a device or all devices in a group."""
-        setup_logging("DEBUG" if verbose else "INFO")
-
-        # ACTION command - use global config theme
-        ctx = CommandContext(
-            config_file=config_file,
-            verbose=verbose,
-            output_mode=None,  # Use global config theme
+        # Create command context with automatic config loading
+        ctx = CommandContext.from_standard_kwargs(
+            config_file=config_file, verbose=verbose, output_mode=output_mode
         )
 
         try:
-            config = load_config(config_file)
+            config = ctx.config
 
             # Resolve DeviceSession from cli to preserve test patching path
             module = import_module("network_toolkit.cli")
