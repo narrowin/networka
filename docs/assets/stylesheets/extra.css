@@ -1,20 +1,42 @@
 /* Header logo sizing and spacing */
 .md-header__button.md-logo img {
-  height: 48px; /* desktop size */
+  height: 64px; /* desktop size - increased from 48px */
   width: auto;
 }
 
-/* Remove extra padding around the logo button and tighten gap */
+/* Simple logo positioning - match reference site */
 .md-header__button.md-logo {
-  padding: 0;
-  margin-right: 0.5rem;
+  padding: 0.4rem; /* Match default Material Design spacing */
+  margin: 0; /* Remove all custom margins */
 }
 
 /* Slightly reduce on small screens to keep header compact */
 @media (max-width: 600px) {
   .md-header__button.md-logo img {
-    height: 40px;
+    height: 48px; /* increased from 40px */
   }
+}
+
+/* Homepage enhancements - keep it simple */
+.md-typeset h1 {
+  font-weight: 700;
+}
+
+/* Center demo image */
+.md-typeset img[src*="lne-demo-narrowin-ch-transp"] {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 2rem auto;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Style feature sections with icons */
+.md-typeset h3:has(.twemoji) {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 /* Optional: tighten spacing between logo and title */
