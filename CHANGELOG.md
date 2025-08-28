@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+## [Unreleased]
+
+### Added
+-
+
+### Changed
+-
+
+### Fixed
+-
+
+
 - Renamed project from "netkit" to "networka"
 - Changed CLI command from "netkit" to "nw"
 - Updated all documentation and examples to use new command name

@@ -18,5 +18,5 @@ keywords:
   - "MikroTik"
   - "RouterOS"
 license: Apache-2.0
-version: "0.1.6"  # This will be automatically updated by release.sh
-date-released: "2025-08-28"  # This will be automatically updated by release.sh
+version: "0.1.7"
+date-released: "2025-08-28"
