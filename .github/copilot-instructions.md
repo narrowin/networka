@@ -4,6 +4,18 @@ NO MATTER WHAT RUN THE TESTS DIRECTLY THROUGH VS CODE TEST FEATURE, NOT TERMINAL
 ALWAYS USE VS CODE TASKS FOR RUFF, MYPY, AND TESTS - NEVER USE TERMINAL COMMANDS!!!
 ALL IMPORTS ONLY GO TO THE TOP OF THE FILE, NO EXCEPTIONS!!!
 
+## KEY LIBRARIES
+
+- **pydantic v2** we always follow the pydantic v2 style and patterns and best practices - awlays!
+- **CLI**: Typer with Rich output
+- **Network**: Scrapli (AsyncScrapli for async)
+- **Validation**: Pydantic v2
+- **Package Management**: uv
+- **Testing**: pytest, pytest-asyncio
+- **Quality**: Ruff (lint/format), mypy (types)
+
+````
+
 ## MANDATORY VS CODE TASKS - NEVER USE TERMINAL COMMANDS
 
 **ALWAYS use run_task tool for these operations:**
@@ -106,7 +118,7 @@ except DeviceConnectionError as e:
 class DeviceConfig(BaseModel):
     host: str
     port: int = 22
-```
+````
 
 ### Project Structure
 
@@ -201,13 +213,4 @@ async def test_feature(mock_config):
 
 - Account for device resource limitations
 - Proper timeout handling for slow devices
-
-## KEY LIBRARIES
-
-- **CLI**: Typer with Rich output
-- **Network**: Scrapli (AsyncScrapli for async)
-- **Validation**: Pydantic v2
-- **Package Management**: uv
-- **Testing**: pytest, pytest-asyncio
-- **Quality**: Ruff (lint/format), mypy (types)
 ```

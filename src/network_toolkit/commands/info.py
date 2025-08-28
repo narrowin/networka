@@ -25,7 +25,6 @@ from network_toolkit.common.table_providers import (
     TransportTypesTableProvider,
     VendorSequenceInfoTableProvider,
 )
-from network_toolkit.config import load_config
 from network_toolkit.credentials import EnvironmentCredentialManager
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.sequence_manager import SequenceManager
@@ -82,23 +81,24 @@ def register(app: typer.Typer) -> None:
         """
         setup_logging("DEBUG" if verbose else "INFO")
 
-        # Resolve default config path: if user passed the literal default 'config'
-        # and it doesn't exist, fall back to the OS default config dir.
-        cfg_path = Path(config_file)
-        if str(cfg_path) == "config" and not cfg_path.exists():
-            from network_toolkit.common.paths import default_modular_config_dir
+        # Use centralized config context for intelligent path resolution
+        from network_toolkit.common.config_context import ConfigContext
 
-            cfg_path = default_modular_config_dir()
+        config_ctx = ConfigContext.from_path(config_file)
 
         # Use CommandContext for consistent output management
         ctx = CommandContext(
-            config_file=cfg_path,
+            config_file=config_file,
             verbose=verbose,
             output_mode=output_mode,
         )
 
         try:
-            config = load_config(cfg_path)
+            config = config_ctx.config
+
+            # Log config source for debugging
+            if verbose and config_ctx.source_info:
+                ctx.print_info(f"Using configuration from: {config_ctx.source_info}")
 
             # Handle interactive authentication if requested
             interactive_creds = None
