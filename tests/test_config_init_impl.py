@@ -59,15 +59,16 @@ class TestConfigInitCore:
         create_example_devices(devices_dir)
 
         assert devices_dir.exists()
-        router_file = devices_dir / "router1.yml"
-        switch_file = devices_dir / "switch1.yml"
+        devices_file = devices_dir / "devices.yml"
 
-        assert router_file.exists()
-        assert switch_file.exists()
+        assert devices_file.exists()
 
-        router_content = router_file.read_text()
-        assert "host: 192.168.1.1" in router_content
-        assert "device_type: mikrotik_routeros" in router_content
+        devices_content = devices_file.read_text()
+        assert "devices:" in devices_content
+        assert "router1:" in devices_content
+        assert "switch1:" in devices_content
+        assert "host: 192.168.1.1" in devices_content
+        assert "device_type: mikrotik_routeros" in devices_content
 
     def test_create_example_groups(self, tmp_path: Path) -> None:
         """Test example group files creation."""
@@ -75,15 +76,16 @@ class TestConfigInitCore:
         create_example_groups(groups_dir)
 
         assert groups_dir.exists()
-        office_file = groups_dir / "office.yml"
-        critical_file = groups_dir / "critical.yml"
+        groups_file = groups_dir / "groups.yml"
 
-        assert office_file.exists()
-        assert critical_file.exists()
+        assert groups_file.exists()
 
-        office_content = office_file.read_text()
-        assert 'description: "All office network devices"' in office_content
-        assert "match_tags:" in office_content
+        groups_content = groups_file.read_text()
+        assert "groups:" in groups_content
+        assert "office:" in groups_content
+        assert "critical:" in groups_content
+        assert 'description: "All office network devices"' in groups_content
+        assert "match_tags:" in groups_content
 
     def test_create_example_sequences(self, tmp_path: Path) -> None:
         """Test example sequence files creation."""
@@ -91,10 +93,11 @@ class TestConfigInitCore:
         create_example_sequences(sequences_dir)
 
         assert sequences_dir.exists()
-        global_file = sequences_dir / "global.yml"
-        assert global_file.exists()
+        sequences_file = sequences_dir / "sequences.yml"
+        assert sequences_file.exists()
 
-        content = global_file.read_text()
+        content = sequences_file.read_text()
+        assert "sequences:" in content
         assert "health_check:" in content
         assert "backup_config:" in content
         assert "commands:" in content
