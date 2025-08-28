@@ -38,7 +38,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Setup uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v6
         with:
           version: "0.8.8"
           enable-cache: true
@@ -68,7 +68,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Setup uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v6
         with:
           version: "0.8.8"
           enable-cache: true
@@ -113,7 +113,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Setup uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v6
         with:
           version: "0.8.8"
           enable-cache: true
@@ -154,7 +154,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Setup uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v6
         with:
           version: "0.8.8"
           enable-cache: true
@@ -176,7 +176,7 @@ jobs:
           extra_args: --debug --only-verified
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v6
         with:
           version: "0.8.8"
 
@@ -214,7 +214,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v6
         with:
           version: "0.8.8"
       - name: Install go-task
@@ -247,7 +247,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Setup uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v6
         with:
           version: "0.8.8"
           enable-cache: true
