@@ -63,19 +63,44 @@ tasks:
       - pyproject.toml
 
   test:
-    desc: Run tests
+    desc: Run tests (local development)
     cmds:
-      - echo "Running tests..."
-      - uv run pytest
+      - echo "Running tests (local development mode)..."
+      - uv run pytest -v
     sources:
       - src/**/*.py
       - tests/**/*.py
       - pyproject.toml
 
-  test:cov:
-    desc: Run tests with coverage
+  test:ci:
+    desc: Run tests with CI-exact environment (MANDATORY for CI parity)
+    env:
+      FORCE_COLOR: "1"
+      PYTHONUNBUFFERED: "1"
+      CI: "true"
+      COLUMNS: "150"
+      UV_FROZEN: "true"
     cmds:
-      - echo "Running tests with coverage..."
+      - echo "Running tests with CI-exact environment..."
+      - echo "Environment variables:"
+      - echo "  FORCE_COLOR=$FORCE_COLOR"
+      - echo "  PYTHONUNBUFFERED=$PYTHONUNBUFFERED"
+      - echo "  CI=$CI"
+      - echo "  COLUMNS=$COLUMNS"
+      - echo "  UV_FROZEN=$UV_FROZEN"
+      - uv run pytest --cov={{.PACKAGE_NAME}} --cov-report=xml --cov-report=term-missing --tb=short --color=yes
+    sources:
+      - src/**/*.py
+      - tests/**/*.py
+      - pyproject.toml
+    generates:
+      - coverage.xml
+      - .coverage
+
+  test:cov:
+    desc: Run tests with coverage (local HTML report)
+    cmds:
+      - echo "Running tests with HTML coverage..."
       - uv run pytest --cov={{.PACKAGE_NAME}} --cov-report=term-missing --cov-report=html
     sources:
       - src/**/*.py
@@ -85,7 +110,7 @@ tasks:
       - .coverage
 
   test:fast:
-    desc: Run tests in parallel
+    desc: Run tests in parallel (no coverage)
     cmds:
       - echo "Running tests in parallel..."
       - uv run pytest -n auto
@@ -235,14 +260,14 @@ tasks:
       - echo "Development environment ready!"
 
   ci:
-    desc: Run CI checks locally
+    desc: Run CI checks locally (matches GitHub Actions exactly)
     deps:
       - lint
       - typecheck
-      - test:cov
+      - test:ci
       - security
     cmds:
-      - echo "CI checks completed!"
+      - echo "CI checks completed - matches GitHub Actions environment!"
 
   update:
     desc: Update dependencies
