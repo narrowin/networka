@@ -62,20 +62,27 @@ jobs:
       - name: Test container functionality
         if: github.event_name != 'pull_request'
         run: |
+          # Get the first tag from the metadata output
+          IMAGE_TAG=$(echo '${{ steps.meta.outputs.tags }}' | head -n1)
+          echo "Testing image: $IMAGE_TAG"
+          
           # Pull the just-built image and test basic functionality
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          docker pull "$IMAGE_TAG"
           
           # Test that networka command works
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest nw --help
+          docker run --rm "$IMAGE_TAG" nw --help
           
           # Test that network tools are available
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest which tcpdump
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest which nmap
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest which traceroute
+          docker run --rm "$IMAGE_TAG" which tcpdump
+          docker run --rm "$IMAGE_TAG" which nmap
+          docker run --rm "$IMAGE_TAG" which traceroute
 
       - name: Generate container summary
         if: github.event_name != 'pull_request'
         run: |
+          # Get the first tag from the metadata output for the summary
+          IMAGE_TAG=$(echo '${{ steps.meta.outputs.tags }}' | head -n1)
+          
           echo "## Container Build Summary 🐳" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Registry:** \`${{ env.REGISTRY }}\`" >> $GITHUB_STEP_SUMMARY
@@ -84,6 +91,6 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Quick Start" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_STEP_SUMMARY
-          echo 'docker run -it --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest' >> $GITHUB_STEP_SUMMARY
+          echo "docker pull $IMAGE_TAG" >> $GITHUB_STEP_SUMMARY
+          echo "docker run -it --rm $IMAGE_TAG" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
