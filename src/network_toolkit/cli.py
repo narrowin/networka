@@ -52,24 +52,83 @@ console = _DynamicConsoleProxy()
 from network_toolkit.device import DeviceSession as _DeviceSession  # noqa: E402
 
 
-# Preserve insertion order and group commands under a single Commands section
+# Complete help override to bypass all Click/Typer conflicts
 class CategorizedHelpGroup(TyperGroup):
-    def list_commands(self, ctx: Any) -> list[str]:
-        _ = ctx  # unused
-        return list(self.commands)
+    def format_help(self, ctx: Any, formatter: Any) -> None:
+        """Completely override help formatting to avoid conflicts."""
+        # Write the main help text
+        if self.help:
+            formatter.write_paragraph()
+            formatter.write_text(self.help)
 
-    def format_commands(self, ctx: Any, formatter: Any) -> None:
-        # Desired categories
-        exec_names = [
+        # Define our exact command structure
+        categories = [
+            (
+                "Executing Operations",
+                [
+                    (
+                        "run",
+                        "Execute a single command or a sequence on a device or a group.",
+                    ),
+                    ("ssh", "Open tmux with SSH panes for a device or group."),
+                    (
+                        "upload",
+                        "Upload a file to a device or to all devices in a group.",
+                    ),
+                    (
+                        "download",
+                        "Download a file from a device or all devices in a group.",
+                    ),
+                ],
+            ),
+            (
+                "Vendor-Specific Operations",
+                [
+                    ("backup", "Backup operations for network devices"),
+                    ("firmware", "Firmware management operations"),
+                ],
+            ),
+            (
+                "Info & Configuration",
+                [
+                    (
+                        "info",
+                        "Show comprehensive information for devices, groups, or sequences.",
+                    ),
+                    (
+                        "list",
+                        "List network devices, groups, sequences, and platform information",
+                    ),
+                    ("config", "Configuration management commands"),
+                    ("schema", "JSON schema management commands"),
+                    ("diff", "Diff config, a command, or a sequence."),
+                ],
+            ),
+        ]
+
+        # Write each category
+        for category_name, commands in categories:
+            formatter.write_text(f"\n{category_name}")
+            formatter.write_dl(commands)
+
+        # Write options section manually
+        formatter.write_text("\nOptions")
+        formatter.write_dl(
+            [
+                ("--version", "Show version information"),
+                ("--help, -h", "Show this message and exit."),
+            ]
+        )
+
+    def list_commands(self, ctx: Any) -> list[str]:
+        # Return all our commands in order
+        return [
             "run",
             "ssh",
             "upload",
             "download",
             "backup",
             "firmware",
-        ]
-        vendor_names: list[str] = []
-        info_names = [
             "info",
             "list",
             "config",
@@ -77,33 +136,11 @@ class CategorizedHelpGroup(TyperGroup):
             "diff",
         ]
 
-        def rows(names: list[str]) -> list[tuple[str, str]]:
-            items: list[tuple[str, str]] = []
-            for name in names:
-                cmd = self.get_command(ctx, name)
-                if not cmd:
-                    continue
-                # Prefer short help if available
-                short_getter = getattr(cmd, "get_short_help_str", None)
-                short_text = (
-                    short_getter() if callable(short_getter) else (cmd.help or "")
-                )
-                items.append((name, str(short_text)))
-            return items
-
-        exec_rows = rows(exec_names)
-        vendor_rows = rows(vendor_names)
-        info_rows = rows(info_names)
-
-        if exec_rows:
-            formatter.write_text("\nExecuting Operations")
-            formatter.write_dl(exec_rows)
-        if vendor_rows:
-            formatter.write_text("\nVendor-Specific Operations")
-            formatter.write_dl(vendor_rows)
-        if info_rows:
-            formatter.write_text("\nInfo & Configuration")
-            formatter.write_dl(info_rows)
+    def get_command(self, ctx: Any, cmd_name: str) -> Any:
+        # Only allow our approved commands
+        if cmd_name in self.list_commands(ctx):
+            return super().get_command(ctx, cmd_name)
+        return None
 
 
 # Typer application instance
