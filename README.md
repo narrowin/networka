@@ -151,6 +151,24 @@ nw --help
 
 Details → https://narrowin.github.io/networka/platform-compatibility/#wsl2-quickstart-recommended
 
+## Docker Container
+
+Container with network debugging tools and SSH access:
+
+```bash
+# Pull and run latest version
+docker pull ghcr.io/narrowin/networka:latest
+docker compose -f docker/docker-compose.yml up -d
+
+# Access via SSH (password: networka)
+ssh networka@localhost -p 2222
+
+# Initialize configuration (same as local install)
+nw config init
+```
+
+**Documentation**: [Docker Container Guide →](https://narrowin.github.io/networka/docker/)
+
 ## Quick Start
 
 Get up and running with config init command:
@@ -186,6 +204,7 @@ Note: When targeting IPs directly, `--platform` refers to the network driver (de
 ## Quick links
 
 - Getting started → https://narrowin.github.io/networka/getting-started/
+- **Docker container** → https://narrowin.github.io/networka/docker/
 - Running commands → https://narrowin.github.io/networka/running-commands/
 - Configuration  → https://narrowin.github.io/networka/configuration/
 - Environment variables → https://narrowin.github.io/networka/environment-variables/

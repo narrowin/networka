@@ -10,6 +10,7 @@ nav:
   - Getting started:
       - Quickstart: getting-started.md
       - Platform compatibility: platform-compatibility.md
+      - Docker container: docker.md
   - User guide:
     - Configuration: configuration.md
     - Environment variables: environment-variables.md

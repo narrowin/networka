@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Start SSH daemon - MANDATORY
+# Start SSH daemon
 echo "Starting SSH daemon..."
 service ssh start
 
@@ -23,23 +23,7 @@ if [ ! -f /app/data/config/devices.yml ]; then
     fi
 fi
 
-# Create useful network debugging aliases for root
-cat >> /root/.bashrc << 'EOF'
-# Network debugging aliases
-alias myip='curl -s ifconfig.me'
-alias localip='hostname -I'
-alias ports='netstat -tuln'
-alias scan='nmap'
-alias trace='traceroute'
-alias tcpdump-any='tcpdump -i any'
-alias arp-table='arp -a'
-alias dig-short='dig +short'
-alias mtr-report='mtr --report'
-alias netstat-listen='netstat -tlnp'
-alias ss-listen='ss -tlnp'
-EOF
-
-# Create useful network debugging aliases for networka user
+# Create useful network debugging aliases for networka user (the main user)
 cat >> /home/networka/.bashrc << 'EOF'
 # Network debugging aliases
 alias myip='curl -s ifconfig.me'
@@ -53,15 +37,55 @@ alias dig-short='dig +short'
 alias mtr-report='mtr --report'
 alias netstat-listen='netstat -tlnp'
 alias ss-listen='ss -tlnp'
+
+# Networka shortcuts
+alias nw-help='nw --help'
+alias nw-list='nw list'
+alias nw-info='nw info'
+alias nw-devices='nw list devices'
+alias nw-groups='nw list groups'
 EOF
 
-# Welcome message
-echo "Networka Docker Container with SSH Access"
-echo "Data directory: /app/data"
+# Create welcome message that shows on login
+cat > /home/networka/.welcome << 'EOF'
+====================================================================
+🌐 NETWORKA NETWORK AUTOMATION CONTAINER
+====================================================================
+
+🚀 QUICK START:
+   nw --help              # Show all commands
+   nw list devices        # List configured devices
+   nw info <device>       # Get device information
+   nw run <device> <cmd>  # Execute command
+
+📁 DATA DIRECTORIES:
+   /app/data/config/      # Device definitions, groups, sequences
+   /app/data/results/     # Command execution results
+   /app/data/backups/     # Device configuration backups
+   /app/data/logs/        # Application logs
+
+🔧 NETWORK TOOLS:
+   myip, localip, ports   # Network info
+   scan, trace, dig-short # Network analysis  
+   tcpdump-any, arp-table # Packet analysis
+   tmux                   # Terminal multiplexer
+
+💡 SSH FANOUT:
+   nw ssh <device>        # Multi-device SSH with tmux
+   nw ssh <group>         # SSH to device groups
+
+====================================================================
+EOF
+
+# Show welcome message on login for networka user
+echo 'cat ~/.welcome 2>/dev/null || true' >> /home/networka/.bashrc
+
+# Welcome message for container startup
+echo ""
+echo "🌐 Networka Container Ready!"
 echo "SSH: ssh networka@localhost -p 2222 (password: networka)"
 echo "Direct: docker exec -it networka bash"
-echo "Type 'nw --help' to get started"
-echo "Network tools: ping, traceroute, tcpdump, nmap, dig, netstat, ss, mtr, tmux"
+echo ""
 
 exec "$@"
    nw config init              - Initialize configuration

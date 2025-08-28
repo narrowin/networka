@@ -1,118 +1,270 @@
-# Networka Docker Container
+# 🌐 Networka Docker Container
 
-Simple Docker setup for the Networka network automation tool with essential network debugging tools and SSH access.
+Production-ready Docker container for the Networka network automation tool with comprehensive network debugging capabilities and SSH access.
 
-## Quick Start
+## 🚀 Quick Start
 
-1. **Build and run:**
-   ```bash
-   docker compose up -d
-   ```
-
-2. **Access via SSH:**
-   ```bash
-   ssh networka@localhost -p 2222
-   # Password: networka
-   ```
-
-3. **Or enter container directly:**
-   ```bash
-   docker exec -it networka bash
-   ```
-
-4. **Use networka:**
-   ```bash
-   nw --help
-   ```
-
-## SSH Access (MANDATORY)
-
-The container runs an SSH server for remote access:
-
-**Connection:**
 ```bash
+# 1. Start the container
+docker compose -f docker/docker-compose.yml up -d
+
+# 2. Access via SSH
 ssh networka@localhost -p 2222
+# Password: networka
+
+# 3. Start automating!
+nw --help
 ```
 
-**Default credentials:**
-- Username: `networka`
-- Password: `networka`
+## 📋 What's Included
 
-**Setup SSH keys:**
-```bash
-# Copy your public key to container
-ssh-copy-id -p 2222 networka@localhost
+### ⚡ Network Automation
+- **Networka CLI**: Full `nw` command suite for multi-vendor automation
+- **SSH Fanout**: `nw ssh` for multi-device management with tmux
+- **Device Management**: Comprehensive device, group, and sequence support
+- **File Operations**: Upload/download capabilities
 
-# Or manually:
-cat ~/.ssh/id_rsa.pub | ssh -p 2222 networka@localhost "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"
-```
-
-**Change password:**
-```bash
-docker exec -it networka passwd networka
-```
-
-## Network Debugging Tools
-
-Essential Linux network tools included:
+### 🛠️ Network Debugging Arsenal
 - **Connectivity**: ping, traceroute, mtr
-- **Packet Analysis**: tcpdump
+- **Packet Analysis**: tcpdump (with aliases)
 - **Network Scanning**: nmap, arp-scan  
 - **Protocol Analysis**: netstat, ss, netcat
-- **DNS Tools**: dig, nslookup (dnsutils)
+- **DNS Tools**: dig, nslookup
 - **Network Config**: ip (iproute2), ifconfig (net-tools)
 - **HTTP Tools**: curl, wget
 - **Network Info**: whois
 - **Terminal Multiplexer**: tmux
 
-## Useful Aliases
-
+### 🎯 Built-in Aliases
 ```bash
+# Network Information
 myip           # Get public IP
 localip        # Get local IP  
 ports          # Show listening ports
+
+# Network Analysis
 scan           # nmap shortcut
 trace          # traceroute shortcut
-tcpdump-any    # Capture on all interfaces
-arp-table      # Show ARP table
-dig-short      # Dig with +short
-mtr-report     # MTR in report mode
-netstat-listen # Show listening processes
-ss-listen      # Show listening sockets
+dig-short      # dig +short
+mtr-report     # mtr --report
+
+# Packet Analysis
+tcpdump-any    # tcpdump -i any
+arp-table      # arp -a
+
+# System Monitoring
+netstat-listen # netstat -tlnp
+ss-listen      # ss -tlnp
+
+# Networka Shortcuts
+nw-help        # nw --help
+nw-devices     # nw list devices
+nw-groups      # nw list groups
 ```
 
-## Data Persistence
+## 🔐 Access Methods
 
-All data is stored in `/app/data` volume:
-- `config/` - Device definitions, groups, sequences
-- `results/` - Command execution results  
-- `backups/` - Device configuration backups
-- `logs/` - Application logs
+### SSH Access (Recommended)
+```bash
+# Connect via SSH
+ssh networka@localhost -p 2222
+# Default password: networka
 
-Data persists across container restarts.
+# Setup SSH keys for passwordless access
+ssh-copy-id -p 2222 networka@localhost
+```
 
-## Environment Variables
+### Direct Container Access
+```bash
+# Direct shell access
+docker exec -it networka bash
 
-Set in `.env` file or environment:
+# Run single commands
+docker exec -it networka nw list devices
+```
+
+## 💾 Data Persistence
+
+All data persists in the `networka_data` Docker volume:
+
+```
+/app/data/
+├── config/     # Device definitions, groups, sequences
+├── results/    # Command execution results
+├── backups/    # Device configuration backups
+└── logs/       # Application logs
+```
+
+## ⚙️ Configuration
+
+### Environment Variables
+
+Create a `.env` file or set environment variables:
 
 ```bash
+# Device credentials
 NW_USER_DEFAULT=admin
-NW_PASSWORD_DEFAULT=yourpassword
+NW_PASSWORD_DEFAULT=your-password
+
+# Container settings
 TZ=America/New_York
 ```
 
-## Build Only
+### Device Configuration
 
-```bash
-docker build -f docker/Dockerfile -t networka .
-docker run -it networka
+Configure your devices in `/app/data/config/devices.yml`:
+
+```yaml
+devices:
+  router1:
+    host: "192.168.1.1"
+    device_type: "mikrotik_routeros"
+    platform: "arm"
+    
+  switch1:
+    host: "192.168.1.10"
+    device_type: "cisco_ios"
+    platform: "cisco"
+
+device_groups:
+  infrastructure:
+    - router1
+    - switch1
 ```
 
-## Platform Support
+## 🔧 Common Usage Examples
 
-- Docker Desktop
-- Podman Desktop
-- DevContainers/DevPods
+### Device Operations
+```bash
+# Device information
+nw info router1
+
+# Execute commands
+nw run router1 "/system resource print"
+nw run switch1 "show version"
+
+# File operations
+nw upload router1 firmware.npk
+nw download switch1 startup-config.txt
+
+# Backup configurations
+nw backup router1
+nw backup all
+```
+
+### Network Debugging
+```bash
+# Test connectivity
+ping 192.168.1.1
+trace google.com
+mtr-report 8.8.8.8
+
+# Network scanning
+scan -sT 192.168.1.0/24
+arp-table
+
+# Packet capture
+tcpdump-any host 192.168.1.1
+
+# DNS analysis
+dig-short google.com
+```
+
+### SSH Fanout (Multi-device)
+```bash
+# SSH to multiple devices with tmux
+nw ssh infrastructure  # SSH to device group
+nw ssh router1 switch1 # SSH to specific devices
+
+# Commands are synchronized across all panes
+# Ctrl+B then T to toggle synchronization
+```
+
+## 🐳 Container Management
+
+### Build from Source
+```bash
+git clone https://github.com/narrowin/networka.git
+cd networka
+docker compose -f docker/docker-compose.yml build
+```
+
+### Update Container
+```bash
+docker compose -f docker/docker-compose.yml pull
+docker compose -f docker/docker-compose.yml up -d
+```
+
+### View Logs
+```bash
+docker compose -f docker/docker-compose.yml logs -f
+```
+
+### Container Status
+```bash
+docker compose -f docker/docker-compose.yml ps
+```
+
+## 🚨 Troubleshooting
+
+### Container Won't Start
+```bash
+# Check logs
+docker compose -f docker/docker-compose.yml logs
+
+# Verify system
+docker --version
+docker compose --version
+```
+
+### SSH Connection Issues
+```bash
+# Test SSH service
+docker exec networka systemctl status ssh
+
+# Check port mapping
+docker port networka
+
+# Reset password
+docker exec -it networka passwd networka
+```
+
+### Network Connectivity Issues
+```bash
+# Test from container
+docker exec networka ping 8.8.8.8
+
+# Check host networking
+ping 8.8.8.8
+```
+
+### Permission Issues
+```bash
+# Fix data permissions
+docker exec networka sudo chown -R networka:networka /app/data
+```
+
+## 🔒 Security
+
+- **Non-root execution**: All operations run as `networka` user
+- **SSH hardening**: Root login disabled, secure configuration
+- **Minimal attack surface**: Only essential packages installed
+- **Data isolation**: User data in dedicated volume
+- **Environment-based credentials**: No hardcoded passwords
+
+## 📚 Additional Resources
+
+- **Networka Documentation**: [https://narrowin.github.io/networka/](https://narrowin.github.io/networka/)
+- **Docker Compose Reference**: [https://docs.docker.com/compose/](https://docs.docker.com/compose/)
+- **Network Debugging Guide**: See container's welcome message
+
+## 🆘 Support
+
+For issues and questions:
+1. Check container logs: `docker compose logs`
+2. Review troubleshooting section above
+3. Visit project documentation
+4. Open GitHub issue with logs and configuration
     platform: "arm"
   
   switch1:
