@@ -139,6 +139,39 @@ else
     echo "Would update CHANGELOG.md with version $VERSION and date $TODAY"
 fi
 
+# Update CITATION.cff version and date if file exists
+CITATION_FILE="CITATION.cff"
+if [[ -f "$CITATION_FILE" ]]; then
+    if [[ "$DRY_RUN" != true ]]; then
+        echo "Updating CITATION.cff version and date..."
+        # Simple sed updates for version and date only
+        sed -i.bak "s/^version: .*/version: \"$VERSION\"/" "$CITATION_FILE"
+        sed -i.bak "s/^date-released: .*/date-released: \"$TODAY\"/" "$CITATION_FILE"
+        rm -f "$CITATION_FILE.bak"
+        echo "CITATION.cff updated: version $VERSION, date $TODAY"
+    else
+        echo "Would update CITATION.cff with version $VERSION and date $TODAY"
+    fi
+fi
+
+# Validate CITATION.cff if it exists
+if [[ -f "CITATION.cff" ]]; then
+    if [[ "$DRY_RUN" != true ]]; then
+        echo "Validating CITATION.cff..."
+        if command -v cffconvert >/dev/null 2>&1; then
+            if cffconvert --validate; then
+                echo "CITATION.cff is valid"
+            else
+                echo "WARNING: CITATION.cff validation failed"
+            fi
+        else
+            echo "cffconvert not found - skipping CITATION.cff validation"
+        fi
+    else
+        echo "Would validate CITATION.cff"
+    fi
+fi
+
 # Update uv.lock with new version
 if [[ "$DRY_RUN" != true ]]; then
     echo "Updating uv.lock..."
@@ -148,12 +181,17 @@ else
 fi
 
 # Commit changes
+COMMIT_FILES=("$VERSION_FILE" "$CHANGELOG_FILE" "uv.lock")
+if [[ -f "$CITATION_FILE" ]]; then
+    COMMIT_FILES+=("$CITATION_FILE")
+fi
+
 if [[ "$DRY_RUN" != true ]]; then
     echo "Committing release changes..."
-    git add "$VERSION_FILE" "$CHANGELOG_FILE" uv.lock
+    git add "${COMMIT_FILES[@]}"
     git commit --no-verify -m "chore: bump version to v$VERSION"
 else
-    echo "Would commit release changes"
+    echo "Would commit release changes: ${COMMIT_FILES[*]}"
 fi
 
 # Push commit first, then create and push tag
