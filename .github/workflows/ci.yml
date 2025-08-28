@@ -92,7 +92,7 @@ jobs:
           retention-days: 7
       - name: Upload coverage to Codecov
         if: ${{ github.actor != 'nektos/act' }}
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           file: ./coverage.xml
           fail_ci_if_error: true
@@ -137,7 +137,7 @@ jobs:
           retention-days: 7
       - name: Upload coverage to Codecov
         if: ${{ matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && github.actor != 'nektos/act' }}
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           file: ./coverage.xml
           fail_ci_if_error: true
