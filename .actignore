@@ -1,0 +1,8 @@
+.venv/
+node_modules/
+results/
+htmlcov/
+site/
+.git/
+*.log
+__pycache__/

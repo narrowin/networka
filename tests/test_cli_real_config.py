@@ -125,13 +125,27 @@ class TestCLIWithRealConfig:
                 try:
                     config = load_config(config_path)
                     device_count = len(config.devices) if config.devices else 0
-                    sequence_count = (
-                        len(config.vendor_sequences) if config.vendor_sequences else 0
+
+                    # Check for sequences in vendor_sequences OR global_command_sequences
+                    vendor_sequence_count = 0
+                    if config.vendor_sequences:
+                        vendor_sequence_count = sum(
+                            len(platform_sequences)
+                            for platform_sequences in config.vendor_sequences.values()
+                        )
+
+                    global_sequence_count = (
+                        len(config.global_command_sequences)
+                        if config.global_command_sequences
+                        else 0
                     )
+                    total_sequence_count = vendor_sequence_count + global_sequence_count
 
                     # Both should load the same data since they point to the same modular config
                     assert device_count > 0, f"No devices loaded from {config_path}"
-                    assert sequence_count > 0, f"No sequences loaded from {config_path}"
+                    assert total_sequence_count > 0, (
+                        f"No sequences loaded from {config_path} (vendor: {vendor_sequence_count}, global: {global_sequence_count})"
+                    )
 
                 except Exception as e:
                     pytest.fail(f"Config loading failed for {config_path}: {e}")
