@@ -35,6 +35,15 @@ tasks:
       - src/**/*.py
       - tests/**/*.py
 
+  format:check:
+    desc: Check code formatting with ruff
+    cmds:
+      - echo "Checking code formatting..."
+      - uv run ruff format --check .
+    sources:
+      - src/**/*.py
+      - tests/**/*.py
+
   lint:
     desc: Lint code with ruff
     cmds:
