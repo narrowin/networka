@@ -11,13 +11,18 @@
       text-align: center;
       margin: 0;
     }
-    
+
+    /* Remove gradient for dark mode */
+    [data-md-color-scheme="slate"] .hero {
+      background: var(--md-primary-fg-color);
+    }
+
     .hero h1 {
       font-size: 3.5rem;
       margin-bottom: 1.5rem;
       font-weight: 700;
     }
-    
+
     .hero p {
       font-size: 1.25rem;
       margin-bottom: 2.5rem;
@@ -26,75 +31,75 @@
       margin-right: auto;
       opacity: 0.9;
     }
-    
+
     .hero .md-button {
       margin: 0 0.5rem;
       padding: 0.8rem 2rem;
       font-size: 1rem;
       font-weight: 500;
     }
-    
+
     .hero .md-button--primary {
       background-color: white;
       color: var(--md-primary-fg-color);
       border-color: white;
     }
-    
+
     .hero .md-button--primary:hover {
       background-color: rgba(255, 255, 255, 0.9);
       transform: translateY(-2px);
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     }
-    
+
     .hero .md-button:not(.md-button--primary) {
       background-color: transparent;
       color: white;
       border: 2px solid white;
     }
-    
+
     .hero .md-button:not(.md-button--primary):hover {
       background-color: rgba(255, 255, 255, 0.1);
       transform: translateY(-2px);
     }
-    
+
     /* Remove default padding from main content */
     .md-main__inner {
       margin-top: 0;
     }
-    
+
     .md-content__inner {
       padding-top: 0;
     }
-    
+
     /* Hide left sidebar completely on home page */
     .md-sidebar--primary {
       display: none;
     }
-    
+
     /* Hide pagination on home page */
     .md-content__pagination {
       display: none;
     }
-    
+
     /* Expand content to full width when sidebar is hidden */
     .md-content {
       margin-left: 0;
     }
-    
+
     /* Responsive */
     @media (max-width: 768px) {
       .hero {
         padding: 4rem 1rem;
       }
-      
+
       .hero h1 {
         font-size: 2.5rem;
       }
-      
+
       .hero p {
         font-size: 1.1rem;
       }
-      
+
       .hero .md-button {
         display: block;
         margin: 0.5rem auto;
