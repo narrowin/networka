@@ -4,17 +4,14 @@ from pathlib import Path
 
 from network_toolkit.tui.data import TuiData
 
-# Get the repository root directory (parent of tests directory)
-REPO_ROOT = Path(__file__).parent.parent
-CONFIG_DIR = REPO_ROOT / "config"
 
-
-def test_tui_data_loads_from_config_dir() -> None:
-    data = TuiData(str(CONFIG_DIR))
+def test_tui_data_loads_from_config_dir(mock_repo_config: Path) -> None:
+    """Test TUI data loading with proper test config directory."""
+    data = TuiData(str(mock_repo_config))
     targets = data.targets()
     actions = data.actions()
 
-    # Basic sanity: our repo has non-empty config/devices, config/groups, and vendor sequences
+    # Basic sanity: our test config has devices, groups, and vendor sequences
     assert len(targets.devices) > 0, (
         "Expected devices to be discovered from config/devices/*.yml"
     )

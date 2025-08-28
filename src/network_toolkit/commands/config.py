@@ -198,66 +198,69 @@ def create_example_devices(devices_dir: Path) -> None:
     """Create example device configurations."""
     devices_dir.mkdir(parents=True, exist_ok=True)
 
-    mikrotik_content = """# MikroTik RouterOS Device Example
-host: 192.168.1.1
-device_type: mikrotik_routeros
-description: "Main office router"
-tags:
-  - office
-  - critical
+    devices_content = """# Example Device Configurations
+devices:
+  router1:
+    host: 192.168.1.1
+    device_type: mikrotik_routeros
+    platform: tile
+    description: "Main office router"
+    tags:
+      - office
+      - critical
+
+  switch1:
+    host: 192.168.1.2
+    device_type: cisco_ios
+    platform: cisco_ios
+    description: "Access switch"
+    tags:
+      - switch
+      - access
 """
 
-    cisco_content = """# Cisco IOS Device Example
-host: 192.168.1.2
-device_type: cisco_ios
-description: "Access switch"
-tags:
-  - switch
-  - access
-"""
-
-    (devices_dir / "router1.yml").write_text(mikrotik_content)
-    (devices_dir / "switch1.yml").write_text(cisco_content)
+    (devices_dir / "devices.yml").write_text(devices_content)
 
 
 def create_example_groups(groups_dir: Path) -> None:
     """Create example group configurations."""
     groups_dir.mkdir(parents=True, exist_ok=True)
 
-    office_content = """# Office devices group
-description: "All office network devices"
-match_tags:
-  - office
+    groups_content = """# Example Group Configurations
+groups:
+  office:
+    description: "All office network devices"
+    match_tags:
+      - office
+
+  critical:
+    description: "Critical network infrastructure"
+    match_tags:
+      - critical
 """
 
-    critical_content = """# Critical infrastructure group
-description: "Critical network infrastructure"
-match_tags:
-  - critical
-"""
-
-    (groups_dir / "office.yml").write_text(office_content)
-    (groups_dir / "critical.yml").write_text(critical_content)
+    (groups_dir / "groups.yml").write_text(groups_content)
 
 
 def create_example_sequences(sequences_dir: Path) -> None:
     """Create example sequence configurations."""
     sequences_dir.mkdir(parents=True, exist_ok=True)
 
-    global_content = """# Global command sequences
-health_check:
-  description: "Basic device health check"
-  commands:
-    - "/system resource print"
-    - "/interface print brief"
+    sequences_content = """# Example Command Sequences
+sequences:
+  health_check:
+    description: "Basic device health check"
+    commands:
+      - "/system resource print"
+      - "/interface print brief"
 
-backup_config:
-  description: "Backup device configuration"
-  commands:
-    - "/export file=backup"
+  backup_config:
+    description: "Backup device configuration"
+    commands:
+      - "/export file=backup"
 """
 
-    (sequences_dir / "global.yml").write_text(global_content)
+    (sequences_dir / "sequences.yml").write_text(sequences_content)
 
     # Create vendor-specific directories
     (sequences_dir / "mikrotik").mkdir(exist_ok=True)

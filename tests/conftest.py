@@ -253,6 +253,59 @@ def mock_paramiko_ssh() -> MagicMock:
     return ssh
 
 
+# --- Config Directory Fixtures for Integration Tests ----------------------
+
+
+@pytest.fixture(scope="session")
+def test_config_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Create a temporary config directory structure for tests that need real config files.
+
+    This fixture uses the existing 'nw config init' functions to ensure
+    tests use the exact same config structure that real users get.
+    """
+    from network_toolkit.commands.config import (
+        create_config_yml,
+        create_example_devices,
+        create_example_groups,
+        create_example_sequences,
+    )
+
+    config_root = tmp_path_factory.mktemp("test_config")
+
+    # Create directory structure
+    config_dir = config_root / "config"
+    config_dir.mkdir()
+    (config_dir / "devices").mkdir()
+    (config_dir / "groups").mkdir()
+    (config_dir / "sequences").mkdir()
+
+    # Use the existing config init functions - single source of truth!
+    create_config_yml(config_dir)
+    create_example_devices(config_dir / "devices")
+    create_example_groups(config_dir / "groups")
+    create_example_sequences(config_dir / "sequences")
+
+    return config_root
+
+
+@pytest.fixture
+def test_config_dir(test_config_root: Path) -> Path:
+    """Get the config directory from the test config root."""
+    return test_config_root / "config"
+
+
+@pytest.fixture
+def mock_repo_config(test_config_dir: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Mock the repository config directory to point to test config.
+
+    This fixture redirects code that looks for the real config/ directory
+    to use our test config instead.
+    """
+    # Change working directory to the test config root so relative 'config' path works
+    monkeypatch.chdir(test_config_dir.parent)
+    return test_config_dir
+
+
 # --- Test selection hooks ----------------------------------------------------
 
 
