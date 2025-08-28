@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Annotated
 
 import typer
 
+from network_toolkit.common.config_manager import ConfigManager
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import (
@@ -17,7 +18,7 @@ from network_toolkit.common.output import (
     set_output_mode,
 )
 from network_toolkit.common.styles import StyleManager, StyleName
-from network_toolkit.config import load_config
+from network_toolkit.config import NetworkConfig
 from network_toolkit.exceptions import NetworkToolkitError
 
 if TYPE_CHECKING:
@@ -57,6 +58,7 @@ class CommandContext:
         """Initialize command context with output styling."""
         self.verbose = verbose
         self.config_file = config_file or DEFAULT_CONFIG_PATH
+        self._config: NetworkConfig | None = None
 
         # Set up logging
         setup_logging("DEBUG" if verbose else "INFO")
@@ -70,10 +72,11 @@ class CommandContext:
             try:
                 # Only try to load config if the path seems valid
                 if self.config_file and self.config_file.exists():
-                    config = load_config(self.config_file)
+                    config = ConfigManager.load_config_safe(self.config_file)
                     self.output_manager = get_output_manager_with_config(
                         config.general.output_mode
                     )
+                    self._config = config
                 else:
                     # Use default if config doesn't exist or path is invalid
                     self.output_manager = get_output_manager()
@@ -87,6 +90,27 @@ class CommandContext:
         # Expose commonly used objects
         self.console = self.style_manager.console
         self.mode = self.output_manager.mode
+
+    @property
+    def config(self) -> NetworkConfig:
+        """Get configuration, loading it lazily if needed."""
+        if self._config is None:
+            self._config = ConfigManager.load_config_safe(self.config_file)
+        return self._config
+
+    @classmethod
+    def from_standard_kwargs(
+        cls,
+        config_file: Path,
+        verbose: bool = False,
+        output_mode: OutputMode | None = None,
+    ) -> CommandContext:
+        """Create CommandContext from standard command parameters."""
+        return cls(
+            config_file=config_file,
+            verbose=verbose,
+            output_mode=output_mode,
+        )
 
     @property
     def table_generator(self) -> TableGenerator:

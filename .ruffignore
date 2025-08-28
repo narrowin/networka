@@ -1,20 +1,25 @@
 # Exclude old source code directory
+
 src-old/
 
 # Exclude scripts directory (development utilities)
+
 scripts/
 
 # Exclude generated files
+
 htmlcov/
 .coverage
 coverage.xml
 
 # Exclude build artifacts
+
 build/
 dist/
-*.egg-info/
+\*.egg-info/
 
 # Exclude environment and cache
+
 .venv/
 .mypy_cache/
-__pycache__/
+**pycache**/

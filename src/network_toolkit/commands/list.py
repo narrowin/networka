@@ -3,15 +3,12 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 import typer
 
+from network_toolkit.common.command_base import standardized_command
 from network_toolkit.common.command_helpers import CommandContext
-from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
-from network_toolkit.common.logging import setup_logging
-from network_toolkit.common.output import OutputMode
 from network_toolkit.common.table_providers import (
     DeviceListTableProvider,
     GlobalSequencesTableProvider,
@@ -20,8 +17,7 @@ from network_toolkit.common.table_providers import (
     TransportTypesTableProvider,
     VendorSequencesTableProvider,
 )
-from network_toolkit.config import NetworkConfig, load_config
-from network_toolkit.exceptions import NetworkToolkitError
+from network_toolkit.config import NetworkConfig
 from network_toolkit.sequence_manager import SequenceManager, SequenceRecord
 
 if TYPE_CHECKING:
@@ -163,108 +159,35 @@ def register(app: typer.Typer) -> None:
     )
 
     @list_app.command("devices")
-    def devices(
-        config_file: Annotated[
-            Path, typer.Option("--config", "-c", help="Configuration file path")
-        ] = DEFAULT_CONFIG_PATH,
-        output_mode: Annotated[
-            OutputMode | None,
-            typer.Option(
-                "--output-mode",
-                "-o",
-                help="Output decoration mode: default, light, dark, no-color, raw",
-                show_default=False,
-            ),
-        ] = None,
-        verbose: Annotated[
-            bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
-        ] = False,
-    ) -> None:
+    @standardized_command()
+    def devices(ctx: CommandContext) -> None:
         """List all configured network devices."""
-        setup_logging("DEBUG" if verbose else "INFO")
+        config = ctx.config
 
-        ctx = CommandContext(
-            config_file=config_file,
-            verbose=verbose,
-            output_mode=output_mode,
-        )
+        if not config.devices:
+            ctx.print_warning("No devices configured.")
+            return
 
-        try:
-            config = load_config(config_file)
-
-            if not config.devices:
-                ctx.print_warning("No devices configured.")
-                return
-
-            # Use the local implementation
-            _list_devices_impl(config, ctx, verbose=verbose)
-
-        except NetworkToolkitError as e:
-            ctx.print_error(str(e))
-            if verbose and e.details:
-                ctx.print_error(f"Details: {e.details}")
-            raise typer.Exit(1) from None
-        except typer.Exit:
-            # Allow clean exits (e.g., user cancellation) to pass through
-            raise
-        except Exception as e:  # pragma: no cover - unexpected
-            ctx.print_error(f"Unexpected error: {e}")
-            raise typer.Exit(1) from None
+        # Use the local implementation
+        _list_devices_impl(config, ctx, verbose=ctx.verbose)
 
     @list_app.command("groups")
-    def groups(
-        config_file: Annotated[
-            Path, typer.Option("--config", "-c", help="Configuration file path")
-        ] = DEFAULT_CONFIG_PATH,
-        output_mode: Annotated[
-            OutputMode | None,
-            typer.Option(
-                "--output-mode",
-                "-o",
-                help="Output decoration mode: default, light, dark, no-color, raw",
-                show_default=False,
-            ),
-        ] = None,
-        verbose: Annotated[
-            bool, typer.Option("--verbose", "-v", help="Show detailed information")
-        ] = False,
-    ) -> None:
+    @standardized_command()
+    def groups(ctx: CommandContext) -> None:
         """List all configured device groups and their members."""
-        setup_logging("DEBUG" if verbose else "INFO")
+        config = ctx.config
 
-        ctx = CommandContext(
-            config_file=config_file,
-            verbose=verbose,
-            output_mode=output_mode,
-        )
+        if not config.device_groups:
+            ctx.print_warning("No device groups configured.")
+            return
 
-        try:
-            config = load_config(config_file)
-
-            if not config.device_groups:
-                ctx.print_warning("No device groups configured.")
-                return
-
-            # Use the local implementation
-            _list_groups_impl(config, ctx, verbose=verbose)
-
-        except NetworkToolkitError as e:
-            ctx.print_error(str(e))
-            if verbose and e.details:
-                ctx.print_error(f"Details: {e.details}")
-            raise typer.Exit(1) from None
-        except typer.Exit:
-            # Allow clean exits (e.g., user cancellation) to pass through
-            raise
-        except Exception as e:  # pragma: no cover - unexpected
-            ctx.print_error(f"Unexpected error: {e}")
-            raise typer.Exit(1) from None
+        # Use the local implementation
+        _list_groups_impl(config, ctx, verbose=ctx.verbose)
 
     @list_app.command("sequences")
+    @standardized_command()
     def sequences(
-        config_file: Annotated[
-            Path, typer.Option("--config", "-c", help="Configuration file path")
-        ] = DEFAULT_CONFIG_PATH,
+        ctx: CommandContext,
         vendor: Annotated[
             str | None,
             typer.Option("--vendor", "-v", help="Filter by vendor platform"),
@@ -273,73 +196,20 @@ def register(app: typer.Typer) -> None:
             str | None,
             typer.Option("--category", help="Filter by sequence category"),
         ] = None,
-        output_mode: Annotated[
-            OutputMode | None,
-            typer.Option(
-                "--output-mode",
-                "-o",
-                help="Output decoration mode: default, light, dark, no-color, raw",
-                show_default=False,
-            ),
-        ] = None,
-        verbose: Annotated[
-            bool, typer.Option("--verbose", help="Show detailed information")
-        ] = False,
     ) -> None:
         """List all available command sequences, optionally filtered by vendor
         or category."""
-        setup_logging("DEBUG" if verbose else "INFO")
+        config = ctx.config
 
-        ctx = CommandContext(
-            config_file=config_file,
-            verbose=verbose,
-            output_mode=output_mode,
-        )
-
-        try:
-            config = load_config(config_file)
-
-            # Use the local implementation
-            _list_sequences_impl(config, ctx, vendor, category, verbose=verbose)
-
-        except NetworkToolkitError as e:
-            ctx.print_error(str(e))
-            if verbose and e.details:
-                ctx.print_error(f"Details: {e.details}")
-            raise typer.Exit(1) from None
-        except typer.Exit:
-            # Allow clean exits (e.g., user cancellation) to pass through
-            raise
-        except Exception as e:  # pragma: no cover - unexpected
-            ctx.print_error(f"Unexpected error: {e}")
-            raise typer.Exit(1) from None
+        # Use the local implementation
+        _list_sequences_impl(config, ctx, vendor, category, verbose=ctx.verbose)
 
     @list_app.command("supported-types")
-    def supported_types(
-        verbose: Annotated[
-            bool, typer.Option("--verbose", "-v", help="Show detailed information")
-        ] = False,
-    ) -> None:
+    @standardized_command(has_config=False)
+    def supported_types(ctx: CommandContext) -> None:
         """Show supported device types and platform information."""
-        setup_logging("DEBUG" if verbose else "INFO")
-
-        ctx = CommandContext()
-
-        try:
-            # Use the local implementation
-            _show_supported_types_impl(ctx, verbose=verbose)
-
-        except NetworkToolkitError as e:
-            ctx.print_error(str(e))
-            if verbose and e.details:
-                ctx.print_error(f"Details: {e.details}")
-            raise typer.Exit(1) from None
-        except typer.Exit:
-            # Allow clean exits (e.g., user cancellation) to pass through
-            raise
-        except Exception as e:  # pragma: no cover - unexpected
-            ctx.print_error(f"Unexpected error: {e}")
-            raise typer.Exit(1) from None
+        # Use the local implementation
+        _show_supported_types_impl(ctx, verbose=ctx.verbose)
 
     # Register the list command group with the main app
     app.add_typer(list_app, name="list", rich_help_panel="Info & Configuration")
