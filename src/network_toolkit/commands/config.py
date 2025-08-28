@@ -266,6 +266,40 @@ sequences:
     (sequences_dir / "mikrotik").mkdir(exist_ok=True)
     (sequences_dir / "cisco").mkdir(exist_ok=True)
 
+    # Create vendor-specific sequences
+    mikrotik_content = """# MikroTik RouterOS Sequences
+system_info:
+  description: "System information and status"
+  commands:
+    - "/system resource print"
+    - "/system identity print"
+    - "/system clock print"
+
+interface_status:
+  description: "Interface status and configuration"
+  commands:
+    - "/interface print brief"
+    - "/ip address print"
+"""
+
+    cisco_content = """# Cisco IOS Sequences
+system_info:
+  description: "System information and status"
+  commands:
+    - "show version"
+    - "show running-config | include hostname"
+    - "show clock"
+
+interface_status:
+  description: "Interface status and configuration"
+  commands:
+    - "show ip interface brief"
+    - "show interface status"
+"""
+
+    (sequences_dir / "mikrotik" / "system.yml").write_text(mikrotik_content)
+    (sequences_dir / "cisco" / "system.yml").write_text(cisco_content)
+
 
 def _validate_git_url(url: str) -> None:
     """Validate Git URL for security."""

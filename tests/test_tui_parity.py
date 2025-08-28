@@ -81,8 +81,10 @@ def test_all_groups_resolve_to_devices() -> None:
     assert found_non_empty
 
 
-def test_can_resolve_a_vendor_sequence_for_a_real_device() -> None:
-    cfg: NetworkConfig = load_config(str(CONFIG_DIR))
+def test_can_resolve_a_vendor_sequence_for_a_real_device(
+    mock_repo_config: Path,
+) -> None:
+    cfg: NetworkConfig = load_config(str(mock_repo_config))
     sm = SequenceManager(cfg)
 
     assert cfg.devices, "Expected devices in config"
