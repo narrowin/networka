@@ -110,14 +110,14 @@ class TestCLIWithRealConfig:
         # Should work with default config discovery
         assert result.exit_code == 0, f"Default config loading failed: {result.output}"
 
-    def test_config_loading_debug(self):
+    def test_config_loading_debug(self, mock_repo_config: Path):
         """Debug test to understand what's happening with config loading."""
         from network_toolkit.config import load_config
 
         # Test different config loading scenarios
         test_cases = [
-            CONFIG_DIR,
-            CONFIG_DIR / "config.yml",
+            mock_repo_config,
+            mock_repo_config / "config.yml",
         ]
 
         for config_path in test_cases:

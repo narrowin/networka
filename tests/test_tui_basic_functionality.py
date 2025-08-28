@@ -14,8 +14,8 @@ REPO_ROOT = Path(__file__).parent.parent
 CONFIG_DIR = REPO_ROOT / "config"
 
 
-def test_tui_targets_are_sorted_and_unique() -> None:
-    data = TuiData(str(CONFIG_DIR))
+def test_tui_targets_are_sorted_and_unique(mock_repo_config: Path) -> None:
+    data = TuiData(str(mock_repo_config))
     t = data.targets()
 
     # Devices
@@ -27,8 +27,10 @@ def test_tui_targets_are_sorted_and_unique() -> None:
     assert len(t.groups) == len(set(t.groups))
 
 
-def test_tui_actions_sequences_sorted_unique_and_non_empty() -> None:
-    data = TuiData(str(CONFIG_DIR))
+def test_tui_actions_sequences_sorted_unique_and_non_empty(
+    mock_repo_config: Path,
+) -> None:
+    data = TuiData(str(mock_repo_config))
     a = data.actions()
 
     assert a.sequences == sorted(a.sequences)
@@ -36,9 +38,9 @@ def test_tui_actions_sequences_sorted_unique_and_non_empty() -> None:
     assert "" not in a.sequences
 
 
-def test_tui_default_constructor_discovers_repo_config() -> None:
+def test_tui_default_constructor_discovers_repo_config(mock_repo_config: Path) -> None:
     # TuiData() uses default path; load_config falls back to modular config
-    data = TuiData(str(CONFIG_DIR))
+    data = TuiData(str(mock_repo_config))
     assert len(data.targets().devices) > 0
 
 
@@ -55,10 +57,10 @@ def _first_device_with_vendor(
 
 @pytest.mark.parametrize("vendor,known_seq", [("mikrotik_routeros", "system_info")])
 def test_actions_contain_known_vendor_sequence_and_resolve(
-    vendor: str, known_seq: str
+    vendor: str, known_seq: str, mock_repo_config: Path
 ) -> None:
-    cfg: NetworkConfig = load_config("config")
-    data = TuiData("config")
+    cfg: NetworkConfig = load_config(str(mock_repo_config))
+    data = TuiData(str(mock_repo_config))
     sm = SequenceManager(cfg)
 
     # Ensure repo actually has the vendor; otherwise skip gracefully
@@ -79,10 +81,12 @@ def test_actions_contain_known_vendor_sequence_and_resolve(
     assert resolved and all(isinstance(c, str) and c for c in resolved)
 
 
-def test_tui_sequence_resolution_matches_sequence_manager_for_vendor() -> None:
-    cfg: NetworkConfig = load_config(str(CONFIG_DIR))
+def test_tui_sequence_resolution_matches_sequence_manager_for_vendor(
+    mock_repo_config: Path,
+) -> None:
+    cfg: NetworkConfig = load_config(str(mock_repo_config))
     sm = SequenceManager(cfg)
-    data = TuiData(str(CONFIG_DIR))
+    data = TuiData(str(mock_repo_config))
 
     # Find any device and use its vendor
     assert cfg.devices, "Expected devices in config"
