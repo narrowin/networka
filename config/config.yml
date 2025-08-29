@@ -9,7 +9,7 @@ general:
   results_dir: "./results"
 
   # Connection settings
-  transport: "ssh"  # ssh or telnet
+  transport: "system"  # system, paramiko, or others in the future
   port: 22
   timeout: 30
   command_timeout: 60

@@ -17,7 +17,7 @@ MAX_LIST_PREVIEW = 10
 
 
 def register(app: typer.Typer) -> None:
-    @app.command(rich_help_panel="Executing Operations")
+    @app.command(rich_help_panel="Remote Operations")
     def upload(  # pyright: ignore[reportUnusedFunction]
         target_name: Annotated[
             str,

@@ -33,7 +33,7 @@ def sample_config_data(temp_dir: Path) -> dict[str, Any]:
             "backup_dir": str(temp_dir / "backups"),
             "logs_dir": str(temp_dir / "logs"),
             "results_dir": str(temp_dir / "results"),
-            "transport": "ssh",
+            "transport": "system",
             "port": 22,
             "timeout": 30,
             "connection_retries": 3,

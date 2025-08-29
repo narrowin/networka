@@ -310,7 +310,7 @@ class TestSequenceTableProviders:
         """Test GlobalSequencesTableProvider implementation."""
         # Create a real NetworkConfig with global_command_sequences
         config = NetworkConfig(
-            general=GeneralConfig(backup_dir="/tmp", transport="ssh"),
+            general=GeneralConfig(backup_dir="/tmp", transport="system"),
             devices={},
             device_groups={},
             global_command_sequences=None,  # Use None to avoid type issues
@@ -424,7 +424,7 @@ class TestTableProviderIntegration:
     def test_device_list_provider_with_real_config(self) -> None:
         """Test DeviceListTableProvider with realistic config data."""
         config = NetworkConfig(
-            general=GeneralConfig(backup_dir="/tmp", transport="ssh"),
+            general=GeneralConfig(backup_dir="/tmp", transport="system"),
             devices={
                 "router1": DeviceConfig(
                     host="192.168.1.1",
@@ -526,7 +526,7 @@ class TestTableProviderEdgeCases:
 
         # Empty sequences config
         empty_config = NetworkConfig(
-            general=GeneralConfig(backup_dir="/tmp", transport="ssh"),
+            general=GeneralConfig(backup_dir="/tmp", transport="system"),
             devices={},
             device_groups={},
             global_command_sequences={},

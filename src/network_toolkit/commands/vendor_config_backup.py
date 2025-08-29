@@ -14,7 +14,7 @@ import typer
 
 from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
-from network_toolkit.common.output import OutputMode
+from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.styles import StyleName
 from network_toolkit.config import DeviceConfig, NetworkConfig
 from network_toolkit.exceptions import NetworkToolkitError
@@ -335,7 +335,9 @@ def register(app: typer.Typer) -> None:
             raise typer.Exit(1) from e
 
     # Register the main config-backup command
-    @app.command(rich_help_panel="Vendor-Specific Operations", name="config-backup")
+    @app.command(
+        rich_help_panel="Vendor-Specific Remote Operations", name="config-backup"
+    )
     def config_backup(
         target_name: Annotated[
             str,

@@ -42,13 +42,8 @@ class ScrapliTransportFactory:
             ScrapliSyncTransport as DeviceScrapliSyncTransport,
         )
 
-        # Map generic transport values to concrete Scrapli backends
-        def _map_transport(value: str | None) -> str:
-            v = (value or "paramiko").lower()
-            return "paramiko" if v == "ssh" else v
-
         params = dict(connection_params)
-        params["transport"] = _map_transport(params.get("transport"))
+        params["transport"] = (params.get("transport") or "system").lower()
 
         # Create Scrapli driver and wrap it in our adapter
         driver = DeviceScrapli(**params)

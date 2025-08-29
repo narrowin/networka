@@ -170,9 +170,9 @@ include = [
 [tool.ruff]
 target-version = "py311"
 line-length = 88
-exclude = [
-    "src-old/**",
-    "scripts/**",
+include = [
+    "src/**/*.py",
+    "tests/**/*.py",
 ]
 
 [tool.ruff.lint]

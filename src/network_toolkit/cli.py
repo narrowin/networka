@@ -125,22 +125,48 @@ class CategorizedHelpGroup(TyperGroup):
         return [
             "run",
             "ssh",
+            "diff",
             "upload",
             "download",
+        ]
+        vendor_names: list[str] = [
             "backup",
             "firmware",
+        ]
+        info_names = [
             "info",
             "list",
             "config",
             "schema",
-            "diff",
         ]
 
-    def get_command(self, ctx: Any, cmd_name: str) -> Any:
-        # Only allow our approved commands
-        if cmd_name in self.list_commands(ctx):
-            return super().get_command(ctx, cmd_name)
-        return None
+        def rows(names: list[str]) -> list[tuple[str, str]]:
+            items: list[tuple[str, str]] = []
+            for name in names:
+                cmd = self.get_command(ctx, name)
+                if not cmd:
+                    continue
+                # Prefer short help if available
+                short_getter = getattr(cmd, "get_short_help_str", None)
+                short_text = (
+                    short_getter() if callable(short_getter) else (cmd.help or "")
+                )
+                items.append((name, str(short_text)))
+            return items
+
+        exec_rows = rows(exec_names)
+        vendor_rows = rows(vendor_names)
+        info_rows = rows(info_names)
+
+        if exec_rows:
+            formatter.write_text("\nRemote Operations")
+            formatter.write_dl(exec_rows)
+        if vendor_rows:
+            formatter.write_text("\nVendor-Specific Remote Operations")
+            formatter.write_dl(vendor_rows)
+        if info_rows:
+            formatter.write_text("\nInfo & Configuration")
+            formatter.write_dl(info_rows)
 
 
 # Typer application instance

@@ -44,7 +44,7 @@ class TestGeneralConfig:
             assert config.backup_dir == "/tmp/backups"
             assert config.default_user == "admin"
             assert config.default_password == "admin"
-            assert config.transport == "ssh"
+            assert config.transport == "system"
             assert config.port == 22
             assert config.timeout == 30
             assert config.connection_retries == 3
@@ -81,12 +81,12 @@ class TestGeneralConfig:
     def test_transport_validation(self) -> None:
         """Test transport validation."""
         # Valid transports
-        for transport in ["ssh", "telnet", "SSH", "TELNET"]:
+        for transport in ["system", "telnet", "paramiko", "ssh2"]:
             config = GeneralConfig(transport=transport)
             assert config.transport == transport.lower()
 
         # Invalid transport
-        with pytest.raises(Exception, match="transport must be either"):
+        with pytest.raises(Exception, match="transport must be one of"):
             GeneralConfig(transport="http")
 
     def test_log_level_validation(self) -> None:
@@ -292,7 +292,7 @@ class TestNetworkConfig:
             "port": 22,
             "timeout_socket": 30,
             "timeout_transport": 30,
-            "transport": "ssh",
+            "transport": "system",
             "platform": "mikrotik_routeros",  # Now correctly uses device_type, not hardware platform
         }
 
@@ -311,7 +311,7 @@ class TestNetworkConfig:
             "port": 2222,
             "timeout_socket": 60,
             "timeout_transport": 60,
-            "transport": "ssh",
+            "transport": "system",
             "platform": "mikrotik_routeros",
         }
 
@@ -472,7 +472,7 @@ class TestGeneralConfigValidation:
     def test_general_config_defaults(self) -> None:
         """Test general config with default values."""
         config = GeneralConfig()
-        assert config.transport == "ssh"
+        assert config.transport == "system"
         assert config.port == 22
         assert config.timeout == 30
         assert config.verify_checksums is True
@@ -496,9 +496,24 @@ class TestGeneralConfigValidation:
     def test_general_config_invalid_transport(self) -> None:
         """Test general config with invalid transport."""
         with pytest.raises(
-            ValueError, match="transport must be either 'ssh' or 'telnet'"
+            ValueError,
+            match="transport must be one of: system, paramiko, ssh2, telnet, asyncssh, asynctelnet",
         ):
             GeneralConfig(transport="invalid")
+
+    def test_general_config_valid_transports(self) -> None:
+        """Test general config with valid transports."""
+        valid_transports = [
+            "system",
+            "paramiko",
+            "ssh2",
+            "telnet",
+            "asyncssh",
+            "asynctelnet",
+        ]
+        for transport in valid_transports:
+            config = GeneralConfig(transport=transport)
+            assert config.transport == transport.lower()
 
     def test_general_config_invalid_log_level(self) -> None:
         """Test general config with invalid log level."""
