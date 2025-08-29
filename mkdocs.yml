@@ -8,7 +8,7 @@ edit_uri: edit/main/docs/
 nav:
   - Home: index.md
   - Getting started:
-      - Quickstart: getting-started.md
+      - Intallation: getting-started.md
       - Platform compatibility: platform-compatibility.md
   - User guide:
     - Configuration: configuration.md
