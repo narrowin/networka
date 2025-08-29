@@ -17,7 +17,7 @@ from network_toolkit.exceptions import NetworkToolkitError
 
 
 def register(app: typer.Typer) -> None:
-    @app.command(rich_help_panel="Executing Operations")
+    @app.command(rich_help_panel="Remote Operations")
     def download(  # pyright: ignore[reportUnusedFunction]
         target_name: Annotated[
             str,
