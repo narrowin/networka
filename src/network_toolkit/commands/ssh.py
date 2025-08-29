@@ -258,7 +258,7 @@ def _sanitize_session_name(name: str) -> str:
 
 
 def register(app: typer.Typer) -> None:
-    @app.command("ssh", help=app_help)
+    @app.command("ssh", help=app_help, rich_help_panel="Remote Operations")
     def ssh_fanout(
         target: Annotated[
             str,

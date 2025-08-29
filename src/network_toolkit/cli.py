@@ -63,18 +63,19 @@ class CategorizedHelpGroup(TyperGroup):
         exec_names = [
             "run",
             "ssh",
+            "diff",
             "upload",
             "download",
+        ]
+        vendor_names: list[str] = [
             "backup",
             "firmware",
         ]
-        vendor_names: list[str] = []
         info_names = [
             "info",
             "list",
             "config",
             "schema",
-            "diff",
         ]
 
         def rows(names: list[str]) -> list[tuple[str, str]]:
@@ -96,10 +97,10 @@ class CategorizedHelpGroup(TyperGroup):
         info_rows = rows(info_names)
 
         if exec_rows:
-            formatter.write_text("\nExecuting Operations")
+            formatter.write_text("\nRemote Operations")
             formatter.write_dl(exec_rows)
         if vendor_rows:
-            formatter.write_text("\nVendor-Specific Operations")
+            formatter.write_text("\nVendor-Specific Remote Operations")
             formatter.write_dl(vendor_rows)
         if info_rows:
             formatter.write_text("\nInfo & Configuration")

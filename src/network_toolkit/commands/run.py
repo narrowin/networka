@@ -44,7 +44,7 @@ PREVIEW_LEN = 200
 
 
 def register(app: typer.Typer) -> None:
-    @app.command(rich_help_panel="Executing Operations")
+    @app.command(rich_help_panel="Remote Operations")
     def run(
         target: Annotated[
             str,
