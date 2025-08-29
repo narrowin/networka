@@ -42,7 +42,7 @@ general:
   output_mode: "dark"
 
 # Default connection settings
-transport: "ssh"
+transport: "system"
 port: 22
 connection_retries: 3
 retry_delay: 5

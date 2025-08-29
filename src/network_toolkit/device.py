@@ -104,6 +104,10 @@ class DeviceSession:
             {
                 "auth_strict_key": False,  # Don't enforce strict host key checking
                 "ssh_config_file": False,  # Don't use SSH config file settings
+                "timeout_socket": 10,  # Socket timeout
+                "timeout_transport": 30,  # Transport timeout
+                "timeout_ops": 30,  # Operations timeout
+                "channel_lock": True,  # Ensure thread-safe channel operations
             }
         )
 

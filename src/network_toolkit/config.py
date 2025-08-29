@@ -72,7 +72,7 @@ class GeneralConfig(BaseModel):
     results_dir: str = "/tmp/results"
 
     # Default connection settings (credentials now come from environment variables)
-    transport: str = "ssh"
+    transport: str = "system"
     port: int = 22
     timeout: int = 30
     default_transport_type: str = "scrapli"
@@ -134,8 +134,16 @@ class GeneralConfig(BaseModel):
     @classmethod
     def validate_transport(cls, v: str) -> str:
         """Validate transport is supported."""
-        if v.lower() not in ["ssh", "telnet"]:
-            msg = "transport must be either 'ssh' or 'telnet'"
+        valid_transports = [
+            "system",
+            "paramiko",
+            "ssh2",
+            "telnet",
+            "asyncssh",
+            "asynctelnet",
+        ]
+        if v.lower() not in valid_transports:
+            msg = f"transport must be one of: {', '.join(valid_transports)}"
             raise ValueError(msg)
         return v.lower()
 

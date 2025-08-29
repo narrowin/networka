@@ -186,6 +186,9 @@ general:
   output_mode: default  # Options: default, light, dark, no-color, raw
   log_level: INFO       # Options: DEBUG, INFO, WARNING, ERROR
 
+  # Default transport for all devices (can be overridden per device)
+  transport: system     # Options: system, paramiko, ssh
+
 # Device configurations are loaded from devices/ directory
 # Group configurations are loaded from groups/ directory
 # Sequence configurations are loaded from sequences/ directory
