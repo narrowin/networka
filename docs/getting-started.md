@@ -1,4 +1,4 @@
-# Quickstart
+# Installation
 
 ## Installation (not on PyPI yet)
 
