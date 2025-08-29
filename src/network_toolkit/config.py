@@ -876,12 +876,13 @@ def _merge_configs(
 
 def load_config(config_path: str | Path) -> NetworkConfig:
     """
-    Load and validate configuration from YAML file(s).
+    Load and validate configuration from modular directory structure.
 
-    Supports both:
-    1. New modular config: config_path as directory containing config/, devices.yml,
-       groups.yml, sequences.yml
-    2. Legacy monolithic: config_path as single devices.yml file
+    The config_path must be a directory containing modular config files:
+    - config.yml (general configuration)
+    - devices/ directory with device configs
+    - groups/ directory with group configs (optional)
+    - sequences/ directory with sequence configs (optional)
 
     Additionally loads environment variables from .env files before loading config.
     Auto-exports JSON schemas for editor validation when working in a project directory.
@@ -892,111 +893,68 @@ def load_config(config_path: str | Path) -> NetworkConfig:
     # Load .env files first to make environment variables available for credential resolution
     load_dotenv_files(config_path)
 
-    # Check for new modular configuration structure
     # Handle default path "config" - check current directory first, then fall back to platform default
     if config_path.name in ["config", "config/"]:
         # First try current directory
-        if config_path.exists():
+        if config_path.exists() and config_path.is_dir():
             config = load_modular_config(config_path)
             _auto_export_schemas_if_project()
             return config
         # Fall through to platform default logic below
 
-    # If user provided an explicit file path that doesn't exist, fail immediately
-    if not config_path.exists() and str(original_path) not in ["config", "devices.yml"]:
-        # User specified an explicit path that doesn't exist
-        msg = f"Configuration file not found: {config_path}"
+    # If user provided an explicit path that doesn't exist, fail immediately
+    if not config_path.exists() and str(original_path) != "config":
+        msg = f"Configuration directory not found: {config_path}"
         raise FileNotFoundError(msg)
 
-    # Check if config_path is a directory or if config/ directory exists alongside it
+    # Check if config_path is a directory with modular config structure
     if config_path.is_dir():
-        # Support directories that directly contain the modular files (config.yml, devices.yml, ...)
+        # Support directories that directly contain the modular files (config.yml, devices/, ...)
         direct_config_file = config_path / "config.yml"
-        direct_devices_file = config_path / "devices.yml"
-        if direct_config_file.exists() and direct_devices_file.exists():
+        if direct_config_file.exists():
             config = load_modular_config(config_path)
             _auto_export_schemas_if_project()
             return config
+
         # Also support nested "config/" directory inside the provided directory
-        config_dir = config_path / "config"
-    else:
-        # If pointing to a specific file, check if it's part of a modular config structure
-        config_dir = config_path.parent
-
-        # Special case: if pointing to config.yml, check if parent has modular structure
-        if config_path.name == "config.yml":
-            devices_dir = config_dir / "devices"
-            sequences_dir = config_dir / "sequences"
-            groups_dir = config_dir / "groups"
-
-            # If we find modular directories, treat as modular config
-            if (
-                (devices_dir.exists() and devices_dir.is_dir())
-                or (sequences_dir.exists() and sequences_dir.is_dir())
-                or (groups_dir.exists() and groups_dir.is_dir())
-            ):
-                config = load_modular_config(config_dir)
+        nested_config_dir = config_path / "config"
+        if nested_config_dir.exists() and nested_config_dir.is_dir():
+            nested_config_file = nested_config_dir / "config.yml"
+            if nested_config_file.exists():
+                config = load_modular_config(nested_config_dir)
                 _auto_export_schemas_if_project()
                 return config
 
-        # Otherwise check for nested config/ directory
-        config_dir = config_path.parent / "config"
+    # If config_path is a file, reject it - we only support directories
+    if config_path.exists() and config_path.is_file():
+        msg = f"Configuration path must be a directory, not a file: {config_path}"
+        raise ValueError(msg)
 
-    # Try modular config first (nested config/ next to provided path)
-    if config_dir.exists() and config_dir.is_dir():
-        config = load_modular_config(config_dir)
-        _auto_export_schemas_if_project()
-        return config
+    # Only try fallback paths for default config name
+    if str(original_path) == "config":
+        # Try current working directory first
+        cwd_config = Path("config")
+        if (
+            cwd_config.exists()
+            and cwd_config.is_dir()
+            and (cwd_config / "config.yml").exists()
+        ):
+            config = load_modular_config(cwd_config)
+            _auto_export_schemas_if_project()
+            return config
 
-    # Legacy monolithic config - if file exists, load it
-    if config_path.exists():
-        config = load_legacy_config(config_path)
-        _auto_export_schemas_if_project()
-        return config
-
-    # Only try fallback paths for default config names
-    if str(original_path) in ["config", "devices.yml"]:
-        # Prefer platform default location first
-        platform_default = default_modular_config_dir()
-        possible_paths: list[Path] = []
-        if (platform_default / "config.yml").exists():
-            possible_paths.append(platform_default / "config.yml")
-        possible_paths.extend(
-            [
-                Path("config/config.yml"),  # Modular config in CWD
-                Path("devices.yml"),  # Legacy config in root
-            ]
-        )
-
-        for path in possible_paths:
-            if path.exists():
-                if path.name == "config.yml":
-                    # Check if this is a modular config by looking for devices/ or groups/ directories
-                    parent_dir = path.parent
-                    if (parent_dir / "devices").exists() or (
-                        parent_dir / "groups"
-                    ).exists():
-                        config = load_modular_config(parent_dir)
-                        _auto_export_schemas_if_project()
-                        return config
-                    # Fall back to legacy loading
-                    config = load_legacy_config(path)
-                    _auto_export_schemas_if_project()
-                    return config
-                else:
-                    config = load_legacy_config(path)
-                    _auto_export_schemas_if_project()
-                    return config
-
-    # Final attempt: platform default modular path
-    platform_default_dir = default_modular_config_dir()
-    if (platform_default_dir / "config.yml").exists():
-        config = load_modular_config(platform_default_dir)
-        # Don't auto-export for global configs - only for project configs
-        return config
+        # Final attempt: platform default modular path
+        platform_default_dir = default_modular_config_dir()
+        if (
+            platform_default_dir.exists()
+            and (platform_default_dir / "config.yml").exists()
+        ):
+            config = load_modular_config(platform_default_dir)
+            # Don't auto-export for global configs - only for project configs
+            return config
 
     # If we get here, nothing was found
-    msg = f"Configuration file not found: {config_path}"
+    msg = f"Configuration directory not found: {config_path}"
     raise FileNotFoundError(msg)
 
 
