@@ -438,4 +438,4 @@ def show_vendors() -> None:
 
 def register(app: typer.Typer) -> None:
     """Register the unified backup command with the main CLI app."""
-    app.add_typer(backup_app, rich_help_panel="Vendor-Specific Operations")
+    app.add_typer(backup_app, rich_help_panel="Vendor-Specific Remote Operations")

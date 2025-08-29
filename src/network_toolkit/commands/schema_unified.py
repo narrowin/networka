@@ -88,4 +88,4 @@ def register(app: typer.Typer) -> None:
             ctx.print_error(f"Unexpected error: {e}")
             raise typer.Exit(1) from None
 
-    app.add_typer(schema_app, name="schema")
+    app.add_typer(schema_app, name="schema", rich_help_panel="Info & Configuration")
