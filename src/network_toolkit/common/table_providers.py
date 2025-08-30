@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import yaml
 from pydantic import BaseModel
 
 from network_toolkit.common.styles import StyleName
@@ -338,6 +339,94 @@ class SupportedPlatformsTableProvider(BaseModel, BaseTableProvider):
         return ["Platforms supported by the network toolkit transport layer"]
 
 
+class GlobalSequenceInfoTableProvider(BaseModel, BaseTableProvider):
+    """Provider for global sequence info table."""
+
+    sequence_name: str
+    sequence: Any  # CommandSequence object
+    verbose: bool = False
+
+    def get_table_definition(self) -> TableDefinition:
+        return TableDefinition(
+            title=f"Global Sequence: {self.sequence_name}",
+            columns=[
+                TableColumn(header="Property", style=StyleName.DEVICE),
+                TableColumn(header="Value", style=StyleName.OUTPUT),
+            ],
+        )
+
+    def get_table_rows(self) -> list[list[str]]:
+        """Get global sequence info data."""
+        rows = [
+            ["Description", getattr(self.sequence, "description", "No description")],
+            ["Source", self._get_global_sequence_source()],
+            ["Command Count", str(len(getattr(self.sequence, "commands", [])))],
+        ]
+
+        # Add all individual commands - no truncation
+        commands = getattr(self.sequence, "commands", [])
+        for i, cmd in enumerate(commands, 1):
+            rows.append([f"Command {i}", str(cmd)])
+
+        # Add tags if available
+        tags = getattr(self.sequence, "tags", [])
+        if tags:
+            rows.append(["Tags", ", ".join(tags)])
+
+        return rows
+
+    def _get_global_sequence_source(self) -> str:
+        """Determine the source of this global sequence."""
+        # Global sequences are typically in config.yml or sequences.yml
+        try:
+            config_dir = Path("config")
+
+            # Check main config.yml first
+            config_file = config_dir / "config.yml"
+            if config_file.exists():
+                try:
+                    with config_file.open("r", encoding="utf-8") as f:
+                        data = yaml.safe_load(f)
+                        if (
+                            isinstance(data, dict)
+                            and "global_command_sequences" in data
+                        ):
+                            if self.sequence_name in data["global_command_sequences"]:
+                                return "config file (config/config.yml)"
+                except Exception:
+                    pass
+
+            # Check sequences.yml
+            sequences_file = config_dir / "sequences.yml"
+            if sequences_file.exists():
+                try:
+                    with sequences_file.open("r", encoding="utf-8") as f:
+                        data = yaml.safe_load(f)
+                        if (
+                            isinstance(data, dict)
+                            and "global_command_sequences" in data
+                        ):
+                            if self.sequence_name in data["global_command_sequences"]:
+                                return "config file (config/sequences.yml)"
+                except Exception:
+                    pass
+
+            # Fallback
+            return "config file (global sequences)"
+
+        except Exception:
+            return "config file (global sequences)"
+
+    def get_raw_output(self) -> str | None:
+        """Get raw data for JSON/CSV output."""
+        commands = getattr(self.sequence, "commands", [])
+        return f"sequence={self.sequence_name} type=global commands={len(commands)}"
+
+    def get_verbose_info(self) -> list[str] | None:
+        """Get additional verbose information."""
+        return [f"Global sequence '{self.sequence_name}' details"]
+
+
 class VendorSequenceInfoTableProvider(BaseModel, BaseTableProvider):
     """Provider for vendor sequence info table."""
 
@@ -378,22 +467,10 @@ class VendorSequenceInfoTableProvider(BaseModel, BaseTableProvider):
             ["Command Count", str(len(getattr(self.sequence_record, "commands", [])))],
         ]
 
-        # Show commands based on vendor_specific flag
+        # Add all individual commands - no truncation
         commands = getattr(self.sequence_record, "commands", [])
-
-        if self.vendor_specific:
-            # Show all commands for vendor-specific display
-            for i, cmd in enumerate(commands, 1):
-                rows.append([f"Command {i}", str(cmd)])
-        elif len(self.vendor_names) > 1:
-            # For multi-vendor display, don't show individual commands
-            # since they differ between vendors
-            rows.append(
-                [
-                    "Commands",
-                    "Use --vendor <vendor_name> to see vendor-specific commands",
-                ]
-            )
+        for i, cmd in enumerate(commands, 1):
+            rows.append([f"Command {i}", str(cmd)])
 
         return rows
 
@@ -407,51 +484,57 @@ class VendorSequenceInfoTableProvider(BaseModel, BaseTableProvider):
 
             if origin == "builtin":
                 if path:
-                    return f"Built-in vendor sequences ({path.name})"
-                return "Built-in vendor sequences"
-            elif origin in {"repo", "user"}:
-                # Prefer explicit path if provided
+                    return f"built-in package ({path.name})"
+                return "built-in package sequences"
+            elif origin == "repo":
                 if path:
-                    return f"config file ({path.resolve()})"
-                # Try loader metadata to get exact filename
-                try:
-                    if self.config and getattr(self.config, "vendor_sequences", None):
-                        for _vendor_key, seqs in (
-                            self.config.vendor_sequences or {}
-                        ).items():
-                            seq_obj = seqs.get(self.sequence_name)
-                            if seq_obj is not None:
-                                src = getattr(seq_obj, "_source_path", None)
-                                if src:
-                                    return f"config file ({Path(src).resolve()})"
-                except Exception:
-                    pass
-                # Fall back to generic label by origin
-                return (
-                    "repository config sequences"
-                    if origin == "repo"
-                    else "user config sequences"
-                )
+                    return f"repository config (config/sequences/{path.name})"
+                return "repository config (config/sequences/)"
+            elif origin == "user":
+                if path:
+                    return f"user config (~/.config/nw/sequences/{path.name})"
+                return "user config (~/.config/nw/sequences/)"
             elif origin == "global":
                 return "global config sequences"
 
-        # Fallback: try loader metadata if config is provided
+        # Fallback: try to detect from file system (old approach)
         try:
-            if self.config and getattr(self, "vendor_names", None):
-                vendor_sequences = getattr(self.config, "vendor_sequences", {}) or {}
-                for vendor in self.vendor_names:
-                    seqs = vendor_sequences.get(vendor.replace(" ", "_"), {})
-                    seq_obj = seqs.get(self.sequence_name)
-                    if seq_obj is not None:
-                        src = getattr(seq_obj, "_source_path", None)
-                        if src:
-                            return f"config file ({Path(src).resolve()})"
-        except Exception:
-            # Ignore and continue to final fallback
-            pass
+            config_dir = Path("config")
+            sequences_dir = config_dir / "sequences"
 
-        # Final fallback
-        return "Built-in vendor sequences"
+            if sequences_dir.exists():
+                for sequence_file in sequences_dir.glob("*.yml"):
+                    try:
+                        with sequence_file.open("r", encoding="utf-8") as f:
+                            data = yaml.safe_load(f)
+                            if isinstance(data, dict) and "sequences" in data:
+                                if self.sequence_name in data["sequences"]:
+                                    return f"config file (config/sequences/{sequence_file.name})"
+                    except Exception as exc:
+                        import logging
+
+                        logging.debug(
+                            f"Failed reading sequence YAML {sequence_file}: {exc}"
+                        )
+                        continue
+
+            # Check if it's in the main sequences.yml file
+            sequences_file = config_dir / "sequences.yml"
+            if sequences_file.exists():
+                try:
+                    with sequences_file.open("r", encoding="utf-8") as f:
+                        data = yaml.safe_load(f)
+                        if isinstance(data, dict) and "sequences" in data:
+                            if self.sequence_name in data["sequences"]:
+                                return "config file (config/sequences.yml)"
+                except Exception:
+                    pass
+
+            # Final fallback
+            return "built-in vendor sequences"
+
+        except Exception:
+            return "built-in vendor sequences"
 
     def get_raw_output(self) -> str | None:
         """Get raw data for JSON/CSV output."""
@@ -676,9 +759,9 @@ class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
         # Now trace back to find the source of this resolved value
         # Check device config first
         if credential_type == "username" and dev.user == resolved_value:
-            return "device config file (devices/devices.yml)"
+            return "device config file (config/devices/devices.yml)"
         if credential_type == "password" and dev.password == resolved_value:
-            return "device config file (devices/devices.yml)"
+            return "device config file (config/devices/devices.yml)"
 
         # Check device-specific environment variables
         env_var_name = (
@@ -707,12 +790,16 @@ class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
                         credential_type == "username"
                         and group.credentials.user == resolved_value
                     ):
-                        return f"group config file groups/groups.yml ({group_name})"
+                        return (
+                            f"group config file config/groups/groups.yml ({group_name})"
+                        )
                     elif (
                         credential_type == "password"
                         and group.credentials.password == resolved_value
                     ):
-                        return f"group config file groups/groups.yml ({group_name})"
+                        return (
+                            f"group config file config/groups/groups.yml ({group_name})"
+                        )
 
                 # Check group environment variable
                 if (
@@ -751,14 +838,15 @@ class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
 
     def _get_device_source(self) -> str:
         """Return the exact source file for this device as tracked by the config loader."""
-        # Always present absolute path
+        config_dir = self.config_path.parent if self.config_path else Path("config")
         src_path = self.config.get_device_source_path(self.device_name)
         if src_path is None:
-            return "unknown"
+            return "config file (unknown)"
         try:
-            return str(src_path.resolve())
+            rel = src_path.relative_to(config_dir)
+            return f"config file ({rel})"
         except Exception:
-            return str(src_path)
+            return f"config file ({src_path})"
 
 
 class GroupInfoTableProvider(BaseModel, BaseTableProvider):
@@ -803,14 +891,65 @@ class GroupInfoTableProvider(BaseModel, BaseTableProvider):
         return rows
 
     def _get_group_source(self) -> str:
-        """Determine the source file for this group via loader metadata."""
-        try:
-            src = self.config.get_group_source_path(self.group_name)
-            if src is None:
-                return "unknown"
-            return str(Path(src).resolve())
-        except Exception:
-            return "unknown"
+        """Determine the source file for this group using the same discovery logic as config loading."""
+        # Use the actual config path from the command context
+        if self.config_path:
+            if self.config_path.is_file():
+                config_dir = self.config_path.parent
+            else:
+                config_dir = self.config_path
+        else:
+            config_dir = Path("config")
+
+        # Direct approach: check the known location first since we know it works
+        groups_s3n = config_dir / "groups" / "s3n.yml"
+        if groups_s3n.exists():
+            try:
+                with groups_s3n.open("r", encoding="utf-8") as f:
+                    data = yaml.safe_load(f)
+                    if isinstance(data, dict) and "groups" in data:
+                        if self.group_name in data["groups"]:
+                            rel_path = groups_s3n.relative_to(config_dir)
+                            return f"config file ({rel_path})"
+            except Exception:
+                pass
+
+        # Fallback to full discovery
+        group_files: list[Path] = []
+
+        # Main config file in root
+        for ext in [".yml", ".yaml", ".csv"]:
+            main_file = config_dir / f"groups{ext}"
+            if main_file.exists():
+                group_files.append(main_file)
+
+        # Subdirectory files
+        subdir = config_dir / "groups"
+        if subdir.exists() and subdir.is_dir():
+            # All yaml/csv files in subdirectory
+            for pattern in ["*.yml", "*.yaml", "*.csv"]:
+                group_files.extend(subdir.glob(pattern))
+
+        # Now search through the discovered files for our group
+        for group_file in group_files:
+            try:
+                if group_file.suffix.lower() in [".yml", ".yaml"]:
+                    with group_file.open("r", encoding="utf-8") as f:
+                        data = yaml.safe_load(f)
+                        if isinstance(data, dict) and "groups" in data:
+                            if self.group_name in data["groups"]:
+                                rel_path = group_file.relative_to(config_dir)
+                                return f"config file ({rel_path})"
+            except Exception as exc:
+                import logging
+
+                logging.debug(
+                    f"Error scanning group file {group_file} for group {self.group_name}: {exc}"
+                )
+                continue
+
+        # Fallback
+        return f"config file ({config_dir}/groups/) - checked {len(group_files)} files"
 
     def get_raw_output(self) -> str | None:
         """Get raw data for JSON/CSV output."""
