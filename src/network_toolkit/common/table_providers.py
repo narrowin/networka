@@ -392,7 +392,7 @@ class GlobalSequenceInfoTableProvider(BaseModel, BaseTableProvider):
                             and "global_command_sequences" in data
                         ):
                             if self.sequence_name in data["global_command_sequences"]:
-                                return "config file (config/config.yml)"
+                                return str(config_file.resolve())
                 except Exception:
                     pass
 
@@ -407,12 +407,12 @@ class GlobalSequenceInfoTableProvider(BaseModel, BaseTableProvider):
                             and "global_command_sequences" in data
                         ):
                             if self.sequence_name in data["global_command_sequences"]:
-                                return "config file (config/sequences.yml)"
+                                return str(sequences_file.resolve())
                 except Exception:
                     pass
 
             # Fallback
-            return "config file (global sequences)"
+            return "global sequences"
 
         except Exception:
             return "config file (global sequences)"
@@ -488,12 +488,12 @@ class VendorSequenceInfoTableProvider(BaseModel, BaseTableProvider):
                 return "built-in package sequences"
             elif origin == "repo":
                 if path:
-                    return f"repository config (config/sequences/{path.name})"
-                return "repository config (config/sequences/)"
+                    return f"config file ({path.resolve()})"
+                return "repository config sequences"
             elif origin == "user":
                 if path:
-                    return f"user config (~/.config/nw/sequences/{path.name})"
-                return "user config (~/.config/nw/sequences/)"
+                    return f"config file ({path.resolve()})"
+                return "user config sequences"
             elif origin == "global":
                 return "global config sequences"
 
@@ -509,7 +509,7 @@ class VendorSequenceInfoTableProvider(BaseModel, BaseTableProvider):
                             data = yaml.safe_load(f)
                             if isinstance(data, dict) and "sequences" in data:
                                 if self.sequence_name in data["sequences"]:
-                                    return f"config file (config/sequences/{sequence_file.name})"
+                                    return f"config file ({sequence_file.resolve()})"
                     except Exception as exc:
                         import logging
 
@@ -526,7 +526,7 @@ class VendorSequenceInfoTableProvider(BaseModel, BaseTableProvider):
                         data = yaml.safe_load(f)
                         if isinstance(data, dict) and "sequences" in data:
                             if self.sequence_name in data["sequences"]:
-                                return "config file (config/sequences.yml)"
+                                return f"config file ({sequences_file.resolve()})"
                 except Exception:
                     pass
 
@@ -838,15 +838,14 @@ class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
 
     def _get_device_source(self) -> str:
         """Return the exact source file for this device as tracked by the config loader."""
-        config_dir = self.config_path.parent if self.config_path else Path("config")
+        # Always present absolute path
         src_path = self.config.get_device_source_path(self.device_name)
         if src_path is None:
-            return "config file (unknown)"
+            return "unknown"
         try:
-            rel = src_path.relative_to(config_dir)
-            return f"config file ({rel})"
+            return str(src_path.resolve())
         except Exception:
-            return f"config file ({src_path})"
+            return str(src_path)
 
 
 class GroupInfoTableProvider(BaseModel, BaseTableProvider):
@@ -909,8 +908,7 @@ class GroupInfoTableProvider(BaseModel, BaseTableProvider):
                     data = yaml.safe_load(f)
                     if isinstance(data, dict) and "groups" in data:
                         if self.group_name in data["groups"]:
-                            rel_path = groups_s3n.relative_to(config_dir)
-                            return f"config file ({rel_path})"
+                            return str(groups_s3n.resolve())
             except Exception:
                 pass
 
@@ -938,8 +936,7 @@ class GroupInfoTableProvider(BaseModel, BaseTableProvider):
                         data = yaml.safe_load(f)
                         if isinstance(data, dict) and "groups" in data:
                             if self.group_name in data["groups"]:
-                                rel_path = group_file.relative_to(config_dir)
-                                return f"config file ({rel_path})"
+                                return str(group_file.resolve())
             except Exception as exc:
                 import logging
 
@@ -949,7 +946,7 @@ class GroupInfoTableProvider(BaseModel, BaseTableProvider):
                 continue
 
         # Fallback
-        return f"config file ({config_dir}/groups/) - checked {len(group_files)} files"
+        return f"{config_dir}/groups/ - checked {len(group_files)} files"
 
     def get_raw_output(self) -> str | None:
         """Get raw data for JSON/CSV output."""
