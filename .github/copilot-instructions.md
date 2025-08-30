@@ -22,7 +22,7 @@ ALL IMPORTS ONLY GO TO THE TOP OF THE FILE, NO EXCEPTIONS!!!
 ### Build & Development Tasks
 
 - **"shell: Install Dependencies"** - Instead of `uv sync`
-- **"shell: Run Network Toolkit CLI"** - Instead of `uv run python -m network_toolkit.cli --help`
+- **"shell: Run Network Toolkit CLI"** - Instead of `uv run kit.cli --help`
 - **"shell: Seed Environment"** - Instead of `bash .devcontainer/scripts/seed-env.sh`
 - **"shell: Export Outputs"** - Instead of `bash .devcontainer/scripts/export-outputs.sh`
 - **"shell: Export Outputs (Force)"** - Instead of `bash .devcontainer/scripts/export-outputs.sh --force`
