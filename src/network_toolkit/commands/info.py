@@ -10,7 +10,12 @@ from typing import TYPE_CHECKING, Annotated
 import typer
 
 from network_toolkit.common.command_helpers import CommandContext
-from network_toolkit.common.credentials import InteractiveCredentials
+from network_toolkit.common.credentials import (
+    InteractiveCredentials,
+    prompt_for_credentials,
+)
+from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
+from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import OutputMode
 from network_toolkit.common.table_generator import BaseTableProvider
 from network_toolkit.common.table_providers import (
@@ -41,7 +46,7 @@ def register(app: typer.Typer) -> None:
         config_file: Annotated[
             Path,
             typer.Option("--config", "-c", help="Configuration directory or file path"),
-        ] = Path("config"),
+        ] = DEFAULT_CONFIG_PATH,
         output_mode: Annotated[
             OutputMode | None,
             typer.Option(
