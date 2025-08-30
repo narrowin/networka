@@ -15,12 +15,13 @@ import yaml
 from dotenv import load_dotenv
 from pydantic import BaseModel, PrivateAttr, field_validator
 
+from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.paths import default_modular_config_dir
 from network_toolkit.credentials import (
     ConnectionParameterBuilder,
     EnvironmentCredentialManager,
 )
-from network_toolkit.exceptions import NetworkToolkitError
+from network_toolkit.exceptions import ConfigurationError, NetworkToolkitError
 
 
 def load_dotenv_files(config_path: Path | None = None) -> None:
@@ -901,12 +902,14 @@ def load_config(config_path: str | Path) -> NetworkConfig:
     """
     Load and validate configuration from a modular directory structure.
 
-    Resolution rules (strict):
-    - First, use the directory provided via --config DIR (DIR may be relative or absolute)
-        and require it to contain a config.yml file.
-    - If not found, fall back to the platform default modular path
-        (e.g., ~/.config/networka on Ubuntu) if it contains config.yml.
-    - Do not auto-discover a local ./config directory or nested directories.
+        Resolution rules (strict):
+        - If the caller passed the literal default path ("config") and it does not exist,
+            fall back to the platform default modular path (e.g., ~/.config/networka) if it
+            contains config.yml.
+        - For any other explicit --config path:
+                * If path does not exist -> raise ConfigurationError("No such file or directory: …")
+                * If path is a file      -> raise ConfigurationError("Configuration path must be a directory, not a file: …")
+                * If path is a dir but missing config.yml -> raise ConfigurationError("Not a network config dir - config.yml not found")
 
     The config directory must contain at least:
     - config.yml (general configuration)
@@ -922,29 +925,39 @@ def load_config(config_path: str | Path) -> NetworkConfig:
     # Load .env files first to make environment variables available for credential resolution
     load_dotenv_files(config_path)
 
-    # 1) Use the directory provided via --config DIR if it contains config.yml
-    if config_path.exists() and config_path.is_dir():
-        direct_config_file = config_path / "config.yml"
-        if direct_config_file.exists():
-            config = load_modular_config(config_path)
-            _auto_export_schemas_if_project()
-            return config
+    # 1) If caller used the literal default path ("config") and it doesn't exist,
+    #    fall back to the OS default modular directory.
+    if config_path == DEFAULT_CONFIG_PATH and not config_path.exists():
+        platform_default_dir = default_modular_config_dir()
+        if (
+            platform_default_dir.exists()
+            and (platform_default_dir / "config.yml").exists()
+        ):
+            return load_modular_config(platform_default_dir)
+        # If even the platform default is missing, report clearly for the default case
+        msg = f"No such file or directory: {config_path}"
+        raise ConfigurationError(msg)
 
-    # If config_path is a file, reject it - we only support directories
-    if config_path.exists() and config_path.is_file():
+    # 2) For any explicit path (including an existing ./config), perform strict checks
+    if not config_path.exists():
+        msg = f"No such file or directory: {config_path}"
+        raise ConfigurationError(msg)
+
+    if config_path.is_file():
         msg = f"Configuration path must be a directory, not a file: {config_path}"
-        raise ValueError(msg)
+        raise ConfigurationError(msg)
 
-    # 2) Fall back to the platform default modular path (e.g., ~/.config/networka)
-    platform_default_dir = default_modular_config_dir()
-    if platform_default_dir.exists() and (platform_default_dir / "config.yml").exists():
-        config = load_modular_config(platform_default_dir)
-        # Don't auto-export for global configs - only for project configs
-        return config
+    # Must be a directory; require config.yml
+    direct_config_file = config_path / "config.yml"
+    if not direct_config_file.exists():
+        # Do not fall back silently for explicit directories
+        msg = "not a network config dir - config.yml not found"
+        raise ConfigurationError(msg)
 
-    # If we get here, nothing was found
-    msg = f"Configuration directory not found: {config_path}"
-    raise FileNotFoundError(msg)
+    # Valid explicit directory with config.yml
+    config = load_modular_config(config_path)
+    _auto_export_schemas_if_project()
+    return config
 
 
 def _auto_export_schemas_if_project() -> None:
