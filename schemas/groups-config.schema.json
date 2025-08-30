@@ -511,7 +511,7 @@
           "type": "string"
         },
         "transport": {
-          "default": "ssh",
+          "default": "system",
           "title": "Transport",
           "type": "string"
         },

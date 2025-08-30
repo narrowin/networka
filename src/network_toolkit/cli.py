@@ -26,7 +26,7 @@ from network_toolkit.commands.firmware import register as register_firmware
 from network_toolkit.commands.info import register as register_info
 from network_toolkit.commands.list import register as register_list
 from network_toolkit.commands.run import register as register_run
-from network_toolkit.commands.schema_unified import register as register_schema
+from network_toolkit.commands.schema import register as register_schema
 from network_toolkit.commands.ssh import register as register_ssh
 from network_toolkit.commands.upload import register as register_upload
 from network_toolkit.common.logging import setup_logging
