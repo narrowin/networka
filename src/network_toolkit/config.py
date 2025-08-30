@@ -13,7 +13,7 @@ from typing import Any, cast
 
 import yaml
 from dotenv import load_dotenv
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, PrivateAttr, field_validator
 
 from network_toolkit.common.paths import default_modular_config_dir
 from network_toolkit.credentials import (
@@ -216,6 +216,13 @@ class DeviceConfig(BaseModel):
     overrides: DeviceOverrides | None = None
     command_sequences: dict[str, list[str]] | None = None
 
+    # Private: where this device was loaded from
+    _source_path: Path | None = PrivateAttr(default=None)
+
+    def set_source_path(self, path: Path) -> None:
+        """Set the source path where this device was defined."""
+        self._source_path = path
+
 
 class GroupCredentials(BaseModel):
     """Group-level credential configuration."""
@@ -231,6 +238,9 @@ class DeviceGroup(BaseModel):
     members: list[str] | None = None
     match_tags: list[str] | None = None
     credentials: GroupCredentials | None = None
+
+    # Private: where this group was loaded from
+    _source_path: Path | None = PrivateAttr(default=None)
 
 
 class VendorPlatformConfig(BaseModel):
@@ -250,6 +260,9 @@ class VendorSequence(BaseModel):
     device_types: list[str] | None = None
     commands: list[str]
 
+    # Private: where this vendor sequence was loaded from
+    _source_path: Path | None = PrivateAttr(default=None)
+
 
 class CommandSequence(BaseModel):
     """Global command sequence definition."""
@@ -258,6 +271,9 @@ class CommandSequence(BaseModel):
     commands: list[str]
     tags: list[str] | None = None
     file_operations: dict[str, Any] | None = None
+
+    # Private: where this global sequence was loaded from
+    _source_path: Path | None = PrivateAttr(default=None)
 
 
 class CommandSequenceGroup(BaseModel):
@@ -292,6 +308,13 @@ class NetworkConfig(BaseModel):
     # Multi-vendor support
     vendor_platforms: dict[str, VendorPlatformConfig] | None = None
     vendor_sequences: dict[str, dict[str, VendorSequence]] | None = None
+
+    # Helper: device source path accessor (non-schema, uses PrivateAttr on DeviceConfig)
+    def get_device_source_path(self, device_name: str) -> Path | None:
+        dev = self.devices.get(device_name) if self.devices else None
+        if dev is None:
+            return None
+        return getattr(dev, "_source_path", None)
 
     def get_device_connection_params(
         self,
@@ -876,9 +899,16 @@ def _merge_configs(
 
 def load_config(config_path: str | Path) -> NetworkConfig:
     """
-    Load and validate configuration from modular directory structure.
+    Load and validate configuration from a modular directory structure.
 
-    The config_path must be a directory containing modular config files:
+    Resolution rules (strict):
+    - First, use the directory provided via --config DIR (DIR may be relative or absolute)
+        and require it to contain a config.yml file.
+    - If not found, fall back to the platform default modular path
+        (e.g., ~/.config/networka on Ubuntu) if it contains config.yml.
+    - Do not auto-discover a local ./config directory or nested directories.
+
+    The config directory must contain at least:
     - config.yml (general configuration)
     - devices/ directory with device configs
     - groups/ directory with group configs (optional)
@@ -888,70 +918,29 @@ def load_config(config_path: str | Path) -> NetworkConfig:
     Auto-exports JSON schemas for editor validation when working in a project directory.
     """
     config_path = Path(config_path)
-    original_path = config_path  # Keep track of original user input
 
     # Load .env files first to make environment variables available for credential resolution
     load_dotenv_files(config_path)
 
-    # Handle default path "config" - check current directory first, then fall back to platform default
-    if config_path.name in ["config", "config/"]:
-        # First try current directory
-        if config_path.exists() and config_path.is_dir():
-            config = load_modular_config(config_path)
-            _auto_export_schemas_if_project()
-            return config
-        # Fall through to platform default logic below
-
-    # If user provided an explicit path that doesn't exist, fail immediately
-    if not config_path.exists() and str(original_path) != "config":
-        msg = f"Configuration directory not found: {config_path}"
-        raise FileNotFoundError(msg)
-
-    # Check if config_path is a directory with modular config structure
-    if config_path.is_dir():
-        # Support directories that directly contain the modular files (config.yml, devices/, ...)
+    # 1) Use the directory provided via --config DIR if it contains config.yml
+    if config_path.exists() and config_path.is_dir():
         direct_config_file = config_path / "config.yml"
         if direct_config_file.exists():
             config = load_modular_config(config_path)
             _auto_export_schemas_if_project()
             return config
 
-        # Also support nested "config/" directory inside the provided directory
-        nested_config_dir = config_path / "config"
-        if nested_config_dir.exists() and nested_config_dir.is_dir():
-            nested_config_file = nested_config_dir / "config.yml"
-            if nested_config_file.exists():
-                config = load_modular_config(nested_config_dir)
-                _auto_export_schemas_if_project()
-                return config
-
     # If config_path is a file, reject it - we only support directories
     if config_path.exists() and config_path.is_file():
         msg = f"Configuration path must be a directory, not a file: {config_path}"
         raise ValueError(msg)
 
-    # Only try fallback paths for default config name
-    if str(original_path) == "config":
-        # Try current working directory first
-        cwd_config = Path("config")
-        if (
-            cwd_config.exists()
-            and cwd_config.is_dir()
-            and (cwd_config / "config.yml").exists()
-        ):
-            config = load_modular_config(cwd_config)
-            _auto_export_schemas_if_project()
-            return config
-
-        # Final attempt: platform default modular path
-        platform_default_dir = default_modular_config_dir()
-        if (
-            platform_default_dir.exists()
-            and (platform_default_dir / "config.yml").exists()
-        ):
-            config = load_modular_config(platform_default_dir)
-            # Don't auto-export for global configs - only for project configs
-            return config
+    # 2) Fall back to the platform default modular path (e.g., ~/.config/networka)
+    platform_default_dir = default_modular_config_dir()
+    if platform_default_dir.exists() and (platform_default_dir / "config.yml").exists():
+        config = load_modular_config(platform_default_dir)
+        # Don't auto-export for global configs - only for project configs
+        return config
 
     # If we get here, nothing was found
     msg = f"Configuration directory not found: {config_path}"
@@ -1031,6 +1020,7 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
         all_devices: dict[str, Any] = {}
         device_defaults: dict[str, Any] = {}
         device_files = _discover_config_files(config_dir, "devices")
+        device_sources: dict[str, Path] = {}
 
         # Load defaults first
         devices_dir = config_dir / "devices"
@@ -1038,8 +1028,8 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
             defaults_file = devices_dir / "_defaults.yml"
             if defaults_file.exists():
                 try:
-                    with defaults_file.open("r", encoding="utf-8") as f:
-                        defaults_config: dict[str, Any] = yaml.safe_load(f) or {}
+                    with defaults_file.open("r", encoding="utf-8") as df:
+                        defaults_config: dict[str, Any] = yaml.safe_load(df) or {}
                         device_defaults = defaults_config.get("defaults", {})
                 except yaml.YAMLError as e:
                     logging.warning(
@@ -1059,30 +1049,30 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
                     for key, default_value in device_defaults.items():
                         if getattr(device_config, key, None) is None:
                             setattr(device_config, key, default_value)
+                    # Track source file for each device
+                    device_sources[_device_name] = device_file
                 all_devices.update(file_devices)
             else:
                 try:
-                    with device_file.open("r", encoding="utf-8") as f:
-                        device_yaml_config: dict[str, Any] = yaml.safe_load(f) or {}
-                        file_devices = device_yaml_config.get("devices", {})
-                        if isinstance(file_devices, dict):
-                            # Apply defaults to YAML devices
-                            for _device_name, device_config in file_devices.items():
-                                # Ensure dict shape
-                                if not isinstance(device_config, dict):
-                                    continue
-                                # Apply defaults
-                                for key, default_value in device_defaults.items():
-                                    if key not in device_config:
-                                        device_config[key] = default_value
-                                # Ensure a valid device_type default for YAML devices
-                                # Tests often omit this field for some devices
-                                device_config.setdefault("device_type", "linux")
-                            all_devices.update(file_devices)
-                        else:
-                            logging.warning(
-                                f"Invalid devices structure in {device_file}, skipping"
-                            )
+                    with device_file.open("r", encoding="utf-8") as df:
+                        device_yaml_config: dict[str, Any] = yaml.safe_load(df) or {}
+                        file_devices_node = cast(
+                            dict[str, dict[str, Any]],
+                            device_yaml_config.get("devices", {}) or {},
+                        )
+                        # Apply defaults to YAML devices and collect into a typed dict
+                        typed_file_devices: dict[str, dict[str, Any]] = {}
+                        for _device_name, device_dict in file_devices_node.items():
+                            # Apply defaults
+                            for key, default_value in device_defaults.items():
+                                if key not in device_dict:
+                                    device_dict[key] = default_value
+                            # Ensure a valid device_type default for YAML devices
+                            device_dict.setdefault("device_type", "linux")
+                            # Track source file for each device
+                            device_sources[_device_name] = device_file
+                            typed_file_devices[_device_name] = device_dict
+                        all_devices.update(typed_file_devices)
                 except yaml.YAMLError as e:
                     logging.warning(f"Invalid YAML in {device_file}: {e}")
 
@@ -1096,15 +1086,13 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
                 all_groups.update(file_groups)
             else:
                 try:
-                    with group_file.open("r", encoding="utf-8") as f:
-                        group_yaml_config: dict[str, Any] = yaml.safe_load(f) or {}
-                        file_groups = group_yaml_config.get("groups", {})
-                        if isinstance(file_groups, dict):
-                            all_groups.update(file_groups)
-                        else:
-                            logging.warning(
-                                f"Invalid groups structure in {group_file}, skipping"
-                            )
+                    with group_file.open("r", encoding="utf-8") as gf:
+                        group_yaml_config: dict[str, Any] = yaml.safe_load(gf) or {}
+                        file_groups_node = cast(
+                            dict[str, dict[str, Any]],
+                            group_yaml_config.get("groups", {}) or {},
+                        )
+                        all_groups.update(file_groups_node)
                 except yaml.YAMLError as e:
                     logging.warning(f"Invalid YAML in {group_file}: {e}")
 
@@ -1119,12 +1107,14 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
                 all_sequences.update(file_sequences)
             else:
                 try:
-                    with seq_file.open("r", encoding="utf-8") as f:
-                        seq_yaml_config: dict[str, Any] = yaml.safe_load(f) or {}
+                    with seq_file.open("r", encoding="utf-8") as sf:
+                        seq_yaml_config: dict[str, Any] = yaml.safe_load(sf) or {}
                         # Extract sequences
-                        file_sequences = seq_yaml_config.get("sequences", {})
-                        if isinstance(file_sequences, dict):
-                            all_sequences.update(file_sequences)
+                        file_sequences_node = cast(
+                            dict[str, dict[str, Any]],
+                            seq_yaml_config.get("sequences", {}) or {},
+                        )
+                        all_sequences.update(file_sequences_node)
 
                         # Keep track of other sequence config for vendor sequences
                         if not sequences_config:
@@ -1136,7 +1126,7 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
                 except yaml.YAMLError as e:
                     logging.warning(f"Invalid YAML in {seq_file}: {e}")
 
-        # Load vendor-specific sequences
+        # Load vendor-specific sequences (VendorSequence models will carry _source_path)
         vendor_sequences = _load_vendor_sequences(config_dir, sequences_config)
 
         # Merge all configs into the expected format
@@ -1154,7 +1144,17 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
         logging.debug(f"  - Groups: {len(all_groups)}")
         logging.debug(f"  - Sequences: {len(all_sequences)}")
 
-        return NetworkConfig(**merged_config)
+        # Build the model and then assign private source paths (devices only for now)
+        model = NetworkConfig(**merged_config)
+
+        if model.devices:
+            # Persist source on each device instance (private attr via setter)
+            for _name, _dev in model.devices.items():
+                src = device_sources.get(_name)
+                if src is not None:
+                    _dev.set_source_path(src)
+
+        return model
 
     except yaml.YAMLError as e:
         msg = f"Invalid YAML in modular configuration: {config_dir}"
@@ -1297,12 +1297,14 @@ def _load_sequence_file(file_path: Path, vendor_name: str) -> dict[str, VendorSe
     try:
         with file_path.open("r", encoding="utf-8") as f:
             vendor_config: dict[str, Any] = yaml.safe_load(f) or {}
-
         # Load sequences from the vendor file
-        sequence_data = vendor_config.get("sequences", {})
+        sequence_data = cast(
+            dict[str, dict[str, Any]], vendor_config.get("sequences", {}) or {}
+        )
         for seq_name, seq_data in sequence_data.items():
             try:
-                sequences[seq_name] = VendorSequence(**seq_data)
+                seq_obj = VendorSequence(**seq_data)
+                sequences[seq_name] = seq_obj
             except Exception as e:
                 logging.warning(f"Invalid sequence '{seq_name}' in {file_path}: {e}")
                 continue
@@ -1327,11 +1329,12 @@ def load_legacy_config(config_path: Path) -> NetworkConfig:
 
         # Backfill missing device_type with a sensible default for YAML-based configs
         try:
-            devices_node = raw_config.get("devices", {})
-            if isinstance(devices_node, dict):
-                for _name, dev in devices_node.items():
-                    if isinstance(dev, dict) and "device_type" not in dev:
-                        dev["device_type"] = "linux"
+            devices_node = cast(
+                dict[str, dict[str, Any]], raw_config.get("devices", {}) or {}
+            )
+            for _name, dev in devices_node.items():
+                if "device_type" not in dev:
+                    dev["device_type"] = "linux"
         except Exception:
             # Be permissive; validation will catch irrecoverable shapes
             pass

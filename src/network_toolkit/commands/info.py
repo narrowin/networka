@@ -121,6 +121,20 @@ def register(app: typer.Typer) -> None:
             # Process each target
             known_count = 0
             unknown_count = 0
+            device_count = 0
+
+            # Count devices for header
+            for target in target_list:
+                target_type = _determine_target_type(target, config)
+                if target_type == "device":
+                    device_count += 1
+
+            # Show header for device information if we have devices
+            if device_count > 0:
+                ctx.print_info(
+                    f"Device Information ({device_count} device{'s' if device_count != 1 else ''})"
+                )
+
             for i, target in enumerate(target_list):
                 if i > 0:
                     ctx.print_blank_line()
@@ -246,7 +260,10 @@ def _show_device_info(
         return
 
     provider = DeviceInfoTableProvider(
-        config=config, device_name=device, interactive_creds=interactive_creds
+        config=config,
+        device_name=device,
+        interactive_creds=interactive_creds,
+        config_path=ctx.config_file,
     )
     ctx.render_table(provider, verbose)
 
@@ -257,7 +274,9 @@ def _show_group_info(target: str, config: NetworkConfig, ctx: CommandContext) ->
         ctx.print_error(f"Error: Group '{target}' not found in configuration")
         return
 
-    provider = GroupInfoTableProvider(config=config, group_name=target)
+    provider = GroupInfoTableProvider(
+        config=config, group_name=target, config_path=ctx.config_file
+    )
     ctx.render_table(provider, False)
 
 
