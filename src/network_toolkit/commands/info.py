@@ -290,6 +290,15 @@ def _show_sequence_info(
     """Show detailed information for a sequence."""
     provider: BaseTableProvider
 
+    # Check global sequences first
+    if config.global_command_sequences and target in config.global_command_sequences:
+        sequence = config.global_command_sequences[target]
+        provider = GlobalSequenceInfoTableProvider(
+            config=config, sequence_name=target, sequence=sequence, verbose=verbose
+        )
+        ctx.render_table(provider, verbose)
+        return
+
     # Check vendor sequences
     sm = SequenceManager(config)
 
@@ -338,7 +347,6 @@ def _show_sequence_info(
             vendor_names=matching_vendors,
             verbose=verbose,
             config=config,
-            vendor_specific=False,
         )
         ctx.render_table(provider, verbose)
         return

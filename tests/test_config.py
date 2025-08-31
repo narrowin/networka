@@ -1026,6 +1026,182 @@ class TestModularConfigLoading:
     # Legacy single-file YAML mode removed; no legacy config tests remain
 
 
+class TestNetworkConfigAdvancedMethods:
+    """Test advanced NetworkConfig methods."""
+
+    def test_get_all_sequences_global_only(self) -> None:
+        """Test get_all_sequences with only global sequences."""
+        config = NetworkConfig(
+            global_command_sequences={
+                "global_seq": CommandSequence(
+                    description="Global sequence",
+                    commands=["cmd1", "cmd2"],
+                )
+            }
+        )
+
+        sequences = config.get_all_sequences()
+        assert "global_seq" in sequences
+        assert sequences["global_seq"]["origin"] == "global"
+        assert sequences["global_seq"]["commands"] == ["cmd1", "cmd2"]
+        assert sequences["global_seq"]["sources"] == ["global"]
+        assert sequences["global_seq"]["description"] == "Global sequence"
+
+    def test_get_all_sequences_device_only(self) -> None:
+        """Test get_all_sequences with only device sequences."""
+        config = NetworkConfig(
+            devices={
+                "device1": DeviceConfig(
+                    host="192.168.1.1",
+                    command_sequences={
+                        "device_seq": ["cmd3", "cmd4"],
+                        "shared_seq": ["cmd5"],
+                    },
+                ),
+                "device2": DeviceConfig(
+                    host="192.168.1.2",
+                    command_sequences={
+                        "shared_seq": ["cmd6"],  # Same name as device1
+                    },
+                ),
+            }
+        )
+
+        sequences = config.get_all_sequences()
+        assert "device_seq" in sequences
+        assert sequences["device_seq"]["origin"] == "device"
+        assert sequences["device_seq"]["commands"] == ["cmd3", "cmd4"]
+        assert sequences["device_seq"]["sources"] == ["device1"]
+
+        # shared_seq should track multiple sources
+        assert "shared_seq" in sequences
+        assert sequences["shared_seq"]["origin"] == "device"
+        assert set(sequences["shared_seq"]["sources"]) == {"device1", "device2"}
+
+    def test_get_all_sequences_global_precedence(self) -> None:
+        """Test that global sequences take precedence over device sequences."""
+        config = NetworkConfig(
+            global_command_sequences={
+                "shared_seq": CommandSequence(
+                    description="Global version",
+                    commands=["global_cmd"],
+                )
+            },
+            devices={
+                "device1": DeviceConfig(
+                    host="192.168.1.1",
+                    command_sequences={
+                        "shared_seq": ["device_cmd"],  # Should be overridden
+                    },
+                )
+            },
+        )
+
+        sequences = config.get_all_sequences()
+        assert "shared_seq" in sequences
+        assert sequences["shared_seq"]["origin"] == "global"
+        assert sequences["shared_seq"]["commands"] == ["global_cmd"]
+        assert sequences["shared_seq"]["sources"] == ["global"]
+
+    def test_get_all_sequences_empty_config(self) -> None:
+        """Test get_all_sequences with empty config."""
+        config = NetworkConfig()
+        sequences = config.get_all_sequences()
+        assert sequences == {}
+
+    def test_resolve_sequence_commands_global(self) -> None:
+        """Test resolve_sequence_commands with global sequence."""
+        config = NetworkConfig(
+            global_command_sequences={
+                "test_seq": CommandSequence(
+                    description="Test sequence",
+                    commands=["cmd1", "cmd2"],
+                )
+            }
+        )
+
+        commands = config.resolve_sequence_commands("test_seq")
+        assert commands == ["cmd1", "cmd2"]
+
+    def test_resolve_sequence_commands_vendor(self) -> None:
+        """Test resolve_sequence_commands with vendor sequence."""
+        config = NetworkConfig(
+            devices={
+                "test_device": DeviceConfig(
+                    host="192.168.1.1",
+                    device_type="mikrotik_routeros",
+                )
+            },
+            vendor_sequences={
+                "mikrotik_routeros": {
+                    "vendor_seq": VendorSequence(
+                        description="Vendor sequence",
+                        commands=["vendor_cmd1", "vendor_cmd2"],
+                    )
+                }
+            },
+        )
+
+        commands = config.resolve_sequence_commands("vendor_seq", "test_device")
+        assert commands == ["vendor_cmd1", "vendor_cmd2"]
+
+    def test_resolve_sequence_commands_device_fallback(self) -> None:
+        """Test resolve_sequence_commands falling back to device sequence."""
+        config = NetworkConfig(
+            devices={
+                "device1": DeviceConfig(
+                    host="192.168.1.1",
+                    command_sequences={
+                        "device_seq": ["device_cmd1", "device_cmd2"],
+                    },
+                ),
+                "device2": DeviceConfig(
+                    host="192.168.1.2",
+                    # No command_sequences
+                ),
+            }
+        )
+
+        commands = config.resolve_sequence_commands("device_seq")
+        assert commands == ["device_cmd1", "device_cmd2"]
+
+    def test_resolve_sequence_commands_not_found(self) -> None:
+        """Test resolve_sequence_commands with non-existent sequence."""
+        config = NetworkConfig()
+        commands = config.resolve_sequence_commands("nonexistent")
+        assert commands is None
+
+    def test_resolve_sequence_commands_vendor_fallback(self) -> None:
+        """Test resolve_sequence_commands with vendor sequence fallback."""
+        config = NetworkConfig(
+            devices={
+                "test_device": DeviceConfig(
+                    host="192.168.1.1",
+                    device_type="mikrotik_routeros",
+                    command_sequences={
+                        "fallback_seq": ["device_fallback_cmd"],
+                    },
+                )
+            },
+            vendor_sequences={
+                "mikrotik_routeros": {
+                    "vendor_seq": VendorSequence(
+                        description="Vendor sequence",
+                        commands=["vendor_cmd"],
+                    )
+                }
+            },
+        )
+
+        # Should find vendor sequence
+        commands = config.resolve_sequence_commands("vendor_seq", "test_device")
+        assert commands == ["vendor_cmd"]
+
+        # Should fall back to device sequence when vendor not found
+        commands = config.resolve_sequence_commands("fallback_seq", "test_device")
+        assert commands == ["device_fallback_cmd"]
+
+
 class TestGroupCredentials:
     """Test group credential functionality."""
 

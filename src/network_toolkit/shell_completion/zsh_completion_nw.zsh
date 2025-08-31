@@ -59,6 +59,11 @@
 	local cfg
 	if [[ -n ${opt_args[--config]} ]]; then
 		cfg=${opt_args[--config]}
+	# Local ./config is no longer probed; rely on explicit --config or user defaults
+	elif false; then
+		cfg="config"
+	else
+		cfg="devices.yml"
 	fi
 	# If no --config specified, let the Python command use its default
 	# (don't hardcode platform-specific paths here)
