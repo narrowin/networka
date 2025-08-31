@@ -91,14 +91,15 @@ Because a real **Networka** wants the f\*ing lot.”<br><br>
 
 ### Quick Install (recommended)
 
-Not on PyPI yet — install from GitHub.
-
 ```bash
-# Recommended (isolated, user-wide)
+# From PyPI (stable releases)
+uv tool install networka
+
+# From GitHub (latest development)
 uv tool install git+https://github.com/narrowin/networka.git
 
-# Alternative
-pipx install git+https://github.com/narrowin/networka.git
+# Alternative with pipx
+pipx install networka
 
 # Verify installation
 nw --help

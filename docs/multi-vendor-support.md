@@ -290,6 +290,7 @@ nw run new-device system_info
 ### Existing Installations
 
 Legacy single-file `sequences.yml` configurations are no longer supported; use modular sequences/ files.
+
 - Gradual migration path available
 - No breaking changes to existing functionality
 

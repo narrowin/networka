@@ -1,13 +1,18 @@
 # Installation
 
-## Installation (not on PyPI yet)
+## Quick Install
 
-Install from GitHub using an isolated tool installer.
+Install from PyPI using an isolated tool installer.
 
 ```bash
+# Stable release from PyPI
+uv tool install networka
+
+# Latest development from GitHub
 uv tool install git+https://github.com/narrowin/networka.git
-# or
-pipx install git+https://github.com/narrowin/networka.git
+
+# Alternative with pipx
+pipx install networka
 ```
 
 Short install video (30s):

@@ -1,6 +1,7 @@
 # Environment Variable Configuration
 
 TL;DR
+
 - Prefer interactive auth with `--interactive-auth` for ad‑hoc runs
 - Set `NW_USER_DEFAULT` and `NW_PASSWORD_DEFAULT` for shared defaults
 - Override per device/group with `NW_USER_*` and `NW_PASSWORD_*`
@@ -9,15 +10,15 @@ This document describes how to set up secure credential management using environ
 
 Example precedence
 
-1) Run with interactive auth (highest):
+1. Run with interactive auth (highest):
 
 ```bash
 nw run router1 system_info --interactive-auth
 ```
 
-2) Use device-specific overrides when set (e.g., `NW_USER_ROUTER1`, `NW_PASSWORD_ROUTER1`)
+2. Use device-specific overrides when set (e.g., `NW_USER_ROUTER1`, `NW_PASSWORD_ROUTER1`)
 
-3) Fall back to defaults when no overrides exist:
+3. Fall back to defaults when no overrides exist:
 
 ```bash
 export NW_USER_DEFAULT=admin

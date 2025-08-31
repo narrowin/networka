@@ -65,14 +65,17 @@ for device, success in results.items():
 Upload a file to a single MikroTik device.
 
 **Parameters:**
+
 - `local_path` (str | Path): Path to the local file to upload
 - `remote_filename` (str | None, optional): Name for the file on the remote device. If None, uses the original filename
 - `verify_upload` (bool, default=True): Whether to verify the upload by checking if the file exists on the device
 
 **Returns:**
+
 - `bool`: True if upload was successful, False otherwise
 
 **Raises:**
+
 - `DeviceExecutionError`: If device is not connected or upload fails
 - `FileNotFoundError`: If local file does not exist
 - `ValueError`: If local path is not a file
@@ -82,6 +85,7 @@ Upload a file to a single MikroTik device.
 Upload a file to multiple devices concurrently.
 
 **Parameters:**
+
 - `device_names` (list[str]): List of device names to upload to
 - `config` (NetworkConfig): Network configuration containing device settings
 - `local_path` (str | Path): Path to the local file to upload
@@ -90,9 +94,11 @@ Upload a file to multiple devices concurrently.
 - `max_concurrent` (int, default=5): Maximum number of concurrent uploads
 
 **Returns:**
+
 - `dict[str, bool]`: Dictionary mapping device names to upload success status
 
 **Raises:**
+
 - `FileNotFoundError`: If local file does not exist
 - `ValueError`: If local path is not a file
 
