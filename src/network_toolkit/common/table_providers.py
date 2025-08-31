@@ -7,7 +7,6 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import yaml
 from pydantic import BaseModel
 
 from network_toolkit.common.styles import StyleName
@@ -404,6 +403,8 @@ class SupportedPlatformsTableProvider(BaseModel, BaseTableProvider):
 class GlobalSequenceInfoTableProvider(BaseModel, BaseTableProvider):
     """Provider for global sequence info table."""
 
+    # Config is optional for tests that instantiate the provider directly
+    config: NetworkConfig | None = None
     sequence_name: str
     sequence: Any  # CommandSequence object
     verbose: bool = False
@@ -419,16 +420,21 @@ class GlobalSequenceInfoTableProvider(BaseModel, BaseTableProvider):
 
     def get_table_rows(self) -> list[list[str]]:
         """Get global sequence info data."""
-        rows = [
+        rows: list[list[str]] = [
             ["Description", getattr(self.sequence, "description", "No description")],
-            ["Source", self._get_global_sequence_source()],
+            ["Source", self._get_sequence_source()],
             ["Command Count", str(len(getattr(self.sequence, "commands", [])))],
         ]
 
-        # Add all individual commands - no truncation
+        # Add individual commands with truncation for long lists
         commands = getattr(self.sequence, "commands", [])
-        for i, cmd in enumerate(commands, 1):
+        max_preview = 3
+        for i, cmd in enumerate(commands[:max_preview], 1):
             rows.append([f"Command {i}", str(cmd)])
+
+        remaining = max(0, len(commands) - max_preview)
+        if remaining > 0:
+            rows.append(["Note", f"({remaining} more commands)"])
 
         # Add tags if available
         tags = getattr(self.sequence, "tags", [])
@@ -437,47 +443,31 @@ class GlobalSequenceInfoTableProvider(BaseModel, BaseTableProvider):
 
         return rows
 
-    def _get_global_sequence_source(self) -> str:
-        """Determine the source of this global sequence."""
-        # Global sequences are typically in config.yml or sequences.yml
+    def _get_sequence_source(self) -> str:
+        """
+        Determine the source of this global sequence.
+
+        Prefer the exact config file path recorded by the loader. When running
+        with mocked configs (tests that don't provide loader metadata), fall back
+        to a stable label.
+        """
+        # Try to use loader metadata if available
         try:
-            config_dir = Path("config")
-
-            # Check main config.yml first
-            config_file = config_dir / "config.yml"
-            if config_file.exists():
-                try:
-                    with config_file.open("r", encoding="utf-8") as f:
-                        data = yaml.safe_load(f)
-                        if (
-                            isinstance(data, dict)
-                            and "global_command_sequences" in data
-                        ):
-                            if self.sequence_name in data["global_command_sequences"]:
-                                return str(config_file.resolve())
-                except Exception:
-                    pass
-
-            # Check sequences.yml
-            sequences_file = config_dir / "sequences.yml"
-            if sequences_file.exists():
-                try:
-                    with sequences_file.open("r", encoding="utf-8") as f:
-                        data = yaml.safe_load(f)
-                        if (
-                            isinstance(data, dict)
-                            and "global_command_sequences" in data
-                        ):
-                            if self.sequence_name in data["global_command_sequences"]:
-                                return str(sequences_file.resolve())
-                except Exception:
-                    pass
-
-            # Fallback
-            return "global sequences"
-
+            if self.config is not None and hasattr(
+                self.config, "get_global_sequence_source_path"
+            ):
+                src = self.config.get_global_sequence_source_path(self.sequence_name)
+                if isinstance(src, Path):
+                    try:
+                        return str(src.resolve())
+                    except Exception:
+                        return str(src)
         except Exception:
-            return "config file (global sequences)"
+            # Ignore and fall back to stable label
+            pass
+
+        # Fallback for mocked/global sequences without tracked source
+        return "Global (config)"
 
     def get_raw_output(self) -> str | None:
         """Get raw data for JSON/CSV output."""
@@ -496,6 +486,7 @@ class VendorSequenceInfoTableProvider(BaseModel, BaseTableProvider):
     sequence_record: Any  # SequenceRecord object
     vendor_names: list[str]
     verbose: bool = False
+    config: NetworkConfig | None = None
 
     def get_table_definition(self) -> TableDefinition:
         return TableDefinition(
@@ -540,57 +531,51 @@ class VendorSequenceInfoTableProvider(BaseModel, BaseTableProvider):
 
             if origin == "builtin":
                 if path:
-                    return f"built-in package ({path.name})"
-                return "built-in package sequences"
-            elif origin == "repo":
+                    return f"Built-in vendor sequences ({path.name})"
+                return "Built-in vendor sequences"
+            elif origin in {"repo", "user"}:
+                # Prefer explicit path if provided
                 if path:
                     return f"config file ({path.resolve()})"
-                return "repository config sequences"
-            elif origin == "user":
-                if path:
-                    return f"config file ({path.resolve()})"
-                return "user config sequences"
+                # Try loader metadata to get exact filename
+                try:
+                    if self.config and getattr(self.config, "vendor_sequences", None):
+                        for _vendor_key, seqs in (
+                            self.config.vendor_sequences or {}
+                        ).items():
+                            seq_obj = seqs.get(self.sequence_name)
+                            if seq_obj is not None:
+                                src = getattr(seq_obj, "_source_path", None)
+                                if src:
+                                    return f"config file ({Path(src).resolve()})"
+                except Exception:
+                    pass
+                # Fall back to generic label by origin
+                return (
+                    "repository config sequences"
+                    if origin == "repo"
+                    else "user config sequences"
+                )
             elif origin == "global":
                 return "global config sequences"
 
-        # Fallback: try to detect from file system (old approach)
+        # Fallback: try loader metadata if config is provided
         try:
-            config_dir = Path("config")
-            sequences_dir = config_dir / "sequences"
-
-            if sequences_dir.exists():
-                for sequence_file in sequences_dir.glob("*.yml"):
-                    try:
-                        with sequence_file.open("r", encoding="utf-8") as f:
-                            data = yaml.safe_load(f)
-                            if isinstance(data, dict) and "sequences" in data:
-                                if self.sequence_name in data["sequences"]:
-                                    return f"config file ({sequence_file.resolve()})"
-                    except Exception as exc:
-                        import logging
-
-                        logging.debug(
-                            f"Failed reading sequence YAML {sequence_file}: {exc}"
-                        )
-                        continue
-
-            # Check if it's in the main sequences.yml file
-            sequences_file = config_dir / "sequences.yml"
-            if sequences_file.exists():
-                try:
-                    with sequences_file.open("r", encoding="utf-8") as f:
-                        data = yaml.safe_load(f)
-                        if isinstance(data, dict) and "sequences" in data:
-                            if self.sequence_name in data["sequences"]:
-                                return f"config file ({sequences_file.resolve()})"
-                except Exception:
-                    pass
-
-            # Final fallback
-            return "built-in vendor sequences"
-
+            if self.config and getattr(self, "vendor_names", None):
+                vendor_sequences = getattr(self.config, "vendor_sequences", {}) or {}
+                for vendor in self.vendor_names:
+                    seqs = vendor_sequences.get(vendor.replace(" ", "_"), {})
+                    seq_obj = seqs.get(self.sequence_name)
+                    if seq_obj is not None:
+                        src = getattr(seq_obj, "_source_path", None)
+                        if src:
+                            return f"config file ({Path(src).resolve()})"
         except Exception:
-            return "built-in vendor sequences"
+            # Ignore and continue to final fallback
+            pass
+
+        # Final fallback
+        return "Built-in vendor sequences"
 
     def get_raw_output(self) -> str | None:
         """Get raw data for JSON/CSV output."""
@@ -815,9 +800,9 @@ class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
         # Now trace back to find the source of this resolved value
         # Check device config first
         if credential_type == "username" and dev.user == resolved_value:
-            return "device config file (config/devices/devices.yml)"
+            return "device config file (devices/devices.yml)"
         if credential_type == "password" and dev.password == resolved_value:
-            return "device config file (config/devices/devices.yml)"
+            return "device config file (devices/devices.yml)"
 
         # Check device-specific environment variables
         env_var_name = (
@@ -846,16 +831,12 @@ class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
                         credential_type == "username"
                         and group.credentials.user == resolved_value
                     ):
-                        return (
-                            f"group config file config/groups/groups.yml ({group_name})"
-                        )
+                        return f"group config file groups/groups.yml ({group_name})"
                     elif (
                         credential_type == "password"
                         and group.credentials.password == resolved_value
                     ):
-                        return (
-                            f"group config file config/groups/groups.yml ({group_name})"
-                        )
+                        return f"group config file groups/groups.yml ({group_name})"
 
                 # Check group environment variable
                 if (
@@ -946,63 +927,14 @@ class GroupInfoTableProvider(BaseModel, BaseTableProvider):
         return rows
 
     def _get_group_source(self) -> str:
-        """Determine the source file for this group using the same discovery logic as config loading."""
-        # Use the actual config path from the command context
-        if self.config_path:
-            if self.config_path.is_file():
-                config_dir = self.config_path.parent
-            else:
-                config_dir = self.config_path
-        else:
-            config_dir = Path("config")
-
-        # Direct approach: check the known location first since we know it works
-        groups_s3n = config_dir / "groups" / "s3n.yml"
-        if groups_s3n.exists():
-            try:
-                with groups_s3n.open("r", encoding="utf-8") as f:
-                    data = yaml.safe_load(f)
-                    if isinstance(data, dict) and "groups" in data:
-                        if self.group_name in data["groups"]:
-                            return str(groups_s3n.resolve())
-            except Exception:
-                pass
-
-        # Fallback to full discovery
-        group_files: list[Path] = []
-
-        # Main config file in root
-        for ext in [".yml", ".yaml", ".csv"]:
-            main_file = config_dir / f"groups{ext}"
-            if main_file.exists():
-                group_files.append(main_file)
-
-        # Subdirectory files
-        subdir = config_dir / "groups"
-        if subdir.exists() and subdir.is_dir():
-            # All yaml/csv files in subdirectory
-            for pattern in ["*.yml", "*.yaml", "*.csv"]:
-                group_files.extend(subdir.glob(pattern))
-
-        # Now search through the discovered files for our group
-        for group_file in group_files:
-            try:
-                if group_file.suffix.lower() in [".yml", ".yaml"]:
-                    with group_file.open("r", encoding="utf-8") as f:
-                        data = yaml.safe_load(f)
-                        if isinstance(data, dict) and "groups" in data:
-                            if self.group_name in data["groups"]:
-                                return str(group_file.resolve())
-            except Exception as exc:
-                import logging
-
-                logging.debug(
-                    f"Error scanning group file {group_file} for group {self.group_name}: {exc}"
-                )
-                continue
-
-        # Fallback
-        return f"{config_dir}/groups/ - checked {len(group_files)} files"
+        """Determine the source file for this group via loader metadata."""
+        try:
+            src = self.config.get_group_source_path(self.group_name)
+            if src is None:
+                return "unknown"
+            return str(Path(src).resolve())
+        except Exception:
+            return "unknown"
 
     def get_raw_output(self) -> str | None:
         """Get raw data for JSON/CSV output."""

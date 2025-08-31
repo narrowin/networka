@@ -34,8 +34,8 @@ def _discover_config_metadata(original: Path) -> dict[str, object]:
     """Discover where config was loaded from and which files are involved.
 
     Mirrors the resolution logic in `load_config` to report:
-    - mode: "modular" or "legacy"
-    - root: Path of the modular root directory or the legacy file path
+    - mode: "modular"
+    - root: Path of the modular root directory
     - files: list[Path] of relevant files that were validated
     - display_name: user-facing name for the target (keep "config" when used)
     """
@@ -60,21 +60,10 @@ def _discover_config_metadata(original: Path) -> dict[str, object]:
         return files
 
     # Resolution logic (aligned with config.load_config)
-    # 1) Explicit "config" directory
-    if path.name in ["config", "config/"] and path.exists():
-        root = path
-        return {
-            "mode": "modular",
-            "root": root.resolve(),
-            "files": collect_modular_files(root),
-            "display_name": display_name,
-        }
-
-    # 2) Directory input with direct modular files
+    # 1) Directory input with direct modular files
     if path.exists() and path.is_dir():
         direct_cfg = path / "config.yml"
-        direct_dev = path / "devices.yml"
-        if direct_cfg.exists() and direct_dev.exists():
+        if direct_cfg.exists():
             root = path
             return {
                 "mode": "modular",
@@ -82,29 +71,23 @@ def _discover_config_metadata(original: Path) -> dict[str, object]:
                 "files": collect_modular_files(root),
                 "display_name": display_name,
             }
-        # Nested config directory next to provided path
-        cfg_dir = path / "config"
-        if cfg_dir.exists():
-            root = cfg_dir
-            return {
-                "mode": "modular",
-                "root": root.resolve(),
-                "files": collect_modular_files(root),
-                "display_name": display_name,
-            }
 
-    # 3) Legacy file directly
-    if path.exists() and path.is_file():
+    # 2) Direct config.yml file path
+    if (
+        path.exists()
+        and path.is_file()
+        and path.name.lower() in {"config.yml", "config.yaml"}
+    ):
+        root = path.parent
         return {
-            "mode": "legacy",
-            "root": path.resolve(),
-            "files": [path.resolve()],
+            "mode": "modular",
+            "root": root.resolve(),
+            "files": collect_modular_files(root),
             "display_name": display_name,
         }
 
-    # 4) Fallbacks for default names (platform/user cwd)
-    if str(path) in ["config", "devices.yml"]:
-        # Prefer platform default modular directory
+    # 3) Fallback to platform default modular directory for default token
+    if str(path) in ["config"]:
         platform_default = default_modular_config_dir()
         cfg_yaml = platform_default / "config.yml"
         if cfg_yaml.exists():
@@ -115,26 +98,7 @@ def _discover_config_metadata(original: Path) -> dict[str, object]:
                 "files": collect_modular_files(root),
                 "display_name": display_name,
             }
-
-        # Current working directory fallbacks
-        cwd_cfg_yaml = Path("config/config.yml")
-        if cwd_cfg_yaml.exists():
-            root = cwd_cfg_yaml.parent
-            return {
-                "mode": "modular",
-                "root": root.resolve(),
-                "files": collect_modular_files(root),
-                "display_name": display_name,
-            }
-
-        cwd_legacy = Path("devices.yml")
-        if cwd_legacy.exists():
-            return {
-                "mode": "legacy",
-                "root": cwd_legacy.resolve(),
-                "files": [cwd_legacy.resolve()],
-                "display_name": display_name,
-            }
+        # No cwd based fallbacks anymore
 
     # 5) Final attempt similar to load_config last check
     platform_default = default_modular_config_dir()
@@ -834,7 +798,7 @@ def _config_validate_impl(
         output_manager.print_info(f"Validating Configuration: {display_name}")
         if isinstance(resolved_root, Path):
             output_manager.print_info(f"Path: {resolved_root}")
-        if isinstance(mode, str) and mode in {"modular", "legacy"}:
+        if isinstance(mode, str) and mode in {"modular"}:
             output_manager.print_info(f"Mode: {mode}")
         if isinstance(files, list) and files:
             output_manager.print_info("Files:")

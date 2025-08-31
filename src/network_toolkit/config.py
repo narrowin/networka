@@ -16,12 +16,59 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, PrivateAttr, field_validator
 
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
-from network_toolkit.common.paths import default_modular_config_dir
+
+# from network_toolkit.common.paths import default_modular_config_dir
 from network_toolkit.credentials import (
     ConnectionParameterBuilder,
     EnvironmentCredentialManager,
 )
-from network_toolkit.exceptions import ConfigurationError, NetworkToolkitError
+from network_toolkit.exceptions import NetworkToolkitError
+
+
+def _resolve_fallback_config_path(original_hint: Path | None = None) -> Path | None:
+    """Best-effort fallback discovery for a modular config directory.
+
+    Order:
+    1) NW_CONFIG_DIR environment variable, if it exists
+    2) Search upwards from current working directory for a folder named 'config'
+    3) If an original hint is provided, search upwards from that location as well
+
+    Returns a Path to a directory if found, otherwise None.
+    """
+    # 1) Explicit environment override
+    env_dir = os.environ.get("NW_CONFIG_DIR")
+    if env_dir:
+        p = Path(env_dir)
+        if p.exists() and p.is_dir():
+            return p
+
+    def search_up(start: Path) -> Path | None:
+        cur = start
+        seen = 0
+        while True:
+            candidate = cur / "config"
+            if candidate.exists() and candidate.is_dir():
+                return candidate
+            if cur.parent == cur or seen > 12:  # avoid deep walks
+                return None
+            cur = cur.parent
+            seen += 1
+
+    # 2) From CWD
+    cwd_found = search_up(Path.cwd())
+    if cwd_found is not None:
+        return cwd_found
+
+    # 3) From original hint
+    if original_hint is not None:
+        try:
+            hint_found = search_up(original_hint.resolve())
+        except Exception:
+            hint_found = None
+        if hint_found is not None:
+            return hint_found
+
+    return None
 
 
 def load_dotenv_files(config_path: Path | None = None) -> None:
@@ -243,6 +290,10 @@ class DeviceGroup(BaseModel):
     # Private: where this group was loaded from
     _source_path: Path | None = PrivateAttr(default=None)
 
+    def set_source_path(self, path: Path) -> None:
+        """Set the source path where this group was defined."""
+        self._source_path = path
+
 
 class VendorPlatformConfig(BaseModel):
     """Configuration for vendor platform support."""
@@ -264,6 +315,10 @@ class VendorSequence(BaseModel):
     # Private: where this vendor sequence was loaded from
     _source_path: Path | None = PrivateAttr(default=None)
 
+    def set_source_path(self, path: Path) -> None:
+        """Set the source path where this vendor sequence was defined."""
+        self._source_path = path
+
 
 class CommandSequence(BaseModel):
     """Global command sequence definition."""
@@ -275,6 +330,10 @@ class CommandSequence(BaseModel):
 
     # Private: where this global sequence was loaded from
     _source_path: Path | None = PrivateAttr(default=None)
+
+    def set_source_path(self, path: Path) -> None:
+        """Set the source path where this global sequence was defined."""
+        self._source_path = path
 
 
 class CommandSequenceGroup(BaseModel):
@@ -316,6 +375,24 @@ class NetworkConfig(BaseModel):
         if dev is None:
             return None
         return getattr(dev, "_source_path", None)
+
+    # Helper: group source path accessor (non-schema, uses PrivateAttr on DeviceGroup)
+    def get_group_source_path(self, group_name: str) -> Path | None:
+        grp = self.device_groups.get(group_name) if self.device_groups else None
+        if grp is None:
+            return None
+        return getattr(grp, "_source_path", None)
+
+    # Helper: global sequence source path accessor (non-schema, uses PrivateAttr on CommandSequence)
+    def get_global_sequence_source_path(self, sequence_name: str) -> Path | None:
+        seq = (
+            self.global_command_sequences.get(sequence_name)
+            if self.global_command_sequences
+            else None
+        )
+        if seq is None:
+            return None
+        return getattr(seq, "_source_path", None)
 
     def get_device_connection_params(
         self,
@@ -900,61 +977,91 @@ def _merge_configs(
 
 def load_config(config_path: str | Path) -> NetworkConfig:
     """
-    Load and validate configuration from a modular directory structure.
+    Load and validate configuration.
 
-        Resolution rules (strict):
-        - If the caller passed the literal default path ("config") and it does not exist,
-            fall back to the platform default modular path (e.g., ~/.config/networka) if it
-            contains config.yml.
-        - For any other explicit --config path:
-                * If path does not exist -> raise ConfigurationError("No such file or directory: …")
-                * If path is a file      -> raise ConfigurationError("Configuration path must be a directory, not a file: …")
-                * If path is a dir but missing config.yml -> raise ConfigurationError("Not a network config dir - config.yml not found")
+    Supported mode:
+    - Modular directory: a directory containing config.yml and optional
+      devices/, groups/, sequences/ subdirs and/or companion YAML/CSV files.
+      If a directory is supplied, it must contain config.yml. Missing
+      config.yml raises FileNotFoundError("Main config file not found").
 
-    The config directory must contain at least:
-    - config.yml (general configuration)
-    - devices/ directory with device configs
-    - groups/ directory with group configs (optional)
-    - sequences/ directory with sequence configs (optional)
+    Additionally, passing a direct path to a config.yml file is supported and
+    will be treated as the parent directory in modular mode.
 
-    Additionally loads environment variables from .env files before loading config.
-    Auto-exports JSON schemas for editor validation when working in a project directory.
+    Legacy single-file YAML mode is not supported.
+
+    When no --config is provided elsewhere, callers should pass DEFAULT_CONFIG_PATH.
+    If the default user config directory does not exist, we will fall back to
+    discovering a local 'config' directory relative to the current working
+    directory (or its ancestors), or NW_CONFIG_DIR if set.
     """
+
+    # Normalize input
     config_path = Path(config_path)
 
-    # Load .env files first to make environment variables available for credential resolution
+    # If caller passed the default sentinel path, honor NW_CONFIG_DIR explicitly
+    # so tests and callers can force a specific config/ directory regardless of
+    # whether a user-level DEFAULT_CONFIG_PATH exists.
+    if config_path == DEFAULT_CONFIG_PATH:
+        env_dir = os.environ.get("NW_CONFIG_DIR")
+        if env_dir:
+            env_path = Path(env_dir)
+            if env_path.exists() and env_path.is_dir():
+                # Load .env using the discovered directory and proceed as modular config
+                load_dotenv_files(env_path)
+                config = load_modular_config(env_path)
+                _auto_export_schemas_if_project()
+                return config
+
+        # Prefer a repo-local ./config when running in a project/tests
+        discovered = _resolve_fallback_config_path(config_path)
+        if discovered is not None:
+            load_dotenv_files(discovered)
+            config = load_modular_config(discovered)
+            _auto_export_schemas_if_project()
+            return config
+
+    # Load .env files to make environment variables available for credential resolution
+    # using the original hint path. This happens after the NW_CONFIG_DIR fast path above.
     load_dotenv_files(config_path)
 
-    # 1) If caller used the literal default path ("config") and it doesn't exist,
-    #    fall back to the OS default modular directory.
-    if config_path == DEFAULT_CONFIG_PATH and not config_path.exists():
-        platform_default_dir = default_modular_config_dir()
-        if (
-            platform_default_dir.exists()
-            and (platform_default_dir / "config.yml").exists()
-        ):
-            return load_modular_config(platform_default_dir)
-        # If even the platform default is missing, report clearly for the default case
-        msg = f"No such file or directory: {config_path}"
-        raise ConfigurationError(msg)
-
-    # 2) For any explicit path (including an existing ./config), perform strict checks
+    # When path doesn't exist, provide file vs dir specific messaging
     if not config_path.exists():
-        msg = f"No such file or directory: {config_path}"
-        raise ConfigurationError(msg)
+        # Explicit file path provided
+        if config_path.suffix.lower() in {".yml", ".yaml"}:
+            msg = f"Configuration file not found: {config_path}"
+            raise FileNotFoundError(msg)
+        # Default path missing — surface clearly but without probing CWD
+        if config_path == DEFAULT_CONFIG_PATH:
+            # Attempt best-effort fallback discovery for local development/tests
+            fallback = _resolve_fallback_config_path(config_path)
+            if fallback is not None:
+                # Reload .env with the discovered config directory to ensure correct precedence
+                load_dotenv_files(fallback)
+                config = load_modular_config(fallback)
+                _auto_export_schemas_if_project()
+                return config
+            msg = f"Configuration directory not found: {config_path}"
+            raise FileNotFoundError(msg)
+        msg = f"Configuration path not found: {config_path}"
+        raise FileNotFoundError(msg)
 
+    # Direct file path: treat any *.yml/*.yaml as the main modular config file
     if config_path.is_file():
-        msg = f"Configuration path must be a directory, not a file: {config_path}"
-        raise ConfigurationError(msg)
+        if config_path.suffix.lower() in {".yml", ".yaml"}:
+            config_dir = config_path.parent
+            config = load_modular_config(config_dir, main_config_path=config_path)
+            _auto_export_schemas_if_project()
+            return config
+        msg = "Unsupported configuration file; expected a YAML file (*.yml/*.yaml)."
+        raise FileNotFoundError(msg)
 
-    # Must be a directory; require config.yml
+    # Modular directory mode — must contain config.yml
     direct_config_file = config_path / "config.yml"
     if not direct_config_file.exists():
-        # Do not fall back silently for explicit directories
-        msg = "not a network config dir - config.yml not found"
-        raise ConfigurationError(msg)
+        msg = f"Main config file not found: {direct_config_file}"
+        raise FileNotFoundError(msg)
 
-    # Valid explicit directory with config.yml
     config = load_modular_config(config_path)
     _auto_export_schemas_if_project()
     return config
@@ -979,7 +1086,6 @@ def _auto_export_schemas_if_project() -> None:
         Path("package.json"),
         Path("Cargo.toml"),
         Path("go.mod"),
-        Path("config/config.yml"),  # nw project
     ]
 
     if not any(indicator.exists() for indicator in project_indicators):
@@ -1017,17 +1123,34 @@ def _is_project_config(config_path: Path) -> bool:
         return False
 
 
-def load_modular_config(config_dir: Path) -> NetworkConfig:
-    """Load configuration from modular config directory structure with enhanced discovery."""
+def load_modular_config(
+    config_dir: Path, *, main_config_path: Path | None = None
+) -> NetworkConfig:
+    """Load configuration from modular config directory structure with enhanced discovery.
+
+    Parameters
+    ----------
+    config_dir : Path
+        The directory that contains the modular configuration files.
+    main_config_path : Path | None
+        Optional explicit path to the main config YAML file. When provided,
+        this file will be used instead of "config.yml". This enables callers
+        to pass a direct YAML file path and still leverage modular discovery
+        for devices/, groups/, and sequences/ under the parent directory.
+    """
     try:
-        # Load main config
-        config_file = config_dir / "config.yml"
+        # Load main config (either explicit file or default config.yml)
+        config_file = main_config_path or (config_dir / "config.yml")
         if not config_file.exists():
             msg = f"Main config file not found: {config_file}"
             raise FileNotFoundError(msg)
 
-        with config_file.open("r", encoding="utf-8") as f:
-            main_config: dict[str, Any] = yaml.safe_load(f) or {}
+        try:
+            with config_file.open("r", encoding="utf-8") as f:
+                main_config: dict[str, Any] = yaml.safe_load(f) or {}
+        except yaml.YAMLError as e:  # surface clear error for top-level file
+            msg = "Invalid YAML in configuration file"
+            raise ValueError(msg) from e
 
         # Enhanced device loading with CSV support and subdirectory discovery
         all_devices: dict[str, Any] = {}
@@ -1092,10 +1215,14 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
         # Enhanced group loading with CSV support and subdirectory discovery
         all_groups: dict[str, Any] = {}
         group_files = _discover_config_files(config_dir, "groups")
+        group_sources: dict[str, Path] = {}
 
         for group_file in group_files:
             if group_file.suffix.lower() == ".csv":
                 file_groups = _load_csv_groups(group_file)
+                # Track source per group name
+                for _group_name in file_groups.keys():
+                    group_sources[_group_name] = group_file
                 all_groups.update(file_groups)
             else:
                 try:
@@ -1105,6 +1232,8 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
                             dict[str, dict[str, Any]],
                             group_yaml_config.get("groups", {}) or {},
                         )
+                        for _group_name in file_groups_node.keys():
+                            group_sources[_group_name] = group_file
                         all_groups.update(file_groups_node)
                 except yaml.YAMLError as e:
                     logging.warning(f"Invalid YAML in {group_file}: {e}")
@@ -1113,10 +1242,13 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
         all_sequences: dict[str, Any] = {}
         sequence_files = _discover_config_files(config_dir, "sequences")
         sequences_config: dict[str, Any] = {}
+        global_sequence_sources: dict[str, Path] = {}
 
         for seq_file in sequence_files:
             if seq_file.suffix.lower() == ".csv":
                 file_sequences = _load_csv_sequences(seq_file)
+                for _seq_name in file_sequences.keys():
+                    global_sequence_sources[_seq_name] = seq_file
                 all_sequences.update(file_sequences)
             else:
                 try:
@@ -1127,6 +1259,8 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
                             dict[str, dict[str, Any]],
                             seq_yaml_config.get("sequences", {}) or {},
                         )
+                        for _seq_name in file_sequences_node.keys():
+                            global_sequence_sources[_seq_name] = seq_file
                         all_sequences.update(file_sequences_node)
 
                         # Keep track of other sequence config for vendor sequences
@@ -1157,7 +1291,7 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
         logging.debug(f"  - Groups: {len(all_groups)}")
         logging.debug(f"  - Sequences: {len(all_sequences)}")
 
-        # Build the model and then assign private source paths (devices only for now)
+        # Build the model and then assign private source paths
         model = NetworkConfig(**merged_config)
 
         if model.devices:
@@ -1166,6 +1300,18 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
                 src = device_sources.get(_name)
                 if src is not None:
                     _dev.set_source_path(src)
+
+        if model.device_groups:
+            for _name, _grp in model.device_groups.items():
+                src = group_sources.get(_name)
+                if src is not None:
+                    _grp.set_source_path(src)
+
+        if model.global_command_sequences:
+            for _name, _seq in model.global_command_sequences.items():
+                src = global_sequence_sources.get(_name)
+                if src is not None:
+                    _seq.set_source_path(src)
 
         return model
 
@@ -1317,6 +1463,8 @@ def _load_sequence_file(file_path: Path, vendor_name: str) -> dict[str, VendorSe
         for seq_name, seq_data in sequence_data.items():
             try:
                 seq_obj = VendorSequence(**seq_data)
+                # Store source path on the sequence object (private via setter)
+                seq_obj.set_source_path(file_path)
                 sequences[seq_name] = seq_obj
             except Exception as e:
                 logging.warning(f"Invalid sequence '{seq_name}' in {file_path}: {e}")
@@ -1334,35 +1482,7 @@ def _load_sequence_file(file_path: Path, vendor_name: str) -> dict[str, VendorSe
     return sequences
 
 
-def load_legacy_config(config_path: Path) -> NetworkConfig:
-    """Load configuration from legacy monolithic YAML file."""
-    try:
-        with config_path.open("r", encoding="utf-8") as f:
-            raw_config: dict[str, Any] = yaml.safe_load(f) or {}
-
-        # Backfill missing device_type with a sensible default for YAML-based configs
-        try:
-            devices_node = cast(
-                dict[str, dict[str, Any]], raw_config.get("devices", {}) or {}
-            )
-            for _name, dev in devices_node.items():
-                if "device_type" not in dev:
-                    dev["device_type"] = "linux"
-        except Exception:
-            # Be permissive; validation will catch irrecoverable shapes
-            pass
-
-        # Log config loading for debugging
-        logging.debug(f"Loaded legacy configuration from {config_path}")
-
-        return NetworkConfig(**raw_config)
-
-    except yaml.YAMLError as e:
-        msg = f"Invalid YAML in configuration file: {config_path}"
-        raise ValueError(msg) from e
-    except Exception as e:  # pragma: no cover - safety
-        msg = f"Failed to load configuration from {config_path}: {e}"
-        raise ValueError(msg) from e
+# Legacy single-file YAML mode removed: no legacy loader remains
 
 
 def generate_json_schema() -> dict[str, Any]:

@@ -290,7 +290,7 @@ def _show_sequence_info(
     if config.global_command_sequences and target in config.global_command_sequences:
         sequence = config.global_command_sequences[target]
         provider = GlobalSequenceInfoTableProvider(
-            sequence_name=target, sequence=sequence, verbose=verbose
+            config=config, sequence_name=target, sequence=sequence, verbose=verbose
         )
         ctx.render_table(provider, verbose)
         return
@@ -320,6 +320,7 @@ def _show_sequence_info(
             sequence_record=sequence_record,
             vendor_names=vendor_names,
             verbose=verbose,
+            config=config,
         )
         ctx.render_table(provider, verbose)
         return
@@ -352,9 +353,9 @@ def _get_credential_source(
     dev = config.devices.get(device_name) if config.devices else None
     if dev:
         if credential_type == "username" and getattr(dev, "user", None):
-            return "device config file (config/devices/devices.yml)"
+            return "device config file (devices/devices.yml)"
         if credential_type == "password" and getattr(dev, "password", None):
-            return "device config file (config/devices/devices.yml)"
+            return "device config file (devices/devices.yml)"
 
     # Check device-specific environment variables
     env_var_name = (
@@ -376,9 +377,9 @@ def _get_credential_source(
             )
             if group and group.credentials:
                 if credential_type == "username" and group.credentials.user:
-                    return f"group config file config/groups/groups.yml ({group_name})"
+                    return f"group config file groups/groups.yml ({group_name})"
                 elif credential_type == "password" and group.credentials.password:
-                    return f"group config file config/groups/groups.yml ({group_name})"
+                    return f"group config file groups/groups.yml ({group_name})"
 
             # Check group environment variable
             if EnvironmentCredentialManager.get_group_specific(

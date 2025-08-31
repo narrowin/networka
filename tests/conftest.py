@@ -148,9 +148,22 @@ def mock_config(sample_config: NetworkConfig) -> NetworkConfig:
 
 @pytest.fixture
 def config_file(temp_dir: Path, sample_config_data: dict[str, Any]) -> Path:
-    """Create a temporary config file with sample data."""
-    config_path = temp_dir / "test_config.yml"
-    with config_path.open("w") as f:
+    """Create a temporary modular config with config.yml and return its path.
+
+    The loader now supports only modular directories or a direct path to
+    config.yml. Tests expecting a "config file" should use the path to
+    the created config.yml.
+    """
+    config_dir = temp_dir / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create minimal modular structure; subdirs are optional for most tests
+    (config_dir / "devices").mkdir(exist_ok=True)
+    (config_dir / "groups").mkdir(exist_ok=True)
+    (config_dir / "sequences").mkdir(exist_ok=True)
+
+    config_path = config_dir / "config.yml"
+    with config_path.open("w", encoding="utf-8") as f:
         yaml.dump(sample_config_data, f)
     return config_path
 

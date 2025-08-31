@@ -1168,23 +1168,7 @@ class TestModularConfigLoading:
         assert config.devices == {}  # Empty devices is okay
         assert config.device_groups == {}  # Empty groups is okay
 
-    def test_legacy_config_error_handling(self, tmp_path: Path) -> None:
-        """Test error handling in legacy config loading."""
-        # Invalid YAML file
-        invalid_file = tmp_path / "invalid.yml"
-        invalid_file.write_text("invalid: yaml: content: [")
-
-        with pytest.raises(ValueError, match="Invalid YAML in configuration file"):
-            load_config(invalid_file)
-
-        # Valid YAML but create a file that will cause NetworkConfig validation to fail
-        # Use an empty file which should work fine
-        empty_file = tmp_path / "empty.yml"
-        empty_file.write_text("")
-
-        # This should actually load successfully with empty config
-        config = load_config(empty_file)
-        assert isinstance(config, NetworkConfig)
+    # Legacy single-file YAML mode removed; no legacy config tests remain
 
 
 class TestNetworkConfigAdvancedMethods:

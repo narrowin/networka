@@ -24,7 +24,8 @@ _nw_complete() {
 	local cfg
 	if [[ -n ${opt_args[--config]} ]]; then
 		cfg=${opt_args[--config]}
-	elif [[ -d config || -f config/config.yml ]]; then
+	# Local ./config is no longer probed; rely on explicit --config or user defaults
+	elif false; then
 		cfg="config"
 	else
 		cfg="devices.yml"

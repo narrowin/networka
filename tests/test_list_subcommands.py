@@ -339,16 +339,28 @@ class TestListCommandIntegration:
 
 @pytest.fixture
 def empty_config_file(tmp_path: Path) -> Path:
-    """Create an empty config file for testing."""
-    config_content = """
-general:
-  backup_dir: /tmp/backups
-  output_mode: default
+    """Create a minimal modular config directory with empty sections.
 
-devices: {}
-device_groups: {}
-global_command_sequences: {}
-"""
-    config_file = tmp_path / "empty_config.yml"
-    config_file.write_text(config_content)
+    Returns the path to config.yml inside the temp config/ directory.
+    """
+    cfg_dir = tmp_path / "config"
+    cfg_dir.mkdir(parents=True, exist_ok=True)
+    (cfg_dir / "devices").mkdir(exist_ok=True)
+    (cfg_dir / "groups").mkdir(exist_ok=True)
+    (cfg_dir / "sequences").mkdir(exist_ok=True)
+
+    config_content = {
+        "general": {
+            "backup_dir": "/tmp/backups",
+            "output_mode": "default",
+        },
+        "devices": {},
+        "device_groups": {},
+        "global_command_sequences": {},
+    }
+    config_file = cfg_dir / "config.yml"
+    import yaml as _yaml
+
+    with config_file.open("w", encoding="utf-8") as f:
+        _yaml.dump(config_content, f)
     return config_file

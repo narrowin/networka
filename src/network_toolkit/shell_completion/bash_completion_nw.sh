@@ -32,7 +32,8 @@ _nw() {
 	cfg=$(_after_opt --config)
 	[[ -z "$cfg" ]] && cfg=$(_after_opt -c)
 	if [[ -z "$cfg" ]]; then
-		if [[ -d config || -f config/config.yml ]]; then
+		# Local ./config is no longer probed; rely on explicit --config or user defaults
+		if false; then
 			cfg="config"
 		else
 			cfg="devices.yml"
