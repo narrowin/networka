@@ -578,6 +578,17 @@ def register(app: typer.Typer) -> None:
                                         f"Commands executed: {len(device_results)}",
                                         device_name,
                                     )
+                                    output_mgr.print_blank_line()
+                                    # Display each command and its output
+                                    for i, (cmd, output) in enumerate(
+                                        device_results.items(), 1
+                                    ):
+                                        output_mgr.print_info(f"Command {i}: {cmd}")
+                                        output_mgr.print_output(output)
+                                        if i < len(
+                                            device_results
+                                        ):  # Don't print separator after last command
+                                            output_mgr.print_separator()
                             output_mgr.print_blank_line()
 
                     if results_mgr.store_results:
