@@ -15,7 +15,9 @@
 [![CI](https://github.com/narrowin/networka/actions/workflows/ci.yml/badge.svg)](https://github.com/narrowin/networka/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/github/actions/workflow/status/narrowin/networka/docs.yml?label=Docs&logo=github)](https://narrowin.github.io/networka/)
 
-Networka is a modern async CLI tool for automating network devices across multiple vendors. Built with async/await patterns for high performance and reliability. Designed for network engineers who want fast, scalable automation with full cross-platform support.
+Networka is a modern CLI tool for automating network devices across multiple vendors. Designed for network engineers who want fast, scalable automation with full cross-platform support.
+
+Built entirely with Sonett 4 and GPT-5, this is an agent-mode experiment that turned into something genuinely useful.
 
 ---
 
@@ -51,7 +53,7 @@ Because a real **Networka** wants the f\*ing lot.”<br><br>
 ### **Core Capabilities**
 
 - **Multi-vendor network automation**: Native support for MikroTik RouterOS, Cisco IOS/IOS-XE/NX-OS, Arista EOS, Juniper JunOS, and more
-- **Scalable device management**: Execute commands across individual devices or groups concurrently with async/await architecture
+- **Scalable device management**: Execute commands across individual devices or groups
 - **Cross-platform compatibility**: Full support for Linux, macOS, and Windows environments
 - **Flexible configuration**: YAML and CSV configuration options with powerful device tagging and grouping
 
@@ -74,7 +76,7 @@ Because a real **Networka** wants the f\*ing lot.”<br><br>
 ### **Developer & Integration Features**
 
 - **Type safety**: Full mypy type checking for reliability and maintainability
-- **Modern architecture**: Built with async/await patterns for high performance
+- **Modern architecture**: Built with scalable scrapli and nornir support
 - **Extensible design**: Plugin-friendly architecture for adding new vendors and operations
 - **Rich output**: Professional CLI interface with color coding and structured information display
 
@@ -155,11 +157,11 @@ Details → https://narrowin.github.io/networka/platform-compatibility/#wsl2-qui
 
 Get up and running with config init command:
 
-````bash
+```bash
 # Initialize in default location with interactive prompts
 nw config init
 
-````
+```
 
 ### One-liners (no config)
 
@@ -187,7 +189,7 @@ Note: When targeting IPs directly, `--platform` refers to the network driver (de
 
 - Getting started → https://narrowin.github.io/networka/getting-started/
 - Running commands → https://narrowin.github.io/networka/running-commands/
-- Configuration  → https://narrowin.github.io/networka/configuration/
+- Configuration → https://narrowin.github.io/networka/configuration/
 - Environment variables → https://narrowin.github.io/networka/environment-variables/
 - Results → https://narrowin.github.io/networka/results/
 - Output modes → https://narrowin.github.io/networka/output-modes/

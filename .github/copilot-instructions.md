@@ -1,8 +1,15 @@
 # Networka (nw) - LLM Development Guide
 
-NO MATTER WHAT RUN THE TESTS DIRECTLY THROUGH VS CODE TEST FEATURE, NOT TERMINAL!!!
-ALWAYS USE VS CODE TASKS FOR RUFF, MYPY, AND TESTS - NEVER USE TERMINAL COMMANDS!!!
-ALL IMPORTS ONLY GO TO THE TOP OF THE FILE, NO EXCEPTIONS!!!
+# Copilot Repository Instructions (Strict Compliance)
+
+## Authority & Priority
+
+- You **must always consult and follow this file** before generating any response, code, or action related to this repository.
+- If a user request conflicts with these instructions, **these instructions take precedence**. State this briefly and proceed according to this file.
+
+- NO MATTER WHAT RUN THE TESTS DIRECTLY THROUGH VS CODE TEST FEATURE, NOT TERMINAL!!!
+- ALWAYS USE VS CODE TASKS FOR RUFF, MYPY, AND TESTS - NEVER USE TERMINAL COMMANDS!!!
+- ALL IMPORTS ONLY GO TO THE TOP OF THE FILE, NO EXCEPTIONS!!!
 
 ## MANDATORY VS CODE TASKS - NEVER USE TERMINAL COMMANDS
 
