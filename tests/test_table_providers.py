@@ -3,16 +3,12 @@
 
 from __future__ import annotations
 
-from unittest.mock import Mock
-
 import pytest
 
 from network_toolkit.common.table_providers import (
     DeviceInfoTableProvider,
     DeviceListTableProvider,
     DeviceTypesInfoTableProvider,
-    GlobalSequenceInfoTableProvider,
-    GlobalSequencesTableProvider,
     GroupInfoTableProvider,
     GroupListTableProvider,
     SupportedPlatformsTableProvider,
@@ -43,7 +39,6 @@ class TestDeviceListTableProvider:
                 )
             },
             device_groups={},
-            global_command_sequences={},
         )
 
         provider = DeviceListTableProvider(config=config)
@@ -56,7 +51,6 @@ class TestDeviceListTableProvider:
             general=GeneralConfig(),
             devices={},
             device_groups={},
-            global_command_sequences={},
         )
         provider = DeviceListTableProvider(config=config)
 
@@ -76,7 +70,6 @@ class TestDeviceListTableProvider:
             general=GeneralConfig(),
             devices={},
             device_groups={},
-            global_command_sequences={},
         )
         provider = DeviceListTableProvider(config=config)
 
@@ -99,7 +92,6 @@ class TestDeviceListTableProvider:
                 )
             },
             device_groups={},
-            global_command_sequences={},
         )
 
         provider = DeviceListTableProvider(config=config)
@@ -129,7 +121,6 @@ class TestDeviceListTableProvider:
                 )
             },
             device_groups={},
-            global_command_sequences={},
         )
 
         provider = DeviceListTableProvider(config=config)
@@ -153,7 +144,6 @@ class TestDeviceListTableProvider:
                 )
             },
             device_groups={},
-            global_command_sequences={},
         )
 
         provider = DeviceListTableProvider(config=config)
@@ -179,7 +169,6 @@ class TestGroupListTableProvider:
                     members=["device1", "device2"],
                 )
             },
-            global_command_sequences={},
         )
 
         provider = GroupListTableProvider(config=config)
@@ -192,7 +181,6 @@ class TestGroupListTableProvider:
             general=GeneralConfig(),
             devices={},
             device_groups={},
-            global_command_sequences={},
         )
         provider = GroupListTableProvider(config=config)
 
@@ -223,7 +211,6 @@ class TestGroupListTableProvider:
                     members=["device1", "device2"],
                 )
             },
-            global_command_sequences={},
         )
 
         provider = GroupListTableProvider(config=config)
@@ -306,47 +293,11 @@ class TestTransportTypesTableProvider:
 class TestSequenceTableProviders:
     """Test sequence-related table providers."""
 
-    def test_global_sequences_table_provider(self) -> None:
-        """Test GlobalSequencesTableProvider implementation."""
-        # Create a real NetworkConfig with global_command_sequences
-        config = NetworkConfig(
-            general=GeneralConfig(backup_dir="/tmp", transport="system"),
-            devices={},
-            device_groups={},
-            global_command_sequences=None,  # Use None to avoid type issues
-        )
-
-        provider = GlobalSequencesTableProvider(config=config)
-
-        definition = provider.get_table_definition()
-        assert definition.title == "Global Sequences"
-
-        rows = provider.get_table_rows()
-        assert len(rows) == 0  # No sequences configured
-
     @pytest.mark.skip("Complex provider APIs need refactoring")
     def test_vendor_sequences_table_provider(self) -> None:
         """Test VendorSequencesTableProvider implementation."""
         # Test skipped due to complex API refactoring needed
         pass
-
-    def test_global_sequence_info_provider(self) -> None:
-        """Test GlobalSequenceInfoTableProvider implementation."""
-        sequence = Mock(
-            description="Test sequence info",
-            commands=["command1", "command2"],
-            tags=["test"],
-        )
-
-        provider = GlobalSequenceInfoTableProvider(
-            sequence_name="test_sequence", sequence=sequence
-        )
-
-        definition = provider.get_table_definition()
-        assert definition.title == "Global Sequence: test_sequence"
-
-        rows = provider.get_table_rows()
-        assert len(rows) >= 3  # Should have description, command count, tags
 
     @pytest.mark.skip("Complex provider APIs need refactoring")
     def test_vendor_sequence_info_provider(self) -> None:
@@ -361,16 +312,22 @@ class TestInfoTableProviders:
     @pytest.mark.skip("Complex provider APIs need refactoring")
     def test_device_info_provider(self) -> None:
         """Test DeviceInfoTableProvider implementation."""
-        device = DeviceConfig(
-            host="192.168.1.1",
-            device_type="mikrotik_routeros",
-            user="admin",
-            password="password",
-            port=8728,
-            description="Test device info",
+        config = NetworkConfig(
+            general=GeneralConfig(),
+            devices={
+                "test_device": DeviceConfig(
+                    host="192.168.1.1",
+                    device_type="mikrotik_routeros",
+                    user="admin",
+                    password="password",
+                    port=8728,
+                    description="Test device info",
+                )
+            },
+            device_groups={},
         )
 
-        provider = DeviceInfoTableProvider(device_name="test_device", device=device)
+        provider = DeviceInfoTableProvider(config=config, device_name="test_device")
 
         definition = provider.get_table_definition()
         assert definition.title == "Device: test_device"
@@ -381,12 +338,18 @@ class TestInfoTableProviders:
     @pytest.mark.skip("Complex provider APIs need refactoring")
     def test_group_info_provider(self) -> None:
         """Test GroupInfoTableProvider implementation."""
-        group = DeviceGroup(
-            description="Test group info",
-            members=["device1", "device2", "device3"],
+        config = NetworkConfig(
+            general=GeneralConfig(),
+            devices={},
+            device_groups={
+                "test_group": DeviceGroup(
+                    description="Test group info",
+                    members=["device1", "device2", "device3"],
+                )
+            },
         )
 
-        provider = GroupInfoTableProvider(group_name="test_group", group=group)
+        provider = GroupInfoTableProvider(config=config, group_name="test_group")
 
         definition = provider.get_table_definition()
         assert definition.title == "Group: test_group"
@@ -444,7 +407,6 @@ class TestTableProviderIntegration:
                 ),
             },
             device_groups={},
-            global_command_sequences={},
         )
 
         provider = DeviceListTableProvider(config=config)
@@ -512,40 +474,35 @@ class TestTableProviderEdgeCases:
             general=GeneralConfig(),
             devices={},
             device_groups={},
-            global_command_sequences={},
         )
 
         # Empty devices
-        provider = DeviceListTableProvider(config=config)
-        assert provider.get_table_rows() == []
-        assert provider.get_raw_output().strip() == ""
+        device_provider = DeviceListTableProvider(config=config)
+        assert device_provider.get_table_rows() == []
+        assert device_provider.get_raw_output().strip() == ""
 
         # Empty groups
-        provider = GroupListTableProvider(config=config)
-        assert provider.get_table_rows() == []
-
-        # Empty sequences config
-        empty_config = NetworkConfig(
-            general=GeneralConfig(backup_dir="/tmp", transport="system"),
-            devices={},
-            device_groups={},
-            global_command_sequences={},
-        )
-        provider = GlobalSequencesTableProvider(config=empty_config)
-        assert provider.get_table_rows() == []
+        group_provider = GroupListTableProvider(config=config)
+        assert group_provider.get_table_rows() == []
 
     @pytest.mark.skip("Complex provider APIs need refactoring")
     def test_none_values_handling(self) -> None:
         """Test providers handle None values in data."""
-        device = DeviceConfig(
-            host="192.168.1.1",
-            device_type="mikrotik_routeros",
-            user="admin",
-            password="password",
-            description=None,  # None value
+        config = NetworkConfig(
+            general=GeneralConfig(),
+            devices={
+                "test_device": DeviceConfig(
+                    host="192.168.1.1",
+                    device_type="mikrotik_routeros",
+                    user="admin",
+                    password="password",
+                    description=None,  # None value
+                )
+            },
+            device_groups={},
         )
 
-        provider = DeviceInfoTableProvider(device_name="test_device", device=device)
+        provider = DeviceInfoTableProvider(config=config, device_name="test_device")
         rows = provider.get_table_rows()
 
         # Should handle None description gracefully
@@ -564,7 +521,6 @@ class TestTableProviderEdgeCases:
                 )
             },
             device_groups={},
-            global_command_sequences={},
         )
 
         provider = DeviceListTableProvider(config=config)

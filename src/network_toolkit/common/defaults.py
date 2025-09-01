@@ -5,13 +5,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from network_toolkit.common.paths import default_modular_config_dir
 
 # Default configuration path used by all commands
-# When this path is used, the system will automatically search:
-# 1. Current working directory for "./config/" or "./devices.yml"
-# 2. Platform-specific user config directory (e.g., ~/.config/networka/)
-DEFAULT_CONFIG_PATH = Path("config")
+# New behavior: only use the platform-specific user config directory
+# (e.g., ~/.config/networka) unless an explicit --config path is provided.
+DEFAULT_CONFIG_PATH = default_modular_config_dir()
 
-# Legacy fallback for backward compatibility
-LEGACY_CONFIG_PATH = Path("devices.yml")
+# Legacy single-file mode has been removed; no legacy path constant

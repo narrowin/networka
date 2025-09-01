@@ -31,13 +31,8 @@ _nw() {
 	local cfg
 	cfg=$(_after_opt --config)
 	[[ -z "$cfg" ]] && cfg=$(_after_opt -c)
-	if [[ -z "$cfg" ]]; then
-		if [[ -d config || -f config/config.yml ]]; then
-			cfg="config"
-		else
-			cfg="devices.yml"
-		fi
-	fi
+	# If no --config specified, let the Python command use its default
+	# (don't hardcode platform-specific paths here)
 
 	# Try to find nw command - check if available, otherwise try python module
 	local nw_cmd=""
@@ -64,52 +59,64 @@ _nw() {
 				fi
 				return ;;
 			devices)
-				# Try the completion command first, then fallback to parsing config
+				# Only use the completion command, no fallback parsing
 				local result
-				result=$($nw_cmd __complete --for devices --config "$cfg" 2>/dev/null)
-				if [[ -n "$result" ]]; then
-					echo "$result"
+				if [[ -n "$cfg" ]]; then
+					result=$($nw_cmd __complete --for devices --config "$cfg" 2>/dev/null)
 				else
-					# Fallback: parse devices.yml directly
-					if [[ -f "$cfg/devices.yml" ]]; then
-						grep -E "^  [a-zA-Z0-9_-]+:" "$cfg/devices.yml" 2>/dev/null | sed 's/^  \([^:]*\):.*/\1/' | tr '\n' ' '
-					elif [[ -f "$cfg" && "$cfg" =~ \.ya?ml$ ]]; then
-						grep -E "^  [a-zA-Z0-9_-]+:" "$cfg" 2>/dev/null | sed 's/^  \([^:]*\):.*/\1/' | tr '\n' ' '
-					fi
+					result=$($nw_cmd __complete --for devices 2>/dev/null)
 				fi
+				echo "$result"
 				return ;;
 			groups)
-				# Try the completion command first, then fallback to parsing config
+				# Only use the completion command, no fallback parsing
 				local result
-				result=$($nw_cmd __complete --for groups --config "$cfg" 2>/dev/null)
-				if [[ -n "$result" ]]; then
-					echo "$result"
+				if [[ -n "$cfg" ]]; then
+					result=$($nw_cmd __complete --for groups --config "$cfg" 2>/dev/null)
 				else
-					# Fallback: parse groups.yml directly
-					if [[ -f "$cfg/groups.yml" ]]; then
-						grep -E "^  [a-zA-Z0-9_-]+:" "$cfg/groups.yml" 2>/dev/null | sed 's/^  \([^:]*\):.*/\1/' | tr '\n' ' '
-					fi
+					result=$($nw_cmd __complete --for groups 2>/dev/null)
 				fi
+				echo "$result"
 				return ;;
 			sequences)
 				local dev="$1"; shift || true
 				local result
 				if [[ -n "$dev" ]]; then
-					result=$($nw_cmd __complete --for sequences --device "$dev" --config "$cfg" 2>/dev/null)
+					if [[ -n "$cfg" ]]; then
+						result=$($nw_cmd __complete --for sequences --device "$dev" --config "$cfg" 2>/dev/null)
+					else
+						result=$($nw_cmd __complete --for sequences --device "$dev" 2>/dev/null)
+					fi
 				else
-					result=$($nw_cmd __complete --for sequences --config "$cfg" 2>/dev/null)
+					if [[ -n "$cfg" ]]; then
+						result=$($nw_cmd __complete --for sequences --config "$cfg" 2>/dev/null)
+					else
+						result=$($nw_cmd __complete --for sequences 2>/dev/null)
+					fi
 				fi
-				if [[ -n "$result" ]]; then
-					echo "$result"
-				else
-					# Fallback: basic sequences
-					echo "system_info interface_status backup_config"
-				fi
+				echo "$result"
 				return ;;
 			sequence-groups)
-				$nw_cmd __complete --for sequence-groups --config "$cfg" 2>/dev/null; return ;;
+				if [[ -n "$cfg" ]]; then
+					$nw_cmd __complete --for sequence-groups --config "$cfg" 2>/dev/null
+				else
+					$nw_cmd __complete --for sequence-groups 2>/dev/null
+				fi
+				return ;;
 			tags)
-				$nw_cmd __complete --for tags --config "$cfg" 2>/dev/null; return ;;
+				if [[ -n "$cfg" ]]; then
+					$nw_cmd __complete --for tags --config "$cfg" 2>/dev/null
+				else
+					$nw_cmd __complete --for tags 2>/dev/null
+				fi
+				return ;;
+			vendors)
+				if [[ -n "$cfg" ]]; then
+					$nw_cmd __complete --for vendors --config "$cfg" 2>/dev/null
+				else
+					$nw_cmd __complete --for vendors 2>/dev/null
+				fi
+				return ;;
 		esac
 	}
 
@@ -161,7 +168,7 @@ _nw() {
 	local list_groups_opts="$output_opts $common_opts"
 	local list_sequences_opts="--vendor --category $output_opts $common_opts"
 	local ssh_opts="--config -c --auth --user --password --layout --session-name --window-name --reuse --sync --no-sync --use-sshpass --attach --no-attach --platform -p --port $common_opts"
-	local info_opts="--interactive-auth -i $output_opts $common_opts"
+	local info_opts="--vendor --interactive-auth -i $output_opts $common_opts"
 	local config_validate_opts="$common_opts"
 	local config_init_opts="$common_opts --force"
 	local diff_opts="$common_opts"
@@ -178,6 +185,14 @@ _nw() {
 				groups=$(_nw_list groups)
 				sequences=$(_nw_list sequences)
 				_opts "$devices $groups $sequences"
+			elif [[ $cur == --vendor=* ]]; then
+				# Complete vendor name after --vendor=
+				local vendors="${cur#--vendor=}"
+				vendors=$(_nw_list vendors)
+				COMPREPLY=( $(compgen -W "$vendors" -- "${cur#--vendor=}") )
+			elif [[ ${COMP_WORDS[COMP_CWORD-1]} == "--vendor" ]]; then
+				# Complete vendor name after --vendor
+				_opts "$(_nw_list vendors)"
 			else
 				_opts "$info_opts"
 			fi

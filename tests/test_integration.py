@@ -228,21 +228,7 @@ class TestModuleStructure:
                 )
             return
 
-        # Fall back to legacy config files
-        legacy_config_files = [
-            "devices.yml",
-            "devices.yaml",
-        ]
-
-        found_config = False
-        for config_file in legacy_config_files:
-            if (project_root / config_file).exists():
-                found_config = True
-                break
-
-        assert found_config, (
-            "No example config file found (neither modular config/ nor legacy devices.yml)"
-        )
+    # No legacy fallback; modular config directory is required for examples
 
 
 class TestEndToEndWorkflow:

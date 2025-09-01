@@ -28,13 +28,6 @@ class TestInfoExtendedFunctionality:
             mock_config = Mock()
             mock_config.devices = None
             mock_config.device_groups = None
-            mock_config.global_command_sequences = {
-                "health_check": Mock(
-                    description="System health check",
-                    commands=["/system/health/print", "/system/resource/print"],
-                    tags=["system", "monitoring"],
-                )
-            }
             mock_load_config.return_value = mock_config
 
             result = runner.invoke(
@@ -345,13 +338,6 @@ class TestInfoExtendedFunctionality:
             mock_config.device_groups = {"test_group": mock_group}
             mock_config.get_group_members.return_value = ["sw-test1"]
 
-            # Mock global sequence
-            mock_config.global_command_sequences = {
-                "test_sequence": Mock(
-                    description="Test sequence", commands=["/test/command"], tags=None
-                )
-            }
-
             # Mock connection params
             mock_config.get_device_connection_params.return_value = {
                 "port": 22,
@@ -395,15 +381,6 @@ class TestInfoExtendedFunctionality:
             mock_config.devices = None
             mock_config.device_groups = None
 
-            # Create sequence with many commands
-            commands = [f"/command/{i}" for i in range(10)]
-            mock_config.global_command_sequences = {
-                "long_sequence": Mock(
-                    description="Long sequence with many commands",
-                    commands=commands,
-                    tags=None,
-                )
-            }
             mock_load_config.return_value = mock_config
 
             result = runner.invoke(

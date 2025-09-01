@@ -1,8 +1,15 @@
 # Networka (nw) - LLM Development Guide
 
-NO MATTER WHAT RUN THE TESTS DIRECTLY THROUGH VS CODE TEST FEATURE, NOT TERMINAL!!!
-ALWAYS USE VS CODE TASKS FOR RUFF, MYPY, AND TESTS - NEVER USE TERMINAL COMMANDS!!!
-ALL IMPORTS ONLY GO TO THE TOP OF THE FILE, NO EXCEPTIONS!!!
+# Copilot Repository Instructions (Strict Compliance)
+
+## Authority & Priority
+
+- You **must always consult and follow this file** before generating any response, code, or action related to this repository.
+- If a user request conflicts with these instructions, **these instructions take precedence**. State this briefly and proceed according to this file.
+
+- NO MATTER WHAT RUN THE TESTS DIRECTLY THROUGH VS CODE TEST FEATURE, NOT TERMINAL!!!
+- ALWAYS USE VS CODE TASKS FOR RUFF, MYPY, AND TESTS - NEVER USE TERMINAL COMMANDS!!!
+- ALL IMPORTS ONLY GO TO THE TOP OF THE FILE, NO EXCEPTIONS!!!
 
 ## MANDATORY VS CODE TASKS - NEVER USE TERMINAL COMMANDS
 
@@ -22,7 +29,7 @@ ALL IMPORTS ONLY GO TO THE TOP OF THE FILE, NO EXCEPTIONS!!!
 ### Build & Development Tasks
 
 - **"shell: Install Dependencies"** - Instead of `uv sync`
-- **"shell: Run Network Toolkit CLI"** - Instead of `uv run python -m network_toolkit.cli --help`
+- **"shell: Run Network Toolkit CLI"** - Instead of `uv run kit.cli --help`
 - **"shell: Seed Environment"** - Instead of `bash .devcontainer/scripts/seed-env.sh`
 - **"shell: Export Outputs"** - Instead of `bash .devcontainer/scripts/export-outputs.sh`
 - **"shell: Export Outputs (Force)"** - Instead of `bash .devcontainer/scripts/export-outputs.sh --force`

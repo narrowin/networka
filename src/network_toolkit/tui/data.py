@@ -130,9 +130,6 @@ class TuiData:
 
     def _discover_all_sequences(self) -> Iterable[str]:
         names: set[str] = set()
-        # Global
-        if self.config.global_command_sequences:
-            names |= set(self.config.global_command_sequences.keys())
         # Vendor via SequenceManager
         for vendor_map in self.sequence_manager.list_all_sequences().values():
             names |= set(vendor_map.keys())

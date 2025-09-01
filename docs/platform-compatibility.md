@@ -27,14 +27,15 @@ CI validates Linux, macOS, and Windows runners across Python 3.11–3.13. For pr
 - No additional system dependencies required
 - Works with all major package managers (apt, yum, dnf, pacman)
 - Container-ready for Docker deployments
+
 ## Tested configurations
 
 CI covers Linux, macOS, and Windows runners across Python 3.11–3.13. For production usage, Linux and macOS are first-class; Windows is best-effort unless using WSL2.
+
 - Scrapli (default transport) is not officially supported on native Windows. It may work via Paramiko or ssh2-python, but the strongly recommended setup is WSL2 (Ubuntu) to provide a POSIX environment.
 - Pre-built wheels for all C extensions
 - No Visual Studio Build Tools required
 - PowerShell and Command Prompt compatible (best-effort); WSL2 is preferred
-
 
 - Scrapli (default transport) is not officially supported on native Windows. It may work via Paramiko or ssh2-python, but the strongly recommended setup is WSL2 (Ubuntu) to provide a POSIX environment.
 - PowerShell and Command Prompt are supported on a best-effort basis; prefer WSL2 for a smoother experience.
@@ -51,11 +52,10 @@ exec $SHELL
 uv tool install git+https://github.com/narrowin/networka.git
 nw --help
 ```
+
 ### Networking Libraries
 
 - **scrapli**: Multi-vendor SSH automation
-- **asyncssh**: Async SSH implementation
-- **paramiko**: SSH2 protocol library
 
 ### Cryptography
 
@@ -64,9 +64,11 @@ nw --help
 - **pynacl**: Networking and cryptography
 
 ### Performance
+
 ## Performance notes
 
 Performance is comparable across Linux and macOS. On Windows, use WSL2 for best results.
+
 - **asyncio**: Cross-platform async support
 
 ## Known Platform Differences

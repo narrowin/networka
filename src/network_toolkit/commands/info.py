@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
 
@@ -21,7 +21,6 @@ from network_toolkit.common.table_generator import BaseTableProvider
 from network_toolkit.common.table_providers import (
     DeviceInfoTableProvider,
     DeviceTypesInfoTableProvider,
-    GlobalSequenceInfoTableProvider,
     GroupInfoTableProvider,
     TransportTypesTableProvider,
     VendorSequenceInfoTableProvider,
@@ -48,6 +47,13 @@ def register(app: typer.Typer) -> None:
             Path,
             typer.Option("--config", "-c", help="Configuration directory or file path"),
         ] = DEFAULT_CONFIG_PATH,
+        vendor: Annotated[
+            str | None,
+            typer.Option(
+                "--vendor",
+                help="Show vendor-specific commands for sequences (e.g., cisco_iosxe, mikrotik_routeros)",
+            ),
+        ] = None,
         output_mode: Annotated[
             OutputMode | None,
             typer.Option(
@@ -78,7 +84,8 @@ def register(app: typer.Typer) -> None:
         - nw info sw-acc1                    # Show device info
         - nw info sw-acc1,sw-acc2           # Show multiple devices
         - nw info access_switches           # Show group info
-        - nw info system_info               # Show sequence info
+        - nw info system_info               # Show sequence info (all vendors)
+        - nw info system_info --vendor cisco_iosxe  # Show vendor-specific commands
         - nw info sw-acc1,access_switches,health_check  # Mixed types
         """
         setup_logging("DEBUG" if verbose else "INFO")
@@ -121,6 +128,20 @@ def register(app: typer.Typer) -> None:
             # Process each target
             known_count = 0
             unknown_count = 0
+            device_count = 0
+
+            # Count devices for header
+            for target in target_list:
+                target_type = _determine_target_type(target, config)
+                if target_type == "device":
+                    device_count += 1
+
+            # Show header for device information if we have devices
+            if device_count > 0:
+                ctx.print_info(
+                    f"Device Information ({device_count} device{'s' if device_count != 1 else ''})"
+                )
+
             for i, target in enumerate(target_list):
                 if i > 0:
                     ctx.print_blank_line()
@@ -134,7 +155,7 @@ def register(app: typer.Typer) -> None:
                     _show_group_info(target, config, ctx)
                     known_count += 1
                 elif target_type == "sequence":
-                    _show_sequence_info(target, config, ctx, verbose)
+                    _show_sequence_info(target, config, ctx, verbose, vendor)
                     known_count += 1
                 else:
                     # Unknown targets should not cause a non-zero exit; warn and continue
@@ -146,7 +167,6 @@ def register(app: typer.Typer) -> None:
             if known_count == 0 and unknown_count > 0:
                 has_devices = bool(getattr(config, "devices", None))
                 has_groups = bool(getattr(config, "device_groups", None))
-                has_global_seq = bool(getattr(config, "global_command_sequences", None))
                 # Inspect vendor sequences to determine if repository provides any
                 sm = SequenceManager(config)
                 all_vendor_sequences = sm.list_all_sequences()
@@ -154,9 +174,7 @@ def register(app: typer.Typer) -> None:
                     bool(v) for v in all_vendor_sequences.values()
                 )
 
-                has_any_definitions = (
-                    has_devices or has_groups or has_global_seq or has_vendor_sequences
-                )
+                has_any_definitions = has_devices or has_groups or has_vendor_sequences
 
                 if has_any_definitions:
                     # Heuristic: treat a single unknown token that doesn't look like a
@@ -219,10 +237,6 @@ def _determine_target_type(target: str, config: NetworkConfig) -> str:
     if config.device_groups and target in config.device_groups:
         return "group"
 
-    # Check if it's a global sequence
-    if config.global_command_sequences and target in config.global_command_sequences:
-        return "sequence"
-
     # Check if it's a vendor sequence
     sm = SequenceManager(config)
     all_sequences = sm.list_all_sequences()
@@ -246,7 +260,10 @@ def _show_device_info(
         return
 
     provider = DeviceInfoTableProvider(
-        config=config, device_name=device, interactive_creds=interactive_creds
+        config=config,
+        device_name=device,
+        interactive_creds=interactive_creds,
+        config_path=ctx.config_file,
     )
     ctx.render_table(provider, verbose)
 
@@ -257,50 +274,71 @@ def _show_group_info(target: str, config: NetworkConfig, ctx: CommandContext) ->
         ctx.print_error(f"Error: Group '{target}' not found in configuration")
         return
 
-    provider = GroupInfoTableProvider(config=config, group_name=target)
+    provider = GroupInfoTableProvider(
+        config=config, group_name=target, config_path=ctx.config_file
+    )
     ctx.render_table(provider, False)
 
 
 def _show_sequence_info(
-    target: str, config: NetworkConfig, ctx: CommandContext, verbose: bool = False
+    target: str,
+    config: NetworkConfig,
+    ctx: CommandContext,
+    verbose: bool = False,
+    vendor: str | None = None,
 ) -> None:
     """Show detailed information for a sequence."""
     provider: BaseTableProvider
 
-    # Check global sequences first
-    if config.global_command_sequences and target in config.global_command_sequences:
-        sequence = config.global_command_sequences[target]
-        provider = GlobalSequenceInfoTableProvider(
-            sequence_name=target, sequence=sequence, verbose=verbose
-        )
-        ctx.render_table(provider, verbose)
-        return
-
     # Check vendor sequences
     sm = SequenceManager(config)
+
+    # If vendor is specified, only look for that vendor's implementation
+    if vendor:
+        vendor_sequences = sm.list_vendor_sequences(vendor)
+        if target in vendor_sequences:
+            sequence_record = vendor_sequences[target]
+            # Keep vendor name in original format
+            provider = VendorSequenceInfoTableProvider(
+                sequence_name=target,
+                sequence_record=sequence_record,
+                vendor_names=[vendor],
+                verbose=verbose,
+                config=config,
+                vendor_specific=True,
+            )
+            ctx.render_table(provider, verbose)
+            return
+        else:
+            ctx.print_error(
+                f"Error: Sequence '{target}' not found for vendor '{vendor}'"
+            )
+            return
+
+    # Original logic for multi-vendor display
     all_sequences = sm.list_all_sequences()
 
     # Find all vendors that implement this sequence
     matching_vendors: list[str] = []
-    sequence_record = None
+    found_sequence_record: Any = None
 
-    for vendor, vendor_sequences in all_sequences.items():
+    for vendor_name, vendor_sequences in all_sequences.items():
         if target in vendor_sequences:
-            matching_vendors.append(vendor)
+            matching_vendors.append(vendor_name)
             # Use the first matching sequence record as the template
             # (they should be the same sequence across vendors)
-            if sequence_record is None:
-                sequence_record = vendor_sequences[target]
+            if found_sequence_record is None:
+                found_sequence_record = vendor_sequences[target]
 
-    if sequence_record:
-        # Format vendor names for display
-        vendor_names = [vendor.replace("_", " ").title() for vendor in matching_vendors]
-
+    if found_sequence_record:
+        # Keep vendor names in original format for consistency with --vendor flag
         provider = VendorSequenceInfoTableProvider(
             sequence_name=target,
-            sequence_record=sequence_record,
-            vendor_names=vendor_names,
+            sequence_record=found_sequence_record,
+            vendor_names=matching_vendors,
             verbose=verbose,
+            config=config,
+            vendor_specific=False,
         )
         ctx.render_table(provider, verbose)
         return
@@ -333,9 +371,9 @@ def _get_credential_source(
     dev = config.devices.get(device_name) if config.devices else None
     if dev:
         if credential_type == "username" and getattr(dev, "user", None):
-            return "device config file (config/devices/devices.yml)"
+            return "device config file (devices/devices.yml)"
         if credential_type == "password" and getattr(dev, "password", None):
-            return "device config file (config/devices/devices.yml)"
+            return "device config file (devices/devices.yml)"
 
     # Check device-specific environment variables
     env_var_name = (
@@ -357,9 +395,9 @@ def _get_credential_source(
             )
             if group and group.credentials:
                 if credential_type == "username" and group.credentials.user:
-                    return f"group config file config/groups/groups.yml ({group_name})"
+                    return f"group config file groups/groups.yml ({group_name})"
                 elif credential_type == "password" and group.credentials.password:
-                    return f"group config file config/groups/groups.yml ({group_name})"
+                    return f"group config file groups/groups.yml ({group_name})"
 
             # Check group environment variable
             if EnvironmentCredentialManager.get_group_specific(

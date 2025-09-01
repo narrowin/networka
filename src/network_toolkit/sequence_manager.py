@@ -9,9 +9,6 @@ Resolution order (highest wins):
 1. User-defined vendor sequences (override/extend)
 2. Repo-provided vendor sequences from config/
 3. Built-in sequences shipped with the package
-4. Global sequences from config (NetworkConfig.global_command_sequences)
-
-Global sequences remain available by name and are resolved before vendor/device ones.
 """
 
 from __future__ import annotations
@@ -28,7 +25,7 @@ from network_toolkit.config import NetworkConfig, VendorSequence
 
 @dataclass(frozen=True)
 class SequenceSource:
-    origin: str  # "builtin" | "repo" | "user" | "global"
+    origin: str  # "builtin" | "repo" | "user"
     path: Path | None
 
 
@@ -92,18 +89,10 @@ class SequenceManager:
         """Resolve a sequence to a list of commands with precedence.
 
         Order:
-        1. Global sequences from config
-        2. Vendor sequences based on device_type via user > repo > builtin > config.vendor_sequences
-        3. Device-specific sequences (legacy) via NetworkConfig
+        1. Vendor sequences based on device_type via user > repo > builtin > config.vendor_sequences
+        2. Device-specific sequences (legacy) via NetworkConfig
         """
-        # 1. Global
-        if (
-            self.config.global_command_sequences
-            and sequence_name in self.config.global_command_sequences
-        ):
-            return list(self.config.global_command_sequences[sequence_name].commands)
-
-        # 2. Vendor-based
+        # 1. Vendor-based
         vendor = None
         if device_name and self.config.devices and device_name in self.config.devices:
             vendor = self.config.devices[device_name].device_type
@@ -112,7 +101,7 @@ class SequenceManager:
             if sequence_name in merged:
                 return list(merged[sequence_name].commands)
 
-        # 3. Device-defined
+        # 2. Device-defined
         if self.config.devices:
             for dev in self.config.devices.values():
                 if dev.command_sequences and sequence_name in dev.command_sequences:
@@ -120,12 +109,7 @@ class SequenceManager:
         return None
 
     def exists(self, sequence_name: str) -> bool:
-        """Return True if a sequence is known anywhere (global, vendor, or device)."""
-        if (
-            self.config.global_command_sequences
-            and sequence_name in self.config.global_command_sequences
-        ):
-            return True
+        """Return True if a sequence is known anywhere (vendor or device)."""
         # Any vendor layer
         all_vendor = self.list_all_sequences()
         for vendor_map in all_vendor.values():

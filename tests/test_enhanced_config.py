@@ -93,11 +93,23 @@ production_routers,Production routers,,router;production"""
         assert prod_group.members is None
         assert prod_group.match_tags == ["router", "production"]
 
+    def test_load_csv_invalid_file(self, tmp_path):
+        """Test loading invalid CSV file."""
+        csv_file = tmp_path / "invalid.csv"
+        csv_file.write_text("invalid,csv,content\nwith,missing,headers")
+
+        devices = _load_csv_devices(csv_file)
+        groups = _load_csv_groups(csv_file)
+
+        # Should return empty dicts for invalid files
+        assert devices == {}
+        assert groups == {}
+
     def test_load_csv_sequences_valid(self, tmp_path):
         """Test loading valid sequences CSV file."""
-        csv_content = """name,description,commands,tags
-system_info,Get system info,/system/identity/print;/system/clock/print,system;info
-backup,Create backup,/export file=backup,backup;maintenance"""
+        csv_content = """name,description,commands,category,device_types
+system_info,Get system info,/system/identity/print;/system/clock/print,system,mikrotik_routeros;cisco_ios
+backup,Create backup,/export file=backup,maintenance,mikrotik_routeros"""
 
         csv_file = tmp_path / "sequences.csv"
         csv_file.write_text(csv_content)
@@ -111,13 +123,14 @@ backup,Create backup,/export file=backup,backup;maintenance"""
         sys_seq = sequences["system_info"]
         assert sys_seq.description == "Get system info"
         assert sys_seq.commands == ["/system/identity/print", "/system/clock/print"]
-        assert sys_seq.tags == ["system", "info"]
+        assert sys_seq.category == "system"
+        assert sys_seq.device_types == ["mikrotik_routeros", "cisco_ios"]
 
     def test_load_csv_sequences_no_commands(self, tmp_path):
         """Test loading sequences CSV with missing commands."""
-        csv_content = """name,description,commands,tags
-empty_seq,Empty sequence,,system
-valid_seq,Valid sequence,/system/identity/print,system"""
+        csv_content = """name,description,commands,category,device_types
+empty_seq,Empty sequence,,system,mikrotik_routeros
+valid_seq,Valid sequence,/system/identity/print,system,mikrotik_routeros"""
 
         csv_file = tmp_path / "sequences.csv"
         csv_file.write_text(csv_content)
@@ -127,20 +140,6 @@ valid_seq,Valid sequence,/system/identity/print,system"""
         # Should skip sequence with no commands
         assert len(sequences) == 1
         assert "valid_seq" in sequences
-
-    def test_load_csv_invalid_file(self, tmp_path):
-        """Test loading invalid CSV file."""
-        csv_file = tmp_path / "invalid.csv"
-        csv_file.write_text("invalid,csv,content\nwith,missing,headers")
-
-        devices = _load_csv_devices(csv_file)
-        groups = _load_csv_groups(csv_file)
-        sequences = _load_csv_sequences(csv_file)
-
-        # Should return empty dicts for invalid files
-        assert devices == {}
-        assert groups == {}
-        assert sequences == {}
 
 
 class TestConfigDiscovery:

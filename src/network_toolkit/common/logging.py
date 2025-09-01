@@ -36,8 +36,36 @@ def setup_logging(level: str = "INFO") -> None:
     level : str
         Logging level name (DEBUG, INFO, WARNING, ERROR, CRITICAL)
     """
+    from network_toolkit.common.output import OutputMode
+
+    # Check if we're in raw mode - if so, disable logging entirely
+    output_manager = get_output_manager()
+    if output_manager.mode == OutputMode.RAW:
+        # In raw mode, disable all logging to avoid polluting the output
+        # Set the root logger to a very high level to suppress everything
+        logging.basicConfig(
+            level=logging.CRITICAL + 1,  # Disable all logging
+            handlers=[],
+        )
+
+        # Also explicitly silence common noisy loggers
+        for logger_name in [
+            "scrapli",
+            "scrapli.driver",
+            "scrapli.channel",
+            "scrapli.transport",
+            "scrapli_community",
+            "network_toolkit.device",
+            "network_toolkit.transport",
+        ]:
+            logger = logging.getLogger(logger_name)
+            logger.setLevel(logging.CRITICAL + 1)
+            logger.disabled = True
+
+        return
+
     # Always pull the current themed console at setup time
-    console_obj = get_output_manager().console
+    console_obj = output_manager.console
 
     logging.basicConfig(
         level=getattr(logging, level.upper(), logging.INFO),

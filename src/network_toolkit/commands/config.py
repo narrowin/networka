@@ -34,8 +34,8 @@ def _discover_config_metadata(original: Path) -> dict[str, object]:
     """Discover where config was loaded from and which files are involved.
 
     Mirrors the resolution logic in `load_config` to report:
-    - mode: "modular" or "legacy"
-    - root: Path of the modular root directory or the legacy file path
+    - mode: "modular"
+    - root: Path of the modular root directory
     - files: list[Path] of relevant files that were validated
     - display_name: user-facing name for the target (keep "config" when used)
     """
@@ -60,21 +60,10 @@ def _discover_config_metadata(original: Path) -> dict[str, object]:
         return files
 
     # Resolution logic (aligned with config.load_config)
-    # 1) Explicit "config" directory
-    if path.name in ["config", "config/"] and path.exists():
-        root = path
-        return {
-            "mode": "modular",
-            "root": root.resolve(),
-            "files": collect_modular_files(root),
-            "display_name": display_name,
-        }
-
-    # 2) Directory input with direct modular files
+    # 1) Directory input with direct modular files
     if path.exists() and path.is_dir():
         direct_cfg = path / "config.yml"
-        direct_dev = path / "devices.yml"
-        if direct_cfg.exists() and direct_dev.exists():
+        if direct_cfg.exists():
             root = path
             return {
                 "mode": "modular",
@@ -82,29 +71,23 @@ def _discover_config_metadata(original: Path) -> dict[str, object]:
                 "files": collect_modular_files(root),
                 "display_name": display_name,
             }
-        # Nested config directory next to provided path
-        cfg_dir = path / "config"
-        if cfg_dir.exists():
-            root = cfg_dir
-            return {
-                "mode": "modular",
-                "root": root.resolve(),
-                "files": collect_modular_files(root),
-                "display_name": display_name,
-            }
 
-    # 3) Legacy file directly
-    if path.exists() and path.is_file():
+    # 2) Direct config.yml file path
+    if (
+        path.exists()
+        and path.is_file()
+        and path.name.lower() in {"config.yml", "config.yaml"}
+    ):
+        root = path.parent
         return {
-            "mode": "legacy",
-            "root": path.resolve(),
-            "files": [path.resolve()],
+            "mode": "modular",
+            "root": root.resolve(),
+            "files": collect_modular_files(root),
             "display_name": display_name,
         }
 
-    # 4) Fallbacks for default names (platform/user cwd)
-    if str(path) in ["config", "devices.yml"]:
-        # Prefer platform default modular directory
+    # 3) Fallback to platform default modular directory for default token
+    if str(path) in ["config"]:
         platform_default = default_modular_config_dir()
         cfg_yaml = platform_default / "config.yml"
         if cfg_yaml.exists():
@@ -115,26 +98,7 @@ def _discover_config_metadata(original: Path) -> dict[str, object]:
                 "files": collect_modular_files(root),
                 "display_name": display_name,
             }
-
-        # Current working directory fallbacks
-        cwd_cfg_yaml = Path("config/config.yml")
-        if cwd_cfg_yaml.exists():
-            root = cwd_cfg_yaml.parent
-            return {
-                "mode": "modular",
-                "root": root.resolve(),
-                "files": collect_modular_files(root),
-                "display_name": display_name,
-            }
-
-        cwd_legacy = Path("devices.yml")
-        if cwd_legacy.exists():
-            return {
-                "mode": "legacy",
-                "root": cwd_legacy.resolve(),
-                "files": [cwd_legacy.resolve()],
-                "display_name": display_name,
-            }
+        # No cwd based fallbacks anymore
 
     # 5) Final attempt similar to load_config last check
     platform_default = default_modular_config_dir()
@@ -655,6 +619,7 @@ def _config_init_impl(
             target_path = Path(user_input).expanduser().resolve()
 
     # Check if configuration already exists and handle force flag
+    skip_base_config = False
     if target_path.exists() and any(target_path.iterdir()) and not force:
         if yes:
             # In --yes mode, we proceed without prompting (same as if user said yes)
@@ -666,37 +631,43 @@ def _config_init_impl(
                 default=False,
             )
             if not overwrite:
-                ctx.print_info("Configuration initialization cancelled.")
-                raise typer.Exit(0)
+                ctx.print_info("Skipping base configuration setup (directory exists).")
+                skip_base_config = True
 
     if dry_run:
         ctx.print_info(f"DRY RUN: Would create configuration in {target_path}")
+        if not skip_base_config:
+            ctx.print_info("DRY RUN: Would also ask about optional features")
         return
 
-    # Create directory structure
-    target_path.mkdir(parents=True, exist_ok=True)
-    (target_path / "devices").mkdir(exist_ok=True)
-    (target_path / "groups").mkdir(exist_ok=True)
-    (target_path / "sequences").mkdir(exist_ok=True)
+    # Create directory structure and base config only if not skipping
+    if not skip_base_config:
+        target_path.mkdir(parents=True, exist_ok=True)
+        (target_path / "devices").mkdir(exist_ok=True)
+        (target_path / "groups").mkdir(exist_ok=True)
+        (target_path / "sequences").mkdir(exist_ok=True)
 
-    # Create core configuration files
-    ctx.print_info("Creating configuration files...")
-    create_env_file(target_path)
-    ctx.print_success(f"Created credential template: {target_path / '.env'}")
+        # Create core configuration files
+        ctx.print_info("Creating configuration files...")
+        create_env_file(target_path)
+        ctx.print_success(f"Created credential template: {target_path / '.env'}")
 
-    create_config_yml(target_path)
-    ctx.print_success(f"Created main configuration: {target_path / 'config.yml'}")
+        create_config_yml(target_path)
+        ctx.print_success(f"Created main configuration: {target_path / 'config.yml'}")
 
-    create_example_devices(target_path / "devices")
-    ctx.print_success(f"Created example devices: {target_path / 'devices'}")
+        create_example_devices(target_path / "devices")
+        ctx.print_success(f"Created example devices: {target_path / 'devices'}")
 
-    create_example_groups(target_path / "groups")
-    ctx.print_success(f"Created example groups: {target_path / 'groups'}")
+        create_example_groups(target_path / "groups")
+        ctx.print_success(f"Created example groups: {target_path / 'groups'}")
 
-    create_example_sequences(target_path / "sequences")
-    ctx.print_success(f"Created example sequences: {target_path / 'sequences'}")
+        create_example_sequences(target_path / "sequences")
+        ctx.print_success(f"Created example sequences: {target_path / 'sequences'}")
 
-    ctx.print_success(f"Base configuration initialized in {target_path}")
+        ctx.print_success(f"Base configuration initialized in {target_path}")
+    else:
+        # Ensure the target path exists for optional features
+        target_path.mkdir(parents=True, exist_ok=True)
 
     # Handle optional features
     default_seq_repo = "https://github.com/narrowin/networka.git"
@@ -716,18 +687,13 @@ def _config_init_impl(
             default=True,
         )
 
+    # Group all shell completion questions together
+    chosen_shell = None
+    do_activate_compl = False
     if install_completions is not None:
         do_install_compl = install_completions
     elif interactive_extras:
         do_install_compl = typer.confirm("Install shell completions?", default=True)
-
-    if install_schemas is not None:
-        do_install_schemas = install_schemas
-    elif interactive_extras:
-        do_install_schemas = typer.confirm(
-            "Install JSON schemas for YAML editor validation and auto-completion?",
-            default=True,
-        )
 
     if do_install_compl:
         detected = (
@@ -751,6 +717,14 @@ def _config_init_impl(
                 f"Activate {chosen_shell} completions by updating your shell profile?",
                 default=True,
             )
+
+    if install_schemas is not None:
+        do_install_schemas = install_schemas
+    elif interactive_extras:
+        do_install_schemas = typer.confirm(
+            "Install JSON schemas for YAML editor validation and auto-completion?",
+            default=True,
+        )
 
     # Execute optional installations
     if do_install_sequences:
@@ -834,7 +808,7 @@ def _config_validate_impl(
         output_manager.print_info(f"Validating Configuration: {display_name}")
         if isinstance(resolved_root, Path):
             output_manager.print_info(f"Path: {resolved_root}")
-        if isinstance(mode, str) and mode in {"modular", "legacy"}:
+        if isinstance(mode, str) and mode in {"modular"}:
             output_manager.print_info(f"Mode: {mode}")
         if isinstance(files, list) and files:
             output_manager.print_info("Files:")
@@ -848,15 +822,9 @@ def _config_validate_impl(
 
         device_count = len(config.devices) if config.devices else 0
         group_count = len(config.device_groups) if config.device_groups else 0
-        global_seq_count = (
-            len(config.global_command_sequences)
-            if config.global_command_sequences
-            else 0
-        )
 
         output_manager.print_info(f"Devices: {device_count}")
         output_manager.print_info(f"Device Groups: {group_count}")
-        output_manager.print_info(f"Global Sequences: {global_seq_count}")
 
         if verbose and device_count > 0 and config.devices:
             output_manager.print_blank_line()

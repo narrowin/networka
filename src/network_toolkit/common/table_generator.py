@@ -112,12 +112,19 @@ class TableGenerator:
         self.output_manager.print_table(table)
         self.output_manager.print_blank_line()
 
-        # Print summary
-        self.output_manager.print_text(
-            self.style_manager.format_message(
-                f"Total items: {len(rows)}", StyleName.INFO
-            )
+        # Print summary (only for list-type tables, not single-item info)
+        # Single-item info tables have titles like "Device: name", "Group: name", etc.
+        is_single_item_info = any(
+            definition.title.startswith(prefix)
+            for prefix in ["Device:", "Group:", "Vendor Sequence:", "Global Sequence:"]
         )
+
+        if not is_single_item_info:
+            self.output_manager.print_text(
+                self.style_manager.format_message(
+                    f"Total items: {len(rows)}", StyleName.INFO
+                )
+            )
 
         # Print verbose information if requested
         if verbose:

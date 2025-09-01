@@ -152,7 +152,7 @@ nw run --config <TAB><TAB>
 The completion scripts automatically detect your configuration file:
 
 1. Looks for `--config` or `-c` options in the current command
-2. Falls back to `devices.yml` in the current directory
+2. Uses the modular config directory (no single-file fallback)
 3. Asks the CLI for suggestions via a hidden `__complete` command
 
 ## Advanced Features
@@ -223,12 +223,12 @@ The completion gracefully handles:
 2. **Check file permissions:**
 
    ```bash
-   ls -la devices.yml
+   ls -la config/
    ```
 
 3. **Test with explicit config:**
    ```bash
-   nw --config /path/to/devices.yml info <TAB>
+   nw --config /path/to/config info <TAB>
    ```
 
 ### Performance Issues

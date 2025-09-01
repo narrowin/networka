@@ -54,7 +54,7 @@ Command completed successfully on sw-acc1
 
 1. **Interactive credentials** (highest priority) - When `--interactive-auth` is used
 2. **Environment variables** - `NW_USER_DEFAULT`, `NW_PASSWORD_DEFAULT`, device-specific overrides
-3. **Configuration file** - Default credentials in `devices.yml` (discouraged)
+3. **Configuration file** - Defaults in modular `config.yml` (discouraged)
 
 ### Error Handling
 

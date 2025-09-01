@@ -13,14 +13,62 @@ from typing import Any, cast
 
 import yaml
 from dotenv import load_dotenv
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, PrivateAttr, field_validator
 
-from network_toolkit.common.paths import default_modular_config_dir
+from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
+
+# from network_toolkit.common.paths import default_modular_config_dir
 from network_toolkit.credentials import (
     ConnectionParameterBuilder,
     EnvironmentCredentialManager,
 )
 from network_toolkit.exceptions import NetworkToolkitError
+
+
+def _resolve_fallback_config_path(original_hint: Path | None = None) -> Path | None:
+    """Best-effort fallback discovery for a modular config directory.
+
+    Order:
+    1) NW_CONFIG_DIR environment variable, if it exists
+    2) Search upwards from current working directory for a folder named 'config'
+    3) If an original hint is provided, search upwards from that location as well
+
+    Returns a Path to a directory if found, otherwise None.
+    """
+    # 1) Explicit environment override
+    env_dir = os.environ.get("NW_CONFIG_DIR")
+    if env_dir:
+        p = Path(env_dir)
+        if p.exists() and p.is_dir():
+            return p
+
+    def search_up(start: Path) -> Path | None:
+        cur = start
+        seen = 0
+        while True:
+            candidate = cur / "config"
+            if candidate.exists() and candidate.is_dir():
+                return candidate
+            if cur.parent == cur or seen > 12:  # avoid deep walks
+                return None
+            cur = cur.parent
+            seen += 1
+
+    # 2) From CWD
+    cwd_found = search_up(Path.cwd())
+    if cwd_found is not None:
+        return cwd_found
+
+    # 3) From original hint
+    if original_hint is not None:
+        try:
+            hint_found = search_up(original_hint.resolve())
+        except Exception:
+            hint_found = None
+        if hint_found is not None:
+            return hint_found
+
+    return None
 
 
 def load_dotenv_files(config_path: Path | None = None) -> None:
@@ -216,6 +264,13 @@ class DeviceConfig(BaseModel):
     overrides: DeviceOverrides | None = None
     command_sequences: dict[str, list[str]] | None = None
 
+    # Private: where this device was loaded from
+    _source_path: Path | None = PrivateAttr(default=None)
+
+    def set_source_path(self, path: Path) -> None:
+        """Set the source path where this device was defined."""
+        self._source_path = path
+
 
 class GroupCredentials(BaseModel):
     """Group-level credential configuration."""
@@ -231,6 +286,13 @@ class DeviceGroup(BaseModel):
     members: list[str] | None = None
     match_tags: list[str] | None = None
     credentials: GroupCredentials | None = None
+
+    # Private: where this group was loaded from
+    _source_path: Path | None = PrivateAttr(default=None)
+
+    def set_source_path(self, path: Path) -> None:
+        """Set the source path where this group was defined."""
+        self._source_path = path
 
 
 class VendorPlatformConfig(BaseModel):
@@ -250,14 +312,12 @@ class VendorSequence(BaseModel):
     device_types: list[str] | None = None
     commands: list[str]
 
+    # Private: where this vendor sequence was loaded from
+    _source_path: Path | None = PrivateAttr(default=None)
 
-class CommandSequence(BaseModel):
-    """Global command sequence definition."""
-
-    description: str
-    commands: list[str]
-    tags: list[str] | None = None
-    file_operations: dict[str, Any] | None = None
+    def set_source_path(self, path: Path) -> None:
+        """Set the source path where this vendor sequence was defined."""
+        self._source_path = path
 
 
 class CommandSequenceGroup(BaseModel):
@@ -285,13 +345,26 @@ class NetworkConfig(BaseModel):
     general: GeneralConfig = GeneralConfig()
     devices: dict[str, DeviceConfig] | None = None
     device_groups: dict[str, DeviceGroup] | None = None
-    global_command_sequences: dict[str, CommandSequence] | None = None
     command_sequence_groups: dict[str, CommandSequenceGroup] | None = None
     file_operations: dict[str, FileOperationConfig] | None = None
 
     # Multi-vendor support
     vendor_platforms: dict[str, VendorPlatformConfig] | None = None
     vendor_sequences: dict[str, dict[str, VendorSequence]] | None = None
+
+    # Helper: device source path accessor (non-schema, uses PrivateAttr on DeviceConfig)
+    def get_device_source_path(self, device_name: str) -> Path | None:
+        dev = self.devices.get(device_name) if self.devices else None
+        if dev is None:
+            return None
+        return getattr(dev, "_source_path", None)
+
+    # Helper: group source path accessor (non-schema, uses PrivateAttr on DeviceGroup)
+    def get_group_source_path(self, group_name: str) -> Path | None:
+        grp = self.device_groups.get(group_name) if self.device_groups else None
+        if grp is None:
+            return None
+        return getattr(grp, "_source_path", None)
 
     def get_device_connection_params(
         self,
@@ -378,32 +451,6 @@ class NetworkConfig(BaseModel):
         device = self.devices[device_name]
         return device.transport_type or self.general.default_transport_type
 
-    def get_command_sequences_by_tags(
-        self, tags: list[str]
-    ) -> dict[str, CommandSequence]:
-        """
-        Get command sequences that match any of the specified tags.
-
-        Parameters
-        ----------
-        tags : list[str]
-            List of tags to match against
-
-        Returns
-        -------
-        dict[str, CommandSequence]
-            Dictionary of sequence names to CommandSequence objects that match the tags
-        """
-        if not self.global_command_sequences:
-            return {}
-
-        matching_sequences: dict[str, CommandSequence] = {}
-        for sequence_name, sequence in self.global_command_sequences.items():
-            if sequence.tags and any(tag in sequence.tags for tag in tags):
-                matching_sequences[sequence_name] = sequence
-
-        return matching_sequences
-
     def list_command_sequence_groups(self) -> dict[str, CommandSequenceGroup]:
         """
         List all available command sequence groups.
@@ -414,127 +461,6 @@ class NetworkConfig(BaseModel):
             Dictionary of group names to CommandSequenceGroup objects
         """
         return self.command_sequence_groups or {}
-
-    def get_command_sequences_by_group(
-        self, group_name: str
-    ) -> dict[str, CommandSequence]:
-        """
-        Get command sequences that match a specific group's tags.
-
-        Parameters
-        ----------
-        group_name : str
-            Name of the command sequence group
-
-        Returns
-        -------
-        dict[str, CommandSequence]
-            Dictionary of sequence names to CommandSequence objects that match the group's tags
-
-        Raises
-        ------
-        ValueError
-            If the group doesn't exist
-        """
-        if (
-            not self.command_sequence_groups
-            or group_name not in self.command_sequence_groups
-        ):
-            msg = f"Command sequence group '{group_name}' not found in configuration"
-            raise ValueError(msg)
-
-        group = self.command_sequence_groups[group_name]
-        return self.get_command_sequences_by_tags(group.match_tags)
-
-    # --- New unified sequence helpers ---
-    def get_all_sequences(self) -> dict[str, dict[str, Any]]:
-        """Return all available sequences from global and device-specific configs.
-
-        Returns
-        -------
-        dict[str, dict]
-            Mapping of sequence name -> info dict with keys:
-            - commands: list[str]
-            - origin: "global" | "device"
-            - sources: list[str] (device names if origin == "device", or ["global"])
-            - description: str | None (only for global sequences)
-        """
-        sequences: dict[str, dict[str, Any]] = {}
-
-        # Add global sequences first (these take precedence)
-        if self.global_command_sequences:
-            for name, seq in self.global_command_sequences.items():
-                sequences[name] = {
-                    "commands": list(seq.commands),
-                    "origin": "global",
-                    "sources": ["global"],
-                    "description": getattr(seq, "description", None),
-                }
-
-        # Add device-specific sequences if not already defined globally
-        if self.devices:
-            for dev_name, dev in self.devices.items():
-                if not dev.command_sequences:
-                    continue
-                for name, commands in dev.command_sequences.items():
-                    if name not in sequences:
-                        sequences[name] = {
-                            "commands": list(commands),
-                            "origin": "device",
-                            "sources": [dev_name],
-                            "description": None,
-                        }
-                    elif sequences[name]["origin"] == "device":
-                        # Track additional device sources for same-named sequence
-                        sources = sequences[name].setdefault("sources", [])
-                        if dev_name not in sources:
-                            sources.append(dev_name)
-        return sequences
-
-    def resolve_sequence_commands(
-        self, sequence_name: str, device_name: str | None = None
-    ) -> list[str] | None:
-        """Resolve commands for a sequence name from any origin.
-
-        Parameters
-        ----------
-        sequence_name : str
-            Name of the sequence to resolve
-        device_name : str | None
-            Device name to use for vendor-specific sequence resolution
-
-        Returns
-        -------
-        list[str] | None
-            List of commands for the sequence, or None if not found
-
-        Resolution order:
-        1. Global sequence definitions (highest priority)
-        2. Vendor-specific sequences based on device's device_type
-        3. Device-specific sequences (lowest priority)
-        """
-        # 1. Prefer global definition
-        if (
-            self.global_command_sequences
-            and sequence_name in self.global_command_sequences
-        ):
-            return list(self.global_command_sequences[sequence_name].commands)
-
-        # 2. Look for vendor-specific sequences
-        if device_name and self.devices and device_name in self.devices:
-            device = self.devices[device_name]
-            vendor_commands = self._resolve_vendor_sequence(
-                sequence_name, device.device_type
-            )
-            if vendor_commands:
-                return vendor_commands
-
-        # 3. Fall back to any device-defined sequence
-        if self.devices:
-            for dev in self.devices.values():
-                if dev.command_sequences and sequence_name in dev.command_sequences:
-                    return list(dev.command_sequences[sequence_name])
-        return None
 
     def _resolve_vendor_sequence(
         self, sequence_name: str, device_type: str
@@ -757,14 +683,14 @@ def _load_csv_groups(csv_path: Path) -> dict[str, DeviceGroup]:
         return {}
 
 
-def _load_csv_sequences(csv_path: Path) -> dict[str, CommandSequence]:
+def _load_csv_sequences(csv_path: Path) -> dict[str, VendorSequence]:
     """
     Load command sequence configurations from CSV file.
 
-    Expected CSV headers: name,description,commands,tags
-    Commands and tags should be semicolon-separated.
+    Expected CSV headers: name,description,commands,category,device_types
+    Commands and device_types should be semicolon-separated.
     """
-    sequences: dict[str, CommandSequence] = {}
+    sequences: dict[str, VendorSequence] = {}
 
     try:
         with csv_path.open("r", encoding="utf-8") as f:
@@ -777,26 +703,26 @@ def _load_csv_sequences(csv_path: Path) -> dict[str, CommandSequence]:
 
                 # Parse commands from semicolon-separated string
                 commands_str = row.get("commands", "").strip()
+                if not commands_str:
+                    continue  # Skip sequences without commands
+
                 commands = [
                     cmd.strip() for cmd in commands_str.split(";") if cmd.strip()
                 ]
 
-                if not commands:
-                    logging.warning(f"Sequence '{name}' has no commands, skipping")
-                    continue
-
-                # Parse tags from semicolon-separated string
-                tags_str = row.get("tags", "").strip()
-                tags = (
-                    [tag.strip() for tag in tags_str.split(";") if tag.strip()]
-                    if tags_str
+                # Parse device_types from semicolon-separated string
+                device_types_str = row.get("device_types", "").strip()
+                device_types = (
+                    [dt.strip() for dt in device_types_str.split(";") if dt.strip()]
+                    if device_types_str
                     else None
                 )
 
-                sequence_config = CommandSequence(
+                sequence_config = VendorSequence(
                     description=row.get("description", "").strip(),
                     commands=commands,
-                    tags=tags,
+                    category=row.get("category", "").strip() or None,
+                    device_types=device_types,
                 )
 
                 sequences[name] = sequence_config
@@ -876,86 +802,84 @@ def _merge_configs(
 
 def load_config(config_path: str | Path) -> NetworkConfig:
     """
-    Load and validate configuration from modular directory structure.
+    Load and validate configuration.
 
-    The config_path must be a directory containing modular config files:
-    - config.yml (general configuration)
-    - devices/ directory with device configs
-    - groups/ directory with group configs (optional)
-    - sequences/ directory with sequence configs (optional)
+    Supported mode:
+    - Modular directory: a directory containing config.yml and optional
+      devices/, groups/, sequences/ subdirs and/or companion YAML/CSV files.
+      If a directory is supplied, it must contain config.yml. Missing
+      config.yml raises FileNotFoundError("Main config file not found").
 
-    Additionally loads environment variables from .env files before loading config.
-    Auto-exports JSON schemas for editor validation when working in a project directory.
+    Additionally, passing a direct path to a config.yml file is supported and
+    will be treated as the parent directory in modular mode.
+
+    Legacy single-file YAML mode is not supported.
+
+    When no --config is provided elsewhere, callers should pass DEFAULT_CONFIG_PATH.
+    If the default user config directory does not exist, we will fall back to
+    discovering a local 'config' directory relative to the current working
+    directory (or its ancestors), or NW_CONFIG_DIR if set.
     """
+
+    # Normalize input
     config_path = Path(config_path)
-    original_path = config_path  # Keep track of original user input
 
-    # Load .env files first to make environment variables available for credential resolution
-    load_dotenv_files(config_path)
-
-    # Handle default path "config" - check current directory first, then fall back to platform default
-    if config_path.name in ["config", "config/"]:
-        # First try current directory
-        if config_path.exists() and config_path.is_dir():
-            config = load_modular_config(config_path)
-            _auto_export_schemas_if_project()
-            return config
-        # Fall through to platform default logic below
-
-    # If user provided an explicit path that doesn't exist, fail immediately
-    if not config_path.exists() and str(original_path) != "config":
-        msg = f"Configuration directory not found: {config_path}"
-        raise FileNotFoundError(msg)
-
-    # Check if config_path is a directory with modular config structure
-    if config_path.is_dir():
-        # Support directories that directly contain the modular files (config.yml, devices/, ...)
-        direct_config_file = config_path / "config.yml"
-        if direct_config_file.exists():
-            config = load_modular_config(config_path)
-            _auto_export_schemas_if_project()
-            return config
-
-        # Also support nested "config/" directory inside the provided directory
-        nested_config_dir = config_path / "config"
-        if nested_config_dir.exists() and nested_config_dir.is_dir():
-            nested_config_file = nested_config_dir / "config.yml"
-            if nested_config_file.exists():
-                config = load_modular_config(nested_config_dir)
+    # If caller passed the default sentinel path, honor NW_CONFIG_DIR explicitly
+    # so tests and callers can force a specific config/ directory regardless of
+    # whether a user-level DEFAULT_CONFIG_PATH exists.
+    if config_path == DEFAULT_CONFIG_PATH:
+        env_dir = os.environ.get("NW_CONFIG_DIR")
+        if env_dir:
+            env_path = Path(env_dir)
+            if env_path.exists() and env_path.is_dir():
+                # Load .env using the discovered directory and proceed as modular config
+                load_dotenv_files(env_path)
+                config = load_modular_config(env_path)
                 _auto_export_schemas_if_project()
                 return config
 
-    # If config_path is a file, reject it - we only support directories
-    if config_path.exists() and config_path.is_file():
-        msg = f"Configuration path must be a directory, not a file: {config_path}"
-        raise ValueError(msg)
+        # For DEFAULT_CONFIG_PATH, only use the explicit default path
+        # Do NOT search for local config/ directories
+        # This ensures consistent behavior across different working directories
 
-    # Only try fallback paths for default config name
-    if str(original_path) == "config":
-        # Try current working directory first
-        cwd_config = Path("config")
-        if (
-            cwd_config.exists()
-            and cwd_config.is_dir()
-            and (cwd_config / "config.yml").exists()
-        ):
-            config = load_modular_config(cwd_config)
+    # Load .env files to make environment variables available for credential resolution
+    # using the original hint path. This happens after the NW_CONFIG_DIR fast path above.
+    load_dotenv_files(config_path)
+
+    # When path doesn't exist, provide file vs dir specific messaging
+    if not config_path.exists():
+        # Explicit file path provided
+        if config_path.suffix.lower() in {".yml", ".yaml"}:
+            msg = f"Configuration file not found: {config_path}"
+            raise FileNotFoundError(msg)
+        # Default path missing — surface clearly but without probing CWD
+        if config_path == DEFAULT_CONFIG_PATH:
+            # For DEFAULT_CONFIG_PATH, do not attempt fallback discovery
+            # This ensures consistent behavior regardless of working directory
+            msg = f"Configuration directory not found: {config_path}"
+            raise FileNotFoundError(msg)
+        msg = f"Configuration path not found: {config_path}"
+        raise FileNotFoundError(msg)
+
+    # Direct file path: treat any *.yml/*.yaml as the main modular config file
+    if config_path.is_file():
+        if config_path.suffix.lower() in {".yml", ".yaml"}:
+            config_dir = config_path.parent
+            config = load_modular_config(config_dir, main_config_path=config_path)
             _auto_export_schemas_if_project()
             return config
+        msg = "Unsupported configuration file; expected a YAML file (*.yml/*.yaml)."
+        raise FileNotFoundError(msg)
 
-        # Final attempt: platform default modular path
-        platform_default_dir = default_modular_config_dir()
-        if (
-            platform_default_dir.exists()
-            and (platform_default_dir / "config.yml").exists()
-        ):
-            config = load_modular_config(platform_default_dir)
-            # Don't auto-export for global configs - only for project configs
-            return config
+    # Modular directory mode — must contain config.yml
+    direct_config_file = config_path / "config.yml"
+    if not direct_config_file.exists():
+        msg = f"Main config file not found: {direct_config_file}"
+        raise FileNotFoundError(msg)
 
-    # If we get here, nothing was found
-    msg = f"Configuration directory not found: {config_path}"
-    raise FileNotFoundError(msg)
+    config = load_modular_config(config_path)
+    _auto_export_schemas_if_project()
+    return config
 
 
 def _auto_export_schemas_if_project() -> None:
@@ -977,7 +901,6 @@ def _auto_export_schemas_if_project() -> None:
         Path("package.json"),
         Path("Cargo.toml"),
         Path("go.mod"),
-        Path("config/config.yml"),  # nw project
     ]
 
     if not any(indicator.exists() for indicator in project_indicators):
@@ -1015,22 +938,40 @@ def _is_project_config(config_path: Path) -> bool:
         return False
 
 
-def load_modular_config(config_dir: Path) -> NetworkConfig:
-    """Load configuration from modular config directory structure with enhanced discovery."""
+def load_modular_config(
+    config_dir: Path, *, main_config_path: Path | None = None
+) -> NetworkConfig:
+    """Load configuration from modular config directory structure with enhanced discovery.
+
+    Parameters
+    ----------
+    config_dir : Path
+        The directory that contains the modular configuration files.
+    main_config_path : Path | None
+        Optional explicit path to the main config YAML file. When provided,
+        this file will be used instead of "config.yml". This enables callers
+        to pass a direct YAML file path and still leverage modular discovery
+        for devices/, groups/, and sequences/ under the parent directory.
+    """
     try:
-        # Load main config
-        config_file = config_dir / "config.yml"
+        # Load main config (either explicit file or default config.yml)
+        config_file = main_config_path or (config_dir / "config.yml")
         if not config_file.exists():
             msg = f"Main config file not found: {config_file}"
             raise FileNotFoundError(msg)
 
-        with config_file.open("r", encoding="utf-8") as f:
-            main_config: dict[str, Any] = yaml.safe_load(f) or {}
+        try:
+            with config_file.open("r", encoding="utf-8") as f:
+                main_config: dict[str, Any] = yaml.safe_load(f) or {}
+        except yaml.YAMLError as e:  # surface clear error for top-level file
+            msg = "Invalid YAML in configuration file"
+            raise ValueError(msg) from e
 
         # Enhanced device loading with CSV support and subdirectory discovery
         all_devices: dict[str, Any] = {}
         device_defaults: dict[str, Any] = {}
         device_files = _discover_config_files(config_dir, "devices")
+        device_sources: dict[str, Path] = {}
 
         # Load defaults first
         devices_dir = config_dir / "devices"
@@ -1038,8 +979,8 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
             defaults_file = devices_dir / "_defaults.yml"
             if defaults_file.exists():
                 try:
-                    with defaults_file.open("r", encoding="utf-8") as f:
-                        defaults_config: dict[str, Any] = yaml.safe_load(f) or {}
+                    with defaults_file.open("r", encoding="utf-8") as df:
+                        defaults_config: dict[str, Any] = yaml.safe_load(df) or {}
                         device_defaults = defaults_config.get("defaults", {})
                 except yaml.YAMLError as e:
                     logging.warning(
@@ -1059,72 +1000,70 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
                     for key, default_value in device_defaults.items():
                         if getattr(device_config, key, None) is None:
                             setattr(device_config, key, default_value)
+                    # Track source file for each device
+                    device_sources[_device_name] = device_file
                 all_devices.update(file_devices)
             else:
                 try:
-                    with device_file.open("r", encoding="utf-8") as f:
-                        device_yaml_config: dict[str, Any] = yaml.safe_load(f) or {}
-                        file_devices = device_yaml_config.get("devices", {})
-                        if isinstance(file_devices, dict):
-                            # Apply defaults to YAML devices
-                            for _device_name, device_config in file_devices.items():
-                                # Ensure dict shape
-                                if not isinstance(device_config, dict):
-                                    continue
-                                # Apply defaults
-                                for key, default_value in device_defaults.items():
-                                    if key not in device_config:
-                                        device_config[key] = default_value
-                                # Ensure a valid device_type default for YAML devices
-                                # Tests often omit this field for some devices
-                                device_config.setdefault("device_type", "linux")
-                            all_devices.update(file_devices)
-                        else:
-                            logging.warning(
-                                f"Invalid devices structure in {device_file}, skipping"
-                            )
+                    with device_file.open("r", encoding="utf-8") as df:
+                        device_yaml_config: dict[str, Any] = yaml.safe_load(df) or {}
+                        file_devices_node = cast(
+                            dict[str, dict[str, Any]],
+                            device_yaml_config.get("devices", {}) or {},
+                        )
+                        # Apply defaults to YAML devices and collect into a typed dict
+                        typed_file_devices: dict[str, dict[str, Any]] = {}
+                        for _device_name, device_dict in file_devices_node.items():
+                            # Apply defaults
+                            for key, default_value in device_defaults.items():
+                                if key not in device_dict:
+                                    device_dict[key] = default_value
+                            # Ensure a valid device_type default for YAML devices
+                            device_dict.setdefault("device_type", "linux")
+                            # Track source file for each device
+                            device_sources[_device_name] = device_file
+                            typed_file_devices[_device_name] = device_dict
+                        all_devices.update(typed_file_devices)
                 except yaml.YAMLError as e:
                     logging.warning(f"Invalid YAML in {device_file}: {e}")
 
         # Enhanced group loading with CSV support and subdirectory discovery
         all_groups: dict[str, Any] = {}
         group_files = _discover_config_files(config_dir, "groups")
+        group_sources: dict[str, Path] = {}
 
         for group_file in group_files:
             if group_file.suffix.lower() == ".csv":
                 file_groups = _load_csv_groups(group_file)
+                # Track source per group name
+                for _group_name in file_groups.keys():
+                    group_sources[_group_name] = group_file
                 all_groups.update(file_groups)
             else:
                 try:
-                    with group_file.open("r", encoding="utf-8") as f:
-                        group_yaml_config: dict[str, Any] = yaml.safe_load(f) or {}
-                        file_groups = group_yaml_config.get("groups", {})
-                        if isinstance(file_groups, dict):
-                            all_groups.update(file_groups)
-                        else:
-                            logging.warning(
-                                f"Invalid groups structure in {group_file}, skipping"
-                            )
+                    with group_file.open("r", encoding="utf-8") as gf:
+                        group_yaml_config: dict[str, Any] = yaml.safe_load(gf) or {}
+                        file_groups_node = cast(
+                            dict[str, dict[str, Any]],
+                            group_yaml_config.get("groups", {}) or {},
+                        )
+                        for _group_name in file_groups_node.keys():
+                            group_sources[_group_name] = group_file
+                        all_groups.update(file_groups_node)
                 except yaml.YAMLError as e:
                     logging.warning(f"Invalid YAML in {group_file}: {e}")
 
-        # Enhanced sequence loading with CSV support and subdirectory discovery
-        all_sequences: dict[str, Any] = {}
+        # Load vendor-specific sequences from config files
         sequence_files = _discover_config_files(config_dir, "sequences")
         sequences_config: dict[str, Any] = {}
 
         for seq_file in sequence_files:
-            if seq_file.suffix.lower() == ".csv":
-                file_sequences = _load_csv_sequences(seq_file)
-                all_sequences.update(file_sequences)
-            else:
+            if (
+                seq_file.suffix.lower() != ".csv"
+            ):  # Only process YAML files for vendor config
                 try:
-                    with seq_file.open("r", encoding="utf-8") as f:
-                        seq_yaml_config: dict[str, Any] = yaml.safe_load(f) or {}
-                        # Extract sequences
-                        file_sequences = seq_yaml_config.get("sequences", {})
-                        if isinstance(file_sequences, dict):
-                            all_sequences.update(file_sequences)
+                    with seq_file.open("r", encoding="utf-8") as sf:
+                        seq_yaml_config: dict[str, Any] = yaml.safe_load(sf) or {}
 
                         # Keep track of other sequence config for vendor sequences
                         if not sequences_config:
@@ -1136,7 +1075,7 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
                 except yaml.YAMLError as e:
                     logging.warning(f"Invalid YAML in {seq_file}: {e}")
 
-        # Load vendor-specific sequences
+        # Load vendor-specific sequences (VendorSequence models will carry _source_path)
         vendor_sequences = _load_vendor_sequences(config_dir, sequences_config)
 
         # Merge all configs into the expected format
@@ -1144,7 +1083,6 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
             "general": main_config.get("general", {}),
             "devices": all_devices,
             "device_groups": all_groups,
-            "global_command_sequences": all_sequences,
             "vendor_platforms": sequences_config.get("vendor_platforms", {}),
             "vendor_sequences": vendor_sequences,
         }
@@ -1152,9 +1090,24 @@ def load_modular_config(config_dir: Path) -> NetworkConfig:
         logging.debug(f"Loaded modular configuration from {config_dir.resolve()}")
         logging.debug(f"  - Devices: {len(all_devices)}")
         logging.debug(f"  - Groups: {len(all_groups)}")
-        logging.debug(f"  - Sequences: {len(all_sequences)}")
 
-        return NetworkConfig(**merged_config)
+        # Build the model and then assign private source paths
+        model = NetworkConfig(**merged_config)
+
+        if model.devices:
+            # Persist source on each device instance (private attr via setter)
+            for _name, _dev in model.devices.items():
+                src = device_sources.get(_name)
+                if src is not None:
+                    _dev.set_source_path(src)
+
+        if model.device_groups:
+            for _name, _grp in model.device_groups.items():
+                src = group_sources.get(_name)
+                if src is not None:
+                    _grp.set_source_path(src)
+
+        return model
 
     except yaml.YAMLError as e:
         msg = f"Invalid YAML in modular configuration: {config_dir}"
@@ -1297,12 +1250,16 @@ def _load_sequence_file(file_path: Path, vendor_name: str) -> dict[str, VendorSe
     try:
         with file_path.open("r", encoding="utf-8") as f:
             vendor_config: dict[str, Any] = yaml.safe_load(f) or {}
-
         # Load sequences from the vendor file
-        sequence_data = vendor_config.get("sequences", {})
+        sequence_data = cast(
+            dict[str, dict[str, Any]], vendor_config.get("sequences", {}) or {}
+        )
         for seq_name, seq_data in sequence_data.items():
             try:
-                sequences[seq_name] = VendorSequence(**seq_data)
+                seq_obj = VendorSequence(**seq_data)
+                # Store source path on the sequence object (private via setter)
+                seq_obj.set_source_path(file_path)
+                sequences[seq_name] = seq_obj
             except Exception as e:
                 logging.warning(f"Invalid sequence '{seq_name}' in {file_path}: {e}")
                 continue
@@ -1319,34 +1276,7 @@ def _load_sequence_file(file_path: Path, vendor_name: str) -> dict[str, VendorSe
     return sequences
 
 
-def load_legacy_config(config_path: Path) -> NetworkConfig:
-    """Load configuration from legacy monolithic YAML file."""
-    try:
-        with config_path.open("r", encoding="utf-8") as f:
-            raw_config: dict[str, Any] = yaml.safe_load(f) or {}
-
-        # Backfill missing device_type with a sensible default for YAML-based configs
-        try:
-            devices_node = raw_config.get("devices", {})
-            if isinstance(devices_node, dict):
-                for _name, dev in devices_node.items():
-                    if isinstance(dev, dict) and "device_type" not in dev:
-                        dev["device_type"] = "linux"
-        except Exception:
-            # Be permissive; validation will catch irrecoverable shapes
-            pass
-
-        # Log config loading for debugging
-        logging.debug(f"Loaded legacy configuration from {config_path}")
-
-        return NetworkConfig(**raw_config)
-
-    except yaml.YAMLError as e:
-        msg = f"Invalid YAML in configuration file: {config_path}"
-        raise ValueError(msg) from e
-    except Exception as e:  # pragma: no cover - safety
-        msg = f"Failed to load configuration from {config_path}: {e}"
-        raise ValueError(msg) from e
+# Legacy single-file YAML mode removed: no legacy loader remains
 
 
 def generate_json_schema() -> dict[str, Any]:

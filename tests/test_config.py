@@ -12,7 +12,6 @@ import pytest
 import yaml
 
 from network_toolkit.config import (
-    CommandSequence,
     DeviceConfig,
     DeviceGroup,
     DeviceOverrides,
@@ -215,18 +214,6 @@ class TestDeviceGroup:
         assert group.match_tags == ["switch"]
 
 
-class TestCommandSequence:
-    """Test CommandSequence model."""
-
-    def test_command_sequence(self) -> None:
-        """Test command sequence creation."""
-        sequence = CommandSequence(
-            description="Test sequence", commands=["command1", "command2", "command3"]
-        )
-        assert sequence.description == "Test sequence"
-        assert sequence.commands == ["command1", "command2", "command3"]
-
-
 class TestFileOperationConfig:
     """Test FileOperationConfig model."""
 
@@ -270,7 +257,6 @@ class TestNetworkConfig:
         assert isinstance(config.general, GeneralConfig)
         assert config.devices is None
         assert config.device_groups is None
-        assert config.global_command_sequences is None
         assert config.file_operations is None
 
     def test_get_device_connection_params_nonexistent_device(self) -> None:
@@ -585,31 +571,6 @@ class TestDeviceGroupExtended:
         assert group.match_tags is None
 
 
-class TestCommandSequenceExtended:
-    """Test CommandSequence extended functionality."""
-
-    def test_command_sequence_creation(self) -> None:
-        """Test creating command sequences."""
-        sequence = CommandSequence(
-            description="Test sequence",
-            commands=["command1", "command2"],
-            tags=["system", "info"],
-        )
-        assert sequence.description == "Test sequence"
-        assert sequence.commands == ["command1", "command2"]
-        assert sequence.tags == ["system", "info"]
-
-    def test_command_sequence_minimal(self) -> None:
-        """Test creating minimal command sequence."""
-        sequence = CommandSequence(
-            description="Minimal sequence",
-            commands=["single_command"],
-        )
-        assert sequence.description == "Minimal sequence"
-        assert sequence.commands == ["single_command"]
-        assert sequence.tags is None
-
-
 class TestVendorPlatformConfig:
     """Test VendorPlatformConfig functionality."""
 
@@ -782,39 +743,6 @@ class TestNetworkConfigValidation:
         assert "routers" in config.device_groups
         assert config.device_groups["switches"].members == ["device1"]
         assert config.device_groups["routers"].members == ["device2"]
-
-    def test_network_config_sequences(self, tmp_path: Path) -> None:
-        """Test network config with command sequences."""
-        config_file = tmp_path / "sequences.yml"
-        config_data = {
-            "general": {
-                "default_user": "admin",
-                "default_password": "admin",
-            },
-            "devices": {
-                "test_device": {
-                    "host": "192.168.1.1",
-                    "device_type": "mikrotik_routeros",
-                }
-            },
-            "global_command_sequences": {
-                "system_info": {
-                    "description": "Get system information",
-                    "commands": [
-                        "/system identity print",
-                        "/system clock print",
-                    ],
-                }
-            },
-        }
-        config_file.write_text(yaml.safe_dump(config_data))
-
-        config = load_config(config_file)
-        assert config.global_command_sequences is not None
-        assert "system_info" in config.global_command_sequences
-        sequence = config.global_command_sequences["system_info"]
-        assert sequence.description == "Get system information"
-        assert len(sequence.commands) == 2
 
     def test_network_config_environment_variable_substitution(
         self, tmp_path: Path
@@ -1039,79 +967,6 @@ class TestModularConfigLoading:
         config = load_config(config_dir)
         assert config.devices is not None
 
-    def test_modular_config_with_groups_and_sequences(self, tmp_path: Path) -> None:
-        """Test modular config with groups and sequences files."""
-        config_dir = tmp_path / "config"
-        config_dir.mkdir()
-
-        # Create main config
-        config_file = config_dir / "config.yml"
-        config_file.write_text(yaml.safe_dump({"general": {"timeout": 30}}))
-
-        # Create devices
-        devices_file = config_dir / "devices.yml"
-        devices_data = {
-            "devices": {
-                "device1": {"host": "192.168.1.1", "device_type": "mikrotik_routeros"}
-            }
-        }
-        devices_file.write_text(yaml.safe_dump(devices_data))
-
-        # Create groups file
-        groups_file = config_dir / "groups.yml"
-        groups_data = {
-            "groups": {
-                "switches": {
-                    "description": "All switches",
-                    "members": ["device1"],
-                }
-            }
-        }
-        groups_file.write_text(yaml.safe_dump(groups_data))
-
-        # Create sequences file
-        sequences_file = config_dir / "sequences.yml"
-        sequences_data = {
-            "sequences": {
-                "system_info": {
-                    "description": "Get system info",
-                    "commands": ["/system identity print"],
-                }
-            },
-            "vendor_platforms": {
-                "mikrotik_routeros": {
-                    "description": "MikroTik RouterOS",
-                    "sequence_path": "sequences/mikrotik_routeros",
-                    "default_files": ["common.yml"],
-                }
-            },
-        }
-        sequences_file.write_text(yaml.safe_dump(sequences_data))
-
-        # Create vendor sequence directory
-        vendor_dir = config_dir / "sequences" / "mikrotik_routeros"
-        vendor_dir.mkdir(parents=True)
-
-        vendor_file = vendor_dir / "common.yml"
-        vendor_data = {
-            "sequences": {
-                "system_check": {
-                    "description": "System check sequence",
-                    "commands": ["/system resource print", "/system clock print"],
-                }
-            }
-        }
-        vendor_file.write_text(yaml.safe_dump(vendor_data))
-
-        # Load config
-        config = load_config(config_dir)
-        assert config.device_groups is not None
-        assert "switches" in config.device_groups
-        assert config.global_command_sequences is not None
-        assert "system_info" in config.global_command_sequences
-        assert config.vendor_sequences is not None
-        assert "mikrotik_routeros" in config.vendor_sequences
-
     def test_modular_config_vendor_sequence_errors(self, tmp_path: Path) -> None:
         """Test vendor sequence loading with various error conditions."""
         config_dir = tmp_path / "config"
@@ -1168,199 +1023,7 @@ class TestModularConfigLoading:
         assert config.devices == {}  # Empty devices is okay
         assert config.device_groups == {}  # Empty groups is okay
 
-    def test_legacy_config_error_handling(self, tmp_path: Path) -> None:
-        """Test error handling in legacy config loading."""
-        # Invalid YAML file
-        invalid_file = tmp_path / "invalid.yml"
-        invalid_file.write_text("invalid: yaml: content: [")
-
-        with pytest.raises(ValueError, match="Invalid YAML in configuration file"):
-            load_config(invalid_file)
-
-        # Valid YAML but create a file that will cause NetworkConfig validation to fail
-        # Use an empty file which should work fine
-        empty_file = tmp_path / "empty.yml"
-        empty_file.write_text("")
-
-        # This should actually load successfully with empty config
-        config = load_config(empty_file)
-        assert isinstance(config, NetworkConfig)
-
-
-class TestNetworkConfigAdvancedMethods:
-    """Test advanced NetworkConfig methods."""
-
-    def test_get_all_sequences_global_only(self) -> None:
-        """Test get_all_sequences with only global sequences."""
-        config = NetworkConfig(
-            global_command_sequences={
-                "global_seq": CommandSequence(
-                    description="Global sequence",
-                    commands=["cmd1", "cmd2"],
-                )
-            }
-        )
-
-        sequences = config.get_all_sequences()
-        assert "global_seq" in sequences
-        assert sequences["global_seq"]["origin"] == "global"
-        assert sequences["global_seq"]["commands"] == ["cmd1", "cmd2"]
-        assert sequences["global_seq"]["sources"] == ["global"]
-        assert sequences["global_seq"]["description"] == "Global sequence"
-
-    def test_get_all_sequences_device_only(self) -> None:
-        """Test get_all_sequences with only device sequences."""
-        config = NetworkConfig(
-            devices={
-                "device1": DeviceConfig(
-                    host="192.168.1.1",
-                    command_sequences={
-                        "device_seq": ["cmd3", "cmd4"],
-                        "shared_seq": ["cmd5"],
-                    },
-                ),
-                "device2": DeviceConfig(
-                    host="192.168.1.2",
-                    command_sequences={
-                        "shared_seq": ["cmd6"],  # Same name as device1
-                    },
-                ),
-            }
-        )
-
-        sequences = config.get_all_sequences()
-        assert "device_seq" in sequences
-        assert sequences["device_seq"]["origin"] == "device"
-        assert sequences["device_seq"]["commands"] == ["cmd3", "cmd4"]
-        assert sequences["device_seq"]["sources"] == ["device1"]
-
-        # shared_seq should track multiple sources
-        assert "shared_seq" in sequences
-        assert sequences["shared_seq"]["origin"] == "device"
-        assert set(sequences["shared_seq"]["sources"]) == {"device1", "device2"}
-
-    def test_get_all_sequences_global_precedence(self) -> None:
-        """Test that global sequences take precedence over device sequences."""
-        config = NetworkConfig(
-            global_command_sequences={
-                "shared_seq": CommandSequence(
-                    description="Global version",
-                    commands=["global_cmd"],
-                )
-            },
-            devices={
-                "device1": DeviceConfig(
-                    host="192.168.1.1",
-                    command_sequences={
-                        "shared_seq": ["device_cmd"],  # Should be overridden
-                    },
-                )
-            },
-        )
-
-        sequences = config.get_all_sequences()
-        assert "shared_seq" in sequences
-        assert sequences["shared_seq"]["origin"] == "global"
-        assert sequences["shared_seq"]["commands"] == ["global_cmd"]
-        assert sequences["shared_seq"]["sources"] == ["global"]
-
-    def test_get_all_sequences_empty_config(self) -> None:
-        """Test get_all_sequences with empty config."""
-        config = NetworkConfig()
-        sequences = config.get_all_sequences()
-        assert sequences == {}
-
-    def test_resolve_sequence_commands_global(self) -> None:
-        """Test resolve_sequence_commands with global sequence."""
-        config = NetworkConfig(
-            global_command_sequences={
-                "test_seq": CommandSequence(
-                    description="Test sequence",
-                    commands=["cmd1", "cmd2"],
-                )
-            }
-        )
-
-        commands = config.resolve_sequence_commands("test_seq")
-        assert commands == ["cmd1", "cmd2"]
-
-    def test_resolve_sequence_commands_vendor(self) -> None:
-        """Test resolve_sequence_commands with vendor sequence."""
-        config = NetworkConfig(
-            devices={
-                "test_device": DeviceConfig(
-                    host="192.168.1.1",
-                    device_type="mikrotik_routeros",
-                )
-            },
-            vendor_sequences={
-                "mikrotik_routeros": {
-                    "vendor_seq": VendorSequence(
-                        description="Vendor sequence",
-                        commands=["vendor_cmd1", "vendor_cmd2"],
-                    )
-                }
-            },
-        )
-
-        commands = config.resolve_sequence_commands("vendor_seq", "test_device")
-        assert commands == ["vendor_cmd1", "vendor_cmd2"]
-
-    def test_resolve_sequence_commands_device_fallback(self) -> None:
-        """Test resolve_sequence_commands falling back to device sequence."""
-        config = NetworkConfig(
-            devices={
-                "device1": DeviceConfig(
-                    host="192.168.1.1",
-                    command_sequences={
-                        "device_seq": ["device_cmd1", "device_cmd2"],
-                    },
-                ),
-                "device2": DeviceConfig(
-                    host="192.168.1.2",
-                    # No command_sequences
-                ),
-            }
-        )
-
-        commands = config.resolve_sequence_commands("device_seq")
-        assert commands == ["device_cmd1", "device_cmd2"]
-
-    def test_resolve_sequence_commands_not_found(self) -> None:
-        """Test resolve_sequence_commands with non-existent sequence."""
-        config = NetworkConfig()
-        commands = config.resolve_sequence_commands("nonexistent")
-        assert commands is None
-
-    def test_resolve_sequence_commands_vendor_fallback(self) -> None:
-        """Test resolve_sequence_commands with vendor sequence fallback."""
-        config = NetworkConfig(
-            devices={
-                "test_device": DeviceConfig(
-                    host="192.168.1.1",
-                    device_type="mikrotik_routeros",
-                    command_sequences={
-                        "fallback_seq": ["device_fallback_cmd"],
-                    },
-                )
-            },
-            vendor_sequences={
-                "mikrotik_routeros": {
-                    "vendor_seq": VendorSequence(
-                        description="Vendor sequence",
-                        commands=["vendor_cmd"],
-                    )
-                }
-            },
-        )
-
-        # Should find vendor sequence
-        commands = config.resolve_sequence_commands("vendor_seq", "test_device")
-        assert commands == ["vendor_cmd"]
-
-        # Should fall back to device sequence when vendor not found
-        commands = config.resolve_sequence_commands("fallback_seq", "test_device")
-        assert commands == ["device_fallback_cmd"]
+    # Legacy single-file YAML mode removed; no legacy config tests remain
 
 
 class TestGroupCredentials:
