@@ -155,14 +155,14 @@ def register(app: typer.Typer) -> None:
         # Handle interactive authentication if requested
         interactive_creds = None
         if interactive_auth:
-            if ctx.output.mode != OutputMode.RAW:
+            if output_mode != OutputMode.RAW:
                 ctx.print_info("Interactive authentication mode enabled")
             interactive_creds = prompt_for_credentials(
                 "Enter username for devices",
                 "Enter password for devices",
                 "admin",  # Default username suggestion
             )
-            if ctx.output.mode != OutputMode.RAW:
+            if output_mode != OutputMode.RAW:
                 ctx.print_success(f"Will use username: {interactive_creds.username}")
 
         # Track run timing & reporting state
@@ -179,6 +179,7 @@ def register(app: typer.Typer) -> None:
                 results_mgr.store_results
                 and results_mgr.session_dir
                 and not printed_results_dir
+                and output_mode != OutputMode.RAW
             ):
                 output_mgr.print_results_directory(str(results_mgr.session_dir))
                 printed_results_dir = True
@@ -309,7 +310,7 @@ def register(app: typer.Typer) -> None:
                     platform_list = "\n".join(
                         [f"  {k}: {v}" for k, v in supported_platforms.items()]
                     )
-                    if raw is None:
+                    if output_mode != OutputMode.RAW:
                         ctx.print_error(
                             "When using IP addresses, --platform is required"
                         )
@@ -321,7 +322,7 @@ def register(app: typer.Typer) -> None:
                     platform_list = "\n".join(
                         [f"  {k}: {v}" for k, v in supported_platforms.items()]
                     )
-                    if raw is None:
+                    if output_mode != OutputMode.RAW:
                         ctx.print_error(f"Invalid device type '{device_type}'")
                         ctx.print_info(f"Supported platforms:\n{platform_list}")
                     raise typer.Exit(1)
@@ -332,7 +333,7 @@ def register(app: typer.Typer) -> None:
                     ips, device_type, config, port=port, transport_type=transport_type
                 )
 
-                if raw is None:
+                if output_mode != OutputMode.RAW:
                     ctx.print_info(
                         f"Using IP addresses with device type '{device_type}': {', '.join(ips)}"
                     )
@@ -385,12 +386,12 @@ def register(app: typer.Typer) -> None:
             resolved_devices, unknown_targets = resolve_targets(target)
 
             if unknown_targets and not resolved_devices:
-                if raw is None:
+                if output_mode != OutputMode.RAW:
                     output_mgr.print_error(
                         f"target(s) not found: {', '.join(unknown_targets)}"
                     )
                 raise typer.Exit(1)
-            elif unknown_targets and raw is None:
+            elif unknown_targets and output_mode != OutputMode.RAW:
                 ctx.print_warning(
                     f"Warning: ignoring unknown target(s): {', '.join(unknown_targets)}"
                 )
@@ -407,7 +408,7 @@ def register(app: typer.Typer) -> None:
 
             if is_sequence:
                 if is_single_device:
-                    if raw is None:
+                    if output_mode != OutputMode.RAW:
                         ctx.print_info(
                             f"Executing sequence '{command_or_sequence}' on device {target}"
                         )
@@ -433,12 +434,12 @@ def register(app: typer.Typer) -> None:
                     )
 
                     if error:
-                        if raw is None:
+                        if output_mode != OutputMode.RAW:
                             ctx.print_error(f"Error: {error}")
                         raise typer.Exit(1)
 
                     if results_map:
-                        if raw is not None:
+                        if output_mode == OutputMode.RAW:
                             # Print raw outputs with context per command
                             for cmd, output in results_map.items():
                                 if json_mode:
@@ -483,7 +484,7 @@ def register(app: typer.Typer) -> None:
                             duration=duration,
                             results_mgr=results_mgr,
                             is_group=False,
-                            raw_mode=raw is not None,
+                            raw_mode=output_mode == OutputMode.RAW,
                         )
                         if json_mode:
                             output_mgr.print_json(
@@ -499,11 +500,11 @@ def register(app: typer.Typer) -> None:
                 else:
                     group_members = resolved_devices
                     if not group_members:
-                        if raw is None:
+                        if output_mode != OutputMode.RAW:
                             ctx.print_warning(f"No devices resolved for '{target}'.")
                         return
 
-                    if raw is None:
+                    if output_mode != OutputMode.RAW:
                         ctx.print_info(
                             f"Executing sequence '{command_or_sequence}' on targets '{target}' "
                             f"({len(group_members)} devices)"
@@ -539,7 +540,7 @@ def register(app: typer.Typer) -> None:
                         for seq_future in as_completed(seq_future_to_device):
                             all_results.append(seq_future.result())
 
-                    if raw is not None:
+                    if output_mode == OutputMode.RAW:
                         # Preserve device order from group for deterministic output
                         order_index = {d: i for i, d in enumerate(group_members)}
                         for _device_name, device_results, error in sorted(
@@ -619,7 +620,7 @@ def register(app: typer.Typer) -> None:
                         results_mgr=results_mgr,
                         is_group=True,
                         totals=(len(group_members), succeeded, failed),
-                        raw_mode=raw is not None,
+                        raw_mode=output_mode == OutputMode.RAW,
                     )
                     if json_mode:
                         output_mgr.print_json(
@@ -639,7 +640,7 @@ def register(app: typer.Typer) -> None:
 
             # Otherwise, handle as a single command
             if is_single_device:
-                if raw is None:
+                if output_mode != OutputMode.RAW:
                     device_target = resolved_devices[0]
                     ctx.print_info(f"Executing command on device {device_target}")
                     ctx.print_info(f"Command: {command_or_sequence}")
@@ -665,7 +666,7 @@ def register(app: typer.Typer) -> None:
                 if error:
                     raise typer.Exit(1)
 
-                if raw is not None:
+                if output_mode == OutputMode.RAW:
                     if json_mode:
                         output_mgr.print_json(
                             {
@@ -684,7 +685,11 @@ def register(app: typer.Typer) -> None:
                         device_target, command_or_sequence, result or ""
                     )
 
-                if results_mgr.store_results and raw is None and result:
+                if (
+                    results_mgr.store_results
+                    and output_mode != OutputMode.RAW
+                    and result
+                ):
                     stored_path = results_mgr.store_command_result(
                         device_target, command_or_sequence, result
                     )
@@ -701,7 +706,7 @@ def register(app: typer.Typer) -> None:
                     duration=duration,
                     results_mgr=results_mgr,
                     is_group=False,
-                    raw_mode=raw is not None,
+                    raw_mode=output_mode == OutputMode.RAW,
                 )
                 if json_mode:
                     output_mgr.print_json(
@@ -718,11 +723,11 @@ def register(app: typer.Typer) -> None:
             else:
                 members = resolved_devices
                 if not members:
-                    if raw is None:
+                    if output_mode != OutputMode.RAW:
                         ctx.print_warning(f"No devices resolved for '{target}'.")
                     return
 
-                if raw is None:
+                if output_mode != OutputMode.RAW:
                     ctx.print_info(
                         f"Executing command on targets '{target}' "
                         f"({len(members)} devices)"
@@ -757,7 +762,7 @@ def register(app: typer.Typer) -> None:
                     for future in as_completed(future_to_device_cmd):
                         group_results.append(future.result())
 
-                if raw is not None:
+                if output_mode == OutputMode.RAW:
                     # Emit raw results per device (skip errors in raw mode)
                     for device_name, out_text, error in group_results:
                         if error or out_text is None:
@@ -819,7 +824,7 @@ def register(app: typer.Typer) -> None:
                     results_mgr=results_mgr,
                     is_group=True,
                     totals=(len(members), succeeded, failed),
-                    raw_mode=raw is not None,
+                    raw_mode=output_mode == OutputMode.RAW,
                 )
                 if json_mode:
                     output_mgr.print_json(
@@ -836,7 +841,7 @@ def register(app: typer.Typer) -> None:
                     )
 
         except NetworkToolkitError as e:
-            if raw is None:
+            if output_mode != OutputMode.RAW:
                 output_mgr.print_error(f"Error: {e.message}")
                 if verbose and e.details:
                     output_mgr.print_error(f"Details: {e.details}")
@@ -845,6 +850,6 @@ def register(app: typer.Typer) -> None:
             # Re-raise typer.Exit without catching it as an unexpected error
             raise
         except Exception as e:  # pragma: no cover - unexpected
-            if raw is None:
+            if output_mode != OutputMode.RAW:
                 output_mgr.print_error(f"Unexpected error: {e}")
             raise typer.Exit(1) from None

@@ -90,7 +90,7 @@ class OutputManager:
                 + "\n"
             )
         elif self.mode == OutputMode.RAW:
-            sys.stdout.write(f"device={device} cmd={command}\n")
+            sys.stdout.write(f"=== device={device} cmd={command} ===\n")
             sys.stdout.write(f"{output}\n")
         else:
             # Use style manager for semantic styling
@@ -113,10 +113,8 @@ class OutputManager:
     def print_success(self, message: str, context: str | None = None) -> None:
         """Print a success message."""
         if self.mode == OutputMode.RAW:
-            if context:
-                sys.stdout.write(f"device={context} success: {message}\n")
-            else:
-                sys.stdout.write(f"success: {message}\n")
+            # In raw mode, suppress all success messages - only show command output
+            return
         elif context:
             ok_part = self._style_manager.format_message("OK", self._style_name.SUCCESS)
             context_part = self._style_manager.format_message(
@@ -161,10 +159,8 @@ class OutputManager:
                 payload["device"] = context
             sys.stdout.write(json.dumps(payload) + "\n")
         elif self.mode == OutputMode.RAW:
-            if context:
-                sys.stdout.write(f"device={context} warning: {message}\n")
-            else:
-                sys.stdout.write(f"warning: {message}\n")
+            # In raw mode, suppress all warning messages - only show command output
+            return
         elif context:
             warn_part = self._style_manager.format_message(
                 "WARN", self._style_name.WARNING
@@ -187,10 +183,8 @@ class OutputManager:
                 payload["device"] = context
             sys.stdout.write(json.dumps(payload) + "\n")
         elif self.mode == OutputMode.RAW:
-            if context:
-                sys.stdout.write(f"device={context} info: {message}\n")
-            else:
-                sys.stdout.write(f"info: {message}\n")
+            # In raw mode, suppress all info messages - only show command output
+            return
         elif context:
             self._console.print(f"[{context}] {message}")
         else:
