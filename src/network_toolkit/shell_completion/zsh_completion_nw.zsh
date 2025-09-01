@@ -1,6 +1,41 @@
 #compdef nw networka network-toolkit
-
-_nw_complete() {
+				info)
+					# Offer devices,				run)
+					if (( CU					elif (				ssh)
+					if (( CURRENT == 3 )); then
+						local -a groups devices annotated
+						if [[ -n "$cfg" ]]; then
+							groups=(${(f)"$(nw __complete --for groups --config \"$cfg\" 2>/dev/null)"})
+							devices=(${(f)"$(nw __complete --for devices --config \"$cfg\" 2>/dev/null)"})
+						else
+							groups=(${(f)"$(nw __complete --for groups 2>/dev/null)"})
+							devices=(${(f)"$(nw __complete --for devices 2>/dev/null)"})
+						fiRENT == 4 )); then
+						local target=$words[3]
+						if [[ -n "$cfg" ]]; then
+							values=(${(f)"$(nw __complete --for sequences --device \"$target\" --config \"$cfg\" 2>/dev/null)"})
+						else
+							values=(${(f)"$(nw __complete --for sequences --device \"$target\" 2>/dev/null)"})
+						fiNT == 3 )); then
+						# Groups first, then devices for better UX, annotate entries
+						local -a groups devices annotated
+						if [[ -n "$cfg" ]]; then
+							groups=(${(f)"$(nw __complete --for groups --config \"$cfg\" 2>/dev/null)"})
+							devices=(${(f)"$(nw __complete --for devices --config \"$cfg\" 2>/dev/null)"})
+						else
+							groups=(${(f)"$(nw __complete --for groups 2>/dev/null)"})
+							devices=(${(f)"$(nw __complete --for devices 2>/dev/null)"})
+						fis, and sequences for info command
+					local -a devices groups sequences annotated
+					if [[ -n "$cfg" ]]; then
+						devices=(${(f)"$(nw __complete --for devices --config \"$cfg\" 2>/dev/null)"})
+						groups=(${(f)"$(nw __complete --for groups --config \"$cfg\" 2>/dev/null)"})
+						sequences=(${(f)"$(nw __complete --for sequences --config \"$cfg\" 2>/dev/null)"})
+					else
+						devices=(${(f)"$(nw __complete --for devices 2>/dev/null)"})
+						groups=(${(f)"$(nw __complete --for groups 2>/dev/null)"})
+						sequences=(${(f)"$(nw __complete --for sequences 2>/dev/null)"})
+					fiomplete() {
 	local -a cmds opts values
 	local curcontext="$curcontext" state line
 	typeset -A opt_args
@@ -24,12 +59,9 @@ _nw_complete() {
 	local cfg
 	if [[ -n ${opt_args[--config]} ]]; then
 		cfg=${opt_args[--config]}
-	# Local ./config is no longer probed; rely on explicit --config or user defaults
-	elif false; then
-		cfg="config"
-	else
-		cfg="devices.yml"
 	fi
+	# If no --config specified, let the Python command use its default
+	# (don't hardcode platform-specific paths here)
 
 	case $state in
 		cmds)

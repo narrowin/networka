@@ -1013,13 +1013,9 @@ def load_config(config_path: str | Path) -> NetworkConfig:
                 _auto_export_schemas_if_project()
                 return config
 
-        # Prefer a repo-local ./config when running in a project/tests
-        discovered = _resolve_fallback_config_path(config_path)
-        if discovered is not None:
-            load_dotenv_files(discovered)
-            config = load_modular_config(discovered)
-            _auto_export_schemas_if_project()
-            return config
+        # For DEFAULT_CONFIG_PATH, only use the explicit default path
+        # Do NOT search for local config/ directories
+        # This ensures consistent behavior across different working directories
 
     # Load .env files to make environment variables available for credential resolution
     # using the original hint path. This happens after the NW_CONFIG_DIR fast path above.
@@ -1033,14 +1029,8 @@ def load_config(config_path: str | Path) -> NetworkConfig:
             raise FileNotFoundError(msg)
         # Default path missing — surface clearly but without probing CWD
         if config_path == DEFAULT_CONFIG_PATH:
-            # Attempt best-effort fallback discovery for local development/tests
-            fallback = _resolve_fallback_config_path(config_path)
-            if fallback is not None:
-                # Reload .env with the discovered config directory to ensure correct precedence
-                load_dotenv_files(fallback)
-                config = load_modular_config(fallback)
-                _auto_export_schemas_if_project()
-                return config
+            # For DEFAULT_CONFIG_PATH, do not attempt fallback discovery
+            # This ensures consistent behavior regardless of working directory
             msg = f"Configuration directory not found: {config_path}"
             raise FileNotFoundError(msg)
         msg = f"Configuration path not found: {config_path}"

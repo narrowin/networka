@@ -619,6 +619,7 @@ def _config_init_impl(
             target_path = Path(user_input).expanduser().resolve()
 
     # Check if configuration already exists and handle force flag
+    skip_base_config = False
     if target_path.exists() and any(target_path.iterdir()) and not force:
         if yes:
             # In --yes mode, we proceed without prompting (same as if user said yes)
@@ -630,37 +631,43 @@ def _config_init_impl(
                 default=False,
             )
             if not overwrite:
-                ctx.print_info("Configuration initialization cancelled.")
-                raise typer.Exit(0)
+                ctx.print_info("Skipping base configuration setup (directory exists).")
+                skip_base_config = True
 
     if dry_run:
         ctx.print_info(f"DRY RUN: Would create configuration in {target_path}")
+        if not skip_base_config:
+            ctx.print_info("DRY RUN: Would also ask about optional features")
         return
 
-    # Create directory structure
-    target_path.mkdir(parents=True, exist_ok=True)
-    (target_path / "devices").mkdir(exist_ok=True)
-    (target_path / "groups").mkdir(exist_ok=True)
-    (target_path / "sequences").mkdir(exist_ok=True)
+    # Create directory structure and base config only if not skipping
+    if not skip_base_config:
+        target_path.mkdir(parents=True, exist_ok=True)
+        (target_path / "devices").mkdir(exist_ok=True)
+        (target_path / "groups").mkdir(exist_ok=True)
+        (target_path / "sequences").mkdir(exist_ok=True)
 
-    # Create core configuration files
-    ctx.print_info("Creating configuration files...")
-    create_env_file(target_path)
-    ctx.print_success(f"Created credential template: {target_path / '.env'}")
+        # Create core configuration files
+        ctx.print_info("Creating configuration files...")
+        create_env_file(target_path)
+        ctx.print_success(f"Created credential template: {target_path / '.env'}")
 
-    create_config_yml(target_path)
-    ctx.print_success(f"Created main configuration: {target_path / 'config.yml'}")
+        create_config_yml(target_path)
+        ctx.print_success(f"Created main configuration: {target_path / 'config.yml'}")
 
-    create_example_devices(target_path / "devices")
-    ctx.print_success(f"Created example devices: {target_path / 'devices'}")
+        create_example_devices(target_path / "devices")
+        ctx.print_success(f"Created example devices: {target_path / 'devices'}")
 
-    create_example_groups(target_path / "groups")
-    ctx.print_success(f"Created example groups: {target_path / 'groups'}")
+        create_example_groups(target_path / "groups")
+        ctx.print_success(f"Created example groups: {target_path / 'groups'}")
 
-    create_example_sequences(target_path / "sequences")
-    ctx.print_success(f"Created example sequences: {target_path / 'sequences'}")
+        create_example_sequences(target_path / "sequences")
+        ctx.print_success(f"Created example sequences: {target_path / 'sequences'}")
 
-    ctx.print_success(f"Base configuration initialized in {target_path}")
+        ctx.print_success(f"Base configuration initialized in {target_path}")
+    else:
+        # Ensure the target path exists for optional features
+        target_path.mkdir(parents=True, exist_ok=True)
 
     # Handle optional features
     default_seq_repo = "https://github.com/narrowin/networka.git"
@@ -680,18 +687,13 @@ def _config_init_impl(
             default=True,
         )
 
+    # Group all shell completion questions together
+    chosen_shell = None
+    do_activate_compl = False
     if install_completions is not None:
         do_install_compl = install_completions
     elif interactive_extras:
         do_install_compl = typer.confirm("Install shell completions?", default=True)
-
-    if install_schemas is not None:
-        do_install_schemas = install_schemas
-    elif interactive_extras:
-        do_install_schemas = typer.confirm(
-            "Install JSON schemas for YAML editor validation and auto-completion?",
-            default=True,
-        )
 
     if do_install_compl:
         detected = (
@@ -715,6 +717,14 @@ def _config_init_impl(
                 f"Activate {chosen_shell} completions by updating your shell profile?",
                 default=True,
             )
+
+    if install_schemas is not None:
+        do_install_schemas = install_schemas
+    elif interactive_extras:
+        do_install_schemas = typer.confirm(
+            "Install JSON schemas for YAML editor validation and auto-completion?",
+            default=True,
+        )
 
     # Execute optional installations
     if do_install_sequences:
