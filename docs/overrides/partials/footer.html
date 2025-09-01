@@ -1,0 +1,45 @@
+<!-- Footer with enhanced styling -->
+<footer class="md-footer">
+  <div class="md-footer-nav">
+    <nav class="md-footer-nav__inner md-grid" aria-label="Footer">
+      {% if page.previous_page %}
+        <a href="{{ page.previous_page.url | url }}" class="md-footer-nav__link md-footer-nav__link--prev" aria-label="Previous: {{ page.previous_page.title | e }}" rel="prev">
+          <div class="md-footer-nav__button md-icon">
+            {% include ".icons/material/arrow-left.svg" %}
+          </div>
+          <div class="md-footer-nav__title">
+            <div class="md-ellipsis">
+              <span class="md-footer-nav__direction">Previous</span>
+              {{ page.previous_page.title }}
+            </div>
+          </div>
+        </a>
+      {% endif %}
+      {% if page.next_page %}
+        <a href="{{ page.next_page.url | url }}" class="md-footer-nav__link md-footer-nav__link--next" aria-label="Next: {{ page.next_page.title | e }}" rel="next">
+          <div class="md-footer-nav__title">
+            <div class="md-ellipsis">
+              <span class="md-footer-nav__direction">Next</span>
+              {{ page.next_page.title }}
+            </div>
+          </div>
+          <div class="md-footer-nav__button md-icon">
+            {% include ".icons/material/arrow-right.svg" %}
+          </div>
+        </a>
+      {% endif %}
+    </nav>
+  </div>
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+        {% if config.copyright %}
+          <div class="md-copyright__highlight">
+            {{ config.copyright }}
+          </div>
+        {% endif %}
+      </div>
+      {% include "partials/social.html" %}
+    </div>
+  </div>
+</footer>

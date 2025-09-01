@@ -3,12 +3,6 @@ template: home.html
 title: Networka
 ---
 
-## Naming & terminology
-
-- Networka: the project and documentation
-- nw: the command-line interface (CLI)
-- nw-tui: the terminal ui based on textual (coming soon)
-
 ## 60-second success {#quick-start}
 
 First, install networka:
@@ -34,20 +28,39 @@ name="MikroTik"
 Command completed successfully
 ```
 
-Short install video (30s):
+!!! tip "Pro tip"
+    Use `--help` with any command to see all available options and examples.
 
-[asciinema placeholder – will be embedded here]
+## Installation options
 
-## Key features
+=== "uv (Recommended)"
 
-- Multi-vendor automation (MikroTik, Cisco, Arista, Juniper, …)
-- Async concurrent operations for speed and scale
-- Flexible configuration (YAML/CSV), tags and groups
-- Vendor-aware sequences and backups
-- Rich CLI output with selectable output modes
-- Type-safe internals (mypy), clean CLI (Typer + Rich)
+    ```bash
+    uv tool install git+https://github.com/narrowin/networka.git
+    ```
 
-## Installation
+=== "pip"
+
+    ```bash
+    pip install git+https://github.com/narrowin/networka.git
+    ```
+
+=== "pipx"
+
+    ```bash
+    pipx install git+https://github.com/narrowin/networka.git
+    ```
+
+## What makes it different?
+
+- **Zero configuration needed** - Just run commands against IP addresses
+- **Async by design** - Built from ground up for concurrent operations  
+- **Vendor intelligence** - Platform-specific optimizations and commands
+- **Type safety** - Full mypy coverage for reliable automation
+- **Rich terminal** - Beautiful output with progress indicators and colors
+
+[Get started with configuration :material-arrow-right:](configuration.md){ .md-button .md-button--primary }
+[Browse examples :material-arrow-right:](examples/recipes.md){ .md-button }
 
 Start with the Installation, then explore the User guide for config, environment variables, output modes, results, and more.
 
