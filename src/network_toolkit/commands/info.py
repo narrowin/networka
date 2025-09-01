@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
 
@@ -47,6 +47,13 @@ def register(app: typer.Typer) -> None:
             Path,
             typer.Option("--config", "-c", help="Configuration directory or file path"),
         ] = DEFAULT_CONFIG_PATH,
+        vendor: Annotated[
+            str | None,
+            typer.Option(
+                "--vendor",
+                help="Show vendor-specific commands for sequences (e.g., cisco_iosxe, mikrotik_routeros)",
+            ),
+        ] = None,
         output_mode: Annotated[
             OutputMode | None,
             typer.Option(
@@ -77,7 +84,8 @@ def register(app: typer.Typer) -> None:
         - nw info sw-acc1                    # Show device info
         - nw info sw-acc1,sw-acc2           # Show multiple devices
         - nw info access_switches           # Show group info
-        - nw info system_info               # Show sequence info
+        - nw info system_info               # Show sequence info (all vendors)
+        - nw info system_info --vendor cisco_iosxe  # Show vendor-specific commands
         - nw info sw-acc1,access_switches,health_check  # Mixed types
         """
         setup_logging("DEBUG" if verbose else "INFO")
@@ -147,7 +155,7 @@ def register(app: typer.Typer) -> None:
                     _show_group_info(target, config, ctx)
                     known_count += 1
                 elif target_type == "sequence":
-                    _show_sequence_info(target, config, ctx, verbose)
+                    _show_sequence_info(target, config, ctx, verbose, vendor)
                     known_count += 1
                 else:
                     # Unknown targets should not cause a non-zero exit; warn and continue
@@ -273,37 +281,64 @@ def _show_group_info(target: str, config: NetworkConfig, ctx: CommandContext) ->
 
 
 def _show_sequence_info(
-    target: str, config: NetworkConfig, ctx: CommandContext, verbose: bool = False
+    target: str,
+    config: NetworkConfig,
+    ctx: CommandContext,
+    verbose: bool = False,
+    vendor: str | None = None,
 ) -> None:
     """Show detailed information for a sequence."""
     provider: BaseTableProvider
 
     # Check vendor sequences
     sm = SequenceManager(config)
+
+    # If vendor is specified, only look for that vendor's implementation
+    if vendor:
+        vendor_sequences = sm.list_vendor_sequences(vendor)
+        if target in vendor_sequences:
+            sequence_record = vendor_sequences[target]
+            # Keep vendor name in original format
+            provider = VendorSequenceInfoTableProvider(
+                sequence_name=target,
+                sequence_record=sequence_record,
+                vendor_names=[vendor],
+                verbose=verbose,
+                config=config,
+                vendor_specific=True,
+            )
+            ctx.render_table(provider, verbose)
+            return
+        else:
+            ctx.print_error(
+                f"Error: Sequence '{target}' not found for vendor '{vendor}'"
+            )
+            return
+
+    # Original logic for multi-vendor display
     all_sequences = sm.list_all_sequences()
 
     # Find all vendors that implement this sequence
     matching_vendors: list[str] = []
-    sequence_record = None
+    found_sequence_record: Any = None
 
-    for vendor, vendor_sequences in all_sequences.items():
+    for vendor_name, vendor_sequences in all_sequences.items():
         if target in vendor_sequences:
-            matching_vendors.append(vendor)
+            matching_vendors.append(vendor_name)
             # Use the first matching sequence record as the template
             # (they should be the same sequence across vendors)
-            if sequence_record is None:
-                sequence_record = vendor_sequences[target]
+            if found_sequence_record is None:
+                found_sequence_record = vendor_sequences[target]
 
-    if sequence_record:
-        # Format vendor names for display
-        vendor_names = [vendor.replace("_", " ").title() for vendor in matching_vendors]
-
+    if found_sequence_record:
+        # Keep vendor names in original format for consistency with --vendor flag
         provider = VendorSequenceInfoTableProvider(
             sequence_name=target,
-            sequence_record=sequence_record,
-            vendor_names=vendor_names,
+            sequence_record=found_sequence_record,
+            vendor_names=matching_vendors,
             verbose=verbose,
             config=config,
+            vendor_specific=False,
         )
         ctx.render_table(provider, verbose)
         return

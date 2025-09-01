@@ -346,10 +346,15 @@ class VendorSequenceInfoTableProvider(BaseModel, BaseTableProvider):
     vendor_names: list[str]
     verbose: bool = False
     config: NetworkConfig | None = None
+    vendor_specific: bool = False
 
     def get_table_definition(self) -> TableDefinition:
+        title_suffix = ""
+        if self.vendor_specific and len(self.vendor_names) == 1:
+            title_suffix = f" ({self.vendor_names[0]})"
+
         return TableDefinition(
-            title=f"Vendor Sequence: {self.sequence_name}",
+            title=f"Vendor Sequence: {self.sequence_name}{title_suffix}",
             columns=[
                 TableColumn(header="Property", style=StyleName.DEVICE),
                 TableColumn(header="Value", style=StyleName.OUTPUT),
@@ -373,10 +378,22 @@ class VendorSequenceInfoTableProvider(BaseModel, BaseTableProvider):
             ["Command Count", str(len(getattr(self.sequence_record, "commands", [])))],
         ]
 
-        # Add all individual commands - no truncation
+        # Show commands based on vendor_specific flag
         commands = getattr(self.sequence_record, "commands", [])
-        for i, cmd in enumerate(commands, 1):
-            rows.append([f"Command {i}", str(cmd)])
+
+        if self.vendor_specific:
+            # Show all commands for vendor-specific display
+            for i, cmd in enumerate(commands, 1):
+                rows.append([f"Command {i}", str(cmd)])
+        elif len(self.vendor_names) > 1:
+            # For multi-vendor display, don't show individual commands
+            # since they differ between vendors
+            rows.append(
+                [
+                    "Commands",
+                    "Use --vendor <vendor_name> to see vendor-specific commands",
+                ]
+            )
 
         return rows
 

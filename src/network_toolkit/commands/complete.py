@@ -63,6 +63,18 @@ def _list_tags(config: NetworkConfig) -> list[str]:
     return sorted(tags)
 
 
+def _list_vendors(config: NetworkConfig) -> list[str]:
+    """Return all vendor platforms available in sequences."""
+    vendors: set[str] = set()
+
+    # Get vendors from SequenceManager
+    sm = SequenceManager(config)
+    all_sequences = sm.list_all_sequences()
+    vendors.update(all_sequences.keys())
+
+    return sorted(vendors)
+
+
 def _list_sequences(config: NetworkConfig, *, target: str | None) -> list[str]:
     names: set[str] = set()
 
@@ -121,7 +133,7 @@ def register(app: typer.Typer) -> None:
                 "-f",
                 help=(
                     "Completion target: commands|devices|groups|sequences|"
-                    "sequence-groups|tags"
+                    "sequence-groups|tags|vendors"
                 ),
             ),
         ],
@@ -157,6 +169,8 @@ def register(app: typer.Typer) -> None:
                     items = _list_sequence_groups(cfg)
                 elif for_ == "tags":
                     items = _list_tags(cfg)
+                elif for_ == "vendors":
+                    items = _list_vendors(cfg)
                 else:
                     items = []
 

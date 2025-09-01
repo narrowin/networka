@@ -110,6 +110,13 @@ _nw() {
 					$nw_cmd __complete --for tags 2>/dev/null
 				fi
 				return ;;
+			vendors)
+				if [[ -n "$cfg" ]]; then
+					$nw_cmd __complete --for vendors --config "$cfg" 2>/dev/null
+				else
+					$nw_cmd __complete --for vendors 2>/dev/null
+				fi
+				return ;;
 		esac
 	}
 
@@ -161,7 +168,7 @@ _nw() {
 	local list_groups_opts="$output_opts $common_opts"
 	local list_sequences_opts="--vendor --category $output_opts $common_opts"
 	local ssh_opts="--config -c --auth --user --password --layout --session-name --window-name --reuse --sync --no-sync --use-sshpass --attach --no-attach --platform -p --port $common_opts"
-	local info_opts="--interactive-auth -i $output_opts $common_opts"
+	local info_opts="--vendor --interactive-auth -i $output_opts $common_opts"
 	local config_validate_opts="$common_opts"
 	local config_init_opts="$common_opts --force"
 	local diff_opts="$common_opts"
@@ -178,6 +185,14 @@ _nw() {
 				groups=$(_nw_list groups)
 				sequences=$(_nw_list sequences)
 				_opts "$devices $groups $sequences"
+			elif [[ $cur == --vendor=* ]]; then
+				# Complete vendor name after --vendor=
+				local vendors="${cur#--vendor=}"
+				vendors=$(_nw_list vendors)
+				COMPREPLY=( $(compgen -W "$vendors" -- "${cur#--vendor=}") )
+			elif [[ ${COMP_WORDS[COMP_CWORD-1]} == "--vendor" ]]; then
+				# Complete vendor name after --vendor
+				_opts "$(_nw_list vendors)"
 			else
 				_opts "$info_opts"
 			fi
