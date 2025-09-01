@@ -26,7 +26,6 @@ class TestDeviceListTableProvider:
             general=GeneralConfig(),
             devices={},
             device_groups={},
-            global_command_sequences={},
         )
 
         provider = DeviceListTableProvider(config=config)
@@ -38,7 +37,6 @@ class TestDeviceListTableProvider:
             general=GeneralConfig(),
             devices={},
             device_groups={},
-            global_command_sequences={},
         )
         provider = DeviceListTableProvider(config=config)
 
@@ -52,7 +50,6 @@ class TestDeviceListTableProvider:
             general=GeneralConfig(),
             devices={},
             device_groups={},
-            global_command_sequences={},
         )
         provider = DeviceListTableProvider(config=config)
 
@@ -76,7 +73,6 @@ class TestDeviceListTableProvider:
                 ),
             },
             device_groups={},
-            global_command_sequences={},
         )
         provider = DeviceListTableProvider(config=config)
 
@@ -96,7 +92,6 @@ class TestDeviceListTableProvider:
                 )
             },
             device_groups={},
-            global_command_sequences={},
         )
         provider = DeviceListTableProvider(config=config)
 
@@ -115,7 +110,6 @@ class TestDeviceListTableProvider:
                 "device2": DeviceConfig(host="10.0.0.2", device_type="cisco_iosxe"),
             },
             device_groups={},
-            global_command_sequences={},
         )
         provider = DeviceListTableProvider(config=config)
 
@@ -133,7 +127,6 @@ class TestGroupListTableProvider:
             general=GeneralConfig(),
             devices={},
             device_groups={},
-            global_command_sequences={},
         )
 
         provider = GroupListTableProvider(config=config)
@@ -145,7 +138,6 @@ class TestGroupListTableProvider:
             general=GeneralConfig(),
             devices={},
             device_groups={},
-            global_command_sequences={},
         )
         provider = GroupListTableProvider(config=config)
 
@@ -159,7 +151,6 @@ class TestGroupListTableProvider:
             general=GeneralConfig(),
             devices={},
             device_groups={},
-            global_command_sequences={},
         )
         provider = GroupListTableProvider(config=config)
 
@@ -188,7 +179,6 @@ class TestGroupListTableProvider:
                     match_tags=["switch"],
                 ),
             },
-            global_command_sequences={},
         )
         provider = GroupListTableProvider(config=config)
 
@@ -276,7 +266,6 @@ class TestTableProviderIntegration:
             general=GeneralConfig(),
             devices={},
             device_groups={},
-            global_command_sequences={},
         )
 
         # All providers should handle empty data
@@ -299,7 +288,6 @@ class TestTableProviderIntegration:
             general=GeneralConfig(),
             devices={},
             device_groups={},
-            global_command_sequences={},
         )
 
         providers = [
@@ -335,7 +323,6 @@ class TestTableProviderErrorHandling:
                 )
             },
             device_groups={},
-            global_command_sequences={},
         )
 
         provider = DeviceListTableProvider(config=config)
@@ -356,7 +343,6 @@ class TestTableProviderErrorHandling:
                     members=[],  # Empty members list
                 ),
             },
-            global_command_sequences={},
         )
 
         provider = GroupListTableProvider(config=config)

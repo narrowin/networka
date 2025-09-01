@@ -683,6 +683,58 @@ def _load_csv_groups(csv_path: Path) -> dict[str, DeviceGroup]:
         return {}
 
 
+def _load_csv_sequences(csv_path: Path) -> dict[str, VendorSequence]:
+    """
+    Load command sequence configurations from CSV file.
+
+    Expected CSV headers: name,description,commands,category,device_types
+    Commands and device_types should be semicolon-separated.
+    """
+    sequences: dict[str, VendorSequence] = {}
+
+    try:
+        with csv_path.open("r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+
+            for row in reader:
+                name = row.get("name", "").strip()
+                if not name:
+                    continue
+
+                # Parse commands from semicolon-separated string
+                commands_str = row.get("commands", "").strip()
+                if not commands_str:
+                    continue  # Skip sequences without commands
+
+                commands = [
+                    cmd.strip() for cmd in commands_str.split(";") if cmd.strip()
+                ]
+
+                # Parse device_types from semicolon-separated string
+                device_types_str = row.get("device_types", "").strip()
+                device_types = (
+                    [dt.strip() for dt in device_types_str.split(";") if dt.strip()]
+                    if device_types_str
+                    else None
+                )
+
+                sequence_config = VendorSequence(
+                    description=row.get("description", "").strip(),
+                    commands=commands,
+                    category=row.get("category", "").strip() or None,
+                    device_types=device_types,
+                )
+
+                sequences[name] = sequence_config
+
+        logging.debug(f"Loaded {len(sequences)} sequences from CSV: {csv_path}")
+        return sequences
+
+    except Exception as e:  # pragma: no cover - robustness
+        logging.warning(f"Failed to load sequences from CSV {csv_path}: {e}")
+        return {}
+
+
 def _discover_config_files(config_dir: Path, config_type: str) -> list[Path]:
     """
     Discover configuration files of a specific type in config directory and subdirectories.

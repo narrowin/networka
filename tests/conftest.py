@@ -102,23 +102,6 @@ def sample_config_data(temp_dir: Path) -> dict[str, Any]:
                 "match_tags": ["core"],
             },
         },
-        "global_command_sequences": {
-            "system_info": {
-                "description": "Get system information",
-                "commands": [
-                    "/system/identity/print",
-                    "/system/resource/print",
-                    "/system/clock/print",
-                ],
-            },
-            "interface_status": {
-                "description": "Check interface status",
-                "commands": [
-                    "/interface/print brief",
-                    "/interface/ethernet/print brief",
-                ],
-            },
-        },
         "file_operations": {
             "firmware_upload": {
                 "local_path": str(temp_dir / "firmware" / "routeros-7.12.npk"),
