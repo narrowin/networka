@@ -8,7 +8,7 @@ The Network Toolkit now supports interactive credential input through the `--int
 
 Add the `--interactive-auth` or `-i` flag to any command that connects to devices:
 
-```bash
+````bash
 # Device information with interactive auth
 nw info sw-acc1 --interactive-auth
 
@@ -31,18 +31,21 @@ Will use username: myuser
 Executing on sw-acc1: /system/identity/print
 name="MikroTik"
 Command completed successfully on sw-acc1
-```
+````
 
 1. **`src/network_toolkit/common/credentials.py`** - New module providing:
+
    - `InteractiveCredentials` - Type-safe credential container (NamedTuple)
    - `prompt_for_credentials()` - Secure credential input using getpass
    - `confirm_credentials()` - Optional credential verification
 
 2. **Enhanced Configuration System** - `src/network_toolkit/config.py`:
+
    - `get_device_connection_params()` now accepts credential overrides
    - Maintains compatibility with existing credential sources
 
 3. **Updated Device Session** - `src/network_toolkit/device.py`:
+
    - `DeviceSession` constructor accepts username/password overrides
    - Credential override parameters passed to connection logic
 
@@ -82,7 +85,7 @@ Command completed successfully on sw-acc1
 
 ### Basic Usage
 
-```bash
+````bash
 # Info command with interactive auth
 $ nw info sw-acc1 --interactive-auth
 Interactive authentication mode enabled
@@ -107,11 +110,13 @@ Will use username: admin
 Executing on sw-acc1,sw-acc2: '/system/clock/print'
 Command completed successfully on sw-acc1
 Command completed successfully on sw-acc2
-```
+````
+
 Executing on sw-acc1: /system/identity/print
 name="MikroTik"
 ✓ Command completed successfully on sw-acc1
-```
+
+````
 
 ### Multiple Devices
 
@@ -126,7 +131,7 @@ Will use username: admin
 Executing on sw-acc1,sw-acc2: /system/clock/print
 ✓ Command completed successfully on sw-acc1
 ✓ Command completed successfully on sw-acc2
-```
+````
 
 ## Implementation Notes
 
@@ -140,21 +145,6 @@ def prompt_for_credentials(
     password_prompt: str = "Password",
     default_username: str | None = None,
 ) -> InteractiveCredentials:
-```
-
-### Async Compatibility
-
-The credential system integrates seamlessly with the existing async device session architecture:
-
-```python
-# Credentials are passed as parameters to async context managers
-async with DeviceSession(
-    device_name,
-    config,
-    username_override=creds.username,
-    password_override=creds.password
-) as session:
-    result = await session.execute_command(command)
 ```
 
 ### Backward Compatibility

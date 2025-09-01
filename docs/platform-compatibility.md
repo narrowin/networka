@@ -69,8 +69,6 @@ nw --help
 
 Performance is comparable across Linux and macOS. On Windows, use WSL2 for best results.
 
-- **asyncio**: Cross-platform async support
-
 ## Known Platform Differences
 
 ### Path Handling

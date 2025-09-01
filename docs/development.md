@@ -73,47 +73,8 @@ task build                       # Build package
 
 - **Linting**: ruff (replaces flake8, isort, black)
 - **Type checking**: mypy with strict settings
-- **Testing**: pytest with async support
+- **Testing**: pytest
 - **Security**: bandit for security linting
-
-### Example code patterns
-
-```python
-# Async function with proper typing
-async def execute_command(
-    device_name: str,
-    command: str,
-    config: NetworkConfig
-) -> CommandResult:
-    """Execute a command on a network device.
-
-    Parameters
-    ----------
-    device_name : str
-        Name of the device to execute command on
-    command : str
-        Command to execute
-    config : NetworkConfig
-        Device configuration
-
-    Returns
-    -------
-    CommandResult
-        Result of command execution
-
-    Raises
-    ------
-    DeviceConnectionError
-        If connection to device fails
-    DeviceExecutionError
-        If command execution fails
-    """
-    try:
-        async with DeviceSession(device_name, config) as session:
-            return await session.execute_command(command)
-    except ScrapliException as e:
-        raise DeviceConnectionError(f"Failed to connect to {device_name}") from e
-```
 
 ## Testing
 
@@ -132,37 +93,7 @@ uv run pytest tests/test_device.py
 # Run with verbose output
 uv run pytest -v
 
-# Run async tests only
-uv run pytest -m asyncio
-```
 
-### Writing tests
-
-```python
-import pytest
-from unittest.mock import patch, AsyncMock
-from network_toolkit.device import DeviceSession
-from network_toolkit.config import NetworkConfig
-
-@pytest.mark.asyncio
-async def test_device_connection(mock_config: NetworkConfig):
-    """Test device connection establishment."""
-    with patch('scrapli.AsyncScrapli') as mock_scrapli:
-        mock_scrapli.return_value.__aenter__.return_value.send_command = AsyncMock(
-            return_value=MockResponse(result="test output")
-        )
-
-        async with DeviceSession("test_device", mock_config) as session:
-            result = await session.execute_command("/system/identity/print")
-            assert result.output == "test output"
-
-@pytest.fixture
-def mock_config() -> NetworkConfig:
-    """Provide test configuration."""
-    return NetworkConfig(
-        general=GeneralConfig(timeout=30),
-        devices={"test": DeviceConfig(host="192.168.1.1")}
-    )
 ```
 
 ## Building and releasing

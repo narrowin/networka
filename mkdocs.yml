@@ -1,5 +1,5 @@
 site_name: Networka
-site_description: Modern async Python toolkit for network device automation
+site_description: Modern Python cli toolkit for network device automation
 site_url: https://narrowin.github.io/networka/
 repo_url: https://github.com/narrowin/networka
 repo_name: narrowin/networka

@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "networka"
 dynamic = ["version"]
-description = "Modern async Python toolkit for network device automation"
+description = "Modern Python cli toolkit for network device automation"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
