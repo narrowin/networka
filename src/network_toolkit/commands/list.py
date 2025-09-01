@@ -14,7 +14,6 @@ from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import OutputMode
 from network_toolkit.common.table_providers import (
     DeviceListTableProvider,
-    GlobalSequencesTableProvider,
     GroupListTableProvider,
     SupportedPlatformsTableProvider,
     TransportTypesTableProvider,
@@ -95,17 +94,6 @@ def _show_all_vendor_sequences(
     ctx.render_table(provider, verbose)
 
 
-def _show_global_sequences(
-    config: NetworkConfig,
-    ctx: CommandContext,
-    *,
-    verbose: bool = False,
-) -> None:
-    """Display global sequences."""
-    provider = GlobalSequencesTableProvider(config=config, verbose=verbose)
-    ctx.render_table(provider, verbose)
-
-
 def _show_supported_types_impl(ctx: CommandContext, *, verbose: bool) -> None:
     """Implementation logic for showing supported device types."""
     # Show transport types first
@@ -144,13 +132,6 @@ def _list_sequences_impl(
             )
         else:
             ctx.print_warning("No vendor-specific sequences found.")
-
-    # Show global sequences
-    if config.global_command_sequences:
-        ctx.output_manager.print_blank_line()
-        _show_global_sequences(config, ctx, verbose=verbose)
-    else:
-        ctx.print_warning("No global sequences found.")
 
 
 def register(app: typer.Typer) -> None:

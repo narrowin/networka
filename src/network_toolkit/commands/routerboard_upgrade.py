@@ -121,13 +121,6 @@ def register(app: typer.Typer) -> None:
                                 and precheck_sequence in dcfg.command_sequences
                             ):
                                 seq_cmds = dcfg.command_sequences[precheck_sequence]
-                            elif (
-                                config.global_command_sequences
-                                and precheck_sequence in config.global_command_sequences
-                            ):
-                                seq_cmds = config.global_command_sequences[
-                                    precheck_sequence
-                                ].commands
 
                             for cmd in seq_cmds:
                                 session.execute_command(cmd)

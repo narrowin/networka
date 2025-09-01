@@ -822,15 +822,9 @@ def _config_validate_impl(
 
         device_count = len(config.devices) if config.devices else 0
         group_count = len(config.device_groups) if config.device_groups else 0
-        global_seq_count = (
-            len(config.global_command_sequences)
-            if config.global_command_sequences
-            else 0
-        )
 
         output_manager.print_info(f"Devices: {device_count}")
         output_manager.print_info(f"Device Groups: {group_count}")
-        output_manager.print_info(f"Global Sequences: {global_seq_count}")
 
         if verbose and device_count > 0 and config.devices:
             output_manager.print_blank_line()

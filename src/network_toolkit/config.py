@@ -320,22 +320,6 @@ class VendorSequence(BaseModel):
         self._source_path = path
 
 
-class CommandSequence(BaseModel):
-    """Global command sequence definition."""
-
-    description: str
-    commands: list[str]
-    tags: list[str] | None = None
-    file_operations: dict[str, Any] | None = None
-
-    # Private: where this global sequence was loaded from
-    _source_path: Path | None = PrivateAttr(default=None)
-
-    def set_source_path(self, path: Path) -> None:
-        """Set the source path where this global sequence was defined."""
-        self._source_path = path
-
-
 class CommandSequenceGroup(BaseModel):
     """Command sequence group definition."""
 
@@ -361,7 +345,6 @@ class NetworkConfig(BaseModel):
     general: GeneralConfig = GeneralConfig()
     devices: dict[str, DeviceConfig] | None = None
     device_groups: dict[str, DeviceGroup] | None = None
-    global_command_sequences: dict[str, CommandSequence] | None = None
     command_sequence_groups: dict[str, CommandSequenceGroup] | None = None
     file_operations: dict[str, FileOperationConfig] | None = None
 
@@ -382,17 +365,6 @@ class NetworkConfig(BaseModel):
         if grp is None:
             return None
         return getattr(grp, "_source_path", None)
-
-    # Helper: global sequence source path accessor (non-schema, uses PrivateAttr on CommandSequence)
-    def get_global_sequence_source_path(self, sequence_name: str) -> Path | None:
-        seq = (
-            self.global_command_sequences.get(sequence_name)
-            if self.global_command_sequences
-            else None
-        )
-        if seq is None:
-            return None
-        return getattr(seq, "_source_path", None)
 
     def get_device_connection_params(
         self,
@@ -479,32 +451,6 @@ class NetworkConfig(BaseModel):
         device = self.devices[device_name]
         return device.transport_type or self.general.default_transport_type
 
-    def get_command_sequences_by_tags(
-        self, tags: list[str]
-    ) -> dict[str, CommandSequence]:
-        """
-        Get command sequences that match any of the specified tags.
-
-        Parameters
-        ----------
-        tags : list[str]
-            List of tags to match against
-
-        Returns
-        -------
-        dict[str, CommandSequence]
-            Dictionary of sequence names to CommandSequence objects that match the tags
-        """
-        if not self.global_command_sequences:
-            return {}
-
-        matching_sequences: dict[str, CommandSequence] = {}
-        for sequence_name, sequence in self.global_command_sequences.items():
-            if sequence.tags and any(tag in sequence.tags for tag in tags):
-                matching_sequences[sequence_name] = sequence
-
-        return matching_sequences
-
     def list_command_sequence_groups(self) -> dict[str, CommandSequenceGroup]:
         """
         List all available command sequence groups.
@@ -515,127 +461,6 @@ class NetworkConfig(BaseModel):
             Dictionary of group names to CommandSequenceGroup objects
         """
         return self.command_sequence_groups or {}
-
-    def get_command_sequences_by_group(
-        self, group_name: str
-    ) -> dict[str, CommandSequence]:
-        """
-        Get command sequences that match a specific group's tags.
-
-        Parameters
-        ----------
-        group_name : str
-            Name of the command sequence group
-
-        Returns
-        -------
-        dict[str, CommandSequence]
-            Dictionary of sequence names to CommandSequence objects that match the group's tags
-
-        Raises
-        ------
-        ValueError
-            If the group doesn't exist
-        """
-        if (
-            not self.command_sequence_groups
-            or group_name not in self.command_sequence_groups
-        ):
-            msg = f"Command sequence group '{group_name}' not found in configuration"
-            raise ValueError(msg)
-
-        group = self.command_sequence_groups[group_name]
-        return self.get_command_sequences_by_tags(group.match_tags)
-
-    # --- New unified sequence helpers ---
-    def get_all_sequences(self) -> dict[str, dict[str, Any]]:
-        """Return all available sequences from global and device-specific configs.
-
-        Returns
-        -------
-        dict[str, dict]
-            Mapping of sequence name -> info dict with keys:
-            - commands: list[str]
-            - origin: "global" | "device"
-            - sources: list[str] (device names if origin == "device", or ["global"])
-            - description: str | None (only for global sequences)
-        """
-        sequences: dict[str, dict[str, Any]] = {}
-
-        # Add global sequences first (these take precedence)
-        if self.global_command_sequences:
-            for name, seq in self.global_command_sequences.items():
-                sequences[name] = {
-                    "commands": list(seq.commands),
-                    "origin": "global",
-                    "sources": ["global"],
-                    "description": getattr(seq, "description", None),
-                }
-
-        # Add device-specific sequences if not already defined globally
-        if self.devices:
-            for dev_name, dev in self.devices.items():
-                if not dev.command_sequences:
-                    continue
-                for name, commands in dev.command_sequences.items():
-                    if name not in sequences:
-                        sequences[name] = {
-                            "commands": list(commands),
-                            "origin": "device",
-                            "sources": [dev_name],
-                            "description": None,
-                        }
-                    elif sequences[name]["origin"] == "device":
-                        # Track additional device sources for same-named sequence
-                        sources = sequences[name].setdefault("sources", [])
-                        if dev_name not in sources:
-                            sources.append(dev_name)
-        return sequences
-
-    def resolve_sequence_commands(
-        self, sequence_name: str, device_name: str | None = None
-    ) -> list[str] | None:
-        """Resolve commands for a sequence name from any origin.
-
-        Parameters
-        ----------
-        sequence_name : str
-            Name of the sequence to resolve
-        device_name : str | None
-            Device name to use for vendor-specific sequence resolution
-
-        Returns
-        -------
-        list[str] | None
-            List of commands for the sequence, or None if not found
-
-        Resolution order:
-        1. Global sequence definitions (highest priority)
-        2. Vendor-specific sequences based on device's device_type
-        3. Device-specific sequences (lowest priority)
-        """
-        # 1. Prefer global definition
-        if (
-            self.global_command_sequences
-            and sequence_name in self.global_command_sequences
-        ):
-            return list(self.global_command_sequences[sequence_name].commands)
-
-        # 2. Look for vendor-specific sequences
-        if device_name and self.devices and device_name in self.devices:
-            device = self.devices[device_name]
-            vendor_commands = self._resolve_vendor_sequence(
-                sequence_name, device.device_type
-            )
-            if vendor_commands:
-                return vendor_commands
-
-        # 3. Fall back to any device-defined sequence
-        if self.devices:
-            for dev in self.devices.values():
-                if dev.command_sequences and sequence_name in dev.command_sequences:
-                    return list(dev.command_sequences[sequence_name])
-        return None
 
     def _resolve_vendor_sequence(
         self, sequence_name: str, device_type: str
@@ -855,58 +680,6 @@ def _load_csv_groups(csv_path: Path) -> dict[str, DeviceGroup]:
 
     except Exception as e:  # pragma: no cover - robustness
         logging.warning(f"Failed to load groups from CSV {csv_path}: {e}")
-        return {}
-
-
-def _load_csv_sequences(csv_path: Path) -> dict[str, CommandSequence]:
-    """
-    Load command sequence configurations from CSV file.
-
-    Expected CSV headers: name,description,commands,tags
-    Commands and tags should be semicolon-separated.
-    """
-    sequences: dict[str, CommandSequence] = {}
-
-    try:
-        with csv_path.open("r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-
-            for row in reader:
-                name = row.get("name", "").strip()
-                if not name:
-                    continue
-
-                # Parse commands from semicolon-separated string
-                commands_str = row.get("commands", "").strip()
-                commands = [
-                    cmd.strip() for cmd in commands_str.split(";") if cmd.strip()
-                ]
-
-                if not commands:
-                    logging.warning(f"Sequence '{name}' has no commands, skipping")
-                    continue
-
-                # Parse tags from semicolon-separated string
-                tags_str = row.get("tags", "").strip()
-                tags = (
-                    [tag.strip() for tag in tags_str.split(";") if tag.strip()]
-                    if tags_str
-                    else None
-                )
-
-                sequence_config = CommandSequence(
-                    description=row.get("description", "").strip(),
-                    commands=commands,
-                    tags=tags,
-                )
-
-                sequences[name] = sequence_config
-
-        logging.debug(f"Loaded {len(sequences)} sequences from CSV: {csv_path}")
-        return sequences
-
-    except Exception as e:  # pragma: no cover - robustness
-        logging.warning(f"Failed to load sequences from CSV {csv_path}: {e}")
         return {}
 
 
@@ -1228,30 +1001,17 @@ def load_modular_config(
                 except yaml.YAMLError as e:
                     logging.warning(f"Invalid YAML in {group_file}: {e}")
 
-        # Enhanced sequence loading with CSV support and subdirectory discovery
-        all_sequences: dict[str, Any] = {}
+        # Load vendor-specific sequences from config files
         sequence_files = _discover_config_files(config_dir, "sequences")
         sequences_config: dict[str, Any] = {}
-        global_sequence_sources: dict[str, Path] = {}
 
         for seq_file in sequence_files:
-            if seq_file.suffix.lower() == ".csv":
-                file_sequences = _load_csv_sequences(seq_file)
-                for _seq_name in file_sequences.keys():
-                    global_sequence_sources[_seq_name] = seq_file
-                all_sequences.update(file_sequences)
-            else:
+            if (
+                seq_file.suffix.lower() != ".csv"
+            ):  # Only process YAML files for vendor config
                 try:
                     with seq_file.open("r", encoding="utf-8") as sf:
                         seq_yaml_config: dict[str, Any] = yaml.safe_load(sf) or {}
-                        # Extract sequences
-                        file_sequences_node = cast(
-                            dict[str, dict[str, Any]],
-                            seq_yaml_config.get("sequences", {}) or {},
-                        )
-                        for _seq_name in file_sequences_node.keys():
-                            global_sequence_sources[_seq_name] = seq_file
-                        all_sequences.update(file_sequences_node)
 
                         # Keep track of other sequence config for vendor sequences
                         if not sequences_config:
@@ -1271,7 +1031,6 @@ def load_modular_config(
             "general": main_config.get("general", {}),
             "devices": all_devices,
             "device_groups": all_groups,
-            "global_command_sequences": all_sequences,
             "vendor_platforms": sequences_config.get("vendor_platforms", {}),
             "vendor_sequences": vendor_sequences,
         }
@@ -1279,7 +1038,6 @@ def load_modular_config(
         logging.debug(f"Loaded modular configuration from {config_dir.resolve()}")
         logging.debug(f"  - Devices: {len(all_devices)}")
         logging.debug(f"  - Groups: {len(all_groups)}")
-        logging.debug(f"  - Sequences: {len(all_sequences)}")
 
         # Build the model and then assign private source paths
         model = NetworkConfig(**merged_config)
@@ -1296,12 +1054,6 @@ def load_modular_config(
                 src = group_sources.get(_name)
                 if src is not None:
                     _grp.set_source_path(src)
-
-        if model.global_command_sequences:
-            for _name, _seq in model.global_command_sequences.items():
-                src = global_sequence_sources.get(_name)
-                if src is not None:
-                    _seq.set_source_path(src)
 
         return model
 

@@ -21,7 +21,6 @@ from network_toolkit.common.table_generator import BaseTableProvider
 from network_toolkit.common.table_providers import (
     DeviceInfoTableProvider,
     DeviceTypesInfoTableProvider,
-    GlobalSequenceInfoTableProvider,
     GroupInfoTableProvider,
     TransportTypesTableProvider,
     VendorSequenceInfoTableProvider,
@@ -160,7 +159,6 @@ def register(app: typer.Typer) -> None:
             if known_count == 0 and unknown_count > 0:
                 has_devices = bool(getattr(config, "devices", None))
                 has_groups = bool(getattr(config, "device_groups", None))
-                has_global_seq = bool(getattr(config, "global_command_sequences", None))
                 # Inspect vendor sequences to determine if repository provides any
                 sm = SequenceManager(config)
                 all_vendor_sequences = sm.list_all_sequences()
@@ -168,9 +166,7 @@ def register(app: typer.Typer) -> None:
                     bool(v) for v in all_vendor_sequences.values()
                 )
 
-                has_any_definitions = (
-                    has_devices or has_groups or has_global_seq or has_vendor_sequences
-                )
+                has_any_definitions = has_devices or has_groups or has_vendor_sequences
 
                 if has_any_definitions:
                     # Heuristic: treat a single unknown token that doesn't look like a
@@ -233,10 +229,6 @@ def _determine_target_type(target: str, config: NetworkConfig) -> str:
     if config.device_groups and target in config.device_groups:
         return "group"
 
-    # Check if it's a global sequence
-    if config.global_command_sequences and target in config.global_command_sequences:
-        return "sequence"
-
     # Check if it's a vendor sequence
     sm = SequenceManager(config)
     all_sequences = sm.list_all_sequences()
@@ -285,15 +277,6 @@ def _show_sequence_info(
 ) -> None:
     """Show detailed information for a sequence."""
     provider: BaseTableProvider
-
-    # Check global sequences first
-    if config.global_command_sequences and target in config.global_command_sequences:
-        sequence = config.global_command_sequences[target]
-        provider = GlobalSequenceInfoTableProvider(
-            config=config, sequence_name=target, sequence=sequence, verbose=verbose
-        )
-        ctx.render_table(provider, verbose)
-        return
 
     # Check vendor sequences
     sm = SequenceManager(config)

@@ -111,13 +111,6 @@ def config_backup(
             ):
                 return device_config.command_sequences[seq_name]
 
-            # Fall back to global sequences
-            if (
-                config.global_command_sequences
-                and seq_name in config.global_command_sequences
-            ):
-                return config.global_command_sequences[seq_name].commands
-
             return []
 
         def process_device(dev: str) -> bool:
@@ -300,11 +293,6 @@ def comprehensive_backup(
                 seq = dev_cfg.command_sequences.get("backup")
                 if seq:
                     return list(seq)
-
-            # Global sequence
-            global_seqs = config.global_command_sequences or {}
-            if "backup" in global_seqs:
-                return list(global_seqs["backup"].commands)
 
             return []
 

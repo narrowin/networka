@@ -39,11 +39,6 @@ def _resolve_config_backup_sequence(
         if seq:
             return list(seq)
 
-    # Global sequence
-    global_seqs = config.global_command_sequences or {}
-    if "config_backup" in global_seqs:
-        return list(global_seqs["config_backup"].commands)
-
     return None
 
 
