@@ -34,10 +34,8 @@ name="MikroTik"
 Command completed successfully
 ```
 
-## Demo
-
 <div align="center">
-  <img src="assets/gifs/networka-setup.gif" alt="Networka Setup Demo" width="100%" style="max-width: 800px;"/>
+  <img src="assets/gifs/networka-setup.gif" alt="Networka Setup Demo" width="100%"/>
   <p><em>Networka setup and command execution demonstration</em></p>
 </div>
 
