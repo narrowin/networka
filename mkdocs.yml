@@ -55,7 +55,7 @@ theme:
 
     # Palette toggle for light mode
     - scheme: default
-      primary: indigo
+      primary: black
       accent: indigo
       toggle:
         icon: material/brightness-4
