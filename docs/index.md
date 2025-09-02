@@ -36,7 +36,6 @@ Command completed successfully
 ## Key features
 
 - Multi-vendor automation (MikroTik, Cisco, Arista, Juniper, …)
-- Async concurrent operations for speed and scale
 - Flexible configuration (YAML/CSV), tags and groups
 - Vendor-aware sequences and backups
 - Rich CLI output with selectable output modes
