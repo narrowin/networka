@@ -28,39 +28,23 @@ name="MikroTik"
 Command completed successfully
 ```
 
-!!! tip "Pro tip"
-    Use `--help` with any command to see all available options and examples.
+## Demo
 
-## Installation options
+<div align="center">
+  <img src="assets/gifs/networka-setup.gif" alt="Networka Setup Demo" width="100%" style="max-width: 800px;"/>
+  <p><em>Networka setup and command execution demonstration</em></p>
+</div>
 
-=== "uv (Recommended)"
+## Key features
 
-    ```bash
-    uv tool install git+https://github.com/narrowin/networka.git
-    ```
+- Multi-vendor automation (MikroTik, Cisco, Arista, Juniper, …)
+- Async concurrent operations for speed and scale
+- Flexible configuration (YAML/CSV), tags and groups
+- Vendor-aware sequences and backups
+- Rich CLI output with selectable output modes
+- Type-safe internals (mypy), clean CLI (Typer + Rich)
 
-=== "pip"
-
-    ```bash
-    pip install git+https://github.com/narrowin/networka.git
-    ```
-
-=== "pipx"
-
-    ```bash
-    pipx install git+https://github.com/narrowin/networka.git
-    ```
-
-## What makes it different?
-
-- **Zero configuration needed** - Just run commands against IP addresses
-- **Async by design** - Built from ground up for concurrent operations  
-- **Vendor intelligence** - Platform-specific optimizations and commands
-- **Type safety** - Full mypy coverage for reliable automation
-- **Rich terminal** - Beautiful output with progress indicators and colors
-
-[Get started with configuration :material-arrow-right:](configuration.md){ .md-button .md-button--primary }
-[Browse examples :material-arrow-right:](examples/recipes.md){ .md-button }
+## Installation
 
 Start with the Installation, then explore the User guide for config, environment variables, output modes, results, and more.
 
