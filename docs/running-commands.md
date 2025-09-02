@@ -1,5 +1,16 @@
 # Running commands
 
+Common operations you'll use daily.
+
+## Quick Demo
+
+<div align="center">
+  <img src="../assets/gifs/networka-setup.gif" alt="Networka Commands Demo" width="100%" style="max-width: 800px;"/>
+  <p><em>See how to execute commands across devices and groups</em></p>
+</div>
+
+## Inspect targetsning commands
+
 Common operations you’ll use daily.
 
 ## Inspect targets
