@@ -34,9 +34,12 @@ name="MikroTik"
 Command completed successfully
 ```
 
-Short install video (30s):
+## Demo
 
-[asciinema placeholder – will be embedded here]
+<div align="center">
+  <img src="assets/gifs/networka-setup.gif" alt="Networka Setup Demo" width="100%" style="max-width: 800px;"/>
+  <p><em>Networka setup and command execution demonstration</em></p>
+</div>
 
 ## Key features
 

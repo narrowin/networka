@@ -48,6 +48,13 @@ Because a real **Networka** wants the f\*ing lot.”<br><br>
 - CLI reference → https://narrowin.github.io/networka/reference/cli/
 - API reference → https://narrowin.github.io/networka/reference/api/
 
+## Demo
+
+<div align="center">
+  <img src="https://narrowin.github.io/networka/assets/gifs/networka-setup.gif" alt="Networka Setup Demo" width="800"/>
+  <p><em>Networka setup and command execution demo</em></p>
+</div>
+
 ## Features
 
 ### **Core Capabilities**
