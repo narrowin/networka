@@ -3,12 +3,6 @@ template: home.html
 title: Networka
 ---
 
-## Naming & terminology
-
-- Networka: the project and documentation
-- nw: the command-line interface (CLI)
-- nw-tui: the terminal ui based on textual (coming soon)
-
 ## 60-second success {#quick-start}
 
 First, install networka:
@@ -34,17 +28,14 @@ name="MikroTik"
 Command completed successfully
 ```
 
-## Demo
-
 <div align="center">
-  <img src="assets/gifs/networka-setup.gif" alt="Networka Setup Demo" width="100%" style="max-width: 800px;"/>
+  <img src="assets/gifs/networka-setup.gif" alt="Networka Setup Demo" width="100%"/>
   <p><em>Networka setup and command execution demonstration</em></p>
 </div>
 
 ## Key features
 
 - Multi-vendor automation (MikroTik, Cisco, Arista, Juniper, …)
-- Async concurrent operations for speed and scale
 - Flexible configuration (YAML/CSV), tags and groups
 - Vendor-aware sequences and backups
 - Rich CLI output with selectable output modes

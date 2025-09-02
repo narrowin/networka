@@ -45,21 +45,21 @@ theme:
   favicon: assets/images/networka.png
   custom_dir: docs/overrides
   palette:
+    # Palette toggle for dark mode (default)
+    - scheme: slate
+      primary: black
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to light mode
+
     # Palette toggle for light mode
     - scheme: default
       primary: indigo
       accent: indigo
       toggle:
-        icon: material/brightness-7
-        name: Switch to dark mode
-
-    # Palette toggle for dark mode
-    - scheme: slate
-      primary: black
-      accent: indigo
-      toggle:
         icon: material/brightness-4
-        name: Switch to light mode
+        name: Switch to dark mode
   features:
     - navigation.tabs
     - navigation.sections
