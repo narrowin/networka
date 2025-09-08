@@ -289,7 +289,7 @@ dev = [
     "textual-dev>=1.0.0",
     # Type checking - pinned exactly for consistency (FastAPI approach)
     "mypy==1.17.1",
-    "ruff==0.12.10",
+    "ruff==0.12.12",
     # Type stubs for mypy
     "types-PyYAML>=6.0.0",
     "types-paramiko>=3.0.0",
