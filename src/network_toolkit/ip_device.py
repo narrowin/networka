@@ -74,23 +74,30 @@ def extract_ips_from_target(target: str) -> list[str]:
 
 def create_ip_device_config(
     ip: str,
-    platform: str,
-    device_type: str | None = None,
+    device_type: str,
+    hardware_platform: str | None = None,
     port: int | None = None,
+    transport_type: str | None = None,
 ) -> DeviceConfig:
     """
-    Create a DeviceConfig from an IP address and platform.
+    Create a DeviceConfig from an IP address and device type.
 
     Parameters
     ----------
     ip : str
         IP address of the device
-    platform : str
-        Scrapli platform identifier (e.g., 'mikrotik_routeros', 'cisco_iosxe')
-    device_type : str | None
-        Device type, defaults to platform if not provided
+    device_type : str
+        Network driver type identifier (e.g., 'mikrotik_routeros', 'cisco_iosxe')
+        This determines which Scrapli/transport driver to use for connections.
+        Must be a valid SupportedDeviceType.
+    hardware_platform : str | None
+        Hardware platform architecture (e.g., 'x86', 'arm', 'tile')
+        Used for firmware operations. Optional.
     port : int | None
         SSH port, defaults to 22 if not provided
+    transport_type : str | None
+        Transport type (currently only 'scrapli' is supported)
+        Defaults to configuration or 'scrapli'
 
     Returns
     -------
@@ -104,9 +111,13 @@ def create_ip_device_config(
         msg = f"Invalid IP address '{ip}': {e}"
         raise ValueError(msg) from e
 
-    # Use platform as device_type if not provided
-    if device_type is None:
-        device_type = platform
+    # Validate device_type against supported types
+    from network_toolkit.config import get_supported_device_types
+
+    if device_type not in get_supported_device_types():
+        supported = ", ".join(sorted(get_supported_device_types()))
+        msg = f"Unsupported device_type '{device_type}'. Supported types: {supported}"
+        raise ValueError(msg)
 
     # Default port to 22 if not provided
     if port is None:
@@ -115,48 +126,51 @@ def create_ip_device_config(
     return DeviceConfig(
         host=ip,
         description=f"Dynamic device at {ip}",
-        device_type=device_type,
-        platform=platform,
+        device_type=device_type,  # Validated above
+        platform=hardware_platform,
         port=port,
+        transport_type=transport_type,
     )
 
 
 def create_ip_based_config(
     ips: list[str],
-    platform: str,
+    device_type: str,
     base_config: NetworkConfig,
-    device_type: str | None = None,
+    hardware_platform: str | None = None,
     port: int | None = None,
+    transport_type: str | None = None,
 ) -> NetworkConfig:
     """
-    Create a NetworkConfig with devices based on IP addresses.
+    Create a NetworkConfig with IP-based device configurations.
 
     Parameters
     ----------
     ips : list[str]
-        List of IP addresses
-    platform : str
-        Scrapli platform identifier
+        List of IP addresses to create device configurations for
+    device_type : str
+        Network driver type for all IP devices (e.g., 'mikrotik_routeros')
     base_config : NetworkConfig
-        Base configuration to copy general settings from
-    device_type : str | None
-        Device type, defaults to platform if not provided
+        Base configuration to extend with IP devices
+    hardware_platform : str | None
+        Hardware platform architecture for all IP devices (e.g., 'x86', 'arm')
     port : int | None
-        SSH port, defaults to 22 if not provided
+        SSH port for all IP devices, defaults to 22
+    transport_type : str | None
+        Transport type for all IP devices (currently only 'scrapli' is supported)
 
     Returns
     -------
     NetworkConfig
-        New configuration with IP-based devices
+        Enhanced configuration including IP-based devices
     """
-    # Create device configs for each IP
     ip_devices: dict[str, DeviceConfig] = {}
 
     for ip in ips:
-        # Use IP as device name (replace dots with dashes for valid names)
-        device_name = f"ip_{ip.replace('.', '_')}"
+        # Create a device name from the IP
+        device_name = f"ip_{ip.replace('.', '_').replace(':', '_')}"
         ip_devices[device_name] = create_ip_device_config(
-            ip, platform, device_type, port
+            ip, device_type, hardware_platform, port, transport_type
         )
 
     # Create new config with IP devices combined with existing devices
@@ -172,38 +186,56 @@ def create_ip_based_config(
     return NetworkConfig.model_validate(config_dict)
 
 
-def get_supported_platforms() -> dict[str, str]:
+def get_supported_device_types() -> dict[str, str]:
     """
-    Get supported Scrapli platforms with descriptions.
+    Get supported device types with descriptions.
 
     Returns
     -------
     dict[str, str]
-        Mapping of platform names to descriptions
+        Mapping of device type names to descriptions
     """
-    return {
+    from network_toolkit.config import get_supported_device_types
+
+    # Map device types to human-readable descriptions
+    descriptions = {
         "mikrotik_routeros": "MikroTik RouterOS",
         "cisco_iosxe": "Cisco IOS-XE",
+        "cisco_ios": "Cisco IOS",
         "cisco_iosxr": "Cisco IOS-XR",
         "cisco_nxos": "Cisco NX-OS",
         "juniper_junos": "Juniper JunOS",
         "arista_eos": "Arista EOS",
         "linux": "Linux SSH",
+        "generic": "Generic SSH",
+    }
+
+    # Only return descriptions for supported device types
+    supported_types = get_supported_device_types()
+    return {
+        dt: descriptions.get(dt, dt) for dt in supported_types if dt in descriptions
     }
 
 
-def validate_platform(platform: str) -> bool:
+# Backward compatibility alias
+get_supported_platforms = get_supported_device_types
+
+
+def validate_platform(device_type: str) -> bool:
     """
-    Validate if a platform is supported.
+    Validate if a device type is supported.
+
+    Note: This function name is maintained for backward compatibility,
+    but it actually validates device types (network drivers), not hardware platforms.
 
     Parameters
     ----------
-    platform : str
-        Platform identifier to validate
+    device_type : str
+        Device type identifier to validate
 
     Returns
     -------
     bool
-        True if platform is supported
+        True if device type is supported
     """
-    return platform in get_supported_platforms()
+    return device_type in get_supported_device_types()

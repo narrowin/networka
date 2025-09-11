@@ -9,11 +9,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 from typer.testing import CliRunner
 
-# Skip all tests in this module due to import/attribute errors
-pytest.skip("Module has import/attribute errors, needs investigation", allow_module_level=True)
-
 from network_toolkit.cli import app
 from network_toolkit.common.credentials import InteractiveCredentials
+
+# Skip all tests in this module due to import/attribute errors
+pytest.skip(
+    "Module has import/attribute errors, needs investigation", allow_module_level=True
+)
 
 
 class TestInteractiveAuthIntegration:

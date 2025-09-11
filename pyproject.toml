@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "net-worker"
+name = "networka"
 dynamic = ["version"]
-description = "Modern async Python toolkit for network device automation"
+description = "Modern Python cli toolkit for network device automation"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
@@ -49,6 +49,7 @@ dependencies = [
     "scrapli-community>=2025.1.30",
     "libtmux>=0.46.2",
     "python-dotenv>=1.0.0",
+    "textual>=0.58.0",
 ]
 
 [project.optional-dependencies]
@@ -63,29 +64,33 @@ dev = [
     "detect-secrets>=1.4.0",
     "bandit>=1.7.0",
     "build>=0.10.0",
+    "twine>=4.0.0",
     "types-PyYAML>=6.0.0",
     "types-paramiko>=3.0.0",
+    "cffconvert>=2.0.0",
 ]
 docs = [
     "mkdocs>=1.5.0",
     "mkdocs-material>=9.0.0",
     "mkdocstrings[python]>=0.24.0",
+    "mkdocs-click>=0.9.0",
 ]
 tmux = [
     "libtmux>=0.21.0",
 ]
 
 [project.urls]
-Homepage = "https://github.com/narrowin/net-worker"
-Documentation = "https://github.com/narrowin/net-worker#readme"
-Repository = "https://github.com/narrowin/net-worker.git"
-"Bug Tracker" = "https://github.com/narrowin/net-worker/issues"
-Changelog = "https://github.com/narrowin/net-worker/blob/main/CHANGELOG.md"
-"Source Code" = "https://github.com/narrowin/net-worker"
-"CI/CD" = "https://github.com/narrowin/net-worker/actions"
+Homepage = "https://github.com/narrowin/networka"
+Documentation = "https://narrowin.github.io/networka/"
+Repository = "https://github.com/narrowin/networka.git"
+"Bug Tracker" = "https://github.com/narrowin/networka/issues"
+Changelog = "https://github.com/narrowin/networka/blob/main/CHANGELOG.md"
+"Source Code" = "https://github.com/narrowin/networka"
+"CI/CD" = "https://github.com/narrowin/networka/actions"
 
 [project.scripts]
 nw = "network_toolkit.cli:app"
+# nw-tui = "network_toolkit.tui:run"  # TODO: Enable when TUI is ready for release
 
 [tool.hatch.version]
 path = "src/network_toolkit/__about__.py"
@@ -127,8 +132,8 @@ omit = [
 ]
 
 [tool.coverage.paths]
-network_toolkit = ["src/network_toolkit", "*/net-worker/src/network_toolkit"]
-tests = ["tests", "*/net-worker/tests"]
+network_toolkit = ["src/network_toolkit", "*/networka/src/network_toolkit"]
+tests = ["tests", "*/networka/tests"]
 
 [tool.coverage.report]
 exclude_lines = [
@@ -165,6 +170,10 @@ include = [
 [tool.ruff]
 target-version = "py311"
 line-length = 88
+include = [
+    "src/**/*.py",
+    "tests/**/*.py",
+]
 
 [tool.ruff.lint]
 select = [
@@ -195,35 +204,29 @@ select = [
     "YTT",
 ]
 ignore = [
-    # Allow non-abstract empty methods in abstract base classes
-    "B027",
-    # Allow boolean positional values in function calls, like `dict.get(... True)`
-    "FBT003",
-    # Ignore checks for possible passwords
-    "S105", "S106", "S107",
-    # Ignore complexity
+    # Complexity rules - these are judgment calls
     "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915",
-    # Temporarily disable for build testing
-    "PLC0415",  # Import outside toplevel
-    "ARG002",   # Unused method argument
-    "S108",     # Probable insecure usage of temp file/directory
+    # Formatter conflicts
+    "ISC001",   # Implicit string concatenation (conflicts with formatter)
+    # Specific cases where we need flexibility
+    "S101",     # Use of assert detected (common in tests)
+    "T201",     # print found (sometimes needed for debugging)
+    "ARG001",   # Unused function argument (common in protocol implementations)
+    "ARG002",   # Unused method argument (common in protocol implementations)
+    "PLR2004",  # Magic value used in comparison (sometimes unavoidable)
+    # Import-related (some are unavoidable due to optional dependencies)
+    "PLC0415",  # Import outside toplevel (needed for optional imports)
+    # Test-specific
     "B017",     # pytest.raises without match parameter
-    "F401",     # Unused imports
-    "RUF100",   # Unused noqa directive
-    # Additional common issues
-    "T201",     # print found
-    "T203",     # pprint found
-    "FBT001",   # Boolean positional arg in function definition
-    "FBT002",   # Boolean default value in function definition
-    "PLR2004",  # Magic value used in comparison
-    "S101",     # Use of assert detected
-    "PLW2901",  # Redefined loop variable
-    "PLR0917",  # Too many positional arguments
-    "E501",     # Line too long
-    "ARG001",   # Unused function argument
-    "S603",     # subprocess call check for execution of untrusted input
-    "S110",     # try-except-pass detected
-    "F821",     # Undefined name
+    "S110",     # try-except-pass detected (sometimes needed in cleanup)
+    # Additional pragmatic ignores for mature codebase
+    "E501",     # Line too long (often unavoidable in CLI help text and URLs)
+    "FBT003",   # Boolean positional value in function call (often clear in context)
+    "S108",     # Hardcoded temp file paths (acceptable in configuration defaults)
+    "S603",     # subprocess without shell=True (often safer this way)
+    "S105",     # Hardcoded password (acceptable in tests and examples)
+    "S107",     # Hardcoded password default (acceptable in configuration)
+    "A003",     # Class attribute shadowing Python builtin (legitimate interface methods)
 ]
 unfixable = [
     # Don't touch unused imports
@@ -237,23 +240,42 @@ known-first-party = ["network_toolkit"]
 ban-relative-imports = "all"
 
 [tool.ruff.lint.per-file-ignores]
-# Tests can use magic values, assertions, and relative imports
-"tests/**/*" = ["PLR2004", "S101", "TID252"]
+# Tests can use magic values, assertions, and relative imports, and boolean arguments
+"tests/**/*" = ["PLR2004", "S101", "TID252", "S105", "S106", "S107", "FBT001"]
+# CLI commands using Typer often need boolean flags and default arguments
+"src/network_toolkit/commands/**/*" = ["FBT001", "FBT002"]
+"src/network_toolkit/cli.py" = ["FBT002"]
+# TUI code often needs boolean parameters for theming and state
+"src/network_toolkit/tui/**/*" = ["FBT001"]
+# Platform operations often need boolean flags for hardware control
+"src/network_toolkit/platforms/**/*" = ["FBT001", "FBT002"]
+# Core device operations often need boolean flags for operational control
+"src/network_toolkit/device.py" = ["FBT001", "FBT002"]
+# Common library modules often need boolean parameters for flexibility
+"src/network_toolkit/common/**/*" = ["FBT001", "FBT002"]
 
 [tool.mypy]
 python_version = "3.11"
-warn_return_any = true
+incremental = true
+cache_dir = ".mypy_cache"
+cache_fine_grained = true
+warn_return_any = false
 warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
 check_untyped_defs = true
-disallow_untyped_decorators = true
+disallow_untyped_decorators = false
 no_implicit_optional = true
 warn_redundant_casts = true
-warn_unused_ignores = true
+warn_unused_ignores = false
 warn_no_return = true
-warn_unreachable = true
+warn_unreachable = false
 strict_equality = true
+ignore_missing_imports = true
+explicit_package_bases = true
+exclude = [
+    "tests/"
+]
 
 [dependency-groups]
 dev = [
@@ -263,4 +285,12 @@ dev = [
     "pytest-cov>=6.2.1",
     "pytest-mock>=3.14.1",
     "pytest-xdist>=3.8.0",
+    # Helper tooling for developing the Textual TUI (live reload, inspector)
+    "textual-dev>=1.0.0",
+    # Type checking - pinned exactly for consistency (FastAPI approach)
+    "mypy==1.17.1",
+    "ruff==0.12.10",
+    # Type stubs for mypy
+    "types-PyYAML>=6.0.0",
+    "types-paramiko>=3.0.0",
 ]

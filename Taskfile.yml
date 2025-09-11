@@ -1,7 +1,7 @@
 version: '3'
 
 vars:
-  PROJECT_NAME: net-worker
+  PROJECT_NAME: networka
   PACKAGE_NAME: network_toolkit
   PYTHON_VERSION: "3.11"
 
@@ -18,7 +18,7 @@ tasks:
   install:
     desc: Install development dependencies
     cmds:
-      - echo "🔧 Installing development dependencies..."
+      - echo "Installing development dependencies..."
       - uv sync --all-extras --group dev
     sources:
       - pyproject.toml
@@ -29,8 +29,17 @@ tasks:
   format:
     desc: Format code with ruff
     cmds:
-      - echo "🎨 Formatting code..."
+      - echo "Formatting code..."
       - uv run ruff format .
+    sources:
+      - src/**/*.py
+      - tests/**/*.py
+
+  format:check:
+    desc: Check code formatting with ruff
+    cmds:
+      - echo "Checking code formatting..."
+      - uv run ruff format --check .
     sources:
       - src/**/*.py
       - tests/**/*.py
@@ -38,7 +47,7 @@ tasks:
   lint:
     desc: Lint code with ruff
     cmds:
-      - echo "🔍 Linting code..."
+      - echo "Linting code..."
       - uv run ruff check .
     sources:
       - src/**/*.py
@@ -47,7 +56,7 @@ tasks:
   lint:fix:
     desc: Lint and fix code with ruff
     cmds:
-      - echo "🔧 Linting and fixing code..."
+      - echo "Linting and fixing code..."
       - uv run ruff check --fix .
     sources:
       - src/**/*.py
@@ -56,26 +65,51 @@ tasks:
   typecheck:
     desc: Type check with mypy
     cmds:
-      - echo "🔬 Type checking..."
+      - echo "Type checking..."
       - uv run mypy src/
     sources:
       - src/**/*.py
       - pyproject.toml
 
   test:
-    desc: Run tests
+    desc: Run tests (local development)
     cmds:
-      - echo "🧪 Running tests..."
-      - uv run pytest
+      - echo "Running tests (local development mode)..."
+      - uv run pytest -v
     sources:
       - src/**/*.py
       - tests/**/*.py
       - pyproject.toml
 
-  test:cov:
-    desc: Run tests with coverage
+  test:ci:
+    desc: Run tests with CI-exact environment (MANDATORY for CI parity)
+    env:
+      FORCE_COLOR: "1"
+      PYTHONUNBUFFERED: "1"
+      CI: "true"
+      COLUMNS: "150"
+      UV_FROZEN: "true"
     cmds:
-      - echo "📊 Running tests with coverage..."
+      - echo "Running tests with CI-exact environment..."
+      - echo "Environment variables:"
+      - echo "  FORCE_COLOR=$FORCE_COLOR"
+      - echo "  PYTHONUNBUFFERED=$PYTHONUNBUFFERED"
+      - echo "  CI=$CI"
+      - echo "  COLUMNS=$COLUMNS"
+      - echo "  UV_FROZEN=$UV_FROZEN"
+      - uv run pytest --cov={{.PACKAGE_NAME}} --cov-report=xml --cov-report=term-missing --tb=short --color=yes
+    sources:
+      - src/**/*.py
+      - tests/**/*.py
+      - pyproject.toml
+    generates:
+      - coverage.xml
+      - .coverage
+
+  test:cov:
+    desc: Run tests with coverage (local HTML report)
+    cmds:
+      - echo "Running tests with HTML coverage..."
       - uv run pytest --cov={{.PACKAGE_NAME}} --cov-report=term-missing --cov-report=html
     sources:
       - src/**/*.py
@@ -85,9 +119,9 @@ tasks:
       - .coverage
 
   test:fast:
-    desc: Run tests in parallel
+    desc: Run tests in parallel (no coverage)
     cmds:
-      - echo "⚡ Running tests in parallel..."
+      - echo "Running tests in parallel..."
       - uv run pytest -n auto
     sources:
       - src/**/*.py
@@ -96,9 +130,9 @@ tasks:
   security:
     desc: Run security checks
     cmds:
-      - echo "🔒 Running security checks..."
+      - echo "Running security checks..."
       - uv run bandit -r src/ -f json -o bandit-report.json || true
-      - echo "✅ Security report saved to bandit-report.json"
+      - echo "Security report saved to bandit-report.json"
     sources:
       - src/**/*.py
     generates:
@@ -107,7 +141,7 @@ tasks:
   secrets:
     desc: Scan for secrets
     cmds:
-      - echo "🕵️ Scanning for secrets..."
+      - echo "Scanning for secrets..."
       - uv run detect-secrets scan --all-files --baseline .secrets.baseline
     sources:
       - "**/*.py"
@@ -122,15 +156,15 @@ tasks:
       - typecheck
       - test
     cmds:
-      - echo "✅ All checks passed!"
+      - echo "All checks passed!"
 
   build:
     desc: Build package for GitHub release
     cmds:
-      - echo "📦 Building package for GitHub distribution..."
+      - echo "Building package for GitHub distribution..."
       - rm -rf dist/
       - uv build
-      - echo "✅ Built files:"
+      - echo "Built files:"
       - ls -la dist/
     sources:
       - src/**/*.py
@@ -143,9 +177,9 @@ tasks:
   build:check:
     desc: Build and validate package structure
     cmds:
-      - echo "🔍 Building and validating package..."
+      - echo "Building and validating package..."
       - uv build
-      - echo "📋 Package structure check:"
+      - echo "Package structure check:"
       - tar -tzf dist/*.tar.gz | head -20
       - unzip -l dist/*.whl | head -20
     sources:
@@ -159,7 +193,7 @@ tasks:
   clean:
     desc: Clean build artifacts
     cmds:
-      - echo "🧹 Cleaning build artifacts..."
+      - echo "Cleaning build artifacts..."
       - rm -rf build/
       - rm -rf dist/
       - rm -rf *.egg-info/
@@ -170,48 +204,58 @@ tasks:
       - rm -rf .ruff_cache/
       - find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
       - find . -type f -name "*.pyc" -delete 2>/dev/null || true
-      - echo "✅ Clean complete!"
+      - echo "Clean complete!"
 
   docs:
     desc: Generate documentation
     cmds:
-      - echo "📚 Generating documentation..."
-      - echo "⚠️ Documentation generation not yet implemented"
+      - echo "Generating documentation..."
+      - uv run mkdocs build --strict
+
+  docs:serve:
+    desc: Serve documentation locally with live reload
+    cmds:
+      - echo "Serving documentation on http://0.0.0.0:8000 ..."
+      - uv run mkdocs serve -a 0.0.0.0:8000
+
+  docs:check-links:
+    desc: Check documentation links locally (requires docs server to be running)
+    cmds:
+      - echo "Checking links with lychee via Docker..."
+      - docker run --rm --network host -v "$(pwd):/input:ro" lycheeverse/lychee:latest --config /input/.lychee.toml "/input/**/*.md"
+
+  docs:test:
+    desc: Build docs and check links
+    cmds:
+      - task: docs
+      - echo "Starting docs server in background..."
+      - nohup uv run mkdocs serve -a 0.0.0.0:8000 > /dev/null 2>&1 &
+      - sleep 3
+      - task: docs:check-links
+      - pkill -f "mkdocs serve" || true
 
   release:dry:
-    desc: Dry run GitHub release process
+    desc: Test release script in dry-run mode
     interactive: true
     cmds:
-      - echo "🚀 Running GitHub release dry run..."
+      - echo "Testing release script..."
       - |
         read -p "Enter version (e.g., 1.0.0): " version
-        echo "Would create GitHub release v$version with built assets"
-        echo "Assets that would be attached:"
-        task build
-        ls -la dist/
+        ./scripts/release.sh --version "$version" --dry-run
 
   release:
-    desc: Create a GitHub release (interactive)
+    desc: Execute release using release script
     interactive: true
     cmds:
-      - echo "🚀 Creating GitHub release..."
-      - echo "⚠️ This will create a new GitHub release with built assets."
-      - echo "   Make sure you're on main branch with clean working directory."
+      - echo "WARNING - This will create a new release and push to GitHub"
+      - echo "Make sure you are on main branch with clean working directory"
       - |
         read -p "Enter version (e.g., 1.0.0): " version
-        read -p "Are you sure you want to release v$version to GitHub? (y/N): " confirm
+        read -p "Are you sure you want to release v$version? (y/N): " confirm
         if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
-          echo "Building release assets..."
-          task build
-          echo "✅ Assets built. Create GitHub release manually and attach:"
-          ls -la dist/
-          echo "📌 Instructions:"
-          echo "1. Go to https://github.com/narrowin/net-worker/releases/new"
-          echo "2. Tag: v$version"
-          echo "3. Attach files from dist/ directory"
-          echo "4. Write release notes"
+          ./scripts/release.sh --version "$version"
         else
-          echo "❌ Release cancelled"
+          echo "Release cancelled"
         fi
 
   dev:
@@ -222,22 +266,22 @@ tasks:
       - typecheck
       - test
     cmds:
-      - echo "🎉 Development environment ready!"
+      - echo "Development environment ready!"
 
   ci:
-    desc: Run CI checks locally
+    desc: Run CI checks locally (matches GitHub Actions exactly)
     deps:
       - lint
       - typecheck
-      - test:cov
+      - test:ci
       - security
     cmds:
-      - echo "✅ CI checks completed!"
+      - echo "CI checks completed - matches GitHub Actions environment!"
 
   update:
     desc: Update dependencies
     cmds:
-      - echo "⬆️ Updating dependencies..."
+      - echo "Updating dependencies..."
       - uv sync --upgrade
     generates:
       - uv.lock
@@ -245,25 +289,25 @@ tasks:
   shell:
     desc: Open a shell in the virtual environment
     cmds:
-      - echo "🐚 Opening shell in virtual environment..."
+      - echo "Opening shell in virtual environment..."
       - uv shell
 
   run:
     desc: Run the CLI tool (nw --help)
     cmds:
-      - echo "🚀 Running net-worker CLI..."
+      - echo "Running networka CLI..."
       - uv run nw --help
 
   run:info:
     desc: Show CLI info command
     cmds:
-      - echo "ℹ️ Running nw info..."
+      - echo "Running nw info..."
       - uv run nw info || echo "No devices configured yet"
 
   run:version:
     desc: Show CLI version
     cmds:
-      - echo "📋 Showing version..."
+      - echo "Showing version..."
       - uv run nw version
 
   install:task:
@@ -271,7 +315,7 @@ tasks:
     cmds:
       - |
         if ! command -v task &> /dev/null; then
-          echo "📥 Installing go-task..."
+          echo "Installing go-task..."
           if command -v brew &> /dev/null; then
             brew install go-task
           elif command -v apt-get &> /dev/null; then
@@ -290,7 +334,7 @@ tasks:
             exit 1
           fi
         else
-          echo "✅ go-task is already installed"
+          echo "go-task is already installed"
         fi
     status:
       - command -v task
@@ -301,4 +345,4 @@ tasks:
       - install:task
       - install
     cmds:
-      - echo "🎯 Bootstrap complete! Run 'task dev' to set up development environment."
+      - echo "Bootstrap complete! Run 'task dev' to set up development environment."

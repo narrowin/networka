@@ -21,7 +21,7 @@ from network_toolkit.device import DeviceSession
 from pathlib import Path
 
 # Load configuration
-config = load_config("devices.yml")
+config = load_config("config/")
 
 # Upload a file to a single device
 with DeviceSession("router1", config) as session:

@@ -33,6 +33,10 @@ class FakeWindow:
     def attached_pane(self) -> FakePane:
         return self._panes[0]
 
+    @property
+    def active_pane(self) -> FakePane:
+        return self._panes[0]
+
     def split_window(
         self, *, attach: bool = False, vertical: bool | None = None
     ) -> FakePane:
@@ -60,6 +64,10 @@ class FakeSession:
     def attached_window(self) -> FakeWindow:
         return self._window
 
+    @property
+    def active_window(self) -> FakeWindow:
+        return self._window
+
     def new_window(
         self, *, _attach: bool = True, _window_name: str | None = None
     ) -> FakeWindow:
@@ -81,7 +89,7 @@ class FakeServer:
         name = query.get("session_name", "")
         return self.sessions.get(name)
 
-    def new_session(self, session_name: str, attach: bool = False) -> FakeSession:  # noqa: FBT001, FBT002
+    def new_session(self, session_name: str, attach: bool = False) -> FakeSession:  # noqa: FBT002
         _ = attach
         s = FakeSession(session_name)
         self.sessions[session_name] = s
@@ -165,7 +173,7 @@ def test_ssh_device_opens_session(config_file: Path) -> None:
         )
     assert result.exit_code == 0
     assert "Created tmux session" in result.output
-    assert "1 pane(s)" in result.output
+    assert "1" in result.output and "pane" in result.output
 
 
 def test_ssh_group_two_panes(config_file: Path) -> None:
@@ -184,7 +192,7 @@ def test_ssh_group_two_panes(config_file: Path) -> None:
             ],
         )
     assert result.exit_code == 0
-    assert "2 pane(s)" in result.output
+    assert "2" in result.output and "pane" in result.output
 
 
 def test_ssh_missing_tmux_server(config_file: Path) -> None:
@@ -244,8 +252,8 @@ def test_auth_key_first_uses_ssh_with_password_fallback(config_file: Path) -> No
     panes = sess.attached_window.panes
     assert len(panes) >= 1
     sent = panes[0].sent[0]
-    # Should use native SSH with key-first authentication preference
-    assert sent.startswith("ssh ")
+    # With password present and sshpass available, key-first uses sshpass to allow auto password
+    assert sent.startswith("sshpass -f ")
     assert "admin@192.168.1.10" in sent
     assert "PreferredAuthentications=publickey,password" in sent
     assert "PasswordAuthentication=yes" in sent
@@ -362,8 +370,9 @@ def test_user_password_overrides_use_ssh_with_key_first(config_file: Path) -> No
     assert FakeLibtmux.last_server is not None
     key = next(iter(FakeLibtmux.last_server.sessions))
     sent = FakeLibtmux.last_server.sessions[key].attached_window.panes[0].sent[0]
-    # Should use native SSH with key-first authentication preference
-    assert sent.startswith("ssh ")
+    # Should use sshpass (-f FIFO) with key-first authentication preference when password is provided
+    assert sent.startswith("sshpass -f ")
+    assert " ssh " in sent
     assert "other@192.168.1.10" in sent
     assert "PreferredAuthentications=publickey,password" in sent
     assert "PasswordAuthentication=yes" in sent

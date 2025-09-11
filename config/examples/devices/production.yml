@@ -12,7 +12,7 @@ devices:
       - "core"
       - "production"
       - "critical"
-  
+
   sw-prod-core-02:
     host: "10.0.1.2"
     device_type: "mikrotik_routeros"
@@ -25,7 +25,7 @@ devices:
       - "core"
       - "production"
       - "critical"
-      
+
   rtr-prod-wan-01:
     host: "10.0.0.1"
     device_type: "mikrotik_routeros"
@@ -36,6 +36,6 @@ devices:
     tags:
       - "router"
       - "wan"
-      - "production" 
+      - "production"
       - "critical"
       - "edge"

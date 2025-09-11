@@ -1,0 +1,146 @@
+site_name: Networka
+site_description: Modern Python cli toolkit for network device automation
+site_url: https://narrowin.github.io/networka/
+repo_url: https://github.com/narrowin/networka
+repo_name: narrowin/networka
+edit_uri: edit/main/docs/
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Intallation: getting-started.md
+      - Platform compatibility: platform-compatibility.md
+  - User guide:
+    - Configuration: configuration.md
+    - Environment variables: environment-variables.md
+    - Running commands: running-commands.md
+    - Results: results.md
+    - Output modes: output-modes.md
+    - Backups: backups.md
+    - File upload: file_upload.md
+    - Multi-vendor support: multi-vendor-support.md
+    - Shell completion: shell-completion.md
+    - Interactive credentials: interactive-credentials.md
+    - Transport: transport.md
+    - IP address support: ip-address-support.md
+    - tmux SSH sessions: tmux-ssh.md
+    - Recipes: examples/recipes.md
+    - Examples (user sequences): examples/user_sequences/README.md
+  - Troubleshooting: troubleshooting.md
+  - Vendors:
+      - Overview: vendors/index.md
+      - MikroTik RouterOS: vendors/mikrotik/index.md
+      - Cisco IOS / IOS-XE: vendors/cisco/index.md
+      - Arista EOS: vendors/arista/index.md
+      - Juniper JunOS: vendors/juniper/index.md
+  - Reference:
+    - CLI: reference/cli.md
+    - API: reference/api.md
+    - Project development: development.md
+    - Documentation guidelines: documentation-guidelines.md
+
+theme:
+  name: material
+  logo: assets/images/networka.png
+  favicon: assets/images/networka.png
+  custom_dir: docs/overrides
+  palette:
+    # Palette toggle for dark mode (default)
+    - scheme: slate
+      primary: black
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to light mode
+
+    # Palette toggle for light mode
+    - scheme: default
+      primary: "blue grey"
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to dark mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - navigation.footer
+    - toc.integrate
+    - toc.follow
+    - content.code.copy
+    - content.action.edit
+    - content.tooltips
+    - search.suggest
+    - search.highlight
+    - search.share
+
+extra_css:
+  - assets/stylesheets/extra.css
+
+extra_javascript:
+  - assets/javascripts/extra.js
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: ["src"]
+          options:
+            show_root_heading: true
+            show_root_full_path: false
+            show_object_full_path: false
+            show_category_heading: true
+            show_if_no_docstring: false
+            separate_signature: true
+            docstring_style: numpy
+            inherited_members: false
+            filters: ["!^_"]
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      check_paths: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+  - pymdownx.tabbed:
+      alternate_style: true
+      combine_header_slug: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+  - tables
+  - mkdocs-click
+
+extra:
+  announcement: >-
+    Onboarding first: our docs aim to get you to your first successful `nw run` in minutes. If a step slows users down, we fix or remove it. Defaults should work, commands are copy‑pasteable, and every page shows the shortest path to success.
+
+watch:
+  - src
+  - docs

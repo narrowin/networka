@@ -45,12 +45,6 @@ def mock_config() -> MagicMock:
         "maintenance": ["backup", "update"],
     }
 
-    # Setup global sequences
-    config.global_command_sequences = {
-        "global_health": ["ping", "uptime"],
-        "global_backup": ["backup"],
-    }
-
     # Setup get_group_members method
     config.get_group_members.return_value = ["sw-acc1"]
 
@@ -69,14 +63,14 @@ class TestListCommands:
             "run",
             "upload",
             "download",
-            "config-backup",
-            "firmware-upgrade",
-            "firmware-downgrade",
-            "bios-upgrade",
-            "list-devices",
-            "list-groups",
-            "list-sequences",
-            "config-validate",
+            "backup",
+            "firmware",
+            "ssh",
+            "diff",
+            "list",
+            "config",
+            "schema",
+            "complete",
         ]
 
         assert commands == expected_commands
@@ -242,7 +236,6 @@ class TestListSequences:
     def test_list_sequences_no_sequences(self) -> None:
         """Test listing sequences when no sequences exist."""
         config = MagicMock(spec=NetworkConfig)
-        config.global_command_sequences = None
         config.devices = None
 
         with patch("network_toolkit.commands.complete.SequenceManager"):

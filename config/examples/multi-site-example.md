@@ -5,6 +5,7 @@ This example demonstrates a realistic network configuration for a company with m
 ## Scenario
 
 **Company**: TechCorp with 3 sites
+
 - **Headquarters**: Main office with core infrastructure
 - **Branch Office**: Smaller office with access switches
 - **Lab Environment**: Testing and development equipment
@@ -32,21 +33,23 @@ config/
 ## Configuration Files
 
 ### Main Configuration (config.yml)
+
 ```yaml
 general:
   timeout: 30
   results_dir: "./results"
   backup_dir: "./backups"
   output_mode: "dark"
-  
+
 # Default connection settings
-transport: "ssh"
+transport: "system"
 port: 22
 connection_retries: 3
 retry_delay: 5
 ```
 
 ### Core Infrastructure (devices/core-infrastructure.yml)
+
 ```yaml
 devices:
   # Core infrastructure shared across all sites
@@ -61,7 +64,7 @@ devices:
       - "critical"
       - "headquarters"
       - "edge"
-  
+
   sw-core-01:
     host: "10.0.1.1"
     device_type: "mikrotik_routeros"
@@ -76,6 +79,7 @@ devices:
 ```
 
 ### Headquarters Equipment (devices/headquarters.yml)
+
 ```yaml
 devices:
   sw-hq-floor1:
@@ -89,7 +93,7 @@ devices:
       - "access"
       - "headquarters"
       - "floor1"
-  
+
   sw-hq-floor2:
     host: "10.0.1.11"
     device_type: "mikrotik_routeros"
@@ -101,7 +105,7 @@ devices:
       - "access"
       - "headquarters"
       - "floor2"
-  
+
   ap-hq-lobby:
     host: "10.0.2.10"
     device_type: "mikrotik_routeros"
@@ -116,6 +120,7 @@ devices:
 ```
 
 ### Branch Office Devices (devices/branch-office.csv)
+
 ```csv
 name,host,device_type,description,platform,model,location,tags
 sw-branch-main,10.1.0.1,mikrotik_routeros,Branch Office Main Switch,mipsbe,CRS326-24G-2S+,Branch Office IDF,switch;access;branch;critical
@@ -125,6 +130,7 @@ rtr-branch-edge,10.1.0.254,mikrotik_routeros,Branch Office Edge Router,arm,RB401
 ```
 
 ### Lab Equipment (devices/lab-equipment.csv)
+
 ```csv
 name,host,device_type,description,platform,model,location,tags
 sw-lab-01,192.168.100.1,mikrotik_routeros,Lab Test Switch 1,mipsbe,CRS326-24G-2S+,Lab Rack 1,switch;access;lab;test
@@ -135,18 +141,19 @@ ap-lab-wireless,192.168.100.10,mikrotik_routeros,Lab Wireless Test AP,arm,cAP ac
 ```
 
 ### Core Groups (groups/core-groups.yml)
+
 ```yaml
 groups:
   all_firewalls:
     description: "All firewall devices across all sites"
     match_tags:
       - "firewall"
-  
+
   critical_infrastructure:
     description: "Mission-critical devices requiring priority support"
     match_tags:
       - "critical"
-  
+
   wireless_infrastructure:
     description: "All wireless access points"
     match_tags:
@@ -154,29 +161,30 @@ groups:
 ```
 
 ### Site-Based Groups (groups/site-groups.yml)
+
 ```yaml
 groups:
   headquarters_all:
     description: "All headquarters equipment"
     match_tags:
       - "headquarters"
-  
+
   branch_office_all:
     description: "All branch office equipment"
     match_tags:
       - "branch"
-  
+
   lab_environment:
     description: "Lab and testing equipment"
     match_tags:
       - "lab"
-  
+
   headquarters_access:
     description: "HQ access layer switches"
     match_tags:
       - "headquarters"
       - "access"
-  
+
   branch_critical:
     description: "Critical branch office infrastructure"
     match_tags:
@@ -185,6 +193,7 @@ groups:
 ```
 
 ### Operational Groups (groups/operational.csv)
+
 ```csv
 name,description,members,match_tags
 backup_priority_high,High priority backup devices,,critical
@@ -196,6 +205,7 @@ access_switches,All access layer switches,,access
 ```
 
 ### Common Sequences (sequences/common-sequences.yml)
+
 ```yaml
 sequences:
   health_check:
@@ -208,7 +218,7 @@ sequences:
     tags:
       - "monitoring"
       - "health"
-  
+
   security_audit:
     description: "Security configuration review"
     commands:
@@ -222,6 +232,7 @@ sequences:
 ```
 
 ### Monitoring Sequences (sequences/monitoring.yml)
+
 ```yaml
 sequences:
   interface_monitoring:
@@ -235,7 +246,7 @@ sequences:
       - "monitoring"
       - "interface"
       - "performance"
-  
+
   wireless_monitoring:
     description: "Wireless-specific monitoring commands"
     commands:
@@ -245,7 +256,7 @@ sequences:
     tags:
       - "monitoring"
       - "wireless"
-  
+
   routing_analysis:
     description: "Routing table and protocol analysis"
     commands:
@@ -261,6 +272,7 @@ sequences:
 ```
 
 ### Maintenance Tasks (sequences/maintenance.csv)
+
 ```csv
 name,description,commands,tags
 backup_config,Create configuration backup,/export file=backup-$(date +%Y%m%d),backup;maintenance
@@ -316,6 +328,12 @@ nw run lab_environment health_check
 ```bash
 # Check specific device
 nw info sw-hq-floor1
+
+# Check device group details
+nw info hq_infrastructure
+
+# Check sequence information
+nw info health_check
 
 # Run command on specific device
 nw run fw-main "/ip/firewall/connection/print count-only"

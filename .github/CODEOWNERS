@@ -1,0 +1,25 @@
+# These owners will be the default owners for everything in
+# the repo. Unless a later match takes precedence,
+# they will be requested for review when someone opens a pull request.
+* @narrowin
+
+# GitHub Actions and CI/CD workflows
+/.github/ @narrowin
+
+# Core source code
+/src/ @narrowin
+
+# Documentation
+/docs/ @narrowin
+
+# Configuration and schemas
+/config/ @narrowin
+/schemas/ @narrowin
+
+# Tests
+/tests/ @narrowin
+
+# Project configuration files
+pyproject.toml @narrowin
+pytest.ini @narrowin
+mkdocs.yml @narrowin

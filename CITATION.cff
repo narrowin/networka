@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+title: "Networka: Network Automation CLI Tool"
+message: "If you use this software, please cite it as below."
+type: software
+authors:
+  - family-names: "Diehm"
+    given-names: "Mischa"
+    # orcid: "https://orcid.org/0000-0000-0000-0000"  # Uncomment and update with actual ORCID if available
+repository-code: "https://github.com/narrowin/networka"
+url: "https://narrowin.github.io/networka/"
+abstract: "Networka is a modern async CLI tool for automating network devices across multiple vendors. Built with async/await patterns for high performance and reliability."
+keywords:
+  - "network automation"
+  - "CLI tool"
+  - "async python"
+  - "network devices"
+  - "multi-vendor"
+  - "MikroTik"
+  - "RouterOS"
+license: Apache-2.0
+version: "0.1.10"
+date-released: "2025-09-01"

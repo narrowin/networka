@@ -11,6 +11,7 @@ from typing import Annotated
 
 import typer
 
+from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.config import NetworkConfig, load_config
 from network_toolkit.sequence_manager import SequenceManager
 
@@ -26,14 +27,14 @@ def _list_commands() -> list[str]:
         "run",
         "upload",
         "download",
-        "config-backup",
-        "firmware-upgrade",
-        "firmware-downgrade",
-        "bios-upgrade",
-        "list-devices",
-        "list-groups",
-        "list-sequences",
-        "config-validate",
+        "backup",
+        "firmware",
+        "ssh",
+        "diff",
+        "list",
+        "config",
+        "schema",
+        "complete",
     ]
 
 
@@ -62,12 +63,20 @@ def _list_tags(config: NetworkConfig) -> list[str]:
     return sorted(tags)
 
 
+def _list_vendors(config: NetworkConfig) -> list[str]:
+    """Return all vendor platforms available in sequences."""
+    vendors: set[str] = set()
+
+    # Get vendors from SequenceManager
+    sm = SequenceManager(config)
+    all_sequences = sm.list_all_sequences()
+    vendors.update(all_sequences.keys())
+
+    return sorted(vendors)
+
+
 def _list_sequences(config: NetworkConfig, *, target: str | None) -> list[str]:
     names: set[str] = set()
-
-    # Global sequences
-    if config.global_command_sequences:
-        names.update(config.global_command_sequences.keys())
 
     # Device-specific sequences (either for a specific device/group or across all)
     if config.devices:
@@ -124,13 +133,13 @@ def register(app: typer.Typer) -> None:
                 "-f",
                 help=(
                     "Completion target: commands|devices|groups|sequences|"
-                    "sequence-groups|tags"
+                    "sequence-groups|tags|vendors"
                 ),
             ),
         ],
         config_file: Annotated[
             Path, typer.Option("--config", "-c", help="Configuration file path")
-        ] = Path("devices.yml"),
+        ] = DEFAULT_CONFIG_PATH,
         device: Annotated[
             str | None,
             typer.Option(
@@ -160,6 +169,8 @@ def register(app: typer.Typer) -> None:
                     items = _list_sequence_groups(cfg)
                 elif for_ == "tags":
                     items = _list_tags(cfg)
+                elif for_ == "vendors":
+                    items = _list_vendors(cfg)
                 else:
                     items = []
 

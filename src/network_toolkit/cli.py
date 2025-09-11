@@ -11,37 +11,45 @@ from typing import Annotated, Any
 
 import typer
 from typer.core import TyperGroup
+from typer.main import get_command as _get_click_command
 
 from network_toolkit import __version__
-from network_toolkit.commands.bios_upgrade import register as register_bios_upgrade
-from network_toolkit.commands.complete import register as register_complete
 
 # Command registration: import command factories that attach to `app`
 # Each module defines a `register(app)` function that adds its commands.
-from network_toolkit.commands.config_backup import register as register_config_backup
-from network_toolkit.commands.config_validate import (
-    register as register_config_validate,
-)
+from network_toolkit.commands.backup import register as register_backup
+from network_toolkit.commands.complete import register as register_complete
+from network_toolkit.commands.config import register as register_config
 from network_toolkit.commands.diff import register as register_diff
 from network_toolkit.commands.download import register as register_download
-from network_toolkit.commands.firmware_downgrade import (
-    register as register_firmware_downgrade,
-)
-from network_toolkit.commands.firmware_upgrade import (
-    register as register_firmware_upgrade,
-)
+from network_toolkit.commands.firmware import register as register_firmware
 from network_toolkit.commands.info import register as register_info
-from network_toolkit.commands.list_devices import register as register_list_devices
-from network_toolkit.commands.list_groups import register as register_list_groups
-from network_toolkit.commands.list_sequences import register as register_list_sequences
+from network_toolkit.commands.list import register as register_list
 from network_toolkit.commands.run import register as register_run
+from network_toolkit.commands.schema import register as register_schema
 from network_toolkit.commands.ssh import register as register_ssh
 from network_toolkit.commands.upload import register as register_upload
-from network_toolkit.common.logging import console, setup_logging
-from network_toolkit.common.output import OutputMode, set_output_mode
+from network_toolkit.common.logging import setup_logging
+from network_toolkit.common.output import get_output_manager
+from network_toolkit.config import NetworkConfig
+
+
+class _DynamicConsoleProxy:
+    """Proxy that forwards attribute access to the current OutputManager console.
+
+    This avoids capturing a stale Console at import time so that changes to the
+    output mode (e.g., via --output-mode or config) are reflected everywhere.
+    """
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(get_output_manager().console, name)
+
+
+# Dynamic console that always reflects the active OutputManager
+console = _DynamicConsoleProxy()
 
 # Keep this import here to preserve tests that patch `network_toolkit.cli.DeviceSession`
-from network_toolkit.device import DeviceSession as _DeviceSession
+from network_toolkit.device import DeviceSession as _DeviceSession  # noqa: E402
 
 
 # Preserve insertion order and group commands under a single Commands section
@@ -55,20 +63,19 @@ class CategorizedHelpGroup(TyperGroup):
         exec_names = [
             "run",
             "ssh",
+            "diff",
             "upload",
             "download",
-            "config-backup",
-            "firmware-upgrade",
-            "firmware-downgrade",
-            "bios-upgrade",
+        ]
+        vendor_names: list[str] = [
+            "backup",
+            "firmware",
         ]
         info_names = [
             "info",
-            "list-devices",
-            "list-groups",
-            "list-sequences",
-            "config-validate",
-            "diff",
+            "list",
+            "config",
+            "schema",
         ]
 
         def rows(names: list[str]) -> list[tuple[str, str]]:
@@ -86,11 +93,15 @@ class CategorizedHelpGroup(TyperGroup):
             return items
 
         exec_rows = rows(exec_names)
+        vendor_rows = rows(vendor_names)
         info_rows = rows(info_names)
 
         if exec_rows:
-            formatter.write_text("\nExecuting Operations")
+            formatter.write_text("\nRemote Operations")
             formatter.write_dl(exec_rows)
+        if vendor_rows:
+            formatter.write_text("\nVendor-Specific Remote Operations")
+            formatter.write_dl(vendor_rows)
         if info_rows:
             formatter.write_text("\nInfo & Configuration")
             formatter.write_dl(info_rows)
@@ -98,14 +109,15 @@ class CategorizedHelpGroup(TyperGroup):
 
 # Typer application instance
 help_text = (
-    "\n    Network Worker (nw)\n\n"
-    "    A powerful multi-vendor CLI tool for automating network devices based on ssh protocol.\n"
+    "\n    Networka (nw)\n\n"
+    "    A powerful multi-vendor CLI tool for automating network devices based "
+    "on ssh protocol.\n"
     "    Built with async/await support and type safety in mind.\n\n"
     "    QUICK START:\n"
     "      nw run sw-acc1 '/system/clock/print'  # Execute command\n"
     "      nw run office_switches system_info    # Run sequence on group\n\n"
     "    For detailed help on any command: nw <command> --help\n"
-    "    Default config directory: config/ (use --config to override)\n    "
+    "    Default config directory: system app config (use --config to override)\n    "
 )
 app = typer.Typer(
     name="nw",
@@ -118,6 +130,8 @@ app = typer.Typer(
     invoke_without_command=True,
 )
 
+# Click-compatible command is created after all subcommands are registered below
+
 
 @app.callback()
 def main(
@@ -128,12 +142,18 @@ def main(
 ) -> None:
     """Configure global settings for the network toolkit."""
     if version:
-        console.print(f"Network Worker (nw) version {__version__}")
+        from network_toolkit.common.command_helpers import CommandContext
+
+        cmd_ctx = CommandContext()
+        cmd_ctx.print_info(f"Networka (nw) version {__version__}")
         raise typer.Exit()
 
     # If no command is invoked and no version flag, show help
     if ctx.invoked_subcommand is None:
-        console.print(ctx.get_help())
+        from network_toolkit.common.command_helpers import CommandContext
+
+        cmd_ctx = CommandContext()
+        cmd_ctx.output_manager.print_text(ctx.get_help())
         raise typer.Exit()
 
 
@@ -142,53 +162,37 @@ DeviceSession = _DeviceSession
 
 
 def _handle_file_downloads(
-    *,
-    session: Any,
+    session: _DeviceSession,
+    config: NetworkConfig,
     device_name: str,
-    download_files: list[dict[str, Any]] | list[dict[str, str | bool]],
-    config: Any,
+    download_files: list[dict[str, Any]],
 ) -> dict[str, str]:
-    """Handle one or more file downloads using an existing device session.
+    """Handle file downloads from a device session using centralized output.
 
-    Parameters
-    ----------
-    session : DeviceSession-like
-        An active device session exposing `download_file`.
-    device_name : str
-        Name of the device (used for placeholder replacement and messages).
-    download_files : list[dict[str, Any]]
-        List of download specs. Each item may contain:
-        - remote_file (required)
-        - local_path (optional; defaults to config.general.backup_dir)
-        - local_filename (optional; defaults to remote_file)
-        - delete_remote (optional; bool)
-    config : NetworkConfig-like
-        Configuration object providing at least `general.backup_dir`.
-
-    Returns
-    -------
-    dict[str, str]
-        Mapping of remote_file -> result message.
+    Returns:
+        Dict mapping remote_file names to download status messages.
     """
+    from network_toolkit.common.command_helpers import CommandContext
+
+    # Create a context for centralized output
+    ctx = CommandContext()
 
     results: dict[str, str] = {}
 
-    if not download_files:
-        return results
-
-    # Helper for placeholder replacement
-    today = datetime.datetime.now(datetime.UTC).date().isoformat()
-
-    def replace_placeholders(value: str) -> str:
-        return value.replace("{date}", today).replace("{device}", device_name)
+    def replace_placeholders(text: str) -> str:
+        now = datetime.datetime.now(datetime.UTC)
+        return (
+            text.replace("{date}", now.strftime("%Y%m%d"))
+            .replace("{time}", now.strftime("%H%M%S"))
+            .replace("{datetime}", now.strftime("%Y%m%d_%H%M%S"))
+            .replace("{device}", device_name)
+        )
 
     def to_bool(val: Any) -> bool:
         if isinstance(val, bool):
             return val
         if isinstance(val, str):
-            return val.strip().lower() in {"1", "true", "yes", "y", "on"}
-        if isinstance(val, int):
-            return val != 0
+            return val.lower() in ("true", "yes", "1", "on")
         return bool(val)
 
     default_dir = getattr(getattr(config, "general", object()), "backup_dir", ".")
@@ -208,24 +212,25 @@ def _handle_file_downloads(
         filename = replace_placeholders(local_filename_str)
         destination = local_dir / filename
 
-        console.print(f"[cyan]Downloading {remote_file} from {device_name}...[/cyan]")
+        # Use centralized output system
+        ctx.output_manager.print_downloading(device_name, remote_file)
 
         try:
-            success = session.download_file(
+            success = session.download_file(  # type: ignore[attr-defined]
                 remote_filename=remote_file,
                 local_path=destination,
                 delete_remote=delete_remote,
             )
             if success:
-                console.print(
-                    f"[green]OK Downloaded {remote_file} to {destination}[/green]"
+                ctx.output_manager.print_success(
+                    f"Downloaded {remote_file} to {destination}"
                 )
                 results[remote_file] = f"Downloaded to {destination}"
             else:
-                console.print(f"[red]FAIL Failed to download {remote_file}[/red]")
+                ctx.output_manager.print_error(f"Failed to download {remote_file}")
                 results[remote_file] = "Download failed"
         except Exception as e:  # DeviceExecutionError or unexpected
-            console.print(f"[red]FAIL Error downloading {remote_file}: {e}[/red]")
+            ctx.output_manager.print_error(f"Error downloading {remote_file}: {e}")
             results[remote_file] = f"Download error: {e}"
 
     return results
@@ -233,26 +238,28 @@ def _handle_file_downloads(
 
 # Register all commands with the Typer app
 register_info(app)
+register_list(app)
 register_run(app)
-register_list_devices(app)
-register_list_groups(app)
-register_list_sequences(app)
-register_config_validate(app)
+register_config(app)
+register_backup(app)
 register_upload(app)
 register_download(app)
-register_config_backup(app)
-register_firmware_upgrade(app)
-register_firmware_downgrade(app)
-register_bios_upgrade(app)
+register_firmware(app)
 register_complete(app)
 register_diff(app)
+register_schema(app)
 register_ssh(app)
+
+# Expose a Click-compatible command for documentation tools (e.g., mkdocs-click)
+# Create this after all subcommands have been registered
+cli = _get_click_command(app)
 
 
 __all__ = [
     "DeviceSession",
     "_handle_file_downloads",
     "app",
+    "cli",
     "console",
     "setup_logging",
 ]

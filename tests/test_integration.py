@@ -39,7 +39,7 @@ class TestCLIIntegration:
         )
 
     def test_list_devices_with_config(self, config_file: Path) -> None:
-        """Test list-devices command with a real config file."""
+        """Test list devices command with a real config file."""
         result = subprocess.run(
             [
                 sys.executable,
@@ -47,7 +47,8 @@ class TestCLIIntegration:
                 "network_toolkit.cli",
                 "--config",
                 str(config_file),
-                "list-devices",
+                "list",
+                "devices",
             ],
             check=False,
             capture_output=True,
@@ -104,7 +105,8 @@ class TestCLIIntegration:
                 "network_toolkit",
                 "--config",
                 "/nonexistent/config.yml",
-                "list-devices",
+                "list",
+                "devices",
             ],
             check=False,
             capture_output=True,
@@ -216,7 +218,7 @@ class TestModuleStructure:
             assert main_config.exists(), (
                 f"Required config file not found: {main_config}"
             )
-            
+
             # Check that subdirectories exist (they may be empty but should exist)
             subdirs = ["devices", "groups", "sequences", "examples"]
             for subdir in subdirs:
@@ -226,21 +228,7 @@ class TestModuleStructure:
                 )
             return
 
-        # Fall back to legacy config files
-        legacy_config_files = [
-            "devices.yml",
-            "devices.yaml",
-        ]
-
-        found_config = False
-        for config_file in legacy_config_files:
-            if (project_root / config_file).exists():
-                found_config = True
-                break
-
-        assert found_config, (
-            "No example config file found (neither modular config/ nor legacy devices.yml)"
-        )
+    # No legacy fallback; modular config directory is required for examples
 
 
 class TestEndToEndWorkflow:

@@ -13,7 +13,6 @@ from network_toolkit.device import DeviceSession
 from network_toolkit.exceptions import (
     DeviceConnectionError,
     DeviceExecutionError,
-    NetworkToolkitError,
 )
 from network_toolkit.transport import ScrapliSyncTransport
 
@@ -315,7 +314,9 @@ class TestDeviceSessionAdditional:
 
             session = DeviceSession("test_device1", sample_config)
 
-            with patch("network_toolkit.device.ScrapliSyncTransport") as mock_transport:
+            with patch(
+                "network_toolkit.transport.ScrapliSyncTransport"
+            ) as mock_transport:
                 mock_transport.return_value = MagicMock()
                 session.connect()
 

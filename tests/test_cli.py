@@ -27,7 +27,7 @@ class TestCLI:
         runner = CliRunner()
         result = runner.invoke(app, ["--help"])
         assert result.exit_code == 0
-        assert "Network Worker" in result.output
+        assert "Networka" in result.output
         assert "nw" in result.output
 
     @pytest.mark.skip(reason="CLI test has exit code issues, needs investigation")
@@ -50,26 +50,26 @@ class TestCLI:
 
     @pytest.mark.skip(reason="CLI test has exit code issues, needs investigation")
     def test_list_devices_command(self, config_file: Path) -> None:
-        """Test list-devices command."""
+        """Test list devices command."""
         runner = CliRunner()
-        result = runner.invoke(app, ["list-devices", "--config", str(config_file)])
+        result = runner.invoke(app, ["list", "devices", "--config", str(config_file)])
         assert result.exit_code == 0
         assert "test_device1" in result.output
         assert "test_device2" in result.output
 
     @pytest.mark.skip(reason="CLI test has exit code issues, needs investigation")
     def test_list_groups_command(self, config_file: Path) -> None:
-        """Test list-groups command."""
+        """Test list groups command."""
         runner = CliRunner()
-        result = runner.invoke(app, ["list-groups", "--config", str(config_file)])
+        result = runner.invoke(app, ["list", "groups", "--config", str(config_file)])
         assert result.exit_code == 0
         # Should show configured groups
         assert "all_switches" in result.output or "lab_devices" in result.output
 
     def test_list_sequences_command(self, config_file: Path) -> None:
-        """Test list-sequences command."""
+        """Test list sequences command."""
         runner = CliRunner()
-        result = runner.invoke(app, ["list-sequences", "--config", str(config_file)])
+        result = runner.invoke(app, ["list", "sequences", "--config", str(config_file)])
         assert result.exit_code == 0
         # Should show global sequences
         assert "system_info" in result.output
@@ -143,9 +143,11 @@ class TestCLI:
         assert result.exit_code == 0
 
     def test_config_validate_command(self, config_file: Path) -> None:
-        """Test config-validate command."""
+        """Test config validate command."""
         runner = CliRunner()
-        result = runner.invoke(app, ["config-validate", "--config", str(config_file)])
+        result = runner.invoke(
+            app, ["config", "validate", "--config", str(config_file)]
+        )
         # Config validation should succeed with valid test config
         assert result.exit_code == 0
         assert "valid" in result.output.lower() or "OK" in result.output
@@ -238,7 +240,10 @@ class TestCLI:
     ) -> None:
         """Test firmware-downgrade on single device."""
         mock_session = MagicMock()
-        mock_session.downgrade_firmware_and_reboot.return_value = True
+        mock_session.config.devices = {
+            "test_device1": MagicMock(device_type="mikrotik_routeros")
+        }
+        mock_session.device_name = "test_device1"
         mock_session.__enter__ = MagicMock(return_value=mock_session)
         mock_session.__exit__ = MagicMock(return_value=None)
         mock_device_session.return_value = mock_session
@@ -247,7 +252,8 @@ class TestCLI:
         result = runner.invoke(
             app,
             [
-                "firmware-downgrade",
+                "firmware",
+                "downgrade",
                 "--config",
                 str(config_file),
                 "test_device1",
@@ -271,7 +277,8 @@ class TestCLI:
         result = runner.invoke(
             app,
             [
-                "firmware-downgrade",
+                "firmware",
+                "downgrade",
                 "--config",
                 str(config_file),
                 "lab_devices",
@@ -286,7 +293,10 @@ class TestCLI:
     ) -> None:
         """Test bios-upgrade on single device."""
         mock_session = MagicMock()
-        mock_session.routerboard_upgrade_and_reboot.return_value = True
+        mock_session.config.devices = {
+            "test_device1": MagicMock(device_type="mikrotik_routeros")
+        }
+        mock_session.device_name = "test_device1"
         mock_session.__enter__ = MagicMock(return_value=mock_session)
         mock_session.__exit__ = MagicMock(return_value=None)
         mock_device_session.return_value = mock_session
@@ -295,7 +305,8 @@ class TestCLI:
         result = runner.invoke(
             app,
             [
-                "bios-upgrade",
+                "firmware",
+                "bios",
                 "--config",
                 str(config_file),
                 "test_device1",
@@ -318,7 +329,8 @@ class TestCLI:
         result = runner.invoke(
             app,
             [
-                "bios-upgrade",
+                "firmware",
+                "bios",
                 "--config",
                 str(config_file),
                 "lab_devices",
@@ -332,14 +344,16 @@ class TestCLI:
         invalid_config.write_text("invalid: yaml: [")
 
         runner = CliRunner()
-        result = runner.invoke(app, ["list-devices", "--config", str(invalid_config)])
+        result = runner.invoke(
+            app, ["list", "devices", "--config", str(invalid_config)]
+        )
         assert result.exit_code == 1
 
     def test_missing_config_file(self) -> None:
         """Test CLI with missing config file."""
         runner = CliRunner()
         result = runner.invoke(
-            app, ["list-devices", "--config", "/nonexistent/config.yml"]
+            app, ["list", "devices", "--config", "/nonexistent/config.yml"]
         )
         assert result.exit_code == 1
 
@@ -371,7 +385,7 @@ class TestCLI:
         """Test verbose output mode."""
         runner = CliRunner()
         result = runner.invoke(
-            app, ["list-devices", "--config", str(config_file), "--verbose"]
+            app, ["list", "devices", "--config", str(config_file), "--verbose"]
         )
         assert result.exit_code == 0
 

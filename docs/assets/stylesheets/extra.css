@@ -1,0 +1,196 @@
+/* Header logo sizing and spacing */
+.md-header__button.md-logo img {
+  height: 64px; /* desktop size - increased from 48px */
+  width: auto;
+}
+
+/* Simple logo positioning - match reference site */
+.md-header__button.md-logo {
+  padding: 0.4rem; /* Match default Material Design spacing */
+  margin: 0; /* Remove all custom margins */
+}
+
+/* Slightly reduce on small screens to keep header compact */
+@media (max-width: 600px) {
+  .md-header__button.md-logo img {
+    height: 48px; /* increased from 40px */
+  }
+}
+
+/* Enhanced typography */
+.md-typeset {
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+.md-typeset h1 {
+  font-weight: 700;
+  color: var(--md-default-fg-color);
+}
+
+.md-typeset h2 {
+  font-weight: 600;
+  margin-top: 2rem;
+}
+
+/* Enhanced code blocks */
+.md-typeset .highlight {
+  margin: 1rem 0;
+}
+
+.md-typeset .highlight pre {
+  border-radius: 0.5rem;
+}
+
+/* Enhanced admonitions */
+.md-typeset .admonition {
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+[data-md-color-scheme="slate"] .md-typeset .admonition {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Enhanced buttons */
+.md-typeset .md-button {
+  border-radius: 2rem;
+  font-weight: 500;
+  text-transform: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 2px solid transparent;
+}
+
+.md-typeset .md-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.md-typeset .md-button--primary {
+  background: var(--md-primary-fg-color);
+  color: var(--md-primary-bg-color);
+  border-color: var(--md-primary-fg-color);
+}
+
+.md-typeset .md-button--primary:hover {
+  background: var(--md-accent-fg-color);
+  border-color: var(--md-accent-fg-color);
+}
+
+/* Enhanced content tabs */
+.md-typeset .tabbed-set {
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.md-typeset .tabbed-labels {
+  background: var(--md-code-bg-color);
+}
+
+.md-typeset .tabbed-content {
+  background: var(--md-code-bg-color);
+}
+
+/* Navigation enhancements */
+.md-nav__item .md-nav__link--active {
+  font-weight: 600;
+}
+
+/* Search enhancements */
+.md-search__form {
+  border-radius: 2rem;
+}
+
+/* Footer enhancements */
+.md-footer {
+  background: var(--md-default-bg-color);
+  border-top: 1px solid var(--md-default-fg-color--lightest);
+}
+
+/* Smooth scrolling for anchor links */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Enhanced focus states for accessibility */
+.md-typeset a:focus,
+.md-button:focus,
+.md-nav__link:focus {
+  outline: 2px solid var(--md-accent-fg-color);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Enhanced footer navigation */
+.md-footer-nav {
+  background: var(--md-default-bg-color);
+  border-top: 1px solid var(--md-default-fg-color--lightest);
+}
+
+.md-footer-nav__inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 0;
+}
+
+.md-footer-nav__link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  transition: background-color 0.3s ease;
+  text-decoration: none;
+  color: var(--md-default-fg-color);
+  min-height: 4rem;
+}
+
+.md-footer-nav__link:hover {
+  background: var(--md-code-bg-color);
+}
+
+.md-footer-nav__link--prev {
+  margin-right: auto;
+}
+
+.md-footer-nav__link--next {
+  margin-left: auto;
+}
+
+.md-footer-nav__button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  background: var(--md-primary-fg-color);
+  color: white;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.md-footer-nav__title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.md-footer-nav__direction {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--md-default-fg-color--light);
+  letter-spacing: 0.05em;
+}
+
+.md-footer-nav__title .md-ellipsis:last-child {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--md-default-fg-color);
+}
+
+/* Optional: tighten spacing between logo and title */
+.md-header__title {
+  margin-left: 0;
+}

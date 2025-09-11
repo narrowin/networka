@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from nornir.core.inventory import Inventory
 
-from network_toolkit.config import NetworkConfig, get_env_credential
+from network_toolkit.config import NetworkConfig
 
 
 def build_nornir_inventory(config: NetworkConfig) -> Inventory:
@@ -58,12 +58,10 @@ def build_nornir_inventory(config: NetworkConfig) -> Inventory:
             continue
 
         # Get credentials for this device
-        username = get_env_credential(device_name, "user") or os.getenv(
-            "NW_USER_DEFAULT", "admin"
-        )
-        password = get_env_credential(device_name, "password") or os.getenv(
-            "NW_PASSWORD_DEFAULT", ""
-        )
+        user_env_var = f"NW_USER_{device_name.upper().replace('-', '_')}"
+        password_env_var = f"NW_PASSWORD_{device_name.upper().replace('-', '_')}"
+        username = os.getenv(user_env_var) or os.getenv("NW_USER_DEFAULT", "admin")
+        password = os.getenv(password_env_var) or os.getenv("NW_PASSWORD_DEFAULT", "")
 
         if not password:
             # Skip devices without proper credentials

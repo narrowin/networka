@@ -9,13 +9,15 @@ from typing import Annotated, Any, cast
 
 import typer
 
-from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.command_helpers import CommandContext
+from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
+from network_toolkit.common.logging import setup_logging
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 
 
 def register(app: typer.Typer) -> None:
-    @app.command(rich_help_panel="Executing Operations")
+    @app.command(rich_help_panel="Remote Operations")
     def download(  # pyright: ignore[reportUnusedFunction]
         target_name: Annotated[
             str,
@@ -53,13 +55,20 @@ def register(app: typer.Typer) -> None:
         ] = True,
         config_file: Annotated[
             Path, typer.Option("--config", "-c", help="Configuration file path")
-        ] = Path("devices.yml"),
+        ] = DEFAULT_CONFIG_PATH,
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose output")
         ] = False,
     ) -> None:
         """Download a file from a device or all devices in a group."""
         setup_logging("DEBUG" if verbose else "INFO")
+
+        # ACTION command - use global config theme
+        ctx = CommandContext(
+            config_file=config_file,
+            verbose=verbose,
+            output_mode=None,  # Use global config theme
+        )
 
         try:
             config = load_config(config_file)
@@ -74,34 +83,29 @@ def register(app: typer.Typer) -> None:
             is_group = target_name in groups
 
             if not (is_device or is_group):
-                console.print(
-                    f"[red]Error: '{target_name}' not found as device or group in "
-                    "configuration[/red]"
+                ctx.print_error(
+                    f"'{target_name}' not found as device or group in configuration"
                 )
                 raise typer.Exit(1)
 
             if is_device:
                 # Show summary
                 transport_type = config.get_transport_type(target_name)
-                console.print("[bold cyan]File Download Details:[/bold cyan]")
-                console.print(f"  [bold]Device:[/bold] {target_name}")
-                console.print(
-                    f"  [bold]Transport:[/bold] [yellow]{transport_type}[/yellow]"
+                ctx.print_info("File Download Details:")
+                ctx.print_detail_line("Device", target_name)
+                ctx.print_detail_line("Transport", transport_type)
+                ctx.print_detail_line("Remote file", remote_file)
+                ctx.print_detail_line("Local path", str(local_path))
+                ctx.print_detail_line(
+                    "Delete remote after download", "Yes" if delete_remote else "No"
                 )
-                console.print(f"  [bold]Remote file:[/bold] {remote_file}")
-                console.print(f"  [bold]Local path:[/bold] {local_path}")
-                console.print(
-                    "  [bold]Delete remote after download:[/bold] "
-                    + ("Yes" if delete_remote else "No")
+                ctx.print_detail_line(
+                    "Verify download", "Yes" if verify_download else "No"
                 )
-                console.print(
-                    "  [bold]Verify download:[/bold] "
-                    + ("Yes" if verify_download else "No")
-                )
-                console.print()
+                ctx.print_blank_line()
 
-                with console.status(
-                    f"[bold green]Downloading {remote_file} from {target_name}..."
+                with ctx.output_manager.status(
+                    f"Downloading {remote_file} from {target_name}..."
                 ):
                     with device_session(target_name, config) as session:
                         success = session.download_file(
@@ -112,13 +116,12 @@ def register(app: typer.Typer) -> None:
                         )
 
                 if success:
-                    console.print("[bold green]OK Download successful![/bold green]")
-                    console.print(
-                        f"[green]File '{remote_file}' downloaded to "
-                        f"'{local_path}'[/green]"
+                    ctx.print_success("Download successful!")
+                    ctx.print_success(
+                        f"File '{remote_file}' downloaded to '{local_path}'"
                     )
                 else:
-                    console.print("[bold red]FAIL Download failed![/bold red]")
+                    ctx.print_error("Download failed!")
                     raise typer.Exit(1)
                 return
 
@@ -130,36 +133,30 @@ def register(app: typer.Typer) -> None:
                 members = group_obj.members if group_obj and group_obj.members else []
 
             if not members:
-                console.print(
-                    f"[red]Error: No devices found in group '{target_name}'[/red]",
-                )
+                ctx.print_error(f"No devices found in group '{target_name}'")
                 raise typer.Exit(1)
 
-            console.print("[bold cyan]Group File Download Details:[/bold cyan]")
-            console.print(f"  [bold]Group:[/bold] {target_name}")
-            console.print(f"  [bold]Devices:[/bold] {len(members)}")
-            console.print(f"  [bold]Remote file:[/bold] {remote_file}")
-            console.print(
-                "  [bold]Base path:[/bold] "
-                f"{local_path} (files saved under <base>/<device>/{remote_file})"
+            ctx.print_info("Group File Download Details:")
+            ctx.print_detail_line("Group", target_name)
+            ctx.print_detail_line("Devices", str(len(members)))
+            ctx.print_detail_line("Remote file", remote_file)
+            ctx.print_detail_line(
+                "Base path",
+                f"{local_path} (files saved under <base>/<device>/{remote_file})",
             )
-            console.print(
-                "  [bold]Delete remote after download:[/bold] "
-                + ("Yes" if delete_remote else "No")
+            ctx.print_detail_line(
+                "Delete remote after download", "Yes" if delete_remote else "No"
             )
-            console.print(
-                "  [bold]Verify download:[/bold] "
-                + ("Yes" if verify_download else "No")
-            )
-            console.print()
+            ctx.print_detail_line("Verify download", "Yes" if verify_download else "No")
+            ctx.print_blank_line()
 
             successes = 0
             results: dict[str, bool] = {}
 
             for dev in members:
                 dest = (local_path / dev / remote_file).resolve()
-                with console.status(
-                    f"[bold green]Downloading {remote_file} from {dev}..."
+                with ctx.output_manager.status(
+                    f"Downloading {remote_file} from {dev}..."
                 ):
                     try:
                         with device_session(dev, config) as session:
@@ -172,28 +169,29 @@ def register(app: typer.Typer) -> None:
                             results[dev] = ok
                             if ok:
                                 successes += 1
-                                console.print(
-                                    f"[green]OK {dev}: downloaded to {dest}[/green]"
-                                )
+                                ctx.print_success(f"OK {dev}: downloaded to {dest}")
                             else:
-                                console.print(f"[red]FAIL {dev}: download failed[/red]")
+                                ctx.print_error(f"FAIL {dev}: download failed")
                     except Exception as e:  # pragma: no cover - unexpected
                         results[dev] = False
-                        console.print(f"[red]FAIL {dev}: error during download: {e}[/red]")
+                        ctx.print_error(f"FAIL {dev}: error during download: {e}")
 
             total = len(members)
-            console.print("[bold cyan]Group Download Results:[/bold cyan]")
-            console.print(f"  [bold green]Successful:[/bold green] {successes}/{total}")
-            console.print(f"  [bold red]Failed:[/bold red] {total - successes}/{total}")
+            ctx.print_info("Group Download Results:")
+            ctx.print_success(f"  Successful: {successes}/{total}")
+            ctx.print_error(f"  Failed: {total - successes}/{total}")
 
             if successes < total:
                 raise typer.Exit(1)
 
         except NetworkToolkitError as e:
-            console.print(f"[red]Error: {e.message}[/red]")
+            ctx.print_error(f"Error: {e.message}")
             if verbose and getattr(e, "details", None):
-                console.print(f"[red]Details: {e.details}[/red]")
+                ctx.print_error(f"Details: {e.details}")
             raise typer.Exit(1) from None
+        except typer.Exit:
+            # Allow clean exits (e.g., user cancellation) to pass through
+            raise
         except Exception as e:  # pragma: no cover - unexpected
-            console.print(f"[red]Unexpected error: {e}[/red]")
+            ctx.print_error(f"Unexpected error: {e}")
             raise typer.Exit(1) from None

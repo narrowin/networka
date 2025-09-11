@@ -31,15 +31,15 @@ print_error() {
 # Function to test wheel installation
 test_wheel_installation() {
     print_step "Testing wheel installation..."
-    
+
     # Create a temporary virtual environment
     TEMP_VENV=$(mktemp -d)
     python3 -m venv "$TEMP_VENV"
     source "$TEMP_VENV/bin/activate"
-    
+
     # Upgrade pip
     python -m pip install --upgrade pip
-    
+
     # Find and install wheel file
     wheel_file=$(find dist/ -name "*.whl" | head -1)
     if [ -n "$wheel_file" ]; then
@@ -53,7 +53,7 @@ test_wheel_installation() {
         rm -rf "$TEMP_VENV"
         return 1
     fi
-    
+
     # Test the installed package
     print_step "Testing installed package..."
     if nw --help >/dev/null 2>&1; then
@@ -64,7 +64,7 @@ test_wheel_installation() {
         rm -rf "$TEMP_VENV"
         return 1
     fi
-    
+
     if python -c "import network_toolkit; print('✅ Import successful')" 2>/dev/null; then
         print_success "Python import works"
     else
@@ -73,7 +73,7 @@ test_wheel_installation() {
         rm -rf "$TEMP_VENV"
         return 1
     fi
-    
+
     # Cleanup
     deactivate
     rm -rf "$TEMP_VENV"
@@ -83,15 +83,15 @@ test_wheel_installation() {
 # Function to test source distribution installation
 test_source_installation() {
     print_step "Testing source distribution installation..."
-    
+
     # Create a temporary virtual environment
     TEMP_VENV=$(mktemp -d)
     python3 -m venv "$TEMP_VENV"
     source "$TEMP_VENV/bin/activate"
-    
+
     # Upgrade pip
     python -m pip install --upgrade pip
-    
+
     # Find and install source distribution
     tar_file=$(find dist/ -name "*.tar.gz" | head -1)
     if [ -n "$tar_file" ]; then
@@ -105,7 +105,7 @@ test_source_installation() {
         rm -rf "$TEMP_VENV"
         return 1
     fi
-    
+
     # Test the installed package
     print_step "Testing installed package from source..."
     if nw --help >/dev/null 2>&1; then
@@ -116,7 +116,7 @@ test_source_installation() {
         rm -rf "$TEMP_VENV"
         return 1
     fi
-    
+
     if python -c "import network_toolkit; print('✅ Source distribution import successful')" 2>/dev/null; then
         print_success "Python import works"
     else
@@ -125,7 +125,7 @@ test_source_installation() {
         rm -rf "$TEMP_VENV"
         return 1
     fi
-    
+
     # Cleanup
     deactivate
     rm -rf "$TEMP_VENV"
@@ -135,26 +135,26 @@ test_source_installation() {
 # Function to test git installation
 test_git_installation() {
     print_step "Testing Git installation (if repo is accessible)..."
-    
+
     # Create a temporary virtual environment
     TEMP_VENV=$(mktemp -d)
     python3 -m venv "$TEMP_VENV"
     source "$TEMP_VENV/bin/activate"
-    
+
     # Upgrade pip
     python -m pip install --upgrade pip
-    
+
     # Try to install from current directory (simulates git install)
     if python -m pip install . 2>/dev/null; then
         print_success "Local directory installation successful"
-        
+
         # Test the installed package
         if nw --help >/dev/null 2>&1; then
             print_success "CLI command works"
         else
             print_error "CLI command failed"
         fi
-        
+
         if python -c "import network_toolkit; print('✅ Git-style installation successful')" 2>/dev/null; then
             print_success "Python import works"
         else
@@ -163,7 +163,7 @@ test_git_installation() {
     else
         print_error "Local directory installation failed"
     fi
-    
+
     # Cleanup
     deactivate
     rm -rf "$TEMP_VENV"
@@ -176,11 +176,11 @@ main() {
         print_error "dist/ directory not found. Run 'task build' first."
         exit 1
     fi
-    
+
     print_step "Found build artifacts:"
     ls -la dist/
     echo ""
-    
+
     # Run tests
     if test_wheel_installation; then
         print_success "Wheel installation test PASSED"
@@ -188,20 +188,20 @@ main() {
         print_error "Wheel installation test FAILED"
         exit 1
     fi
-    
+
     echo ""
-    
+
     if test_source_installation; then
         print_success "Source distribution test PASSED"
     else
         print_error "Source distribution test FAILED"
         exit 1
     fi
-    
+
     echo ""
-    
+
     test_git_installation
-    
+
     echo ""
     print_success "🎉 All local tests completed successfully!"
     echo ""

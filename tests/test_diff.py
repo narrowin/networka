@@ -215,8 +215,12 @@ class TestDiffAdvancedScenarios:
             )
 
         assert result.exit_code == 1  # differences found
-        assert "old-router" in result.output
-        assert "new-router" in result.output
+        # Check for router names in the diff output (may be colored)
+        import re
+
+        output_clean = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+        assert "old-router" in output_clean
+        assert "new-router" in output_clean
 
     def test_diff_sequence_all_files_match(
         self, config_file: Path, tmp_path: Path

@@ -9,11 +9,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 from typer.testing import CliRunner
 
-# Skip all tests in this module due to CLI integration issues
-pytest.skip("Module has CLI integration issues, needs investigation", allow_module_level=True)
-
 from network_toolkit import __version__
 from network_toolkit.cli import app
+
+# Skip all tests in this module due to CLI integration issues
+pytest.skip(
+    "Module has CLI integration issues, needs investigation", allow_module_level=True
+)
 
 
 class TestCommandsCoverage:
@@ -114,13 +116,14 @@ class TestCommandsCoverage:
         assert result.exit_code in [0, 1, 2]
 
     def test_config_validate_basic(self, config_file: Path) -> None:
-        """Test config-validate command."""
+        """Test config validate command."""
         runner = CliRunner()
 
         result = runner.invoke(
             app,
             [
-                "config-validate",
+                "config",
+                "validate",
                 "--config",
                 str(config_file),
             ],
@@ -129,13 +132,14 @@ class TestCommandsCoverage:
         assert result.exit_code == 0
 
     def test_config_validate_verbose(self, config_file: Path) -> None:
-        """Test config-validate with verbose output."""
+        """Test config validate with verbose output."""
         runner = CliRunner()
 
         result = runner.invoke(
             app,
             [
-                "config-validate",
+                "config",
+                "validate",
                 "--verbose",
                 "--config",
                 str(config_file),
@@ -153,7 +157,8 @@ class TestCommandsCoverage:
         result = runner.invoke(
             app,
             [
-                "list-devices",
+                "list",
+                "devices",
                 "--config",
                 str(invalid_config),
             ],
@@ -226,7 +231,8 @@ class TestCommandLineInterfaceEdgeCases:
         result = runner.invoke(
             app,
             [
-                "list-devices",
+                "list",
+                "devices",
                 "--config",
                 str(missing_config),
             ],
@@ -258,7 +264,8 @@ class TestCommandLineInterfaceEdgeCases:
         result = runner.invoke(
             app,
             [
-                "list-devices",
+                "list",
+                "devices",
                 "--config",
                 str(config_file),
             ],
@@ -302,7 +309,8 @@ devices:
         result = runner.invoke(
             app,
             [
-                "list-devices",
+                "list",
+                "devices",
                 "--config",
                 str(large_config),
             ],
@@ -319,7 +327,8 @@ devices:
         result = runner.invoke(
             app,
             [
-                "list-devices",
+                "list",
+                "devices",
                 "--config",
                 str(config_file),
             ],
@@ -346,7 +355,8 @@ devices:
         result = runner.invoke(
             app,
             [
-                "list-devices",
+                "list",
+                "devices",
                 "--config",
                 str(restricted_config),
             ],

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 """`nw routerboard-upgrade` command implementation (device or group).
 
-Runs '/system routerboard upgrade' and reboots the device to apply RouterBOOT/BIOS.
+Platform-agnostic BIOS/firmware upgrade using vendor-specific implementations.
 """
 
 from __future__ import annotations
@@ -12,15 +12,20 @@ from typing import Annotated, Any, cast
 
 import typer
 
-from network_toolkit.common.logging import console, setup_logging
+from network_toolkit.common.command_helpers import CommandContext
+from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
+
+# For backward compatibility with tests
+from network_toolkit.common.logging import setup_logging
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
+from network_toolkit.platforms import UnsupportedOperationError, get_platform_operations
 
 MAX_LIST_PREVIEW = 10
 
 
 def register(app: typer.Typer) -> None:
-    @app.command(rich_help_panel="Executing Operations")
+    @app.command(rich_help_panel="Remote Operations")
     def routerboard_upgrade(  # pyright: ignore[reportUnusedFunction]
         target_name: Annotated[
             str,
@@ -46,16 +51,24 @@ def register(app: typer.Typer) -> None:
         ] = False,
         config_file: Annotated[
             Path, typer.Option("--config", "-c", help="Configuration file path")
-        ] = Path("devices.yml"),
+        ] = DEFAULT_CONFIG_PATH,
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose output")
         ] = False,
     ) -> None:
-        """Upgrade RouterBOARD (RouterBOOT/BIOS) and reboot to apply.
+        """Upgrade device BIOS/RouterBOOT and reboot to apply.
 
-        This runs '/system routerboard upgrade' followed by an automatic reboot.
+        Uses platform-specific implementations to handle vendor differences
+        in BIOS upgrade procedures.
         """
         setup_logging("DEBUG" if verbose else "INFO")
+
+        # ACTION command - use global config theme
+        ctx = CommandContext(
+            config_file=config_file,
+            verbose=verbose,
+            output_mode=None,  # Use global config theme
+        )
 
         try:
             config = load_config(config_file)
@@ -69,32 +82,36 @@ def register(app: typer.Typer) -> None:
             is_group = target_name in groups
 
             if not (is_device or is_group):
-                console.print(
-                    f"[red]Error: '{target_name}' not found as device or group in "
-                    "configuration[/red]"
+                ctx.print_error(
+                    f"Error: '{target_name}' not found as device or group in configuration"
                 )
                 if devices:
                     dev_names = sorted(devices.keys())
                     preview = ", ".join(dev_names[:MAX_LIST_PREVIEW])
                     if len(dev_names) > MAX_LIST_PREVIEW:
                         preview += " ..."
-                    console.print("[yellow]Known devices:[/yellow] " + preview)
+                    ctx.print_info("Known devices: " + preview)
                 if groups:
                     grp_names = sorted(groups.keys())
                     preview = ", ".join(grp_names[:MAX_LIST_PREVIEW])
                     if len(grp_names) > MAX_LIST_PREVIEW:
                         preview += " ..."
-                    console.print("[yellow]Known groups:[/yellow] " + preview)
+                    ctx.print_info("Known groups: " + preview)
                 raise typer.Exit(1)
 
             def process_device(dev: str) -> bool:
                 try:
                     with device_session(dev, config) as session:
+                        # Get platform-specific operations
+                        try:
+                            platform_ops = get_platform_operations(session)
+                        except UnsupportedOperationError as e:
+                            ctx.print_error(f"Error on {dev}: {e}")
+                            return False
+
                         if precheck_sequence and not skip_precheck:
-                            console.print(
-                                "[cyan]Running precheck sequence '"
-                                + precheck_sequence
-                                + f"' on {dev}[/cyan]"
+                            ctx.print_info(
+                                f"Running precheck sequence '{precheck_sequence}' on {dev}"
                             )
                             seq_cmds: list[str] = []
                             dcfg = (config.devices or {}).get(dev)
@@ -104,39 +121,36 @@ def register(app: typer.Typer) -> None:
                                 and precheck_sequence in dcfg.command_sequences
                             ):
                                 seq_cmds = dcfg.command_sequences[precheck_sequence]
-                            elif (
-                                config.global_command_sequences
-                                and precheck_sequence in config.global_command_sequences
-                            ):
-                                seq_cmds = config.global_command_sequences[
-                                    precheck_sequence
-                                ].commands
 
                             for cmd in seq_cmds:
                                 session.execute_command(cmd)
 
-                        console.print(
-                            "[bold yellow]Upgrading RouterBOARD (RouterBOOT) on "
-                            f"{dev} and rebooting...[/bold yellow]"
+                        ctx.print_warning(
+                            f"Upgrading BIOS/RouterBOOT on {dev} and rebooting..."
                         )
-                        ok = session.routerboard_upgrade_and_reboot()
+                        try:
+                            platform_name_obj = platform_ops.get_platform_name()
+                            platform_name = str(platform_name_obj)
+                        except Exception:  # pragma: no cover - defensive
+                            platform_name = "unknown"
+                        ctx.print_info(f"Platform: {platform_name}")
+
+                        # Use platform-specific BIOS upgrade
+                        ok = platform_ops.bios_upgrade()
                         if ok:
-                            console.print(
-                                "[green]OK RouterBOARD upgrade scheduled; "
-                                f"device rebooting: {dev}[/green]"
+                            ctx.print_success(
+                                f"OK BIOS upgrade scheduled; device rebooting: {dev}"
                             )
                             return True
-                        console.print(
-                            f"[red]FAIL RouterBOARD upgrade failed to start on {dev}[/red]"
-                        )
+                        ctx.print_error(f"FAIL BIOS upgrade failed to start on {dev}")
                         return False
                 except NetworkToolkitError as e:
-                    console.print(f"[red]Error on {dev}: {e.message}[/red]")
+                    ctx.print_error(f"Error on {dev}: {e.message}")
                     if verbose and e.details:
-                        console.print(f"[red]Details: {e.details}[/red]")
+                        ctx.print_error(f"Details: {e.details}")
                     return False
                 except Exception as e:  # pragma: no cover - unexpected
-                    console.print(f"[red]Unexpected error on {dev}: {e}[/red]")
+                    ctx.print_error(f"Unexpected error on {dev}: {e}")
                     return False
 
             if is_device:
@@ -154,17 +168,11 @@ def register(app: typer.Typer) -> None:
                     members = grp.members or []
 
             if not members:
-                console.print(
-                    f"[red]Error: No devices found in group '{target_name}'[/red]",
-                )
+                ctx.print_error(f"Error: No devices found in group '{target_name}'")
                 raise typer.Exit(1)
 
-            console.print(
-                "[bold cyan]Starting RouterBOARD upgrade for group '"
-                + target_name
-                + "' ("
-                + str(len(members))
-                + ") devices)[/bold cyan]"
+            ctx.print_info(
+                f"Starting RouterBOARD upgrade for group '{target_name}' ({len(members)} devices)"
             )
             failures = 0
             for dev in members:
@@ -172,17 +180,18 @@ def register(app: typer.Typer) -> None:
                 failures += 0 if ok else 1
 
             total = len(members)
-            console.print(
-                f"[bold]Completed:[/bold] {total - failures}/{total} initiated"
+            # Keep summary formatting consistent with other commands
+            ctx.output_manager.print_info(
+                f"Completed: {total - failures}/{total} initiated"
             )
             if failures:
                 raise typer.Exit(1)
 
         except NetworkToolkitError as e:
-            console.print(f"[red]Error: {e.message}[/red]")
+            ctx.print_error(f"Error: {e.message}")
             if verbose and e.details:
-                console.print(f"[red]Details: {e.details}[/red]")
+                ctx.print_error(f"Details: {e.details}")
             raise typer.Exit(1) from None
         except Exception as e:  # pragma: no cover - unexpected
-            console.print(f"[red]Unexpected error: {e}[/red]")
+            ctx.print_error(f"Unexpected error: {e}")
             raise typer.Exit(1) from None

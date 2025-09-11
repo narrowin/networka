@@ -1,12 +1,36 @@
 # Environment Variable Configuration
 
-This document describes how to set up secure credential management using environment variables for the Network Worker.
+TL;DR
+- Prefer interactive auth with `--interactive-auth` for ad‑hoc runs
+- Set `NW_USER_DEFAULT` and `NW_PASSWORD_DEFAULT` for shared defaults
+- Override per device/group with `NW_USER_*` and `NW_PASSWORD_*`
+
+This document describes how to set up secure credential management using environment variables for Networka.
+
+Example precedence
+
+1) Run with interactive auth (highest):
+
+```bash
+nw run router1 system_info --interactive-auth
+```
+
+2) Use device-specific overrides when set (e.g., `NW_USER_ROUTER1`, `NW_PASSWORD_ROUTER1`)
+
+3) Fall back to defaults when no overrides exist:
+
+```bash
+export NW_USER_DEFAULT=admin
+export NW_PASSWORD_DEFAULT=secret
+nw run router1 system_info
+```
 
 ## Overview
 
-For security best practices, all device credentials have been moved from the `devices.yml` configuration file to environment variables. This prevents sensitive information from being stored in version control.
+For security best practices, all device credentials should be managed via environment variables rather than YAML files. This prevents sensitive information from being stored in version control.
 
-The Network Worker now supports multiple levels of credential management:
+The Networka now supports multiple levels of credential management:
+
 - **Device-specific credentials** - For individual devices
 - **Group-level credentials** - For entire device groups
 - **Default credentials** - Fallback for all devices
@@ -25,22 +49,24 @@ export NW_PASSWORD_DEFAULT=your_secure_password_here
 ### Device-Specific Credentials (Optional)
 
 You can override credentials for specific devices using the pattern:
+
 - `NW_USER_DEVICENAME` - Username for the specific device
 - `NW_PASSWORD_DEVICENAME` - Password for the specific device
 
-Device names should match those in `devices.yml` and will be automatically converted to uppercase with hyphens replaced by underscores.
+Device names should match those in your configuration and will be automatically converted to uppercase with hyphens replaced by underscores.
 
 Examples:
+
 ```bash
-# For device 'sw-acc1' in devices.yml
+# For device 'sw-acc1' in config
 export NW_USER_SW_ACC1=admin
 export NW_PASSWORD_SW_ACC1=switch1_password
 
-# For device 'sw-acc2' in devices.yml
+# For device 'sw-acc2' in config
 export NW_USER_SW_ACC2=admin
 export NW_PASSWORD_SW_ACC2=switch2_password
 
-# For device 'sw-dist1' in devices.yml
+# For device 'sw-dist1' in config
 export NW_USER_SW_DIST1=admin
 export NW_PASSWORD_SW_DIST1=distribution_password
 ```
@@ -48,6 +74,7 @@ export NW_PASSWORD_SW_DIST1=distribution_password
 ### Group-Level Credentials (New Feature)
 
 You can set credentials for entire device groups using the pattern:
+
 - `NW_USER_GROUPNAME` - Username for all devices in the group
 - `NW_PASSWORD_GROUPNAME` - Password for all devices in the group
 
@@ -70,11 +97,13 @@ export NW_PASSWORD_CRITICAL_INFRASTRUCTURE=critical_systems_password
 The Network Toolkit automatically loads environment variables from `.env` files, making credential management simple and secure.
 
 1. Copy the example environment file:
+
    ```bash
    cp .env.example .env
    ```
 
 2. Edit `.env` with your actual credentials:
+
    ```bash
    nano .env
    ```
@@ -93,6 +122,7 @@ The toolkit automatically looks for `.env` files in the following order (highest
 3. **Current Working Directory** (Lowest priority) - `.env` file in your current directory
 
 This allows for flexible credential management:
+
 - Place `.env` in your project/config directory for project-specific credentials
 - Place `.env` in your working directory for global defaults
 - Use shell environment variables for runtime overrides
@@ -100,6 +130,7 @@ This allows for flexible credential management:
 ### Option 2: Export in Shell
 
 Add to your `~/.bashrc` or `~/.zshrc`:
+
 ```bash
 # Network Toolkit Credentials
 export NW_USER_DEFAULT=admin
@@ -112,6 +143,7 @@ export NW_PASSWORD_SW_DIST1=distribution_password
 ```
 
 Then reload your shell:
+
 ```bash
 source ~/.bashrc
 ```
@@ -119,6 +151,7 @@ source ~/.bashrc
 ### Option 3: Runtime Export
 
 Set variables directly before running commands:
+
 ```bash
 export NW_USER_DEFAULT=admin
 export NW_PASSWORD_DEFAULT=your_password
@@ -144,6 +177,7 @@ The toolkit resolves credentials in this priority order:
 5. **Default environment variables** (Lowest) - `NW_USER_DEFAULT` and `NW_PASSWORD_DEFAULT`
 
 This precedence allows you to:
+
 - Set global defaults with `NW_USER_DEFAULT` and `NW_PASSWORD_DEFAULT`
 - Override entire groups with group-level credentials
 - Override specific devices with device-specific credentials
@@ -162,7 +196,8 @@ This error means `NW_PASSWORD_DEFAULT` is not set in any of the credential sourc
 ### Device-specific credentials not working
 
 Check that:
-1. The environment variable name matches the device name in `devices.yml`
+
+1. The environment variable name matches the device name in your config
 2. Hyphens in device names become underscores in environment variables
 3. Device names are converted to uppercase for environment variables
 4. The variables are exported in your current shell session
@@ -171,14 +206,16 @@ Check that:
 ### Group credentials not being applied
 
 Check that:
+
 1. The group name in the environment variable matches exactly the group name in `groups.yml`
-2. The device is actually a member of the group (check with `nw list-groups`)
+2. The device is actually a member of the group (check with `nw list groups`)
 3. Use the correct format: `NW_USER_GROUPNAME` and `NW_PASSWORD_GROUPNAME`
 4. Group credentials have lower priority than device-specific credentials
 
 ### Verification
 
 You can verify your environment variables are set correctly:
+
 ```bash
 # Check if default credentials are set
 echo "Default user: $NW_USER_DEFAULT"
@@ -195,11 +232,11 @@ echo "Access switches password set: $(if [ -n "$NW_PASSWORD_ACCESS_SWITCHES" ]; 
 
 ## Migration from Old Configuration
 
-If you have an existing `devices.yml` with hardcoded credentials:
+If you have an existing legacy single-file config with hardcoded credentials:
 
 1. Extract all `user` and `password` values from the file
 2. Set them as environment variables using the patterns above
-3. Remove or comment out the `user` and `password` lines from `devices.yml`
+3. Remove or comment out the `user` and `password` lines from your config files
 4. Test the configuration to ensure devices can still connect
 
 The updated configuration will automatically fall back to environment variables when device-specific credentials are not found in the YAML file.

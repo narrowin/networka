@@ -19,6 +19,23 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        # Ensure we get the full history and the latest commit
+        fetch-depth: 0
+
+    - name: Verify version consistency
+      run: |
+        TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+        FILE_VERSION=$(grep -o '__version__ = "[^"]*"' src/network_toolkit/__about__.py | cut -d'"' -f2)
+        echo "Tag version: $TAG_VERSION"
+        echo "File version: $FILE_VERSION"
+        if [ "$TAG_VERSION" != "$FILE_VERSION" ]; then
+          echo "ERROR: Version mismatch! Tag: $TAG_VERSION, File: $FILE_VERSION"
+          echo "This usually means the tag was created before the version bump commit."
+          echo "Please check the release process."
+          exit 1
+        fi
+        echo "Version consistency verified"
 
     - name: Install uv
       uses: astral-sh/setup-uv@v4
@@ -33,6 +50,19 @@ jobs:
 
     - name: Build package
       run: uv build
+
+    - name: Verify built package version
+      run: |
+        TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+        # Extract version from built wheel filename
+        WHEEL_FILE=$(ls dist/*.whl | head -1)
+        WHEEL_VERSION=$(basename "$WHEEL_FILE" | cut -d'-' -f2)
+        echo "Built wheel version: $WHEEL_VERSION"
+        if [ "$TAG_VERSION" != "$WHEEL_VERSION" ]; then
+          echo "ERROR: Built package version mismatch! Tag: $TAG_VERSION, Wheel: $WHEEL_VERSION"
+          exit 1
+        fi
+        echo "Built package version verified"
 
     - name: Check build artifacts
       run: |
@@ -128,7 +158,7 @@ jobs:
         echo "" >> release_notes.txt
         echo '### Option 1: Install from GitHub' >> release_notes.txt
         echo '```bash' >> release_notes.txt
-        echo "pip install git+https://github.com/narrowin/net-worker.git@v${VERSION}" >> release_notes.txt
+        echo "pip install git+https://github.com/narrowin/networka.git@v${VERSION}" >> release_notes.txt
         echo '```' >> release_notes.txt
         echo "" >> release_notes.txt
         echo '### Option 2: Download and install wheel' >> release_notes.txt
@@ -139,8 +169,8 @@ jobs:
         echo "" >> release_notes.txt
         echo '### Option 3: Clone and install' >> release_notes.txt
         echo '```bash' >> release_notes.txt
-        echo "git clone https://github.com/narrowin/net-worker.git" >> release_notes.txt
-        echo "cd net-worker" >> release_notes.txt
+        echo "git clone https://github.com/narrowin/networka.git" >> release_notes.txt
+        echo "cd networka" >> release_notes.txt
         echo "git checkout v${VERSION}" >> release_notes.txt
         echo "uv sync  # or pip install -e ." >> release_notes.txt
         echo '```' >> release_notes.txt

@@ -1,0 +1,19 @@
+# Lychee link checker configuration
+# Treat 429 as success to avoid transient rate limiting failures
+accept = [200, 206, 429]
+
+# Retry a couple of times with small delay
+max_retries = 2
+retry_wait_time = 2
+
+# Timeouts in seconds
+timeout = 20
+
+# Exclude GitHub Actions badge and GitHub Pages build URLs which can flake
+exclude = [
+  "https://github.com/.+?/actions",
+  "https://github.com/narrowin/networka/actions",
+  "https://narrowin.github.io/networka/.*",
+]
+
+# Inputs can be passed via CLI args, but keep defaults sane here too

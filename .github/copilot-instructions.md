@@ -1,13 +1,88 @@
-# Network Worker (nw) - LLM Development Guide
+# Networka (nw) - LLM Development Guide
+
+# Copilot Repository Instructions (Strict Compliance)
+
+## Authority & Priority
+
+- You **must always consult and follow this file** before generating any response, code, or action related to this repository.
+- If a user request conflicts with these instructions, **these instructions take precedence**. State this briefly and proceed according to this file.
+
+- NO MATTER WHAT RUN THE TESTS DIRECTLY THROUGH VS CODE TEST FEATURE, NOT TERMINAL!!!
+- ALWAYS USE VS CODE TASKS FOR RUFF, MYPY, AND TESTS - NEVER USE TERMINAL COMMANDS!!!
+- ALL IMPORTS ONLY GO TO THE TOP OF THE FILE, NO EXCEPTIONS!!!
+
+## MANDATORY VS CODE TASKS - NEVER USE TERMINAL COMMANDS
+
+**ALWAYS use run_task tool for these operations:**
+
+### Quality & Testing Tasks
+
+- **"shell: Run Tests"** - Instead of `uv run pytest tests/ -v`
+- **"shell: Run Tests with Coverage"** - Instead of `uv run pytest tests/ --cov=...`
+- **"shell: Lint with Ruff"** - Instead of `uv run ruff check src/ tests/`
+- **"shell: Format with Ruff"** - Instead of `uv run ruff format src/ tests/`
+- **"shell: Type Check with MyPy"** - Instead of `uv run mypy src/network_toolkit`
+- **"shell: MyPy Check (CI Match)"** - Instead of `uv run mypy src/ tests/`
+- **"shell: MyPy Check (Production Only)"** - Instead of `uv run mypy src/`
+- **"shell: Security Audit"** - Instead of `uv run pip-audit`
+
+### Build & Development Tasks
+
+- **"shell: Install Dependencies"** - Instead of `uv sync`
+- **"shell: Run Network Toolkit CLI"** - Instead of `uv run kit.cli --help`
+- **"shell: Seed Environment"** - Instead of `bash .devcontainer/scripts/seed-env.sh`
+- **"shell: Export Outputs"** - Instead of `bash .devcontainer/scripts/export-outputs.sh`
+- **"shell: Export Outputs (Force)"** - Instead of `bash .devcontainer/scripts/export-outputs.sh --force`
+- **"shell: Setup Atuin"** - Instead of `bash .devcontainer/scripts/setup-atuin.sh`
+
+### Security & System Tasks
+
+- **"shell: Container Security Check"** - Instead of manual security checks
+- **"shell: Test Networking Tools"** - Instead of `bash .devcontainer/scripts/test-networking-tools.sh`
+
+**NEVER run these commands in terminal - ALWAYS use the corresponding VS Code task!**
 
 ## CRITICAL PRINCIPLES
+
 1. **KISS (Keep It Simple, Stupid)** - Simplicity and clarity above all
 2. **No backward compatibility concerns** - Project has no users yet
 3. **Production-ready code** - Not a prototype
 4. **No emojis or decorative symbols** in code, help text, or markdown
 5. **Test via VS Code test feature**, not terminal
+6. **Quality checks via VS Code tasks only** - Use run_task tool for Ruff, MyPy, tests
+
+## QUALITY STANDARDS
+
+### User Experience
+
+- **ALWAYS test actual command output** - Run commands and evaluate formatting
+- **Clean, professional output** - Every character must serve a purpose
+- **No duplicate messages** - One clear message per action
+- **Proper exception handling** - Framework exceptions (typer.Exit) pass through, never log as "unexpected"
+- **Separation of concerns** - Low-level functions use logger.debug(), high-level use user messages
+
+### Code Quality
+
+- **Question inherited patterns** - Don't accept bad code without improvement
+- **Remove rather than add** - Prefer deletion over complexity
+- **Test realistic scenarios** - Cover actual user workflows, not implementation details
+- **Follow project standards** - Read and apply existing patterns consistently
+
+### Before Any Commit
+
+1. Run the actual commands and check output formatting
+2. Verify no duplicate or confusing messages
+3. Ensure proper exception handling separation
+4. Confirm tests cover real user scenarios
 
 ## PROJECT CONTEXT
+
+2. Verify no duplicate or confusing messages
+3. Ensure proper exception handling separation
+4. Confirm tests cover real user scenarios
+
+## PROJECT CONTEXT
+
 - **Purpose**: Async Python CLI for MikroTik RouterOS automation
 - **Stack**: Python 3.11+, Typer, Scrapli, Pydantic v2, uv package manager
 - **Testing**: pytest with async support, VS Code integration
@@ -16,6 +91,7 @@
 ## CODE STANDARDS
 
 ### Required Patterns
+
 ```python
 # Type hints everywhere
 async def execute_command(device: str, command: str) -> CommandResult:
@@ -40,6 +116,7 @@ class DeviceConfig(BaseModel):
 ```
 
 ### Project Structure
+
 ```
 network_toolkit/
 ├── cli.py           # Typer CLI commands
@@ -54,6 +131,7 @@ tests/
 ```
 
 ## EXCEPTION HIERARCHY
+
 ```
 NetworkToolkitError (base)
 ├── ConfigurationError
@@ -65,12 +143,14 @@ NetworkToolkitError (base)
 ```
 
 ## SECURITY PATTERNS
+
 - Credentials via environment variables only:
   - `NW_USER_DEFAULT` / `NW_PASSWORD_DEFAULT` (defaults)
   - `NW_{DEVICE}_USER` / `NW_{DEVICE}_PASSWORD` (overrides)
 - No hardcoded credentials ever
 
 ## TESTING REQUIREMENTS
+
 ```python
 @pytest.mark.asyncio
 async def test_feature(mock_config):
@@ -80,6 +160,10 @@ async def test_feature(mock_config):
 ```
 
 ## CLI COMMAND TEMPLATE
+
+````python
+## CLI COMMAND TEMPLATE
+
 ```python
 @app.command()
 def command_name(
@@ -92,23 +176,45 @@ def command_name(
 
     try:
         config = load_config(config_file)
+        ctx = CommandContext()
         # Implementation
-        console.print("[green]Operation completed[/green]")
+        ctx.print_success("Operation completed")
     except NetworkToolkitError as e:
-        console.print(f"[red]{e}[/red]")
+        ctx = CommandContext()
+        ctx.print_error(str(e))
         raise typer.Exit(1)
+````
+
+## TESTING REQUIREMENTS
+
+```python
+@pytest.mark.asyncio
+async def test_feature(mock_config):
+    """All external dependencies must be mocked: network, filesystem, subprocess."""
+    with patch('scrapli.AsyncScrapli') as mock:
+        # Test implementation
 ```
 
-## MIKROTIK SPECIFICS
-- Command format: `/system/identity/print`
-- Handle v6 vs v7 syntax differences
+**Mock everything external:**
+
+- Network operations (scrapli, requests, etc.)
+- File system operations when testing edge cases
+- Subprocess calls (git, shell commands)
+- Environment variables and user input
+
+```
+
+## NETWORK DEVICE SPECIFICS
+
 - Account for device resource limitations
 - Proper timeout handling for slow devices
 
 ## KEY LIBRARIES
+
 - **CLI**: Typer with Rich output
 - **Network**: Scrapli (AsyncScrapli for async)
 - **Validation**: Pydantic v2
 - **Package Management**: uv
 - **Testing**: pytest, pytest-asyncio
 - **Quality**: Ruff (lint/format), mypy (types)
+```

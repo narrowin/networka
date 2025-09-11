@@ -33,7 +33,7 @@ def sample_config_data(temp_dir: Path) -> dict[str, Any]:
             "backup_dir": str(temp_dir / "backups"),
             "logs_dir": str(temp_dir / "logs"),
             "results_dir": str(temp_dir / "results"),
-            "transport": "ssh",
+            "transport": "system",
             "port": 22,
             "timeout": 30,
             "connection_retries": 3,
@@ -102,23 +102,6 @@ def sample_config_data(temp_dir: Path) -> dict[str, Any]:
                 "match_tags": ["core"],
             },
         },
-        "global_command_sequences": {
-            "system_info": {
-                "description": "Get system information",
-                "commands": [
-                    "/system/identity/print",
-                    "/system/resource/print",
-                    "/system/clock/print",
-                ],
-            },
-            "interface_status": {
-                "description": "Check interface status",
-                "commands": [
-                    "/interface/print brief",
-                    "/interface/ethernet/print brief",
-                ],
-            },
-        },
         "file_operations": {
             "firmware_upload": {
                 "local_path": str(temp_dir / "firmware" / "routeros-7.12.npk"),
@@ -141,10 +124,29 @@ def sample_config(sample_config_data: dict[str, Any]) -> NetworkConfig:
 
 
 @pytest.fixture
+def mock_config(sample_config: NetworkConfig) -> NetworkConfig:
+    """Alias for sample_config to maintain compatibility with existing tests."""
+    return sample_config
+
+
+@pytest.fixture
 def config_file(temp_dir: Path, sample_config_data: dict[str, Any]) -> Path:
-    """Create a temporary config file with sample data."""
-    config_path = temp_dir / "test_config.yml"
-    with config_path.open("w") as f:
+    """Create a temporary modular config with config.yml and return its path.
+
+    The loader now supports only modular directories or a direct path to
+    config.yml. Tests expecting a "config file" should use the path to
+    the created config.yml.
+    """
+    config_dir = temp_dir / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create minimal modular structure; subdirs are optional for most tests
+    (config_dir / "devices").mkdir(exist_ok=True)
+    (config_dir / "groups").mkdir(exist_ok=True)
+    (config_dir / "sequences").mkdir(exist_ok=True)
+
+    config_path = config_dir / "config.yml"
+    with config_path.open("w", encoding="utf-8") as f:
         yaml.dump(sample_config_data, f)
     return config_path
 
@@ -245,3 +247,80 @@ def mock_paramiko_ssh() -> MagicMock:
     ssh.open_sftp = MagicMock()
     ssh.close = MagicMock()
     return ssh
+
+
+# --- Config Directory Fixtures for Integration Tests ----------------------
+
+
+@pytest.fixture(scope="session")
+def test_config_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Create a temporary config directory structure for tests that need real config files.
+
+    This fixture uses the existing 'nw config init' functions to ensure
+    tests use the exact same config structure that real users get.
+    """
+    from network_toolkit.commands.config import (
+        create_config_yml,
+        create_example_devices,
+        create_example_groups,
+        create_example_sequences,
+    )
+
+    config_root = tmp_path_factory.mktemp("test_config")
+
+    # Create directory structure
+    config_dir = config_root / "config"
+    config_dir.mkdir()
+    (config_dir / "devices").mkdir()
+    (config_dir / "groups").mkdir()
+    (config_dir / "sequences").mkdir()
+
+    # Use the existing config init functions - single source of truth!
+    create_config_yml(config_dir)
+    create_example_devices(config_dir / "devices")
+    create_example_groups(config_dir / "groups")
+    create_example_sequences(config_dir / "sequences")
+
+    return config_root
+
+
+@pytest.fixture
+def test_config_dir(test_config_root: Path) -> Path:
+    """Get the config directory from the test config root."""
+    return test_config_root / "config"
+
+
+@pytest.fixture
+def mock_repo_config(test_config_dir: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Mock the repository config directory to point to test config.
+
+    This fixture redirects code that looks for the real config/ directory
+    to use our test config instead.
+    """
+    # Change working directory to the test config root so relative 'config' path works
+    monkeypatch.chdir(test_config_dir.parent)
+    return test_config_dir
+
+
+# --- Test selection hooks ----------------------------------------------------
+
+
+def pytest_collection_modifyitems(
+    config: pytest.Config, items: list[pytest.Item]
+) -> None:
+    """Auto-mark TUI-related tests so they can be selected with '-m tui'.
+
+    Best practice is to use markers for groups of tests. Instead of editing each
+    file to add a marker, we tag any tests whose filenames start with
+    'test_tui_' or that live under a 'tui' test sub-folder.
+    """
+    tui_mark = pytest.mark.tui
+    for item in items:
+        try:
+            path = str(getattr(item, "fspath", ""))
+        except Exception:  # pragma: no cover - defensive
+            path = ""
+        p_norm = path.replace("\\", "/")
+        filename = p_norm.rsplit("/", 1)[-1]
+        if filename.startswith("test_tui_") or "/tui/" in p_norm:
+            item.add_marker(tui_mark)

@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://narrowin.github.io/networka/
+    about: Please check the documentation before opening an issue
+  - name: Discussions
+    url: https://github.com/narrowin/networka/discussions
+    about: Use discussions for questions, ideas, and general community interaction
+  - name: Security Issues
+    url: https://github.com/narrowin/networka/blob/main/SECURITY.md
+    about: Please follow responsible disclosure for security vulnerabilities

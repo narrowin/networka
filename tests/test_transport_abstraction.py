@@ -19,18 +19,19 @@ class TestTransportAbstraction:
         assert factory is not None
         assert hasattr(factory, "create_transport")
 
-    def test_get_transport_factory_nornir(self):
-        """Test getting Nornir transport factory."""
-        factory = get_transport_factory("nornir_netmiko")
-        assert factory is not None
-        assert hasattr(factory, "create_transport")
+    def test_get_transport_factory_nornir_not_available(self):
+        """Test that Nornir transport factory is not available yet."""
+        with pytest.raises(ValueError, match="Unknown transport type"):
+            get_transport_factory("nornir_netmiko")
 
     def test_get_transport_factory_invalid(self):
         """Test invalid transport type raises error."""
         with pytest.raises(ValueError, match="Unknown transport type"):
             get_transport_factory("invalid_transport")
 
-    @patch.dict(os.environ, {"NW_USER_DEFAULT": "admin", "NW_PASSWORD_DEFAULT": "test_password"})
+    @patch.dict(
+        os.environ, {"NW_USER_DEFAULT": "admin", "NW_PASSWORD_DEFAULT": "test_password"}
+    )
     def test_scrapli_transport_creation(self):
         """Test creating a Scrapli transport instance."""
         # Set up environment variables for credential resolution
@@ -75,9 +76,7 @@ class TestTransportAbstraction:
             general=GeneralConfig(default_transport_type="scrapli"),
             devices={
                 "device1": DeviceConfig(host="192.168.1.1"),  # No transport_type
-                "device2": DeviceConfig(
-                    host="192.168.1.2", transport_type="nornir_netmiko"
-                ),
+                "device2": DeviceConfig(host="192.168.1.2", transport_type="scrapli"),
             },
         )
 
@@ -85,9 +84,11 @@ class TestTransportAbstraction:
         assert config.get_transport_type("device1") == "scrapli"
 
         # Device2 should use device-specific
-        assert config.get_transport_type("device2") == "nornir_netmiko"
+        assert config.get_transport_type("device2") == "scrapli"
 
-    @patch.dict(os.environ, {"NW_USER_DEFAULT": "admin", "NW_PASSWORD_DEFAULT": "test_password"})
+    @patch.dict(
+        os.environ, {"NW_USER_DEFAULT": "admin", "NW_PASSWORD_DEFAULT": "test_password"}
+    )
     def test_config_connection_params(self):
         """Test connection parameter generation."""
         # Set up environment variables for credential resolution
