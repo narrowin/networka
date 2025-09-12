@@ -4,41 +4,76 @@ ARG CLAB_VERSION=latest
 
 # Add the netdevops repository
 RUN echo "deb [trusted=yes] https://netdevops.fury.site/apt/ /" | \
-    tee -a /etc/apt/sources.list.d/netdevops.list
+  tee -a /etc/apt/sources.list.d/netdevops.list
 
 # Install necessary packages, including curl
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    direnv \
-    btop \
-    iputils-ping \
-    tcpdump \
-    iproute2 \
-    qemu-kvm \
-    dnsutils \
-    telnet \
-    curl
+  direnv \
+  btop \
+  iputils-ping \
+  tcpdump \
+  iproute2 \
+  qemu-kvm \
+  dnsutils \
+  telnet \
+  curl \
+  bonding \
+  curl \
+  ethtool \
+  iperf \
+  iperf3 \
+  iproute2 \
+  iputils \
+  jq \
+  lftp \
+  mtr \
+  net-tools \
+  netcat-openbsd \
+  nmap \
+  openssl \
+  procps \
+  rsync \
+  socat \
+  xz \
+  tcpdump \
+  tcptraceroute \
+  tshark \
+  wget \
+  envsubst \
+  scapy \
+  fping \
+  htop \
+  vim \
+  nano \
+  iputils-ping \
+  dhclient \
+  traceroute \
+  wpa_supplicant \
+  dhcping \
+  tmux
+
 
 # Install Containerlab
 RUN if [ -z "${CLAB_VERSION}" ] || [ "${CLAB_VERSION}" = "latest" ]; then \
-    bash -c "$(curl -sL https://get.containerlab.dev)"; \
-    else \
-    bash -c "$(curl -sL https://get.containerlab.dev)" -- -v ${CLAB_VERSION}; \
-    fi
+  bash -c "$(curl -sL https://get.containerlab.dev)"; \
+  else \
+  bash -c "$(curl -sL https://get.containerlab.dev)" -- -v ${CLAB_VERSION}; \
+  fi
 
 # Install GitHub CLI directly from the latest release
 RUN bash -c 'ARCH=$(uname -m | sed "s/x86_64/amd64/" | sed "s/aarch64/arm64/") && \
-    VERSION=$(curl -s https://api.github.com/repos/cli/cli/releases/latest | \
-    grep -oP "\"tag_name\": \"\K[^\"]+") && \
-    CLEAN_VERSION=${VERSION#v} && \
-    DOWNLOAD_URL="https://github.com/cli/cli/releases/download/${VERSION}/gh_${CLEAN_VERSION}_linux_${ARCH}.tar.gz" && \
-    curl -L "$DOWNLOAD_URL" | tar xz -C /tmp && \
-    mv /tmp/gh_${CLEAN_VERSION}_linux_${ARCH}/bin/gh /usr/local/bin/ && \
-    chmod +x /usr/local/bin/gh && \
-    rm -rf /tmp/gh_${CLEAN_VERSION}_linux_${ARCH}'
+  VERSION=$(curl -s https://api.github.com/repos/cli/cli/releases/latest | \
+  grep -oP "\"tag_name\": \"\K[^\"]+") && \
+  CLEAN_VERSION=${VERSION#v} && \
+  DOWNLOAD_URL="https://github.com/cli/cli/releases/download/${VERSION}/gh_${CLEAN_VERSION}_linux_${ARCH}.tar.gz" && \
+  curl -L "$DOWNLOAD_URL" | tar xz -C /tmp && \
+  mv /tmp/gh_${CLEAN_VERSION}_linux_${ARCH}/bin/gh /usr/local/bin/ && \
+  chmod +x /usr/local/bin/gh && \
+  rm -rf /tmp/gh_${CLEAN_VERSION}_linux_${ARCH}'
 
 # Install gNMIc and gNOIc
 RUN bash -c "$(curl -sL https://get-gnmic.openconfig.net)" && \
-    bash -c "$(curl -sL https://get-gnoic.kmrd.dev)"
+  bash -c "$(curl -sL https://get-gnoic.kmrd.dev)"
 
 # Add empty docker config files to avoid clab warnings for root user
 RUN mkdir -p /root/.docker && echo "{}" > /root/.docker/config.json
@@ -64,8 +99,8 @@ COPY --from=ghcr.io/astral-sh/uv:0.6.2 /uv /uvx /bin/
 
 # Install go-task for task runner (required by VS Code tasks)
 RUN curl -sL https://taskfile.dev/install.sh | sh -s -- -d -b /tmp && \
-    sudo mv /tmp/task /usr/local/bin/task && \
-    chmod +x /usr/local/bin/task
+  sudo mv /tmp/task /usr/local/bin/task && \
+  chmod +x /usr/local/bin/task
 
 # Add empty docker config files to avoid clab warnings for vscode user
 RUN mkdir -p /home/vscode/.docker && echo "{}" > /home/vscode/.docker/config.json
