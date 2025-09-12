@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/devcontainers/python:3.11-bookworm
+FROM mcr.microsoft.com/devcontainers/python:3.13-bookworm
 
 ARG CLAB_VERSION=latest
 
@@ -20,9 +20,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Containerlab
 RUN if [ -z "${CLAB_VERSION}" ] || [ "${CLAB_VERSION}" = "latest" ]; then \
-        bash -c "$(curl -sL https://get.containerlab.dev)"; \
+    bash -c "$(curl -sL https://get.containerlab.dev)"; \
     else \
-        bash -c "$(curl -sL https://get.containerlab.dev)" -- -v ${CLAB_VERSION}; \
+    bash -c "$(curl -sL https://get.containerlab.dev)" -- -v ${CLAB_VERSION}; \
     fi
 
 # Install GitHub CLI directly from the latest release
@@ -61,6 +61,11 @@ RUN ssh-keygen -t ecdsa -b 256 -N "" -f ~/.ssh/id_ecdsa
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:0.6.2 /uv /uvx /bin/
+
+# Install go-task for task runner (required by VS Code tasks)
+RUN curl -sL https://taskfile.dev/install.sh | sh -s -- -d -b /tmp && \
+    sudo mv /tmp/task /usr/local/bin/task && \
+    chmod +x /usr/local/bin/task
 
 # Add empty docker config files to avoid clab warnings for vscode user
 RUN mkdir -p /home/vscode/.docker && echo "{}" > /home/vscode/.docker/config.json
