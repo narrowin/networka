@@ -66,6 +66,14 @@ else
     git config --global commit.gpgsign false
 fi
 
+# Verify Git configuration is available
+if [ -f "/home/vscode/.gitconfig" ]; then
+    echo "✓ Git configuration mounted from host"
+    git config --global --get user.name && git config --global --get user.email
+else
+    echo "⚠ Host .gitconfig not mounted - Git identity may need to be configured manually"
+fi
+
 # Setup pre-commit hooks if config exists
 if [ -f ".pre-commit-config.yaml" ]; then
     echo "Setting up pre-commit hooks..."

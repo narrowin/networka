@@ -23,7 +23,9 @@
         // Persist mypy cache
         "source=devcontainer-mypy-cache,target=/home/vscode/.cache/mypy,type=volume",
         // Mount host SSH directory as read-only (for Git signing and SSH keys)
-        "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh-host,type=bind,readonly"
+        "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh-host,type=bind,readonly",
+        // Mount host Git configuration as read-only
+        "source=${localEnv:HOME}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,readonly"
     ],
     "features": {
         "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
