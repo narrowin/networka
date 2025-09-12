@@ -113,6 +113,8 @@
     // Persist mypy cache
     "source=devcontainer-mypy-cache,target=/home/vscode/.cache/mypy,type=volume",
     // Mount host SSH directory as read-only (for Git signing and SSH keys)
+    // Note: post-start script creates symlinks from ~/.ssh-host/* to ~/.ssh/*
+    // and updates Git signing key paths for container environment
     "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh-host,type=bind,readonly",
     // Mount host Git configuration as read-only
     "source=${localEnv:HOME}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,readonly"

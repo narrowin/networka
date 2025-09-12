@@ -49,29 +49,58 @@ if [ -f "pyproject.toml" ]; then
 fi
 
 # Setup SSH keys from host (if available)
-if [ -d "/home/vscode/.ssh-host" ] && [ -f "/home/vscode/.ssh-host/id_rsa-md-git" ]; then
-    echo "Configuring Git with host SSH keys..."
-    # Configure Git to use the host SSH signing key
-    git config --global user.signingkey "/home/vscode/.ssh-host/id_rsa-md-git"
-    git config --global gpg.format ssh
-    git config --global gpg.ssh.program ssh-keygen
-    git config --global commit.gpgsign true
-    echo "✓ Git configured with SSH signing key from host"
-elif [ -d "/home/vscode/.ssh-host" ]; then
-    echo "⚠ Host SSH directory mounted but signing key not found"
-    echo "Available keys in host .ssh:"
-    ls -la /home/vscode/.ssh-host/ 2>/dev/null || echo "Cannot list host SSH directory"
+echo "Configuring Git signing from host configuration..."
+if [ -f "/home/vscode/.gitconfig" ]; then
+    # Read the signing key from the mounted host .gitconfig
+    host_signing_key=$(git config --file /home/vscode/.gitconfig user.signingkey 2>/dev/null || echo "")
+
+    if [ -n "$host_signing_key" ] && [ -d "/home/vscode/.ssh-host" ]; then
+        # Extract just the key filename to make it portable
+        key_filename=$(basename "$host_signing_key")
+        host_key_path="/home/vscode/.ssh-host/keys/$key_filename"
+
+        if [ -f "$host_key_path" ]; then
+            echo "Found host signing key: $key_filename"
+            # Configure Git to use the host SSH signing key
+            git config --global user.signingkey "$host_key_path"
+            git config --global gpg.format ssh
+            git config --global gpg.ssh.program ssh-keygen
+            git config --global commit.gpgsign true
+            echo "Git configured with SSH signing key from host"
+        else
+            echo "Signing key referenced in host .gitconfig not found: $key_filename"
+            echo "Available keys in host SSH:"
+            ls -la /home/vscode/.ssh-host/keys/ 2>/dev/null || echo "No keys directory found"
+            git config --global commit.gpgsign false
+        fi
+    else
+        echo "No signing key configured in host .gitconfig or SSH directory not mounted"
+        git config --global commit.gpgsign false
+    fi
 else
-    echo "⚠ Host SSH directory not mounted - commit signing disabled"
+    echo "Host .gitconfig not mounted - commit signing disabled"
     git config --global commit.gpgsign false
 fi
 
 # Verify Git configuration is available
+echo "Verifying Git identity configuration..."
 if [ -f "/home/vscode/.gitconfig" ]; then
-    echo "✓ Git configuration mounted from host"
-    git config --global --get user.name && git config --global --get user.email
+    echo "Git configuration mounted from host"
+    user_name=$(git config --global --get user.name 2>/dev/null || echo "Not set")
+    user_email=$(git config --global --get user.email 2>/dev/null || echo "Not set")
+    echo "Git user: $user_name <$user_email>"
+
+    # Show signing status
+    if git config --global --get commit.gpgsign &>/dev/null; then
+        signing_key=$(git config --global --get user.signingkey 2>/dev/null || echo "None")
+        echo "Commit signing: enabled with key $(basename "$signing_key")"
+    else
+        echo "Commit signing: disabled"
+    fi
 else
-    echo "⚠ Host .gitconfig not mounted - Git identity may need to be configured manually"
+    echo "Host .gitconfig not mounted - Git identity may need to be configured manually"
+    echo "Use: git config --global user.name 'Your Name'"
+    echo "Use: git config --global user.email 'your.email@example.com'"
 fi
 
 # Setup pre-commit hooks if config exists
