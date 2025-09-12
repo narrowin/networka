@@ -14,7 +14,15 @@
     ],
     "mounts": [
         "type=bind,src=/var/lib/docker,dst=/var/lib/docker",
-        "type=bind,src=/lib/modules,dst=/lib/modules"
+        "type=bind,src=/lib/modules,dst=/lib/modules",
+        // Persist uv cache between rebuilds
+        "source=devcontainer-uv-cache,target=/home/vscode/.cache/uv,type=volume",
+        // Persist pip cache
+        "source=devcontainer-pip-cache,target=/home/vscode/.cache/pip,type=volume",
+        // Persist mypy cache
+        "source=devcontainer-mypy-cache,target=/home/vscode/.cache/mypy,type=volume",
+        // Mount host SSH directory as read-only (for Git signing and SSH keys)
+        "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh-host,type=bind,readonly"
     ],
     "features": {
         "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
@@ -28,6 +36,11 @@
         },
         "ghcr.io/devcontainers/features/go:1": {
             "version": "1.22"
+        },
+        // Python development environment
+        "ghcr.io/devcontainers/features/python:1": {
+            "version": "3.13",
+            "installTools": false
         }
     },
     "remoteUser": "vscode",
@@ -40,17 +53,50 @@
                         "path": "/bin/zsh"
                     }
                 },
-                "terminal.integrated.fontFamily": "FiraCode Nerd Font, Menlo, Monaco, Cascadia Code, Consolas, Courier New, monospace"
+                "terminal.integrated.fontFamily": "FiraCode Nerd Font, Menlo, Monaco, Cascadia Code, Consolas, Courier New, monospace",
+                // Python settings for best practices
+                "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+                "python.terminal.activateEnvironment": true,
+                "python.linting.enabled": false,  // Using Ruff instead
+                "python.formatting.provider": "none",  // Using Ruff instead
+                "[python]": {
+                    "editor.formatOnSave": true,
+                    "editor.codeActionsOnSave": {
+                        "source.organizeImports": "explicit",
+                        "source.fixAll.ruff": "explicit"
+                    }
+                },
+                "ruff.lint.enable": true,
+                "ruff.format.enable": true,
+                "ruff.organizeImports": true,
+                "python.testing.pytestEnabled": true,
+                "python.testing.unittestEnabled": false,
+                "python.testing.pytestArgs": [
+                    "tests",
+                    "-v",
+                    "--no-cov"  // Disable coverage in VS Code test runner for speed
+                ],
+                "mypy-type-checker.args": [
+                    "--config-file=${workspaceFolder}/pyproject.toml"
+                ]
             },
             "extensions": [
                 // go
                 "golang.go",
+                // Git tools
+                "eamodio.gitlens",  // Git supercharged
                 "mhutchie.git-graph",
                 "ms-azuretools.vscode-docker",
-                // Python.
+                // Python - Enhanced setup
                 "ms-python.python",
                 "ms-python.vscode-pylance",
-                // Errors and highlighters.
+                "ms-python.debugpy",
+                "charliermarsh.ruff",  // Fast Python linter/formatter
+                "ms-python.mypy-type-checker",  // Type checking
+                "tamasfe.even-better-toml",  // pyproject.toml support
+                "njpwerner.autodocstring",  // Generate docstrings
+                "littlefoxteam.vscode-python-test-adapter",  // Better test integration
+                // Errors and highlighters
                 "mechatroner.rainbow-csv",
                 "redhat.vscode-yaml",
                 "jinliming2.vscode-go-template",
@@ -60,10 +106,25 @@
                 // proto
                 "zxh404.vscode-proto3",
                 // containerlab
-                "srl-labs.vscode-containerlab"
+                "srl-labs.vscode-containerlab",
+                // General development
+                "editorconfig.editorconfig",  // EditorConfig support
+                "streetsidesoftware.code-spell-checker",  // Spell checking
+                "usernamehw.errorlens"  // Inline error display
             ]
         }
     },
     "workspaceFolder": "${localWorkspaceFolder}",
-    "workspaceMount": "source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind,consistency=cached"
+    "workspaceMount": "source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind,consistency=cached",
+    "postCreateCommand": "bash .devcontainer/scripts/setup-python-env.sh",
+    "postStartCommand": "bash .devcontainer/scripts/post-start.sh",
+    "containerEnv": {
+        // Python environment variables
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PIP_NO_CACHE_DIR": "off",
+        "PIP_DISABLE_PIP_VERSION_CHECK": "on",
+        "UV_SYSTEM_PYTHON": "true",
+        "UV_VIRTUALENV_SEED": "true"
+    }
 }

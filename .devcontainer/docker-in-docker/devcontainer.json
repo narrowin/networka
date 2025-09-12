@@ -69,6 +69,8 @@
       "extensions": [
         // go
         "golang.go",
+        // Git tools
+        "eamodio.gitlens",  // Git supercharged
         "mhutchie.git-graph",
         "ms-azuretools.vscode-docker",
         // Python - Enhanced setup
