@@ -4,7 +4,7 @@
         "dockerfile": "../Dockerfile",
         "context": "../..",
         "args": {
-            "CLAB_VERSION": "${localEnv:CLAB_VERSION}"
+            "CLAB_VERSION": "${localEnv:CLAB_VERSION:latest}"
         }
     },
     "runArgs": [

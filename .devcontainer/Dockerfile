@@ -1,6 +1,6 @@
 FROM mcr.microsoft.com/devcontainers/python:3.11-bookworm
 
-ARG CLAB_VERSION
+ARG CLAB_VERSION=latest
 
 # Add the netdevops repository
 RUN echo "deb [trusted=yes] https://netdevops.fury.site/apt/ /" | \
@@ -19,7 +19,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl
 
 # Install Containerlab
-RUN bash -c "$(curl -sL https://get.containerlab.dev)" -- -v ${CLAB_VERSION}
+RUN if [ -z "${CLAB_VERSION}" ] || [ "${CLAB_VERSION}" = "latest" ]; then \
+        bash -c "$(curl -sL https://get.containerlab.dev)"; \
+    else \
+        bash -c "$(curl -sL https://get.containerlab.dev)" -- -v ${CLAB_VERSION}; \
+    fi
 
 # Install GitHub CLI directly from the latest release
 RUN bash -c 'ARCH=$(uname -m | sed "s/x86_64/amd64/" | sed "s/aarch64/arm64/") && \
