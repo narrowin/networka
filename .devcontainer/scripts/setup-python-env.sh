@@ -3,6 +3,12 @@ set -e
 
 echo "Setting up Python development environment..."
 
+# Ensure cache directories exist and have correct permissions
+echo "Setting up cache directories..."
+mkdir -p "$HOME/.cache/uv" "$HOME/.cache/pip" "$HOME/.cache/mypy"
+sudo chown -R $(id -u):$(id -g) "$HOME/.cache"
+chmod -R 755 "$HOME/.cache"
+
 # Install uv - ultra-fast Python package manager
 if ! command -v uv &> /dev/null; then
     echo "Installing uv..."
