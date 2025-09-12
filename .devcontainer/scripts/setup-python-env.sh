@@ -61,46 +61,44 @@ if [ -f "/home/vscode/.gitconfig" ]; then
 
         if [ -f "$host_key_path" ]; then
             echo "Found host signing key: $key_filename"
-            # Configure Git to use the host SSH signing key
-            git config --global user.signingkey "$host_key_path"
-            git config --global gpg.format ssh
-            git config --global gpg.ssh.program ssh-keygen
-            git config --global commit.gpgsign true
+            # Configure Git to use the host SSH signing key (use --local since global config is read-only)
+            cd "${GITHUB_WORKSPACE:-/workspaces/$(basename "$(pwd)")}" 2>/dev/null || cd "$(pwd)"
+            git config --local user.signingkey "$host_key_path" 2>/dev/null || echo "Could not set signing key (will try in post-start)"
+            git config --local gpg.format ssh 2>/dev/null || echo "Could not set GPG format (will try in post-start)"
+            git config --local gpg.ssh.program ssh-keygen 2>/dev/null || echo "Could not set GPG SSH program (will try in post-start)"
+            git config --local commit.gpgsign true 2>/dev/null || echo "Could not set commit signing (will try in post-start)"
             echo "Git configured with SSH signing key from host"
         else
             echo "Signing key referenced in host .gitconfig not found: $key_filename"
             echo "Available keys in host SSH:"
             ls -la /home/vscode/.ssh-host/keys/ 2>/dev/null || echo "No keys directory found"
-            git config --global commit.gpgsign false
         fi
     else
         echo "No signing key configured in host .gitconfig or SSH directory not mounted"
-        git config --global commit.gpgsign false
     fi
 else
-    echo "Host .gitconfig not mounted - commit signing disabled"
-    git config --global commit.gpgsign false
+    echo "Host .gitconfig not mounted - using host configuration as-is"
 fi
 
 # Verify Git configuration is available
 echo "Verifying Git identity configuration..."
 if [ -f "/home/vscode/.gitconfig" ]; then
     echo "Git configuration mounted from host"
-    user_name=$(git config --global --get user.name 2>/dev/null || echo "Not set")
-    user_email=$(git config --global --get user.email 2>/dev/null || echo "Not set")
+    user_name=$(git config --get user.name 2>/dev/null || echo "Not set")
+    user_email=$(git config --get user.email 2>/dev/null || echo "Not set")
     echo "Git user: $user_name <$user_email>"
 
     # Show signing status
-    if git config --global --get commit.gpgsign &>/dev/null; then
-        signing_key=$(git config --global --get user.signingkey 2>/dev/null || echo "None")
+    if git config --get commit.gpgsign &>/dev/null; then
+        signing_key=$(git config --get user.signingkey 2>/dev/null || echo "None")
         echo "Commit signing: enabled with key $(basename "$signing_key")"
     else
         echo "Commit signing: disabled"
     fi
 else
     echo "Host .gitconfig not mounted - Git identity may need to be configured manually"
-    echo "Use: git config --global user.name 'Your Name'"
-    echo "Use: git config --global user.email 'your.email@example.com'"
+    echo "Use: git config --local user.name 'Your Name'"
+    echo "Use: git config --local user.email 'your.email@example.com'"
 fi
 
 # Setup pre-commit hooks if config exists

@@ -32,6 +32,9 @@ if [ -d "/home/vscode/.ssh-host" ]; then
 
         if [ -f "$container_key_path" ]; then
             git config --local user.signingkey "$container_key_path"
+            git config --local gpg.format ssh
+            git config --local gpg.ssh.program ssh-keygen
+            git config --local commit.gpgsign true
             echo "Git signing key path updated for container: $key_filename"
         else
             echo "Git signing key not found in container: $key_filename"

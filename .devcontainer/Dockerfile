@@ -2,9 +2,9 @@ FROM mcr.microsoft.com/devcontainers/python:3.13-bookworm
 
 ARG CLAB_VERSION=latest
 
-# Add the netdevops repository
+# Add the netdevops repository (optional, may not be available)
 RUN echo "deb [trusted=yes] https://netdevops.fury.site/apt/ /" | \
-  tee -a /etc/apt/sources.list.d/netdevops.list
+  tee -a /etc/apt/sources.list.d/netdevops.list || true
 
 # Install necessary packages, including curl
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -17,13 +17,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   dnsutils \
   telnet \
   curl \
-  bonding \
-  curl \
   ethtool \
   iperf \
   iperf3 \
-  iproute2 \
-  iputils \
   jq \
   lftp \
   mtr \
@@ -34,21 +30,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   procps \
   rsync \
   socat \
-  xz \
-  tcpdump \
+  xz-utils \
   tcptraceroute \
   tshark \
   wget \
-  envsubst \
-  scapy \
+  gettext-base \
   fping \
   htop \
   vim \
   nano \
-  iputils-ping \
-  dhclient \
+  isc-dhcp-client \
   traceroute \
-  wpa_supplicant \
+  wpasupplicant \
   dhcping \
   tmux
 
