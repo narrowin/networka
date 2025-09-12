@@ -1,5 +1,7 @@
 #!/bin/bash
 # Quick environment validation on container start
+# Don't exit on errors to prevent startup failure
+set +e
 
 # Source cargo env for uv
 source "$HOME/.cargo/env" 2>/dev/null || true
@@ -43,9 +45,17 @@ else
     echo "No host SSH directory found - Git signing may not work"
 fi
 
-# Check if virtual environment exists
+# Check if virtual environment exists and has dependencies
 if [ -f ".venv/bin/activate" ]; then
     echo "Python virtual environment ready at .venv"
+
+    # Quick check if dependencies are installed, sync if needed
+    if [ -f "pyproject.toml" ]; then
+        if ! uv run python -c "import pytest, ruff, mypy" 2>/dev/null; then
+            echo "Some dependencies missing, running uv sync..."
+            uv sync --all-extras --quiet
+        fi
+    fi
 else
     echo "No virtual environment found - run setup script if needed"
 fi
@@ -55,13 +65,12 @@ echo "Development tools status:"
 command -v uv &>/dev/null && echo "  uv $(uv version)"
 command -v pre-commit &>/dev/null && echo "  pre-commit $(pre-commit --version)"
 
-# Check project tools (via virtual environment)
-if [ -f ".venv/bin/activate" ]; then
-    source .venv/bin/activate
-    command -v ruff &>/dev/null && echo "  ruff $(ruff version)"
-    command -v mypy &>/dev/null && echo "  mypy $(mypy --version | cut -d' ' -f2)"
-    command -v pytest &>/dev/null && echo "  pytest $(pytest --version | head -n1 | cut -d' ' -f2)"
-    deactivate
+# Check project tools (via uv run to ensure proper environment)
+if [ -f ".venv/bin/activate" ] && [ -f "pyproject.toml" ]; then
+    # Use uv run to ensure dependencies are available
+    uv run ruff --version 2>/dev/null | head -n1 | sed 's/^/  /' || echo "  ruff (not available)"
+    uv run python -c "import mypy.version; print(f'  mypy {mypy.version.__version__}')" 2>/dev/null || echo "  mypy (not available)"
+    uv run python -c "import pytest; print(f'  pytest {pytest.__version__}')" 2>/dev/null || echo "  pytest (not available)"
 fi
 
 # Show Python version
