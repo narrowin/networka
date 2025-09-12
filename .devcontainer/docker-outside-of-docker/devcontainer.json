@@ -1,5 +1,6 @@
 // For format details, see https://aka.ms/devcontainer.json.
 {
+    "name": "narrowin-python-dev-dod",
     "build": {
         "dockerfile": "../Dockerfile",
         "context": "../..",
