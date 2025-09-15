@@ -1,4 +1,4 @@
-<div align="center"><img src="docs/assets/images/networka2.png" alt="Networka Logo" width="120"/>
+<div align="center"><img src="docs/assets/images/networka_readme.png" alt="Networka Logo" width="320"/>
 
   <p><a href="https://narrowin.github.io/networka/">Full documentation →</a></p>
 </div>
