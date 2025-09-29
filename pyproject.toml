@@ -288,7 +288,7 @@ dev = [
     # Helper tooling for developing the Textual TUI (live reload, inspector)
     "textual-dev>=1.0.0",
     # Type checking - pinned exactly for consistency (FastAPI approach)
-    "mypy==1.17.1",
+    "mypy==1.18.2",
     "ruff==0.12.10",
     # Type stubs for mypy
     "types-PyYAML>=6.0.0",
