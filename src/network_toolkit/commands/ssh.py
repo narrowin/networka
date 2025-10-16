@@ -32,6 +32,7 @@ import typer
 from network_toolkit.commands.ssh_fallback import open_sequential_ssh_sessions
 from network_toolkit.commands.ssh_platform import get_platform_capabilities
 from network_toolkit.common.command_helpers import CommandContext
+from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import OutputMode
 from network_toolkit.common.resolver import DeviceResolver
@@ -272,7 +273,7 @@ def register(app: typer.Typer) -> None:
         *,
         config_file: Annotated[
             Path, typer.Option("--config", "-c", help="Path to config dir or YAML")
-        ] = Path("config"),
+        ] = DEFAULT_CONFIG_PATH,
         auth: Annotated[
             AuthMode,
             typer.Option(
@@ -405,8 +406,8 @@ def register(app: typer.Typer) -> None:
                     f"Using IP addresses with platform '{device_type}': {', '.join(ips)}"
                 )
 
-            resolver = DeviceResolver(config, device_type, port, transport_type)
-            tgt = Target(name=target, devices=resolver.resolve_targets(target)[0])
+            # Use the helper function that properly handles unknown targets
+            tgt = _resolve_targets(config, target, ctx)
 
             # Check platform capabilities after we have config and targets
             platform_caps = get_platform_capabilities()
