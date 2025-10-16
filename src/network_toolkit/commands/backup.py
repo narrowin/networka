@@ -108,6 +108,10 @@ def config_backup(
             sequence_commands = sm.resolve(seq_name, device_name)
             return sequence_commands or []
 
+        # Create single timestamp for entire backup run
+        run_timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
+        backup_dirs: list[Path] = []  # Track all backup directories
+
         def process_device(dev: str) -> bool:
             try:
                 with device_session(dev, config) as session:
@@ -144,10 +148,12 @@ def config_backup(
                             ctx.print_error(f"  {error}")
                         return False
 
-                    # Create timestamped backup directory
-                    timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
-                    backup_dir = Path(config.general.backup_dir) / f"{dev}_{timestamp}"
+                    # Create backup directory using shared timestamp
+                    backup_dir = (
+                        Path(config.general.backup_dir) / f"{dev}_{run_timestamp}"
+                    )
                     backup_dir.mkdir(parents=True, exist_ok=True)
+                    backup_dirs.append(backup_dir)
                     ctx.print_info(f"Saving backup to: {backup_dir}")
 
                     # Save text outputs
@@ -175,7 +181,7 @@ def config_backup(
                     # Generate manifest
                     manifest = {
                         "device": dev,
-                        "timestamp": timestamp,
+                        "timestamp": run_timestamp,
                         "platform": platform_name,
                         "transport": transport_type,
                         "text_outputs": list(backup_result.text_outputs.keys()),
@@ -206,6 +212,15 @@ def config_backup(
             if not ok:
                 raise typer.Exit(1)
             ctx.print_operation_complete("Backup", success=True)
+
+            # Print backup summary
+            if backup_dirs:
+                ctx.output_manager.print_text("")  # Blank line
+                ctx.print_success("Backup Summary:")
+                ctx.print_info(f"  Timestamp: {run_timestamp}")
+                ctx.print_info(f"  Location: {backup_dirs[0]}")
+                file_count = len(list(backup_dirs[0].glob("*")))
+                ctx.print_info(f"  Files: {file_count} files saved")
             return
 
         # Group path
@@ -229,6 +244,18 @@ def config_backup(
 
         total = len(members)
         ctx.print_info(f"Completed: {total - failures}/{total} successful backups")
+
+        # Print backup summary for group
+        if backup_dirs:
+            ctx.output_manager.print_text("")  # Blank line
+            ctx.print_success("Backup Summary:")
+            ctx.print_info(f"  Timestamp: {run_timestamp}")
+            ctx.print_info(f"  Devices backed up: {len(backup_dirs)}")
+            for backup_dir in backup_dirs:
+                file_count = len(list(backup_dir.glob("*")))
+                ctx.print_info(f"    {backup_dir.name}: {file_count} files")
+            ctx.print_info(f"  Base directory: {backup_dirs[0].parent}")
+
         if failures:
             raise typer.Exit(1)
 
@@ -319,6 +346,10 @@ def comprehensive_backup(
 
             return []
 
+        # Create single timestamp for entire backup run
+        run_timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
+        backup_dirs: list[Path] = []  # Track all backup directories
+
         def process_device(dev: str) -> bool:
             try:
                 with device_session(dev, config) as session:
@@ -354,10 +385,12 @@ def comprehensive_backup(
                             ctx.print_error(f"  {error}")
                         return False
 
-                    # Create timestamped backup directory
-                    timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
-                    backup_dir = Path(config.general.backup_dir) / f"{dev}_{timestamp}"
+                    # Create backup directory using shared timestamp
+                    backup_dir = (
+                        Path(config.general.backup_dir) / f"{dev}_{run_timestamp}"
+                    )
                     backup_dir.mkdir(parents=True, exist_ok=True)
+                    backup_dirs.append(backup_dir)
                     ctx.print_info(f"Saving comprehensive backup to: {backup_dir}")
 
                     # Save text outputs
@@ -385,7 +418,7 @@ def comprehensive_backup(
                     # Generate manifest
                     manifest = {
                         "device": dev,
-                        "timestamp": timestamp,
+                        "timestamp": run_timestamp,
                         "platform": platform_name,
                         "transport": transport_type,
                         "backup_type": "comprehensive",
@@ -417,6 +450,15 @@ def comprehensive_backup(
             if not ok:
                 raise typer.Exit(1)
             ctx.print_operation_complete("Comprehensive Backup", success=True)
+
+            # Print backup summary
+            if backup_dirs:
+                ctx.output_manager.print_text("")  # Blank line
+                ctx.print_success("Backup Summary:")
+                ctx.print_info(f"  Timestamp: {run_timestamp}")
+                ctx.print_info(f"  Location: {backup_dirs[0]}")
+                file_count = len(list(backup_dirs[0].glob("*")))
+                ctx.print_info(f"  Files: {file_count} files saved")
             return
 
         # Group processing
@@ -440,6 +482,17 @@ def comprehensive_backup(
 
         total = len(members)
         ctx.print_info(f"Completed: {total - failures}/{total} successful backups")
+
+        # Print backup summary for group
+        if backup_dirs:
+            ctx.output_manager.print_text("")  # Blank line
+            ctx.print_success("Backup Summary:")
+            ctx.print_info(f"  Timestamp: {run_timestamp}")
+            ctx.print_info(f"  Devices backed up: {len(backup_dirs)}")
+            for backup_dir in backup_dirs:
+                file_count = len(list(backup_dir.glob("*")))
+                ctx.print_info(f"    {backup_dir.name}: {file_count} files")
+            ctx.print_info(f"  Base directory: {backup_dirs[0].parent}")
         if failures:
             raise typer.Exit(1)
 
