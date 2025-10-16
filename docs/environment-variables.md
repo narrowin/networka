@@ -240,20 +240,3 @@ If you have an existing legacy single-file config with hardcoded credentials:
 4. Test the configuration to ensure devices can still connect
 
 The updated configuration will automatically fall back to environment variables when device-specific credentials are not found in the YAML file.
-
-## Advanced Configuration Update Variables
-
-For development and testing purposes, you can override the git repository used by `nw config update`:
-
-```bash
-# Use a custom repository URL (for testing or forks)
-export NW_UPDATE_GIT_URL=https://github.com/your-fork/networka.git
-
-# Use a specific branch, tag, or commit ref
-export NW_UPDATE_GIT_REF=develop
-
-# Example: Test updates from a feature branch
-NW_UPDATE_GIT_REF=feature/new-sequences nw config update --check
-```
-
-These variables are only used during config update operations and are completely optional. Most users will never need to set them.

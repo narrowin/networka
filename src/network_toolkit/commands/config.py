@@ -904,8 +904,6 @@ def _config_update_impl(
     check_only: bool = False,
     list_backups: bool = False,
     force: bool = False,
-    git_url: str | None = None,
-    git_ref: str = "main",
     yes: bool = False,
     verbose: bool = False,
 ) -> None:
@@ -980,11 +978,8 @@ def _config_update_impl(
     import subprocess
     import tempfile
 
-    default_repo = "https://github.com/narrowin/networka.git"
-
-    # Allow override via environment variables for development/testing
-    repo_url = git_url or os.environ.get("NW_UPDATE_GIT_URL") or default_repo
-    ref = git_ref if git_ref != "main" else os.environ.get("NW_UPDATE_GIT_REF", "main")
+    repo_url = "https://github.com/narrowin/networka.git"
+    ref = "main"
 
     _validate_git_url(repo_url)
     git_exe = _find_git_executable()
@@ -1442,10 +1437,6 @@ def register(app: typer.Typer) -> None:
 
         List available backups:
           nw config update --list-backups
-
-        Advanced: Override git repository via environment variables:
-          NW_UPDATE_GIT_URL - Custom repository URL
-          NW_UPDATE_GIT_REF - Custom branch/tag/ref (default: main)
         """
         setup_logging("DEBUG" if verbose else "INFO")
 
@@ -1455,8 +1446,6 @@ def register(app: typer.Typer) -> None:
                 check_only=check,
                 list_backups=list_backups,
                 force=force,
-                git_url=None,
-                git_ref="main",
                 yes=yes,
                 verbose=verbose,
             )
