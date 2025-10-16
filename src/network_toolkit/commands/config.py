@@ -491,10 +491,8 @@ def activate_shell_completion(
         raise FileTransferError(msg) from e
 
 
-def install_sequences_from_repo(
-    url: str, ref: str, dest: Path
-) -> tuple[int, list[Path]]:
-    """Install sequences from a Git repository with framework warnings.
+def install_sequences_from_repo(dest: Path) -> tuple[int, list[Path]]:
+    """Install sequences from the official Git repository with framework warnings.
 
     Returns:
         Tuple of (number of files installed, list of framework file paths)
@@ -504,7 +502,8 @@ def install_sequences_from_repo(
 
     from network_toolkit.common.file_utils import get_framework_file_warning
 
-    _validate_git_url(url)
+    repo_url = "https://github.com/narrowin/networka.git"
+    _validate_git_url(repo_url)
     git_exe = _find_git_executable()
     warning = get_framework_file_warning()
     framework_files: list[Path] = []
@@ -519,8 +518,8 @@ def install_sequences_from_repo(
                     "--depth",
                     "1",
                     "--branch",
-                    ref,
-                    url,
+                    "main",
+                    repo_url,
                     str(tmp_root),
                 ],
                 check=True,
@@ -557,7 +556,7 @@ def install_sequences_from_repo(
                     files_copied += 1
 
             logger.debug(
-                f"Copied {files_copied} sequence files from {url}@{ref} to {dest}"
+                f"Copied {files_copied} sequence files from {repo_url} to {dest}"
             )
             return (files_copied, framework_files)
 
@@ -580,9 +579,7 @@ def _add_warning_to_file(file_path: Path, warning: str) -> None:
         logger.debug(f"Could not add warning to {file_path}: {e}")
 
 
-def install_editor_schemas(
-    config_root: Path, git_url: str | None = None, git_ref: str = "main"
-) -> int:
+def install_editor_schemas(config_root: Path) -> int:
     """Install JSON schemas and VS Code settings for YAML editor validation.
 
     Returns:
@@ -603,12 +600,7 @@ def install_editor_schemas(
             "groups-config.schema.json",
         ]
 
-        github_base_url = (
-            f"{git_url or 'https://github.com/narrowin/networka.git'}".replace(
-                ".git", ""
-            )
-            + f"/raw/{git_ref}/schemas"
-        )
+        github_base_url = "https://github.com/narrowin/networka/raw/main/schemas"
 
         # Download each schema file
         files_downloaded = 0
@@ -680,8 +672,6 @@ def _config_init_impl(
     yes: bool = False,
     dry_run: bool = False,
     install_sequences: bool | None = None,
-    git_url: str | None = None,
-    git_ref: str = "main",
     install_completions: bool | None = None,
     shell: str | None = None,
     activate_completions: bool | None = None,
@@ -768,7 +758,6 @@ def _config_init_impl(
         target_path.mkdir(parents=True, exist_ok=True)
 
     # Handle optional features
-    default_seq_repo = "https://github.com/narrowin/networka.git"
     do_install_sequences = False
     do_install_compl = False
     do_install_schemas = False
@@ -828,15 +817,14 @@ def _config_init_impl(
     if do_install_sequences:
         try:
             ctx.print_info("Installing additional vendor sequences...")
+            repo_url = "https://github.com/narrowin/networka.git"
             files_installed, seq_files = install_sequences_from_repo(
-                git_url or default_seq_repo,
-                git_ref,
                 target_path / "sequences",
             )
             framework_files_created.extend(seq_files)
             if files_installed > 0:
                 ctx.print_success(
-                    f"Installed {files_installed} sequence files from {git_url or default_seq_repo}"
+                    f"Installed {files_installed} sequence files from {repo_url}"
                 )
             else:
                 ctx.print_warning("No sequence files found in repository")
@@ -865,7 +853,7 @@ def _config_init_impl(
     if do_install_schemas:
         try:
             ctx.print_info("Installing JSON schemas for YAML editor validation...")
-            schema_count = install_editor_schemas(target_path, git_url, git_ref)
+            schema_count = install_editor_schemas(target_path)
             if schema_count > 0:
                 ctx.print_success(
                     f"Installed {schema_count} schema files in: {target_path / 'schemas'}"
@@ -1231,19 +1219,6 @@ def register(app: typer.Typer) -> None:
                 help="Install additional predefined vendor sequences from GitHub",
             ),
         ] = None,
-        git_url: Annotated[
-            str | None,
-            typer.Option(
-                "--git-url",
-                help="Git URL for sequences when using --sequences-source git",
-            ),
-        ] = None,
-        git_ref: Annotated[
-            str,
-            typer.Option(
-                "--git-ref", help="Git branch/tag/ref for sequences", show_default=True
-            ),
-        ] = "main",
         install_completions: Annotated[
             bool | None,
             typer.Option(
@@ -1308,8 +1283,6 @@ def register(app: typer.Typer) -> None:
                 yes=yes,
                 dry_run=dry_run,
                 install_sequences=install_sequences,
-                git_url=git_url,
-                git_ref=git_ref,
                 install_completions=install_completions,
                 shell=shell,
                 activate_completions=activate_completions,

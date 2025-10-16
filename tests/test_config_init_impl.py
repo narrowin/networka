@@ -219,34 +219,16 @@ class TestSequenceInstallation:
 
                 dest = tmp_path / "sequences"
                 dest.mkdir(parents=True, exist_ok=True)  # Ensure destination exists
-                install_sequences_from_repo(
-                    "https://github.com/test/repo.git", "main", dest
-                )
+                install_sequences_from_repo(dest)
 
                 # Verify git clone was called
                 mock_run.assert_called_once()
                 args = mock_run.call_args[0][0]
                 assert "/usr/bin/git" in args
                 assert "clone" in args
-                assert "https://github.com/test/repo.git" in args
+                assert "https://github.com/narrowin/networka.git" in args
 
-    def test_install_sequences_invalid_url(self) -> None:
-        """Test sequence installation with invalid URL."""
-        with pytest.raises(
-            ConfigurationError, match="Git URL must use HTTPS or SSH protocol"
-        ):
-            install_sequences_from_repo(
-                "ftp://invalid.com/repo.git", "main", Path("/tmp")
-            )
-
-    def test_install_sequences_private_ip(self) -> None:
-        """Test sequence installation blocks private IPs."""
-        with pytest.raises(
-            ConfigurationError, match="Private IP addresses not allowed"
-        ):
-            install_sequences_from_repo(
-                "https://192.168.1.1/repo.git", "main", Path("/tmp")
-            )
+    # URL validation tests removed - we now use hardcoded repo URL (KISS principle)
 
     @patch("shutil.which")
     def test_install_sequences_no_git(self, mock_which: Mock) -> None:
@@ -254,9 +236,7 @@ class TestSequenceInstallation:
         mock_which.return_value = None
 
         with pytest.raises(ConfigurationError, match="Git executable not found"):
-            install_sequences_from_repo(
-                "https://github.com/test/repo.git", "main", Path("/tmp")
-            )
+            install_sequences_from_repo(Path("/tmp"))
 
 
 class TestSchemaInstallation:
@@ -371,19 +351,18 @@ class TestConfigInitImpl:
         self, mock_install: Mock, tmp_path: Path
     ) -> None:
         """Test config init with sequence installation."""
-        mock_install.return_value = 5  # Return number of files installed
+        mock_install.return_value = (
+            5,
+            [],
+        )  # Return tuple of (number of files, framework files list)
 
         _config_init_impl(
             target_dir=tmp_path,
             yes=True,
             install_sequences=True,
-            git_url="https://github.com/test/repo.git",
-            git_ref="main",
         )
 
-        mock_install.assert_called_once_with(
-            "https://github.com/test/repo.git", "main", tmp_path / "sequences"
-        )
+        mock_install.assert_called_once_with(tmp_path / "sequences")
 
     @patch("network_toolkit.commands.config.install_shell_completions")
     @patch("network_toolkit.commands.config.activate_shell_completion")
@@ -492,13 +471,9 @@ class TestConfigInitImpl:
             target_dir=tmp_path,
             yes=True,
             install_schemas=True,
-            git_url="https://github.com/test/repo.git",
-            git_ref="main",
         )
 
-        mock_install.assert_called_once_with(
-            tmp_path, "https://github.com/test/repo.git", "main"
-        )
+        mock_install.assert_called_once_with(tmp_path)
 
 
 class TestErrorHandling:
