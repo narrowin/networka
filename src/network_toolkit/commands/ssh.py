@@ -258,8 +258,13 @@ def _sanitize_session_name(name: str) -> str:
 
 
 def register(app: typer.Typer) -> None:
-    @app.command("ssh", help=app_help, rich_help_panel="Remote Operations")
-    def ssh_fanout(
+    @app.command(
+        "ssh",
+        help=app_help,
+        rich_help_panel="Remote Operations",
+        context_settings={"help_option_names": ["-h", "--help"]},
+    )
+    def ssh(
         target: Annotated[
             str,
             typer.Argument(help="Comma-separated device/group names or IP addresses"),

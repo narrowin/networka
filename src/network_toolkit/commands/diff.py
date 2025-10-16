@@ -102,7 +102,10 @@ def _find_baseline_file_for_command(base_dir: Path, command: str) -> Path | None
 
 
 def register(app: typer.Typer) -> None:
-    @app.command(rich_help_panel="Remote Operations")
+    @app.command(
+        rich_help_panel="Remote Operations",
+        context_settings={"help_option_names": ["-h", "--help"]},
+    )
     def diff(
         target: Annotated[
             str,

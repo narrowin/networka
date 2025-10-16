@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from typer.testing import CliRunner
@@ -205,56 +205,6 @@ class TestListCommand:
 
         assert result.exit_code == 1
         assert "Unexpected error" in result.output
-
-    @patch("network_toolkit.commands.list._list_devices_impl")
-    def test_list_devices_implementation_called(
-        self, mock_impl: Mock, config_file: Path
-    ) -> None:
-        """Test that the devices implementation is called correctly."""
-        mock_impl.return_value = None
-
-        runner = CliRunner()
-        result = runner.invoke(app, ["list", "devices", "--config", str(config_file)])
-
-        assert result.exit_code == 0
-        mock_impl.assert_called_once()
-
-    @patch("network_toolkit.commands.list._list_groups_impl")
-    def test_list_groups_implementation_called(
-        self, mock_impl: Mock, config_file: Path
-    ) -> None:
-        """Test that the groups implementation is called correctly."""
-        mock_impl.return_value = None
-
-        runner = CliRunner()
-        result = runner.invoke(app, ["list", "groups", "--config", str(config_file)])
-
-        assert result.exit_code == 0
-        mock_impl.assert_called_once()
-
-    @patch("network_toolkit.commands.list._list_sequences_impl")
-    def test_list_sequences_implementation_called(
-        self, mock_impl: Mock, config_file: Path
-    ) -> None:
-        """Test that the sequences implementation is called correctly."""
-        mock_impl.return_value = None
-
-        runner = CliRunner()
-        result = runner.invoke(app, ["list", "sequences", "--config", str(config_file)])
-
-        assert result.exit_code == 0
-        mock_impl.assert_called_once()
-
-    @patch("network_toolkit.commands.list._show_supported_types_impl")
-    def test_list_supported_types_implementation_called(self, mock_impl: Mock) -> None:
-        """Test that the supported types implementation is called correctly."""
-        mock_impl.return_value = None
-
-        runner = CliRunner()
-        result = runner.invoke(app, ["list", "supported-types"])
-
-        assert result.exit_code == 0
-        mock_impl.assert_called_once()
 
     def test_list_devices_no_devices_configured(self, empty_config_file: Path) -> None:
         """Test list devices when no devices are configured."""

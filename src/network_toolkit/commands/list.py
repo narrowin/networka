@@ -141,6 +141,8 @@ def register(app: typer.Typer) -> None:
     list_app = typer.Typer(
         name="list",
         help="List network devices, groups, sequences, and platform information",
+        no_args_is_help=True,
+        context_settings={"help_option_names": ["-h", "--help"]},
     )
 
     @list_app.command("devices")

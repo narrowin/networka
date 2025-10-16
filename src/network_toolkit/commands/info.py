@@ -35,7 +35,10 @@ if TYPE_CHECKING:
 
 
 def register(app: typer.Typer) -> None:
-    @app.command(rich_help_panel="Info & Configuration")
+    @app.command(
+        rich_help_panel="Info & Configuration",
+        context_settings={"help_option_names": ["-h", "--help"]},
+    )
     def info(
         targets: Annotated[
             str,

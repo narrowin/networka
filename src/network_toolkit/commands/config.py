@@ -857,6 +857,7 @@ def register(app: typer.Typer) -> None:
         name="config",
         help="Configuration management commands",
         no_args_is_help=True,
+        context_settings={"help_option_names": ["-h", "--help"]},
     )
 
     @config_app.command("init")
