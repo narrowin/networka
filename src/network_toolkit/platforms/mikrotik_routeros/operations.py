@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from network_toolkit.common.filename_utils import normalize_command_output_filename
 from network_toolkit.common.interactive_confirmation import create_confirmation_handler
 from network_toolkit.exceptions import DeviceConnectionError, DeviceExecutionError
 from network_toolkit.platforms.base import BackupResult, PlatformOperations
@@ -569,9 +570,9 @@ class MikroTikRouterOSOperations(PlatformOperations):
             for cmd in backup_sequence:
                 logger.debug(f"Executing backup command: {cmd}")
                 result = self.session.execute_command(cmd)
-                # Store text output with command-based filename
-                safe_filename = cmd.replace("/", "_").replace(" ", "_")[:50]
-                text_outputs[f"{safe_filename}.txt"] = result
+                # Store text output with normalized filename
+                filename = normalize_command_output_filename(cmd)
+                text_outputs[filename] = result
 
             # Specify files to download
             files_to_download.extend(
@@ -642,9 +643,9 @@ class MikroTikRouterOSOperations(PlatformOperations):
             for cmd in backup_sequence:
                 logger.debug(f"Executing config backup command: {cmd}")
                 result = self.session.execute_command(cmd)
-                # Store text output with command-based filename
-                safe_filename = cmd.replace("/", "_").replace(" ", "_")[:50]
-                text_outputs[f"{safe_filename}.txt"] = result
+                # Store text output with normalized filename
+                filename = normalize_command_output_filename(cmd)
+                text_outputs[filename] = result
 
             # Specify the exported config file to download
             files_to_download.append(

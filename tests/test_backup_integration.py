@@ -194,7 +194,8 @@ class TestMikroTikBackupIntegration:
         # Verify BackupResult structure
         assert isinstance(result, BackupResult)
         assert result.success is True
-        assert "_export_file=backup.txt" in result.text_outputs
+        # Filename is now normalized (no parameters, clean format)
+        assert "export.txt" in result.text_outputs
 
     def test_mikrotik_includes_export_file_in_downloads(self) -> None:
         """Verify MikroTik config backup includes .rsc export file."""

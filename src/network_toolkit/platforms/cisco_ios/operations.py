@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from network_toolkit.common.filename_utils import normalize_command_output_filename
 from network_toolkit.exceptions import DeviceConnectionError, DeviceExecutionError
 from network_toolkit.platforms.base import (
     BackupResult,
@@ -339,8 +340,8 @@ class CiscoIOSOperations(PlatformOperations):
                 try:
                     logger.debug(f"Executing config backup command: {cmd}")
                     output = self.session.execute_command(cmd)
-                    # Convert command to safe filename
-                    filename = cmd.replace(" ", "_").replace("/", "-") + ".txt"
+                    # Convert command to normalized filename
+                    filename = normalize_command_output_filename(cmd)
                     text_outputs[filename] = output
                 except DeviceExecutionError as e:
                     error_msg = f"Command '{cmd}' failed: {e}"
