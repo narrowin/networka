@@ -8,7 +8,6 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
-import typer
 
 from network_toolkit.commands.config import (
     _config_init_impl,
@@ -506,24 +505,25 @@ class TestErrorHandling:
     """Test error handling scenarios."""
 
     def test_user_cancellation_clean_exit(self, temp_dir: Path) -> None:
-        """Test that user cancellation results in clean exit without error logging."""
+        """Test that user declining overwrite completes cleanly without errors."""
         # Create existing config to trigger overwrite prompt
         existing_file = temp_dir / "devices.yml"
         existing_file.write_text("existing: config")
 
-        # Mock user declining overwrite (which raises typer.Exit(0))
+        # Mock user declining overwrite - should complete successfully without raising
         with patch("typer.confirm", return_value=False):
-            with pytest.raises(typer.Exit) as exc_info:
-                _config_init_impl(
-                    target_dir=temp_dir,
-                    force=False,
-                    yes=False,
-                    dry_run=False,
-                    install_sequences=False,
-                    install_completions=False,
-                    install_schemas=False,
-                    verbose=False,
-                )
+            # Should complete without raising any exceptions
+            _config_init_impl(
+                target_dir=temp_dir,
+                force=False,
+                yes=False,
+                dry_run=False,
+                install_sequences=False,
+                install_completions=False,
+                install_schemas=False,
+                verbose=False,
+            )
 
-            # Should be exit code 0 (clean cancellation)
-            assert exc_info.value.exit_code == 0
+        # Verify the existing file was not overwritten
+        assert existing_file.exists()
+        assert existing_file.read_text() == "existing: config"

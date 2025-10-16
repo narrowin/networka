@@ -903,7 +903,6 @@ def _config_update_impl(
     config_dir: Path | None = None,
     check_only: bool = False,
     list_backups: bool = False,
-    dry_run: bool = False,
     force: bool = False,
     git_url: str | None = None,
     git_ref: str = "main",
@@ -982,7 +981,10 @@ def _config_update_impl(
     import tempfile
 
     default_repo = "https://github.com/narrowin/networka.git"
-    repo_url = git_url or default_repo
+
+    # Allow override via environment variables for development/testing
+    repo_url = git_url or os.environ.get("NW_UPDATE_GIT_URL") or default_repo
+    ref = git_ref if git_ref != "main" else os.environ.get("NW_UPDATE_GIT_REF", "main")
 
     _validate_git_url(repo_url)
     git_exe = _find_git_executable()
@@ -999,7 +1001,7 @@ def _config_update_impl(
                     "--depth",
                     "1",
                     "--branch",
-                    git_ref,
+                    ref,
                     repo_url,
                     str(tmp_root),
                 ],
@@ -1073,10 +1075,6 @@ def _config_update_impl(
 
             if check_only:
                 ctx.print_info("Check complete (use without --check to apply updates)")
-                return
-
-            if dry_run:
-                ctx.print_info("DRY RUN: No changes made")
                 return
 
             # Confirm
@@ -1408,22 +1406,10 @@ def register(app: typer.Typer) -> None:
             bool,
             typer.Option("--list-backups", help="List available backup timestamps"),
         ] = False,
-        dry_run: Annotated[
-            bool,
-            typer.Option("--dry-run", help="Show what would be updated"),
-        ] = False,
         force: Annotated[
             bool,
             typer.Option("--force", help="Update even user-modified framework files"),
         ] = False,
-        git_url: Annotated[
-            str | None,
-            typer.Option("--git-url", help="Git repository URL"),
-        ] = None,
-        git_ref: Annotated[
-            str,
-            typer.Option("--git-ref", help="Git branch/tag/ref", show_default=True),
-        ] = "main",
         yes: Annotated[
             bool,
             typer.Option("--yes", "-y", help="Skip confirmation prompts"),
@@ -1456,6 +1442,10 @@ def register(app: typer.Typer) -> None:
 
         List available backups:
           nw config update --list-backups
+
+        Advanced: Override git repository via environment variables:
+          NW_UPDATE_GIT_URL - Custom repository URL
+          NW_UPDATE_GIT_REF - Custom branch/tag/ref (default: main)
         """
         setup_logging("DEBUG" if verbose else "INFO")
 
@@ -1464,10 +1454,9 @@ def register(app: typer.Typer) -> None:
                 config_dir=config_dir,
                 check_only=check,
                 list_backups=list_backups,
-                dry_run=dry_run,
                 force=force,
-                git_url=git_url,
-                git_ref=git_ref,
+                git_url=None,
+                git_ref="main",
                 yes=yes,
                 verbose=verbose,
             )

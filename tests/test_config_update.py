@@ -105,7 +105,6 @@ class TestConfigUpdateCommand:
         assert result.exit_code == 0
         assert "--check" in result.output
         assert "--list-backups" in result.output
-        assert "--dry-run" in result.output
         assert "--force" in result.output
         assert "Manual rollback" in result.output
         assert "Protected files" in result.output
@@ -237,39 +236,6 @@ class TestConfigUpdateCommand:
             "No updates available" in result.output
             or "all framework files are current" in result.output
         )
-
-    @patch("subprocess.run")
-    def test_update_dry_run(
-        self, mock_subprocess: Mock, mock_config_dir: Path, mock_repo_dir: Path
-    ) -> None:
-        """Test --dry-run shows changes without applying."""
-
-        def git_clone_side_effect(cmd: list[str], **_kwargs: object) -> Mock:
-            if "clone" in cmd:
-                target_dir = Path(cmd[-1])
-                target_dir.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copytree(mock_repo_dir, target_dir)
-            result = Mock()
-            result.returncode = 0
-            result.stdout = ""
-            result.stderr = ""
-            return result
-
-        mock_subprocess.side_effect = git_clone_side_effect
-
-        runner = CliRunner()
-        result = runner.invoke(
-            app,
-            ["config", "update", "--dry-run", "--config-dir", str(mock_config_dir)],
-        )
-
-        assert result.exit_code == 0
-        assert "DRY RUN" in result.output
-        assert "No changes made" in result.output
-
-        # Verify files weren't actually changed
-        cisco_file = mock_config_dir / "sequences/cisco_iosxe/common.yml"
-        assert "UPDATED" not in cisco_file.read_text()
 
     @patch("subprocess.run")
     def test_update_applies_changes_with_backup(
