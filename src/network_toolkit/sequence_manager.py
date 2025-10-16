@@ -3,12 +3,14 @@
 This module provides a single place to discover and resolve sequences:
 - Built-in sequences shipped inside the package (src/network_toolkit/builtin_sequences)
 - Repo-provided vendor sequences under config/sequences/<vendor>/*.yml
-- User-defined sequences under ~/.config/nw/sequences/<vendor>/*.yml
+- User-defined sequences under ~/.config/networka/sequences/<vendor>/*.yml
+- Custom user sequences under ~/.config/networka/sequences/custom/*.yml
 
 Resolution order (highest wins):
-1. User-defined vendor sequences (override/extend)
-2. Repo-provided vendor sequences from config/
-3. Built-in sequences shipped with the package
+1. Custom user sequences (sequences/custom/*.yml) - highest precedence
+2. User-defined vendor sequences (sequences/<vendor>/*.yml)
+3. Repo-provided vendor sequences from config/
+4. Built-in sequences shipped with the package
 """
 
 from __future__ import annotations
@@ -25,7 +27,7 @@ from network_toolkit.config import NetworkConfig, VendorSequence
 
 @dataclass(frozen=True)
 class SequenceSource:
-    origin: str  # "builtin" | "repo" | "user"
+    origin: str  # "builtin" | "repo" | "user" | "custom"
     path: Path | None
 
 
@@ -43,6 +45,12 @@ class SequenceRecord:
 class SequenceManager:
     """Loads and resolves sequences from multiple layers.
 
+    Resolution order (highest to lowest precedence):
+    1. Custom user sequences (sequences/custom/*.yml)
+    2. User vendor sequences (sequences/<vendor>/*.yml)
+    3. Repo vendor sequences (config/sequences/<vendor>/*.yml)
+    4. Built-in sequences (package builtin_sequences/)
+
     Contract:
     - list_vendor_sequences(vendor) -> dict[str, SequenceRecord]
     - resolve(device_name, sequence_name) -> list[str] | None
@@ -50,35 +58,41 @@ class SequenceManager:
 
     def __init__(self, config: NetworkConfig) -> None:
         self.config = config
-        # Layered stores: builtin < repo < user
+        # Layered stores: builtin < repo < user < custom
         self._builtin: dict[str, dict[str, SequenceRecord]] = {}
         self._repo: dict[str, dict[str, SequenceRecord]] = {}
         self._user: dict[str, dict[str, SequenceRecord]] = {}
+        self._custom: dict[str, dict[str, SequenceRecord]] = {}
         # Preload from known places
         self._load_all()
 
     # ---------- Public API ----------
     def list_vendor_sequences(self, vendor: str) -> dict[str, SequenceRecord]:
-        """Get merged sequences for a vendor (user > repo > builtin)."""
+        """Get merged sequences for a vendor (custom > user > repo > builtin)."""
         merged: dict[str, SequenceRecord] = {}
         for layer in (
             self._builtin.get(vendor, {}),
             self._repo.get(vendor, {}),
             self._user.get(vendor, {}),
+            self._custom.get(vendor, {}),  # Custom has highest precedence
         ):
             for name, rec in layer.items():
                 merged[name] = rec
         # Also include config.vendor_sequences from NetworkConfig as repo-level
         if self.config.vendor_sequences and vendor in self.config.vendor_sequences:
             for name, vseq in self.config.vendor_sequences[vendor].items():
-                merged[name] = self._record_from_vendor_sequence(
-                    name, vseq, origin="repo", path=None
-                )
+                # Only add if not already in merged (respect precedence)
+                if name not in merged:
+                    merged[name] = self._record_from_vendor_sequence(
+                        name, vseq, origin="repo", path=None
+                    )
         return merged
 
     def list_all_sequences(self) -> dict[str, dict[str, SequenceRecord]]:
         """Return all vendors and their sequences (merged)."""
-        vendors: set[str] = set(self._builtin) | set(self._repo) | set(self._user)
+        vendors: set[str] = (
+            set(self._builtin) | set(self._repo) | set(self._user) | set(self._custom)
+        )
         if self.config.vendor_sequences:
             vendors |= set(self.config.vendor_sequences)
         return {v: self.list_vendor_sequences(v) for v in sorted(vendors)}
@@ -133,6 +147,10 @@ class SequenceManager:
         user_root = self._user_sequences_root()
         if user_root:
             self._user = self._load_from_root(user_root, origin="user")
+        # Custom paths (highest precedence)
+        custom_root = self._custom_sequences_root()
+        if custom_root:
+            self._custom = self._load_custom_sequences(custom_root)
 
     def _builtin_root(self) -> Path:
         # This file lives at src/network_toolkit/sequence_manager.py
@@ -160,6 +178,71 @@ class SequenceManager:
         # Use OS-appropriate user config directory
         root = user_sequences_dir()
         return root if root.exists() else None
+
+    def _custom_sequences_root(self) -> Path | None:
+        """Get path to custom sequences directory.
+
+        Custom sequences live in sequences/custom/ and have highest precedence.
+        """
+        root = user_sequences_dir()
+        if root.exists():
+            custom_dir = root / "custom"
+            return custom_dir if custom_dir.exists() else None
+        return None
+
+    def _load_custom_sequences(
+        self, custom_root: Path
+    ) -> dict[str, dict[str, SequenceRecord]]:
+        """Load custom sequences from sequences/custom/ directory.
+
+        Custom sequences are organized by vendor name in the filename
+        or loaded as vendor-agnostic and available to all vendors.
+        """
+        data: dict[str, dict[str, SequenceRecord]] = {}
+
+        if not custom_root.exists():
+            return data
+
+        # Load all YAML files in custom/ directory
+        for yml in sorted(custom_root.glob("*.yml")):
+            sequences = self._load_yaml_sequences(yml, origin="custom")
+
+            # Try to extract vendor from filename (e.g., mikrotik_custom.yml)
+            # Otherwise make available to all known vendors
+            filename_stem = yml.stem
+            vendor_name = None
+
+            # Check if filename starts with a known vendor platform
+            for platform in [
+                "mikrotik_routeros",
+                "cisco_iosxe",
+                "cisco_nxos",
+                "arista_eos",
+                "juniper_junos",
+            ]:
+                if filename_stem.startswith(platform):
+                    vendor_name = platform
+                    break
+
+            if vendor_name:
+                # Add to specific vendor
+                if vendor_name not in data:
+                    data[vendor_name] = {}
+                data[vendor_name].update(sequences)
+            else:
+                # Make available to all vendors
+                for vendor in [
+                    "mikrotik_routeros",
+                    "cisco_iosxe",
+                    "cisco_nxos",
+                    "arista_eos",
+                    "juniper_junos",
+                ]:
+                    if vendor not in data:
+                        data[vendor] = {}
+                    data[vendor].update(sequences)
+
+        return data
 
     def _load_from_root(
         self, root: Path, *, origin: str
