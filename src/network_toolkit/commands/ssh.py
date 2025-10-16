@@ -192,21 +192,41 @@ def _build_ssh_cmd(
     port: int = 22,
     auth: AuthMode = AuthMode.KEY_FIRST,
     password: str | None = None,
+    strict_host_key_checking: bool = False,
     ctx: CommandContext,
 ) -> str:
+    # Determine StrictHostKeyChecking value and related options
+    # Default: accept-new (accept new keys, verify existing ones)
+    # With --no-strict-host-key-checking: completely disable all verification
     base = [
         "ssh",
         "-p",
         str(port),
         "-o",
-        "StrictHostKeyChecking=accept-new",
-        # Add options to try key auth first, then password
-        "-o",
-        "PreferredAuthentications=publickey,password",
-        "-o",
-        "PasswordAuthentication=yes",
-        f"{user}@{host}",
+        f"StrictHostKeyChecking={'accept-new' if strict_host_key_checking else 'no'}",
     ]
+
+    # When fully disabling strict checking, also disable known_hosts to prevent any errors
+    if not strict_host_key_checking:
+        base.extend(
+            [
+                "-o",
+                "UserKnownHostsFile=/dev/null",
+                "-o",
+                "GlobalKnownHostsFile=/dev/null",
+            ]
+        )
+
+    # Add authentication options
+    base.extend(
+        [
+            "-o",
+            "PreferredAuthentications=publickey,password",
+            "-o",
+            "PasswordAuthentication=yes",
+            f"{user}@{host}",
+        ]
+    )
 
     if auth == AuthMode.PASSWORD:
         if not password:
@@ -347,6 +367,13 @@ def register(app: typer.Typer) -> None:
                 help="Transport type for connections (currently only scrapli is supported). Defaults to configuration or scrapli.",
             ),
         ] = None,
+        no_strict_host_key_checking: Annotated[
+            bool,
+            typer.Option(
+                "--no-strict-host-key-checking",
+                help="Disable strict SSH host key checking (insecure, use only in lab environments)",
+            ),
+        ] = False,
     ) -> None:
         """
         Open a tmux window with SSH panes for devices in targets.
@@ -468,6 +495,7 @@ def register(app: typer.Typer) -> None:
                     port=port,
                     auth=mode,
                     password=str(pw) if pw is not None else None,
+                    strict_host_key_checking=not no_strict_host_key_checking,
                     ctx=ctx,
                 )
             except Exception as e:

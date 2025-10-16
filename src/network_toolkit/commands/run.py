@@ -130,6 +130,13 @@ def register(app: typer.Typer) -> None:
                 help="Transport type to use for connections (currently only scrapli is supported). Defaults to configuration or scrapli.",
             ),
         ] = None,
+        no_strict_host_key_checking: Annotated[
+            bool,
+            typer.Option(
+                "--no-strict-host-key-checking",
+                help="Disable strict SSH host key checking (insecure, use only in lab environments)",
+            ),
+        ] = False,
     ) -> None:
         """Execute a single command or a sequence on a device or a group."""
         # Validate transport type if provided
@@ -295,6 +302,10 @@ def register(app: typer.Typer) -> None:
 
         try:
             config = load_config(config_file)
+
+            # Apply CLI override for SSH strict host key checking if provided
+            if no_strict_host_key_checking:
+                config.general.ssh_strict_host_key_checking = False
 
             # If no CLI output mode given, honor config/general output mode
             # Keep OutputManager as the single source of truth for theming

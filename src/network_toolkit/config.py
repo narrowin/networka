@@ -125,6 +125,9 @@ class GeneralConfig(BaseModel):
     timeout: int = 30
     default_transport_type: str = "scrapli"
     ssh_config_file: bool = True
+    ssh_strict_host_key_checking: bool = (
+        False  # accept-new: auto-accept new keys, verify existing
+    )
 
     # Connection retry settings
     connection_retries: int = 3
@@ -213,6 +216,15 @@ class GeneralConfig(BaseModel):
             msg = "output_mode must be one of: default, light, dark, no-color, raw"
             raise ValueError(msg)
         return v.lower()
+
+    @field_validator("ssh_strict_host_key_checking")
+    @classmethod
+    def validate_ssh_strict_host_key_checking(cls, v: Any) -> bool:
+        """Validate SSH strict host key checking setting."""
+        if not isinstance(v, bool):
+            msg = "ssh_strict_host_key_checking must be a boolean"
+            raise ValueError(msg)
+        return v
 
 
 class DeviceOverrides(BaseModel):

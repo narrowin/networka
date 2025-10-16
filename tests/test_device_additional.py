@@ -10,10 +10,7 @@ import pytest
 
 from network_toolkit.config import NetworkConfig
 from network_toolkit.device import DeviceSession
-from network_toolkit.exceptions import (
-    DeviceConnectionError,
-    DeviceExecutionError,
-)
+from network_toolkit.exceptions import DeviceConnectionError, DeviceExecutionError
 from network_toolkit.transport import ScrapliSyncTransport
 
 
@@ -255,9 +252,13 @@ class TestDeviceSessionAdditional:
         assert hasattr(session, "_connection_params")
         params = session._connection_params
         assert "auth_strict_key" in params
-        assert params["auth_strict_key"] is False
+        # auth_strict_key should match the config setting (default is False)
+        assert (
+            params["auth_strict_key"]
+            == sample_config.general.ssh_strict_host_key_checking
+        )
         assert "ssh_config_file" in params
-        assert params["ssh_config_file"] is False
+        assert params["ssh_config_file"] == sample_config.general.ssh_config_file
 
     def test_connect_already_connected(self, sample_config: NetworkConfig) -> None:
         """Test connect when already connected."""

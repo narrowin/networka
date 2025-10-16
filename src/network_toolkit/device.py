@@ -102,8 +102,8 @@ class DeviceSession:
         # https://scrapli.dev/user_guide/basic_usage/#ssh-key-verification
         self._connection_params.update(
             {
-                "auth_strict_key": False,  # Don't enforce strict host key checking
-                "ssh_config_file": True,  # XXX Don't use SSH config file settings
+                "auth_strict_key": config.general.ssh_strict_host_key_checking,
+                "ssh_config_file": config.general.ssh_config_file,
                 "timeout_socket": 10,  # Socket timeout
                 "timeout_transport": 30,  # Transport timeout
                 "timeout_ops": 30,  # Operations timeout
