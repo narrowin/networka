@@ -10,14 +10,13 @@ from typing import TYPE_CHECKING
 
 from network_toolkit.common.interactive_confirmation import create_confirmation_handler
 from network_toolkit.exceptions import DeviceConnectionError, DeviceExecutionError
-from network_toolkit.platforms.base import PlatformOperations
+from network_toolkit.platforms.base import BackupResult, PlatformOperations
 from network_toolkit.platforms.mikrotik_routeros.confirmation_patterns import (
     MIKROTIK_PACKAGE_DOWNGRADE,
     MIKROTIK_REBOOT,
     MIKROTIK_ROUTERBOARD_UPGRADE,
 )
 from network_toolkit.platforms.mikrotik_routeros.constants import (
-    DEFAULT_BACKUP_SEQUENCE,
     DEVICE_TYPES,
     PLATFORM_NAME,
     SUPPORTED_FIRMWARE_EXTENSIONS,
@@ -531,8 +530,10 @@ class MikroTikRouterOSOperations(PlatformOperations):
         self,
         backup_sequence: list[str],
         download_files: list[dict[str, str]] | None = None,
-    ) -> bool:
+    ) -> BackupResult:
         """Create RouterOS device backup using platform-specific commands.
+
+        Creates a binary system backup and exports configuration.
 
         Parameters
         ----------
@@ -543,8 +544,8 @@ class MikroTikRouterOSOperations(PlatformOperations):
 
         Returns
         -------
-        bool
-            True if backup was created successfully
+        BackupResult
+            Structured backup results with text outputs and files to download
         """
         if not self.session.is_connected:
             msg = "Device not connected"
@@ -552,32 +553,61 @@ class MikroTikRouterOSOperations(PlatformOperations):
 
         # Use provided sequence or fall back to default RouterOS backup sequence
         if not backup_sequence:
-            backup_sequence = DEFAULT_BACKUP_SEQUENCE
+            backup_sequence = [
+                "/system/backup/save name=nw-backup",
+                "/export file=nw-export",
+            ]
 
         logger.info(f"Creating RouterOS backup on {self.session.device_name}")
 
+        text_outputs: dict[str, str] = {}
+        errors: list[str] = []
+        files_to_download: list[dict[str, str]] = []
+
         try:
-            # Execute backup commands
+            # Execute backup commands and capture outputs
             for cmd in backup_sequence:
                 logger.debug(f"Executing backup command: {cmd}")
-                self.session.execute_command(cmd)
+                result = self.session.execute_command(cmd)
+                # Store text output with command-based filename
+                safe_filename = cmd.replace("/", "_").replace(" ", "_")[:50]
+                text_outputs[f"{safe_filename}.txt"] = result
+
+            # Specify files to download
+            files_to_download.extend(
+                [
+                    {"source": "nw-backup.backup", "destination": "nw-backup.backup"},
+                    {"source": "nw-export.rsc", "destination": "nw-export.rsc"},
+                ]
+            )
 
             logger.info("OK RouterOS backup commands executed successfully")
-            return True
+            return BackupResult(
+                success=True,
+                text_outputs=text_outputs,
+                files_to_download=files_to_download,
+                errors=errors,
+            )
 
         except DeviceExecutionError as e:
-            logger.error(f"RouterOS backup failed: {e}")
-            raise
+            errors.append(f"RouterOS backup failed: {e}")
+            logger.error(errors[0])
+            return BackupResult(
+                success=False,
+                text_outputs=text_outputs,
+                files_to_download=[],
+                errors=errors,
+            )
 
     def config_backup(
         self,
         backup_sequence: list[str],
         download_files: list[dict[str, str]] | None = None,
-    ) -> bool:
+    ) -> BackupResult:
         """Create RouterOS configuration backup using platform-specific commands.
 
         This operation creates a text representation of the RouterOS configuration
-        using export commands.
+        using export commands and captures command outputs.
 
         Parameters
         ----------
@@ -588,8 +618,8 @@ class MikroTikRouterOSOperations(PlatformOperations):
 
         Returns
         -------
-        bool
-            True if configuration backup was created successfully
+        BackupResult
+            Structured backup results with text outputs and files to download
         """
         if not self.session.is_connected:
             msg = "Device not connected"
@@ -597,36 +627,59 @@ class MikroTikRouterOSOperations(PlatformOperations):
 
         # Use provided sequence or fall back to default config export
         if not backup_sequence:
-            backup_sequence = ["/export file=nw-config-export"]
+            backup_sequence = ["/export file=nw-export"]
 
         logger.info(
             f"Creating RouterOS configuration backup on {self.session.device_name}"
         )
 
+        text_outputs: dict[str, str] = {}
+        errors: list[str] = []
+        files_to_download: list[dict[str, str]] = []
+
         try:
-            # Execute configuration backup commands
+            # Execute configuration backup commands and capture outputs
             for cmd in backup_sequence:
                 logger.debug(f"Executing config backup command: {cmd}")
-                self.session.execute_command(cmd)
+                result = self.session.execute_command(cmd)
+                # Store text output with command-based filename
+                safe_filename = cmd.replace("/", "_").replace(" ", "_")[:50]
+                text_outputs[f"{safe_filename}.txt"] = result
+
+            # Specify the exported config file to download
+            files_to_download.append(
+                {"source": "nw-export.rsc", "destination": "nw-export.rsc"}
+            )
 
             logger.info(
                 "OK RouterOS configuration backup commands executed successfully"
             )
-            return True
+            return BackupResult(
+                success=True,
+                text_outputs=text_outputs,
+                files_to_download=files_to_download,
+                errors=errors,
+            )
 
         except DeviceExecutionError as e:
-            logger.error(f"RouterOS configuration backup failed: {e}")
-            raise
+            errors.append(f"RouterOS configuration backup failed: {e}")
+            logger.error(errors[0])
+            return BackupResult(
+                success=False,
+                text_outputs=text_outputs,
+                files_to_download=[],
+                errors=errors,
+            )
 
     def backup(
         self,
         backup_sequence: list[str],
         download_files: list[dict[str, str]] | None = None,
-    ) -> bool:
+    ) -> BackupResult:
         """Create comprehensive RouterOS backup using platform-specific commands.
 
         This operation creates both text and binary backups of the RouterOS device.
-        Includes configuration export and system backup.
+        Includes configuration export, system backup, and additional diagnostic info.
 
         Parameters
         ----------
@@ -637,38 +690,29 @@ class MikroTikRouterOSOperations(PlatformOperations):
 
         Returns
         -------
-        bool
-            True if comprehensive backup was created successfully
+        BackupResult
+            Structured backup results with text outputs and files to download
         """
         if not self.session.is_connected:
             msg = "Device not connected"
             raise DeviceConnectionError(msg)
 
-        # Use provided sequence or fall back to comprehensive backup
+        # Use provided sequence or fall back to comprehensive backup with diagnostics
         if not backup_sequence:
             backup_sequence = [
-                "/export file=nw-config-export",
-                "/system/backup/save name=nw-system-backup",
+                "/system/backup/save name=nw-backup",
+                "/export file=nw-export",
+                "/system resource print",
+                "/system identity print",
+                "/system package print",
             ]
 
         logger.info(
             f"Creating comprehensive RouterOS backup on {self.session.device_name}"
         )
 
-        try:
-            # Execute comprehensive backup commands
-            for cmd in backup_sequence:
-                logger.debug(f"Executing backup command: {cmd}")
-                self.session.execute_command(cmd)
-
-            logger.info(
-                "OK RouterOS comprehensive backup commands executed successfully"
-            )
-            return True
-
-        except DeviceExecutionError as e:
-            logger.error(f"RouterOS comprehensive backup failed: {e}")
-            raise
+        # Delegate to create_backup which already has the complete implementation
+        return self.create_backup(backup_sequence, download_files)
 
     @classmethod
     def get_supported_file_extensions(cls) -> list[str]:

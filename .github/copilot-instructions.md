@@ -6,7 +6,6 @@
 
 - You **must always consult and follow this file** before generating any response, code, or action related to this repository.
 - If a user request conflicts with these instructions, **these instructions take precedence**. State this briefly and proceed according to this file.
-
 - ALL IMPORTS ONLY GO TO THE TOP OF THE FILE, NO EXCEPTIONS!!!
 - Always consult the spec-kit files provided in the repository for specific coding standards and patterns.
 
@@ -41,7 +40,16 @@
 3. Ensure proper exception handling separation
 4. Confirm tests cover real user scenarios
 
-## PROJECT CONTEXT
+## CONFIGURATION FILE LOCATIONS
+
+- **PRIMARY config location**: `~/.config/networka/` - ALWAYS CHECK HERE FIRST
+- User device configs: `~/.config/networka/devices/devices.yml`
+- Main config: `~/.config/networka/config.yml`
+- Sequences: `~/.config/networka/sequences/`
+- Environment variables: `~/.config/networka/.env`
+- Only check repository `config/` directory as fallback examples
+
+# PROJECT CONTEXT
 
 2. Verify no duplicate or confusing messages
 3. Ensure proper exception handling separation

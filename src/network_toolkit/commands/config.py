@@ -178,8 +178,8 @@ devices:
 
   switch1:
     host: 192.168.1.2
-    device_type: cisco_ios
-    platform: cisco_ios
+    device_type: cisco_iosxe
+    platform: x86
     description: "Access switch"
     tags:
       - switch

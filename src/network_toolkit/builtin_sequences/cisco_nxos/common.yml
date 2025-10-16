@@ -1,4 +1,4 @@
-# Built-in Arista EOS Command Sequences
+# Built-in Cisco NX-OS Command Sequences
 sequences:
   system_info:
     description: "Complete system information gathering"
@@ -9,17 +9,17 @@ sequences:
       - "show inventory"
       - "show clock"
       - "show environment"
-      - "show processes top once"
+      - "show processes cpu"
 
   health_check:
     description: "Basic health check for device monitoring"
     category: "monitoring"
     timeout: 45
     commands:
-      - "show processes top once"
-      - "show memory"
+      - "show processes cpu"
+      - "show system resources"
       - "show clock"
-      - "show interfaces status"
+      - "show interface status"
       - "show logging last 10"
 
   interface_status:
@@ -27,10 +27,10 @@ sequences:
     category: "network"
     timeout: 60
     commands:
-      - "show interfaces status"
-      - "show interfaces counters"
-      - "show interfaces description"
-      - "show interfaces transceiver details"
+      - "show interface status"
+      - "show interface counters"
+      - "show interface description"
+      - "show interface trunk"
 
   routing_info:
     description: "Routing table and protocol information"
@@ -38,16 +38,16 @@ sequences:
     timeout: 60
     commands:
       - "show ip route"
-      - "show ip ospf neighbor"
+      - "show ip ospf neighbors"
       - "show ip bgp summary"
-      - "show bfd neighbors"
+      - "show ip protocols"
 
   security_audit:
     description: "Security configuration audit"
     category: "security"
     timeout: 120
     commands:
-      - "show running-config section username"
+      - "show running-config | include username"
       - "show aaa"
       - "show ip access-lists"
       - "show logging"
