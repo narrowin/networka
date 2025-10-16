@@ -948,6 +948,12 @@ def register(app: typer.Typer) -> None:
         """
         setup_logging("DEBUG" if verbose else "INFO")
 
+        # Show banner for config init
+        from network_toolkit.banner import show_banner
+
+        show_banner()
+        print()  # Add spacing
+
         try:
             # Use the local implementation
             _config_init_impl(

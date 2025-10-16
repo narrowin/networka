@@ -122,11 +122,11 @@ help_text = (
 app = typer.Typer(
     name="nw",
     help=help_text,
-    no_args_is_help=True,
+    no_args_is_help=False,
     rich_markup_mode="rich",
     add_completion=False,
     cls=CategorizedHelpGroup,
-    context_settings={"help_option_names": ["-h", "--help"]},
+    context_settings={"help_option_names": []},  # Disable default help
     invoke_without_command=True,
 )
 
@@ -139,6 +139,9 @@ def main(
     version: Annotated[
         bool, typer.Option("--version", help="Show version information")
     ] = False,
+    help_flag: Annotated[
+        bool, typer.Option("--help", "-h", help="Show this message and exit")
+    ] = False,
 ) -> None:
     """Configure global settings for the network toolkit."""
     if version:
@@ -148,11 +151,16 @@ def main(
         cmd_ctx.print_info(f"Networka (nw) version {__version__}")
         raise typer.Exit()
 
-    # If no command is invoked and no version flag, show help
-    if ctx.invoked_subcommand is None:
+    # If help flag is used or no command is invoked, show banner and help
+    if help_flag or ctx.invoked_subcommand is None:
+        from network_toolkit.banner import show_banner
         from network_toolkit.common.command_helpers import CommandContext
 
         cmd_ctx = CommandContext()
+        # Show banner first
+        show_banner()
+        print()  # Add spacing
+        # Then show help
         cmd_ctx.output_manager.print_text(ctx.get_help())
         raise typer.Exit()
 

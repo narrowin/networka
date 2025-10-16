@@ -263,6 +263,7 @@ class ConnectionParameterBuilder:
             "timeout_socket": self.config.general.timeout,
             "timeout_transport": self.config.general.timeout,
             "transport": self.config.general.transport,
+            "ssh_config_file": self.config.general.ssh_config_file,
             # Use device_type for Scrapli platform - this determines the network driver
             # The platform field is reserved for hardware architecture (x86, arm, etc.)
             "platform": device.device_type,

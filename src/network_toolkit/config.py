@@ -124,6 +124,7 @@ class GeneralConfig(BaseModel):
     port: int = 22
     timeout: int = 30
     default_transport_type: str = "scrapli"
+    ssh_config_file: bool = True
 
     # Connection retry settings
     connection_retries: int = 3

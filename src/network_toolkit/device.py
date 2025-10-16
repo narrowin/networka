@@ -103,7 +103,7 @@ class DeviceSession:
         self._connection_params.update(
             {
                 "auth_strict_key": False,  # Don't enforce strict host key checking
-                "ssh_config_file": False,  # Don't use SSH config file settings
+                "ssh_config_file": True,  # XXX Don't use SSH config file settings
                 "timeout_socket": 10,  # Socket timeout
                 "timeout_transport": 30,  # Transport timeout
                 "timeout_ops": 30,  # Operations timeout
@@ -112,6 +112,7 @@ class DeviceSession:
         )
 
         logger.info(f"Initialized session for device: {device_name}")
+        logger.debug(f"All connection parameters: {self._connection_params}")
 
     def connect(self) -> None:
         """Establish connection to the device.
