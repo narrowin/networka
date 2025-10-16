@@ -50,3 +50,12 @@ sequences:
       - "/ip/firewall/filter/print"
       - "/ip/firewall/nat/print"
       - '/log/print where topics~"account|critical|error|warning"'
+
+  backup_config:
+    description: "Create comprehensive device backup"
+    category: "maintenance"
+    timeout: 180
+    commands:
+      - "/system/backup/save name=nw-backup"
+      - "/export compact file=nw-export"
+      - "/system/resource/print"

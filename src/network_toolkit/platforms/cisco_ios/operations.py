@@ -8,8 +8,13 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from network_toolkit.common.filename_utils import normalize_command_output_filename
 from network_toolkit.exceptions import DeviceConnectionError, DeviceExecutionError
-from network_toolkit.platforms.base import PlatformOperations, UnsupportedOperationError
+from network_toolkit.platforms.base import (
+    BackupResult,
+    PlatformOperations,
+    UnsupportedOperationError,
+)
 from network_toolkit.platforms.cisco_ios.constants import (
     DEVICE_TYPES,
     PLATFORM_NAME,
@@ -269,65 +274,49 @@ class CiscoIOSOperations(PlatformOperations):
         self,
         backup_sequence: list[str],
         download_files: list[dict[str, str]] | None = None,
-    ) -> bool:
-        """Create Cisco IOS device backup using platform-specific commands.
+    ) -> BackupResult:
+        """Create Cisco IOS backup using platform-specific commands.
 
         Parameters
         ----------
         backup_sequence : list[str]
             List of Cisco IOS commands to execute for backup
         download_files : list[dict[str, str]] | None
-            Optional list of files to download after backup
+            Optional list of files to download after backup (deprecated, ignored)
 
         Returns
         -------
-        bool
-            True if backup was created successfully
+        BackupResult
+            Result containing text outputs, files to download, and status
         """
-        if not self.session.is_connected:
-            msg = "Device not connected"
-            raise DeviceConnectionError(msg)
-
-        # Use provided sequence or fall back to default IOS backup sequence
+        # Delegate to config_backup with default sequence
         if not backup_sequence:
             backup_sequence = ["show running-config"]
 
         logger.info(f"Creating Cisco IOS backup on {self.session.device_name}")
-
-        try:
-            # Execute backup commands
-            for cmd in backup_sequence:
-                logger.debug(f"Executing backup command: {cmd}")
-                self.session.execute_command(cmd)
-
-            logger.info("OK Cisco IOS backup commands executed successfully")
-            return True
-
-        except DeviceExecutionError as e:
-            logger.error(f"Cisco IOS backup failed: {e}")
-            raise
+        return self.config_backup(backup_sequence, download_files)
 
     def config_backup(
         self,
         backup_sequence: list[str],
         download_files: list[dict[str, str]] | None = None,
-    ) -> bool:
+    ) -> BackupResult:
         """Create Cisco IOS configuration backup using platform-specific commands.
 
         This operation creates a text representation of the Cisco IOS configuration
-        using show commands.
+        using show commands and checks for critical files to download.
 
         Parameters
         ----------
         backup_sequence : list[str]
             List of Cisco IOS commands to execute for configuration backup
         download_files : list[dict[str, str]] | None
-            Optional list of files to download after backup
+            Optional list of files to download after backup (deprecated, ignored)
 
         Returns
         -------
-        bool
-            True if configuration backup was created successfully
+        BackupResult
+            Result containing text outputs, files to download, and status
         """
         if not self.session.is_connected:
             msg = "Device not connected"
@@ -335,22 +324,80 @@ class CiscoIOSOperations(PlatformOperations):
 
         # Use provided sequence or fall back to default config backup
         if not backup_sequence:
-            backup_sequence = ["show running-config"]
+            backup_sequence = ["show running-config", "show startup-config"]
 
         logger.info(
             f"Creating Cisco IOS configuration backup on {self.session.device_name}"
         )
 
-        try:
-            # Execute configuration backup commands
-            for cmd in backup_sequence:
-                logger.debug(f"Executing config backup command: {cmd}")
-                self.session.execute_command(cmd)
+        text_outputs: dict[str, str] = {}
+        files_to_download: list[dict[str, str]] = []
+        errors: list[str] = []
 
-            logger.info(
-                "OK Cisco IOS configuration backup commands executed successfully"
+        try:
+            # Execute configuration backup commands and capture output
+            for cmd in backup_sequence:
+                try:
+                    logger.debug(f"Executing config backup command: {cmd}")
+                    output = self.session.execute_command(cmd)
+                    # Convert command to normalized filename
+                    filename = normalize_command_output_filename(cmd)
+                    text_outputs[filename] = output
+                except DeviceExecutionError as e:
+                    error_msg = f"Command '{cmd}' failed: {e}"
+                    logger.error(error_msg)
+                    errors.append(error_msg)
+
+            # Check for critical Cisco files to download
+            potential_files = [
+                {"remote": "flash:/vlan.dat", "local_name": "vlan.dat"},
+                {"remote": "flash:/config.text", "local_name": "config.text"},
+                {
+                    "remote": "flash:/private-config.text",
+                    "local_name": "private-config.text",
+                },
+            ]
+
+            for file_spec in potential_files:
+                try:
+                    # Check if file exists on device
+                    check_output = self.session.execute_command(
+                        f"dir {file_spec['remote']}"
+                    )
+                    if (
+                        "Error" not in check_output
+                        and "No such file" not in check_output
+                        and "Invalid" not in check_output
+                    ):
+                        files_to_download.append(
+                            {
+                                "remote_file": file_spec["remote"],
+                                "local_filename": file_spec["local_name"],
+                            }
+                        )
+                        logger.debug(
+                            f"Found file to download: {file_spec['local_name']}"
+                        )
+                except Exception as e:
+                    # File might not exist or command might fail - that's okay
+                    logger.debug(f"Could not check for {file_spec['remote']}: {e}")
+
+            success = len(errors) == 0
+            if success:
+                logger.info(
+                    "OK Cisco IOS configuration backup commands executed successfully"
+                )
+            else:
+                logger.warning(
+                    f"Cisco IOS configuration backup completed with {len(errors)} errors"
+                )
+
+            return BackupResult(
+                success=success,
+                text_outputs=text_outputs,
+                files_to_download=files_to_download,
+                errors=errors,
             )
-            return True
 
         except DeviceExecutionError as e:
             logger.error(f"Cisco IOS configuration backup failed: {e}")
@@ -360,29 +407,25 @@ class CiscoIOSOperations(PlatformOperations):
         self,
         backup_sequence: list[str],
         download_files: list[dict[str, str]] | None = None,
-    ) -> bool:
+    ) -> BackupResult:
         """Create comprehensive Cisco IOS backup using platform-specific commands.
 
         This operation creates both configuration and system information backups
-        of the Cisco IOS device.
+        of the Cisco IOS device. Uses config_backup implementation.
 
         Parameters
         ----------
         backup_sequence : list[str]
             List of Cisco IOS commands to execute for comprehensive backup
         download_files : list[dict[str, str]] | None
-            Optional list of files to download after backup
+            Optional list of files to download after backup (deprecated, ignored)
 
         Returns
         -------
-        bool
-            True if comprehensive backup was created successfully
+        BackupResult
+            Result containing text outputs, files to download, and status
         """
-        if not self.session.is_connected:
-            msg = "Device not connected"
-            raise DeviceConnectionError(msg)
-
-        # Use provided sequence or fall back to comprehensive backup
+        # Use config_backup with expanded sequence
         if not backup_sequence:
             backup_sequence = [
                 "show running-config",
@@ -394,21 +437,7 @@ class CiscoIOSOperations(PlatformOperations):
         logger.info(
             f"Creating comprehensive Cisco IOS backup on {self.session.device_name}"
         )
-
-        try:
-            # Execute comprehensive backup commands
-            for cmd in backup_sequence:
-                logger.debug(f"Executing backup command: {cmd}")
-                self.session.execute_command(cmd)
-
-            logger.info(
-                "OK Cisco IOS comprehensive backup commands executed successfully"
-            )
-            return True
-
-        except DeviceExecutionError as e:
-            logger.error(f"Cisco IOS comprehensive backup failed: {e}")
-            raise
+        return self.config_backup(backup_sequence, download_files)
 
     @classmethod
     def get_supported_file_extensions(cls) -> list[str]:

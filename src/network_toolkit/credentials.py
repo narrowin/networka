@@ -255,6 +255,10 @@ class ConnectionParameterBuilder:
         Uses device_type for Scrapli platform parameter since device_type
         defines the network driver/protocol, while platform defines hardware architecture.
         """
+        # Map internal device_type to Scrapli platform names
+        # Scrapli does not have 'cisco_ios' - it uses 'cisco_iosxe' for both IOS and IOS-XE
+        scrapli_platform = self._map_to_scrapli_platform(device.device_type)
+
         return {
             "host": device.host,
             "auth_username": username,
@@ -264,10 +268,33 @@ class ConnectionParameterBuilder:
             "timeout_transport": self.config.general.timeout,
             "transport": self.config.general.transport,
             "ssh_config_file": self.config.general.ssh_config_file,
-            # Use device_type for Scrapli platform - this determines the network driver
+            # Use mapped platform for Scrapli - this determines the network driver
             # The platform field is reserved for hardware architecture (x86, arm, etc.)
-            "platform": device.device_type,
+            "platform": scrapli_platform,
         }
+
+    def _map_to_scrapli_platform(self, device_type: str) -> str:
+        """Map internal device_type to Scrapli platform name.
+
+        Scrapli core drivers use specific platform names that may differ
+        from our internal device_type names. This function handles the mapping.
+
+        Parameters
+        ----------
+        device_type : str
+            Internal device type identifier
+
+        Returns
+        -------
+        str
+            Scrapli platform name
+        """
+        # Scrapli does not have 'cisco_ios' - use 'cisco_iosxe' for both IOS and IOS-XE
+        platform_mapping = {
+            "cisco_ios": "cisco_iosxe",
+            # Other mappings can be added here if needed
+        }
+        return platform_mapping.get(device_type, device_type)
 
     def _apply_device_overrides(
         self, params: dict[str, Any], device: DeviceConfig
