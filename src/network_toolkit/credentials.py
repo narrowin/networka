@@ -5,11 +5,16 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from network_toolkit.config import DeviceConfig, NetworkConfig
+
+
+# module logger
+logger = logging.getLogger(__name__)
 
 
 class CredentialResolver:
@@ -259,7 +264,13 @@ class ConnectionParameterBuilder:
         # Scrapli does not have 'cisco_ios' - it uses 'cisco_iosxe' for both IOS and IOS-XE
         scrapli_platform = self._map_to_scrapli_platform(device.device_type)
 
-        return {
+        logger.debug(
+            "credentials: device_type=%s scrapli_platform=%s",
+            device.device_type,
+            scrapli_platform,
+        )
+
+        params: dict[str, Any] = {
             "host": device.host,
             "auth_username": username,
             "auth_password": password,
@@ -268,12 +279,39 @@ class ConnectionParameterBuilder:
             "timeout_transport": self.config.general.timeout,
             "transport": self.config.general.transport,
             "ssh_config_file": self.config.general.ssh_config_file,
-            # Use mapped platform for Scrapli - this determines the network driver
-            # The platform field is reserved for hardware architecture (x86, arm, etc.)
-            "platform": scrapli_platform,
         }
 
-    def _map_to_scrapli_platform(self, device_type: str) -> str:
+        # Only add platform if it's not None (for generic/linux connections)
+        if scrapli_platform is not None:
+            # Use mapped platform for Scrapli - this determines the network driver
+            # The platform field is reserved for hardware architecture (x86, arm, etc.)
+            params["platform"] = scrapli_platform
+            logger.debug("credentials: added platform=%s to params", scrapli_platform)
+        else:
+            # For generic/linux connections, use GenericDriver with suitable prompt pattern
+            # GenericDriver default is: r"^\S{0,48}[#>$~@:\]]\s*$"
+            # We extend this for Linux which can have longer hostnames/paths
+            # Pattern matches: user@host:~$, root@host#, user@host:~/path$, etc.
+            # Scrapli uses multiline + case insensitive regex flags
+            params["comms_prompt_pattern"] = r"^\S+[\$#]\s*$"
+            # Increase timeout for generic connections as prompt detection may take longer
+            params["timeout_ops"] = 60
+            logger.debug(
+                "credentials: not adding platform; set comms_prompt_pattern and timeout_ops=60 for generic/linux"
+            )
+
+        logger.debug("credentials: final params keys: %s", list(params.keys()))
+        logger.debug("credentials: 'platform' in params: %s", "platform" in params)
+        if "platform" in params:
+            logger.debug("credentials: params['platform'] = %s", params["platform"])
+        if "comms_prompt_pattern" in params:
+            logger.debug(
+                "credentials: params['comms_prompt_pattern'] = %s",
+                params["comms_prompt_pattern"],
+            )
+        return params
+
+    def _map_to_scrapli_platform(self, device_type: str) -> str | None:
         """Map internal device_type to Scrapli platform name.
 
         Scrapli core drivers use specific platform names that may differ
@@ -286,13 +324,15 @@ class ConnectionParameterBuilder:
 
         Returns
         -------
-        str
-            Scrapli platform name
+        str | None
+            Scrapli platform name, or None for generic/linux connections
         """
         # Scrapli does not have 'cisco_ios' - use 'cisco_iosxe' for both IOS and IOS-XE
         platform_mapping = {
             "cisco_ios": "cisco_iosxe",
-            # Other mappings can be added here if needed
+            # For Linux/generic SSH, don't pass a platform - use GenericDriver
+            "linux": None,
+            "generic": None,
         }
         return platform_mapping.get(device_type, device_type)
 
