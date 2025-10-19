@@ -206,6 +206,7 @@ def get_supported_device_types() -> dict[str, str]:
         "cisco_nxos": "Cisco NX-OS",
         "juniper_junos": "Juniper JunOS",
         "arista_eos": "Arista EOS",
+        "nokia_srlinux": "Nokia SR Linux",
         "linux": "Linux SSH",
         "generic": "Generic SSH",
     }

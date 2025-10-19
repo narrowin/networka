@@ -1444,6 +1444,7 @@ def get_supported_device_types() -> set[str]:
         "cisco_nxos",
         "juniper_junos",
         "arista_eos",
+        "nokia_srlinux",
         "linux",
         "generic",
     }
