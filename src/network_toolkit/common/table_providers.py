@@ -254,9 +254,11 @@ class VendorSequencesTableProvider(BaseModel, BaseTableProvider):
                     seq_name,
                     getattr(sequence, "description", "N/A") or "N/A",
                     vendor_name,
-                    commands_str[:50] + "..."
-                    if len(commands_str) > 50
-                    else commands_str,
+                    (
+                        commands_str[:50] + "..."
+                        if len(commands_str) > 50
+                        else commands_str
+                    ),
                 ]
 
                 if self.verbose:
@@ -316,12 +318,11 @@ class SupportedPlatformsTableProvider(BaseModel, BaseTableProvider):
 
     def get_table_rows(self) -> list[list[str]]:
         """Get supported platforms data."""
-        # For now, return sample data since transport factory may not be implemented yet
-        return [
-            ["cisco_ios", "Network", "SSH", "show commands, config"],
-            ["cisco_nxos", "Network", "SSH", "show commands, config"],
-            ["juniper_junos", "Network", "SSH", "show commands, config"],
-        ]
+        device_types = get_supported_device_types()
+        rows = []
+        for device_type in sorted(device_types):
+            rows.append([device_type, "Network", "SSH", "show commands, config"])
+        return rows
 
     def get_raw_output(self) -> str | None:
         """Get raw data for JSON/CSV output."""

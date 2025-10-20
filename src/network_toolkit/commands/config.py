@@ -23,6 +23,10 @@ from network_toolkit.common.output import (
     set_output_mode,
 )
 from network_toolkit.common.paths import default_config_root, default_modular_config_dir
+from network_toolkit.common.table_providers import (
+    SupportedPlatformsTableProvider,
+    TransportTypesTableProvider,
+)
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import (
     ConfigurationError,
@@ -1184,6 +1188,17 @@ def _config_validate_impl(
         raise typer.Exit(1) from None
 
 
+def _show_supported_types_impl(ctx: CommandContext, *, verbose: bool) -> None:
+    """Implementation logic for showing supported device types."""
+    transport_provider = TransportTypesTableProvider()
+    ctx.render_table(transport_provider, verbose=False)
+
+    ctx.output_manager.print_blank_line()
+
+    platforms_provider = SupportedPlatformsTableProvider()
+    ctx.render_table(platforms_provider, verbose)
+
+
 def register(app: typer.Typer) -> None:
     """Register the unified config command group with the main CLI app."""
     config_app = typer.Typer(
@@ -1355,6 +1370,31 @@ def register(app: typer.Typer) -> None:
             from network_toolkit.common.command_helpers import CommandContext
 
             ctx = CommandContext()
+            ctx.print_error(f"Unexpected error: {e}")
+            raise typer.Exit(1) from None
+
+    @config_app.command("supported-types")
+    def supported_types(
+        verbose: Annotated[
+            bool, typer.Option("--verbose", "-v", help="Show detailed information")
+        ] = False,
+    ) -> None:
+        """Show supported device types and platform information."""
+        setup_logging("DEBUG" if verbose else "INFO")
+
+        ctx = CommandContext()
+
+        try:
+            _show_supported_types_impl(ctx, verbose=verbose)
+
+        except NetworkToolkitError as e:
+            ctx.print_error(str(e))
+            if verbose and e.details:
+                ctx.print_error(f"Details: {e.details}")
+            raise typer.Exit(1) from None
+        except typer.Exit:
+            raise
+        except Exception as e:  # pragma: no cover - unexpected
             ctx.print_error(f"Unexpected error: {e}")
             raise typer.Exit(1) from None
 

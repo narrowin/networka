@@ -16,56 +16,6 @@
     "devices"
   ],
   "$defs": {
-    "CommandSequence": {
-      "description": "Global command sequence definition.",
-      "properties": {
-        "description": {
-          "title": "Description",
-          "type": "string"
-        },
-        "commands": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Commands",
-          "type": "array"
-        },
-        "tags": {
-          "anyOf": [
-            {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Tags"
-        },
-        "file_operations": {
-          "anyOf": [
-            {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "File Operations"
-        }
-      },
-      "required": [
-        "description",
-        "commands"
-      ],
-      "title": "CommandSequence",
-      "type": "object"
-    },
     "CommandSequenceGroup": {
       "description": "Command sequence group definition.",
       "properties": {
@@ -529,6 +479,16 @@
           "default": "scrapli",
           "title": "Default Transport Type",
           "type": "string"
+        },
+        "ssh_config_file": {
+          "default": true,
+          "title": "Ssh Config File",
+          "type": "boolean"
+        },
+        "ssh_strict_host_key_checking": {
+          "default": false,
+          "title": "Ssh Strict Host Key Checking",
+          "type": "boolean"
         },
         "connection_retries": {
           "default": 3,

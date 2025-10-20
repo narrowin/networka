@@ -171,6 +171,7 @@ _nw() {
 	local info_opts="--vendor --interactive-auth -i $output_opts $common_opts"
 	local config_validate_opts="$common_opts"
 	local config_init_opts="$common_opts --force"
+	local config_supported_types_opts="--verbose -v --help -h"
 	local diff_opts="$common_opts"
 
 	# Helper: complete from a list or options
@@ -287,7 +288,7 @@ _nw() {
 			# Handle list subcommands
 			if [[ ${#COMP_WORDS[@]} -eq 3 ]]; then
 				# If we're at position 2 (after "nw list"), suggest subcommands
-				COMPREPLY=( $(compgen -W "devices groups sequences supported-types" -- "$cur") )
+				COMPREPLY=( $(compgen -W "devices groups sequences" -- "$cur") )
 			elif [[ ${#COMP_WORDS[@]} -gt 3 ]]; then
 				# Handle options for specific subcommands
 				case "${COMP_WORDS[2]}" in
@@ -297,8 +298,6 @@ _nw() {
 						_opts "$list_groups_opts" ;;
 					sequences)
 						_opts "$list_sequences_opts" ;;
-					supported-types)
-						_opts "$common_opts" ;;
 					*)
 						_opts "$common_opts" ;;
 				esac
@@ -313,12 +312,16 @@ _nw() {
 						_opts "$config_init_opts" ;;
 					validate)
 						_opts "$config_validate_opts" ;;
+					supported-types)
+						_opts "$config_supported_types_opts" ;;
+					update)
+						_opts "$common_opts" ;;
 					*)
 						_opts "$common_opts" ;;
 				esac
 			else
 				# Complete config subcommands
-				COMPREPLY=( $(compgen -W "init validate" -- "$cur") )
+				COMPREPLY=( $(compgen -W "init validate supported-types update" -- "$cur") )
 			fi
 			;;
 		complete)
