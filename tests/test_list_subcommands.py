@@ -21,10 +21,12 @@ class TestListCommand:
         result = runner.invoke(app, ["list", "--help"])
 
         assert result.exit_code == 0
+        # Should list available subcommands
         assert "devices" in result.output
         assert "groups" in result.output
         assert "sequences" in result.output
-        assert "supported-types" in result.output
+        # supported-types should NOT be here anymore - it's moved to config
+        assert "supported-types" not in result.output
 
     def test_list_devices_basic(self, config_file: Path) -> None:
         """Test list devices subcommand."""
@@ -161,17 +163,17 @@ class TestListCommand:
         assert result.exit_code == 0
 
     def test_list_supported_types_basic(self) -> None:
-        """Test list supported-types subcommand."""
+        """Test config supported-types subcommand."""
         runner = CliRunner()
-        result = runner.invoke(app, ["list", "supported-types"])
+        result = runner.invoke(app, ["config", "supported-types"])
 
         assert result.exit_code == 0
         assert "Transport Types" in result.output or "Device Types" in result.output
 
     def test_list_supported_types_verbose(self) -> None:
-        """Test list supported-types with verbose output."""
+        """Test config supported-types with verbose output."""
         runner = CliRunner()
-        result = runner.invoke(app, ["list", "supported-types", "--verbose"])
+        result = runner.invoke(app, ["config", "supported-types", "--verbose"])
 
         assert result.exit_code == 0
         assert "Usage Examples" in result.output or "Transport Types" in result.output
@@ -278,9 +280,9 @@ class TestListCommandIntegration:
         # Should either show sequences or handle empty sequences gracefully
 
     def test_list_supported_types_integration(self) -> None:
-        """Test that list supported-types works end-to-end."""
+        """Test that config supported-types works end-to-end."""
         runner = CliRunner()
-        result = runner.invoke(app, ["list", "supported-types"])
+        result = runner.invoke(app, ["config", "supported-types"])
 
         assert result.exit_code == 0
         # Should show device types and transport information
