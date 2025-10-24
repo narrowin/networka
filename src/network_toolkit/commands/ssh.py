@@ -32,6 +32,7 @@ import typer
 from network_toolkit.commands.ssh_fallback import open_sequential_ssh_sessions
 from network_toolkit.commands.ssh_platform import get_platform_capabilities
 from network_toolkit.common.command_helpers import CommandContext
+from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import OutputMode
 from network_toolkit.common.resolver import DeviceResolver
@@ -191,21 +192,41 @@ def _build_ssh_cmd(
     port: int = 22,
     auth: AuthMode = AuthMode.KEY_FIRST,
     password: str | None = None,
+    strict_host_key_checking: bool = False,
     ctx: CommandContext,
 ) -> str:
+    # Determine StrictHostKeyChecking value and related options
+    # Default: accept-new (accept new keys, verify existing ones)
+    # With --no-strict-host-key-checking: completely disable all verification
     base = [
         "ssh",
         "-p",
         str(port),
         "-o",
-        "StrictHostKeyChecking=accept-new",
-        # Add options to try key auth first, then password
-        "-o",
-        "PreferredAuthentications=publickey,password",
-        "-o",
-        "PasswordAuthentication=yes",
-        f"{user}@{host}",
+        f"StrictHostKeyChecking={'accept-new' if strict_host_key_checking else 'no'}",
     ]
+
+    # When fully disabling strict checking, also disable known_hosts to prevent any errors
+    if not strict_host_key_checking:
+        base.extend(
+            [
+                "-o",
+                "UserKnownHostsFile=/dev/null",
+                "-o",
+                "GlobalKnownHostsFile=/dev/null",
+            ]
+        )
+
+    # Add authentication options
+    base.extend(
+        [
+            "-o",
+            "PreferredAuthentications=publickey,password",
+            "-o",
+            "PasswordAuthentication=yes",
+            f"{user}@{host}",
+        ]
+    )
 
     if auth == AuthMode.PASSWORD:
         if not password:
@@ -258,8 +279,13 @@ def _sanitize_session_name(name: str) -> str:
 
 
 def register(app: typer.Typer) -> None:
-    @app.command("ssh", help=app_help, rich_help_panel="Remote Operations")
-    def ssh_fanout(
+    @app.command(
+        "ssh",
+        help=app_help,
+        rich_help_panel="Remote Operations",
+        context_settings={"help_option_names": ["-h", "--help"]},
+    )
+    def ssh(
         target: Annotated[
             str,
             typer.Argument(help="Comma-separated device/group names or IP addresses"),
@@ -267,7 +293,7 @@ def register(app: typer.Typer) -> None:
         *,
         config_file: Annotated[
             Path, typer.Option("--config", "-c", help="Path to config dir or YAML")
-        ] = Path("config"),
+        ] = DEFAULT_CONFIG_PATH,
         auth: Annotated[
             AuthMode,
             typer.Option(
@@ -341,6 +367,13 @@ def register(app: typer.Typer) -> None:
                 help="Transport type for connections (currently only scrapli is supported). Defaults to configuration or scrapli.",
             ),
         ] = None,
+        no_strict_host_key_checking: Annotated[
+            bool,
+            typer.Option(
+                "--no-strict-host-key-checking",
+                help="Disable strict SSH host key checking (insecure, use only in lab environments)",
+            ),
+        ] = False,
     ) -> None:
         """
         Open a tmux window with SSH panes for devices in targets.
@@ -400,8 +433,8 @@ def register(app: typer.Typer) -> None:
                     f"Using IP addresses with platform '{device_type}': {', '.join(ips)}"
                 )
 
-            resolver = DeviceResolver(config, device_type, port, transport_type)
-            tgt = Target(name=target, devices=resolver.resolve_targets(target)[0])
+            # Use the helper function that properly handles unknown targets
+            tgt = _resolve_targets(config, target, ctx)
 
             # Check platform capabilities after we have config and targets
             platform_caps = get_platform_capabilities()
@@ -462,6 +495,7 @@ def register(app: typer.Typer) -> None:
                     port=port,
                     auth=mode,
                     password=str(pw) if pw is not None else None,
+                    strict_host_key_checking=not no_strict_host_key_checking,
                     ctx=ctx,
                 )
             except Exception as e:

@@ -15,8 +15,6 @@ from network_toolkit.common.output import OutputMode
 from network_toolkit.common.table_providers import (
     DeviceListTableProvider,
     GroupListTableProvider,
-    SupportedPlatformsTableProvider,
-    TransportTypesTableProvider,
     VendorSequencesTableProvider,
 )
 from network_toolkit.config import NetworkConfig, load_config
@@ -94,19 +92,6 @@ def _show_all_vendor_sequences(
     ctx.render_table(provider, verbose)
 
 
-def _show_supported_types_impl(ctx: CommandContext, *, verbose: bool) -> None:
-    """Implementation logic for showing supported device types."""
-    # Show transport types first
-    transport_provider = TransportTypesTableProvider()
-    ctx.render_table(transport_provider, verbose=False)
-
-    ctx.output_manager.print_blank_line()
-
-    # Show supported device types
-    platforms_provider = SupportedPlatformsTableProvider()
-    ctx.render_table(platforms_provider, verbose)
-
-
 def _list_sequences_impl(
     config: NetworkConfig,
     ctx: CommandContext,
@@ -141,6 +126,8 @@ def register(app: typer.Typer) -> None:
     list_app = typer.Typer(
         name="list",
         help="List network devices, groups, sequences, and platform information",
+        no_args_is_help=True,
+        context_settings={"help_option_names": ["-h", "--help"]},
     )
 
     @list_app.command("devices")
@@ -282,33 +269,6 @@ def register(app: typer.Typer) -> None:
 
             # Use the local implementation
             _list_sequences_impl(config, ctx, vendor, category, verbose=verbose)
-
-        except NetworkToolkitError as e:
-            ctx.print_error(str(e))
-            if verbose and e.details:
-                ctx.print_error(f"Details: {e.details}")
-            raise typer.Exit(1) from None
-        except typer.Exit:
-            # Allow clean exits (e.g., user cancellation) to pass through
-            raise
-        except Exception as e:  # pragma: no cover - unexpected
-            ctx.print_error(f"Unexpected error: {e}")
-            raise typer.Exit(1) from None
-
-    @list_app.command("supported-types")
-    def supported_types(
-        verbose: Annotated[
-            bool, typer.Option("--verbose", "-v", help="Show detailed information")
-        ] = False,
-    ) -> None:
-        """Show supported device types and platform information."""
-        setup_logging("DEBUG" if verbose else "INFO")
-
-        ctx = CommandContext()
-
-        try:
-            # Use the local implementation
-            _show_supported_types_impl(ctx, verbose=verbose)
 
         except NetworkToolkitError as e:
             ctx.print_error(str(e))

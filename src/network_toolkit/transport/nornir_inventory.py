@@ -145,6 +145,8 @@ def _map_to_netmiko_platform(device_type: str) -> str:
         "arista_eos": "arista_eos",
         # Juniper
         "juniper_junos": "juniper_junos",
+        # Nokia
+        "nokia_srlinux": "nokia_srl",
         # Others
         "linux": "linux",
         "generic": "terminal_server",
@@ -169,5 +171,6 @@ def get_supported_nornir_platforms() -> dict[str, str]:
         "cisco_iosxr": "Cisco IOS-XR",
         "arista_eos": "Arista EOS",
         "juniper_junos": "Juniper JunOS",
+        "nokia_srlinux": "Nokia SR Linux",
         "linux": "Linux SSH",
     }

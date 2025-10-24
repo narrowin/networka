@@ -131,6 +131,38 @@ Mixing is supported. If both YAML and CSV define the same device/group/sequence 
 - Run common tasks → Running commands
 - Inspect outputs and control formatting → Results and Output modes
 
+## Global settings (config.yml)
+
+The optional `config/config.yml` file can specify global defaults that apply to all devices. This is particularly useful for SSH security settings and connection timeouts.
+
+### SSH security settings
+
+#### ssh_strict_host_key_checking
+
+- **Type**: boolean
+- **Default**: `false` (accept-new behavior)
+- **Description**: Control SSH host key verification behavior
+- **Impact**:
+  - When `false` (default): Uses `accept-new` - automatically accepts new host keys, but verifies existing ones. Protects against MITM on known hosts while allowing new devices.
+  - When `true`: Strict mode - fails on any unknown or changed host key (most secure, but requires manual key management)
+  - With `--no-strict-host-key-checking` flag: Completely disables all verification (INSECURE - lab use only)
+
+Example `config/config.yml`:
+
+```yaml
+general:
+  ssh_strict_host_key_checking: false  # Default: accept-new (accept new, verify existing)
+  # Set to true for maximum security (requires manual key management)
+```
+
+For the `run` and `ssh` commands, you can completely disable all host key verification per-command:
+
+```bash
+# Completely disable host key verification (INSECURE - lab use only)
+nw run router1 '/system/identity/print' --no-strict-host-key-checking
+nw ssh router1 --no-strict-host-key-checking
+```
+
 ## Bootstrap configuration (CLI)
 
 Use the built-in `config` commands to inspect and manage configuration from the CLI. See the CLI reference for the full command set and options.

@@ -84,10 +84,10 @@ class TestCLITransportConfiguration:
             assert "--transport" in str(result.stdout) or result.exit_code != 2
 
     def test_supported_types_shows_transport_info(self):
-        """Test that list supported-types command shows transport information."""
+        """Test that config supported-types command shows transport information."""
         runner = CliRunner()
 
-        result = runner.invoke(app, ["list", "supported-types"])
+        result = runner.invoke(app, ["config", "supported-types"])
 
         # Should succeed and show transport information
         assert result.exit_code == 0

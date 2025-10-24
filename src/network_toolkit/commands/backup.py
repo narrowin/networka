@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from datetime import UTC, datetime
 from importlib import import_module
 from pathlib import Path
 from typing import Annotated, Any, cast
@@ -18,6 +20,7 @@ from network_toolkit.platforms import (
     check_operation_support,
     get_platform_operations,
 )
+from network_toolkit.sequence_manager import SequenceManager
 
 MAX_LIST_PREVIEW = 10
 
@@ -25,6 +28,7 @@ MAX_LIST_PREVIEW = 10
 backup_app = typer.Typer(
     name="backup",
     help="Backup operations for network devices",
+    no_args_is_help=True,
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 
@@ -98,20 +102,15 @@ def config_backup(
         def resolve_backup_sequence(
             config: NetworkConfig, device_name: str
         ) -> list[str]:
-            """Resolve the backup sequence for a device."""
+            """Resolve the backup sequence for a device using SequenceManager."""
             seq_name = "backup_config"
-            devices = config.devices or {}
-            device_config = devices.get(device_name)
+            sm = SequenceManager(config)
+            sequence_commands = sm.resolve(seq_name, device_name)
+            return sequence_commands or []
 
-            # Try device-specific sequences first
-            if (
-                device_config
-                and device_config.command_sequences
-                and seq_name in device_config.command_sequences
-            ):
-                return device_config.command_sequences[seq_name]
-
-            return []
+        # Create single timestamp for entire backup run
+        run_timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
+        backup_dirs: list[Path] = []  # Track all backup directories
 
         def process_device(dev: str) -> bool:
             try:
@@ -138,36 +137,66 @@ def config_backup(
                     ctx.print_info(f"Transport: {transport_type}")
 
                     # Use platform-specific backup creation
-                    backup_success = platform_ops.create_backup(
+                    backup_result = platform_ops.create_backup(
                         backup_sequence=seq_cmds,
-                        download_files=None,  # Will handle downloads separately
+                        download_files=None,
                     )
 
-                    if not backup_success:
+                    if not backup_result.success:
                         ctx.print_error(f"Backup creation failed on {dev}")
+                        for error in backup_result.errors:
+                            ctx.print_error(f"  {error}")
                         return False
 
-                    if download:
-                        downloads: list[dict[str, Any]] = [
-                            {
-                                "remote_file": "nw-backup.backup",
-                                "local_path": str(config.general.backup_dir),
-                                "local_filename": ("{device}_{date}_nw.backup"),
+                    # Create backup directory using shared timestamp
+                    backup_dir = (
+                        Path(config.general.backup_dir) / f"{dev}_{run_timestamp}"
+                    )
+                    backup_dir.mkdir(parents=True, exist_ok=True)
+                    backup_dirs.append(backup_dir)
+                    ctx.print_info(f"Saving backup to: {backup_dir}")
+
+                    # Save text outputs
+                    for filename, content in backup_result.text_outputs.items():
+                        output_file = backup_dir / filename
+                        output_file.write_text(content, encoding="utf-8")
+                        ctx.print_info(f"  Saved: {filename}")
+
+                    # Download platform-specified files if requested
+                    if download and backup_result.files_to_download:
+                        for file_spec in backup_result.files_to_download:
+                            download_spec = {
+                                "remote_file": file_spec["source"],
+                                "local_path": str(backup_dir),
+                                "local_filename": file_spec["destination"],
                                 "delete_remote": delete_remote,
-                            },
-                            {
-                                "remote_file": "nw-export.rsc",
-                                "local_path": str(config.general.backup_dir),
-                                "local_filename": ("{device}_{date}_nw-export.rsc"),
-                                "delete_remote": delete_remote,
-                            },
-                        ]
-                        handle_downloads(
-                            session=session,
-                            device_name=dev,
-                            download_files=downloads,
-                            config=config,
-                        )
+                            }
+                            handle_downloads(
+                                session=session,
+                                device_name=dev,
+                                download_files=[download_spec],
+                                config=config,
+                            )
+
+                    # Generate manifest
+                    manifest = {
+                        "device": dev,
+                        "timestamp": run_timestamp,
+                        "platform": platform_name,
+                        "transport": transport_type,
+                        "text_outputs": list(backup_result.text_outputs.keys()),
+                        "downloaded_files": (
+                            [f["destination"] for f in backup_result.files_to_download]
+                            if download
+                            else []
+                        ),
+                    }
+                    manifest_file = backup_dir / "manifest.json"
+                    manifest_file.write_text(
+                        json.dumps(manifest, indent=2), encoding="utf-8"
+                    )
+                    ctx.print_info("  Saved: manifest.json")
+
                     return True
             except NetworkToolkitError as e:
                 ctx.print_error(f"Error on {dev}: {e.message}")
@@ -183,6 +212,15 @@ def config_backup(
             if not ok:
                 raise typer.Exit(1)
             ctx.print_operation_complete("Backup", success=True)
+
+            # Print backup summary
+            if backup_dirs:
+                ctx.output_manager.print_text("")  # Blank line
+                ctx.print_success("Backup Summary:")
+                ctx.print_info(f"  Timestamp: {run_timestamp}")
+                ctx.print_info(f"  Location: {backup_dirs[0]}")
+                file_count = len(list(backup_dirs[0].glob("*")))
+                ctx.print_info(f"  Files: {file_count} files saved")
             return
 
         # Group path
@@ -206,6 +244,18 @@ def config_backup(
 
         total = len(members)
         ctx.print_info(f"Completed: {total - failures}/{total} successful backups")
+
+        # Print backup summary for group
+        if backup_dirs:
+            ctx.output_manager.print_text("")  # Blank line
+            ctx.print_success("Backup Summary:")
+            ctx.print_info(f"  Timestamp: {run_timestamp}")
+            ctx.print_info(f"  Devices backed up: {len(backup_dirs)}")
+            for backup_dir in backup_dirs:
+                file_count = len(list(backup_dir.glob("*")))
+                ctx.print_info(f"    {backup_dir.name}: {file_count} files")
+            ctx.print_info(f"  Base directory: {backup_dirs[0].parent}")
+
         if failures:
             raise typer.Exit(1)
 
@@ -296,6 +346,10 @@ def comprehensive_backup(
 
             return []
 
+        # Create single timestamp for entire backup run
+        run_timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
+        backup_dirs: list[Path] = []  # Track all backup directories
+
         def process_device(dev: str) -> bool:
             try:
                 with device_session(dev, config) as session:
@@ -318,38 +372,69 @@ def comprehensive_backup(
                     ctx.print_info(f"Platform: {platform_name}")
                     ctx.print_info(f"Transport: {transport_type}")
 
-                    backup_success = platform_ops.create_backup(
+                    backup_result = platform_ops.backup(
                         backup_sequence=seq_cmds,
-                        download_files=None,  # Will handle downloads separately
+                        download_files=None,
                     )
 
-                    if not backup_success:
+                    if not backup_result.success:
                         ctx.print_error(
                             f"Comprehensive backup creation failed on {dev}"
                         )
+                        for error in backup_result.errors:
+                            ctx.print_error(f"  {error}")
                         return False
 
-                    if download:
-                        downloads: list[dict[str, Any]] = [
-                            {
-                                "remote_file": "nw-backup.backup",
-                                "local_path": str(config.general.backup_dir),
-                                "local_filename": "{device}_{date}_nw.backup",
+                    # Create backup directory using shared timestamp
+                    backup_dir = (
+                        Path(config.general.backup_dir) / f"{dev}_{run_timestamp}"
+                    )
+                    backup_dir.mkdir(parents=True, exist_ok=True)
+                    backup_dirs.append(backup_dir)
+                    ctx.print_info(f"Saving comprehensive backup to: {backup_dir}")
+
+                    # Save text outputs
+                    for filename, content in backup_result.text_outputs.items():
+                        output_file = backup_dir / filename
+                        output_file.write_text(content, encoding="utf-8")
+                        ctx.print_info(f"  Saved: {filename}")
+
+                    # Download platform-specified files if requested
+                    if download and backup_result.files_to_download:
+                        for file_spec in backup_result.files_to_download:
+                            download_spec = {
+                                "remote_file": file_spec["source"],
+                                "local_path": str(backup_dir),
+                                "local_filename": file_spec["destination"],
                                 "delete_remote": delete_remote,
-                            },
-                            {
-                                "remote_file": "nw-export.rsc",
-                                "local_path": str(config.general.backup_dir),
-                                "local_filename": "{device}_{date}_nw-export.rsc",
-                                "delete_remote": delete_remote,
-                            },
-                        ]
-                        handle_downloads(
-                            session=session,
-                            device_name=dev,
-                            download_files=downloads,
-                            config=config,
-                        )
+                            }
+                            handle_downloads(
+                                session=session,
+                                device_name=dev,
+                                download_files=[download_spec],
+                                config=config,
+                            )
+
+                    # Generate manifest
+                    manifest = {
+                        "device": dev,
+                        "timestamp": run_timestamp,
+                        "platform": platform_name,
+                        "transport": transport_type,
+                        "backup_type": "comprehensive",
+                        "text_outputs": list(backup_result.text_outputs.keys()),
+                        "downloaded_files": (
+                            [f["destination"] for f in backup_result.files_to_download]
+                            if download
+                            else []
+                        ),
+                    }
+                    manifest_file = backup_dir / "manifest.json"
+                    manifest_file.write_text(
+                        json.dumps(manifest, indent=2), encoding="utf-8"
+                    )
+                    ctx.print_info("  Saved: manifest.json")
+
                     return True
             except NetworkToolkitError as e:
                 ctx.print_error(f"Error on {dev}: {e.message}")
@@ -365,6 +450,15 @@ def comprehensive_backup(
             if not ok:
                 raise typer.Exit(1)
             ctx.print_operation_complete("Comprehensive Backup", success=True)
+
+            # Print backup summary
+            if backup_dirs:
+                ctx.output_manager.print_text("")  # Blank line
+                ctx.print_success("Backup Summary:")
+                ctx.print_info(f"  Timestamp: {run_timestamp}")
+                ctx.print_info(f"  Location: {backup_dirs[0]}")
+                file_count = len(list(backup_dirs[0].glob("*")))
+                ctx.print_info(f"  Files: {file_count} files saved")
             return
 
         # Group processing
@@ -388,6 +482,17 @@ def comprehensive_backup(
 
         total = len(members)
         ctx.print_info(f"Completed: {total - failures}/{total} successful backups")
+
+        # Print backup summary for group
+        if backup_dirs:
+            ctx.output_manager.print_text("")  # Blank line
+            ctx.print_success("Backup Summary:")
+            ctx.print_info(f"  Timestamp: {run_timestamp}")
+            ctx.print_info(f"  Devices backed up: {len(backup_dirs)}")
+            for backup_dir in backup_dirs:
+                file_count = len(list(backup_dir.glob("*")))
+                ctx.print_info(f"    {backup_dir.name}: {file_count} files")
+            ctx.print_info(f"  Base directory: {backup_dirs[0].parent}")
         if failures:
             raise typer.Exit(1)
 

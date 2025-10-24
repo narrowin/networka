@@ -120,7 +120,7 @@
           fi ;;
         config)
           if (( CURRENT == 3 )); then
-            values=("init:Initialize a network toolkit configuration" "validate:Validate the configuration file")
+            values=("init:Initialize a network toolkit configuration" "validate:Validate the configuration file" "supported-types:Show supported device types" "update:Update configuration files")
             _describe -t subcommands 'config subcommands' values && return
           fi ;;
         schema)
@@ -146,7 +146,7 @@
           fi ;;
         list)
           if (( CURRENT == 3 )); then
-            values=("devices:List all configured network devices" "groups:List all configured device groups" "sequences:List available sequences" "supported-types:List supported device types")
+            values=("devices:List all configured network devices" "groups:List all configured device groups" "sequences:List available sequences")
             _describe -t subcommands 'list subcommands' values && return
           fi ;;
         complete)

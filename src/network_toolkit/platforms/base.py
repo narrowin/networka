@@ -4,11 +4,39 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from network_toolkit.device import DeviceSession
+
+
+@dataclass
+class BackupResult:
+    """Result of a backup operation with platform-specific outputs.
+
+    This class captures all outputs from a backup operation, including
+    text command outputs and files that need to be downloaded.
+
+    Attributes
+    ----------
+    success : bool
+        Whether the backup operation completed successfully
+    text_outputs : dict[str, str]
+        Mapping of filename to text content for command outputs
+        Example: {"show_running-config.txt": "...config content..."}
+    files_to_download : list[dict[str, str]]
+        List of file specifications for files to download from device
+        Each dict should contain: {"remote_file": "path", "local_filename": "name"}
+    errors : list[str]
+        List of error messages encountered during backup
+    """
+
+    success: bool
+    text_outputs: dict[str, str] = field(default_factory=dict)
+    files_to_download: list[dict[str, str]] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 class PlatformOperations(ABC):
@@ -123,7 +151,7 @@ class PlatformOperations(ABC):
         self,
         backup_sequence: list[str],
         download_files: list[dict[str, str]] | None = None,
-    ) -> bool:
+    ) -> BackupResult:
         """Create device backup using platform-specific commands.
 
         Parameters
@@ -131,12 +159,12 @@ class PlatformOperations(ABC):
         backup_sequence : list[str]
             List of commands to execute for backup
         download_files : list[dict[str, str]] | None
-            Optional list of files to download after backup
+            Optional list of files to download after backup (deprecated, ignored)
 
         Returns
         -------
-        bool
-            True if backup was created successfully
+        BackupResult
+            Result containing text outputs, files to download, and status
         """
         ...
 
@@ -145,7 +173,7 @@ class PlatformOperations(ABC):
         self,
         backup_sequence: list[str],
         download_files: list[dict[str, str]] | None = None,
-    ) -> bool:
+    ) -> BackupResult:
         """Create device configuration backup using platform-specific commands.
 
         This operation creates a text representation of the device configuration.
@@ -156,12 +184,12 @@ class PlatformOperations(ABC):
         backup_sequence : list[str]
             List of commands to execute for configuration backup
         download_files : list[dict[str, str]] | None
-            Optional list of files to download after backup
+            Optional list of files to download after backup (deprecated, ignored)
 
         Returns
         -------
-        bool
-            True if configuration backup was created successfully
+        BackupResult
+            Result containing text outputs, files to download, and status
         """
         ...
 
@@ -170,7 +198,7 @@ class PlatformOperations(ABC):
         self,
         backup_sequence: list[str],
         download_files: list[dict[str, str]] | None = None,
-    ) -> bool:
+    ) -> BackupResult:
         """Create comprehensive device backup using platform-specific commands.
 
         This operation creates both text and binary backups of the device.
@@ -181,12 +209,12 @@ class PlatformOperations(ABC):
         backup_sequence : list[str]
             List of commands to execute for comprehensive backup
         download_files : list[dict[str, str]] | None
-            Optional list of files to download after backup
+            Optional list of files to download after backup (deprecated, ignored)
 
         Returns
         -------
-        bool
-            True if comprehensive backup was created successfully
+        BackupResult
+            Result containing text outputs, files to download, and status
         """
         ...
 

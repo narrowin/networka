@@ -51,3 +51,12 @@ sequences:
       - "show aaa"
       - "show ip access-lists"
       - "show logging"
+
+  backup_config:
+    description: "Create comprehensive device backup"
+    category: "maintenance"
+    timeout: 180
+    commands:
+      - "show running-config"
+      - "show startup-config"
+      - "show version"
