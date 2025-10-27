@@ -17,7 +17,7 @@
 
 Networka is a modern CLI tool for automating network devices across multiple vendors. Designed for network engineers who want fast, scalable automation with full cross-platform support.
 
-Built entirely with Sonett 4 and GPT-5, this is an agent-mode experiment that turned into something genuinely useful.
+Built almost entirely with agentic-AI, this is an experiment that turned into something genuinely useful.
 
 ---
 
