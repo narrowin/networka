@@ -59,10 +59,10 @@ Sequence completed successfully
 
 ## Supported operations
 
-- Firmware upgrade: yes (`nw upgrade`) — IOS ext: `.bin`, `.tar`; IOS-XE ext: `.bin`, `.pkg`
-- Firmware downgrade: yes (`nw downgrade`) — same as upgrade workflow
-- BIOS upgrade: not applicable for IOS/IOS-XE (`nw bios` not supported)
-- Configuration backup: yes (`nw config-backup` or `nw backup config`)
+- Firmware upgrade: yes (`nw firmware upgrade`) — IOS ext: `.bin`, `.tar`; IOS-XE ext: `.bin`, `.pkg`
+- Firmware downgrade: yes (`nw firmware downgrade`) — same as upgrade workflow
+- BIOS upgrade: not applicable for IOS/IOS-XE (`nw firmware bios` not supported)
+- Configuration backup: yes (`nw backup config`)
 
 ## Firmware management
 
@@ -83,14 +83,14 @@ Networka chooses the proper workflow based on device capabilities. If INSTALL co
 
 CLI shortcuts:
 
-- Upgrade: `nw upgrade <device|group> <path/to/image.bin>`
-- Downgrade: `nw downgrade <device|group> <path/to/older.bin>` (or `install rollback` for IOS-XE when available)
+- Upgrade: `nw firmware upgrade <device|group> <path/to/image.bin>`
+- Downgrade: `nw firmware downgrade <device|group> <path/to/older.bin>` (or `install rollback` for IOS-XE when available)
 
 Pre-checks: by default Networka runs the `pre_maintenance` sequence before firmware actions. Override with `--precheck-sequence` or skip via `--skip-precheck`.
 
 ## Backups
 
-- Config backup (text): `nw config-backup <device|group>`
+- Config backup (text): `nw backup config <device|group>`
   - Uses `show running-config` (and optionally other show commands). For Cisco, output is not saved as a remote file by default; Networka captures command output.
 - Comprehensive backup: `nw backup comprehensive <device|group>`
   - Can include `show running-config`, `show startup-config`, `show version`, `show inventory`, etc.
@@ -117,9 +117,9 @@ nw run switch1 interface_status
 Firmware and backups:
 
 ```bash
-nw upgrade switch1 ~/images/cat9k_iosxe.17.6.5.SPA.bin
-nw downgrade switch1 ~/images/cat9k_iosxe.17.3.7.SPA.bin
-nw config-backup switch1 --download=false
+nw firmware upgrade switch1 ~/images/cat9k_iosxe.17.6.5.SPA.bin
+nw firmware downgrade switch1 ~/images/cat9k_iosxe.17.3.7.SPA.bin
+nw backup config switch1 --download=false
 ```
 
 ## Notes and tips
@@ -127,3 +127,9 @@ nw config-backup switch1 --download=false
 - Ensure there’s enough flash space before uploads; Networka doesn’t remove old images automatically.
 - After IOS-XE `install activate`, use `install commit` when satisfied; `install rollback` can revert.
 - Prefer SSH transport; interactive reload confirmations are handled by Networka.
+- To discover vendor operation support across platforms, run:
+
+```bash
+nw firmware vendors
+nw backup vendors
+```

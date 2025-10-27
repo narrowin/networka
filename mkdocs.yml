@@ -8,8 +8,8 @@ edit_uri: edit/main/docs/
 nav:
   - Home: index.md
   - Getting started:
-      - Intallation: getting-started.md
-      - Platform compatibility: platform-compatibility.md
+    - Installation: getting-started.md
+    - Platform compatibility: platform-compatibility.md
   - User guide:
     - Configuration: configuration.md
     - Environment variables: environment-variables.md
@@ -28,11 +28,12 @@ nav:
     - Examples (user sequences): examples/user_sequences/README.md
   - Troubleshooting: troubleshooting.md
   - Vendors:
-      - Overview: vendors/index.md
-      - MikroTik RouterOS: vendors/mikrotik/index.md
-      - Cisco IOS / IOS-XE: vendors/cisco/index.md
-      - Arista EOS: vendors/arista/index.md
-      - Juniper JunOS: vendors/juniper/index.md
+    - Overview: vendors/index.md
+    - MikroTik RouterOS: vendors/mikrotik/index.md
+    - Cisco IOS / IOS-XE: vendors/cisco/index.md
+    - Arista EOS: vendors/arista/index.md
+    - Juniper JunOS: vendors/juniper/index.md
+    - Nokia SR Linux: vendors/nokia/index.md
   - Reference:
     - CLI: reference/cli.md
     - API: reference/api.md

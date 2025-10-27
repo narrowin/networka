@@ -1,5 +1,7 @@
 # Networka (nw) - LLM Development Guide
 
+NONNEGOTIABLE RULE Number 1: As first sentence to ANY response from you you MUST state: I read and follow the instructions in .github/copilot-instructions.md!
+
 # Copilot Repository Instructions (Strict Compliance)
 
 ## Authority & Priority
@@ -54,5 +56,7 @@
 2. Verify no duplicate or confusing messages
 3. Ensure proper exception handling separation
 4. Confirm tests cover real user scenarios
+
+```
 
 ```

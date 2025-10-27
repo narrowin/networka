@@ -56,10 +56,10 @@ Sequence completed successfully
 
 ## Supported operations
 
-- Firmware upgrade: yes (`nw upgrade`) — file extension: `.npk`
-- Firmware downgrade: yes (`nw downgrade`) — file extension: `.npk`
-- BIOS/RouterBOARD upgrade: yes (`nw bios`)
-- Configuration backup: yes (`nw config-backup` or `nw backup config`)
+- Firmware upgrade: yes (`nw firmware upgrade`) — file extension: `.npk`
+- Firmware downgrade: yes (`nw firmware downgrade`) — file extension: `.npk`
+- BIOS/RouterBOARD upgrade: yes (`nw firmware bios`)
+- Configuration backup: yes (`nw backup config`)
 
 ## Firmware management
 
@@ -71,9 +71,9 @@ Workflow used by Networka (RouterOS operations):
 
 CLI shortcuts:
 
-- Upgrade: `nw upgrade <device|group> <path/to/firmware.npk>`
-- Downgrade: `nw downgrade <device|group> <path/to/older.npk>`
-- RouterBOARD (BIOS): `nw bios <device|group>` — schedules `/system/routerboard/upgrade` then reboots.
+- Upgrade: `nw firmware upgrade <device|group> <path/to/firmware.npk>`
+- Downgrade: `nw firmware downgrade <device|group> <path/to/older.npk>`
+- RouterBOARD (BIOS): `nw firmware bios <device|group>` — schedules `/system/routerboard/upgrade` then reboots.
 
 Pre-checks: by default Networka runs the `pre_maintenance` sequence before firmware actions. Override with `--precheck-sequence` or skip via `--skip-precheck`.
 
@@ -81,7 +81,7 @@ Pre-checks: by default Networka runs the `pre_maintenance` sequence before firmw
 
 Two flavors exist:
 
-- Config backup (text export): `nw config-backup <device|group>`
+- Config backup (text export): `nw backup config <device|group>`
   - Creates an export (default: `/export file=nw-config-export`), then can download `nw-config-export.rsc` to `general.backup_dir`.
 - Comprehensive backup: `nw backup comprehensive <device|group>`
   - Uses export plus system backup (e.g., `/system/backup/save name=nw-system-backup`).
@@ -110,9 +110,9 @@ nw run router1 system_info
 Firmware and backups:
 
 ```bash
-nw upgrade router1 ~/firmware/routeros-7.16.2-arm64.npk
-nw bios router1
-nw config-backup router1 --download --delete-remote
+nw firmware upgrade router1 ~/firmware/routeros-7.16.2-arm64.npk
+nw firmware bios router1
+nw backup config router1 --download --delete-remote
 ```
 
 ## Notes and tips
@@ -120,3 +120,9 @@ nw config-backup router1 --download --delete-remote
 - Set `general.firmware_dir` and `general.backup_dir` in `config/config.yml`.
 - Transport: SSH is recommended; interactive confirmations are handled by Networka.
 - Results and logs can be stored under `results/` and `logs/` if enabled.
+- To check vendor operation support across platforms, run:
+
+```bash
+nw firmware vendors
+nw backup vendors
+```

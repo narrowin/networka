@@ -290,6 +290,7 @@ nw run new-device system_info
 ### Existing Installations
 
 Legacy single-file `sequences.yml` configurations are no longer supported; use modular sequences/ files.
+
 - Gradual migration path available
 - No breaking changes to existing functionality
 
@@ -332,7 +333,7 @@ nw info device-name
 nw list sequences --vendor cisco_iosxe
 
 # Test with verbose logging
-nw --verbose sequence device-name system_info
+nw run --verbose device-name system_info
 ```
 
 ## Future Enhancements
