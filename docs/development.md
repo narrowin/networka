@@ -51,10 +51,15 @@ Why run as a PR? Pull requests trigger different paths/conditions (e.g., `pull_r
 
 ### Docs
 
-- Strict docs build:
-    - `uv run mkdocs build --strict`
+- Regenerate CLI reference before building:
+    - `task docs:generate`
+    - or `uv run python scripts/generate_cli_docs.py`
+- Build docs (includes regeneration):
+    - `task docs`
+    - or `uv run --extra docs mkdocs build --clean`
+- Serve docs locally (auto-regenerates): `task docs:serve`
 
-Link checking runs in CI only.
+`docs/reference/cli.md` is generated. Do not edit it manually. Link checking runs in CI only.
 task lint                        # Run linting
 task build                       # Build package
 ```
@@ -162,7 +167,7 @@ nw --help
 
 ## Project structure
 
-```
+```text
 networka/
 ├── src/network_toolkit/     # Main package
 │   ├── cli.py              # CLI interface

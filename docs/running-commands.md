@@ -1,17 +1,10 @@
 # Running commands
 
-Common operations you'll use daily.
-
 ## Quick Demo
 
-<div align="center">
-  <img src="../assets/gifs/networka-setup.gif" alt="Networka Commands Demo" width="100%" style="max-width: 800px;"/>
-  <p><em>See how to execute commands across devices and groups</em></p>
-</div>
+![Networka Commands Demo](../assets/gifs/networka-setup.gif)
 
-## Inspect targetsning commands
-
-Common operations you’ll use daily.
+*See how to execute commands across devices and groups.*
 
 ## Inspect targets
 
@@ -26,7 +19,7 @@ nw info health_check
 
 Expected output (device):
 
-```
+```text
 Device: device1
 Host: 192.0.2.10
 Port: 22
@@ -49,7 +42,7 @@ nw run device1,access_switches "/system/identity/print"
 
 Expected output (trimmed):
 
-```
+```text
 Executing on device1: /system/resource/print
 uptime=...
 free-memory=...
@@ -68,7 +61,7 @@ nw run core_switches audit
 
 Expected output (trimmed):
 
-```
+```text
 device1: step 1/3 ... ok
 device1: step 2/3 ... ok
 device1: step 3/3 ... ok
@@ -88,19 +81,20 @@ nw download device1 config.backup
 ## Results and formatting
 
 ```bash
-# Save results
+# Save results for a single run
 nw run device1 system_info --store-results
 
-# Choose format and target directory
-nw run device1 system_info --store-results --results-format json --results-dir ./maintenance
+# Override the target directory for this run (format comes from config)
+nw run device1 system_info --store-results --results-dir ./maintenance
 
-# Adjust output styling
+# Adjust output styling for help/readability
 nw info device1 --output-mode raw
 ```
 
 Notes:
-- Use `--results-format json|yaml|txt` to pick a format
-- Use `--results-dir <path>` to set an output directory
+
+- The results directory defaults to the value in `general.results_dir`; override per run with `--results-dir`.
+- Choose the serialization format via `general.results_format` in `config.yml` (txt/json/yaml).
 
 ## Next steps
 

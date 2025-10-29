@@ -55,6 +55,12 @@ ruff format .
 mypy src/
 ```
 
+## Documentation
+
+- `docs/reference/cli.md` is generated. Do not edit it manually.
+- Regenerate the CLI docs with `task docs:generate` (or `uv run python scripts/generate_cli_docs.py`).
+- Always commit the updated `docs/reference/cli.md` alongside CLI changes so reviewers can see the diff.
+
 ## Pull Request Process
 
 1. Fork the repository

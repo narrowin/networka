@@ -6,9 +6,9 @@ Note on credentials: See Environment variables (TL;DR at the top) for how creden
 
 ## Directory layout
 
-Place configuration under the `config/` directory:
+Networka expects a modular configuration rooted at the platform-specific application directory created by `nw config init` (Linux: `~/.config/networka`, macOS: `~/Library/Application Support/networka`, Windows: `%APPDATA%\networka`). Within that root, place configuration under the `config/` directory:
 
-```
+```text
 config/
 ├── config.yml                 # Optional global defaults
 ├── devices/                   # Device definitions (YAML or CSV)
@@ -168,6 +168,7 @@ nw cli router1 --no-strict-host-key-checking
 Use the built-in `config` commands to inspect and manage configuration from the CLI. See the CLI reference for the full command set and options.
 
 - List known devices/groups: `nw list devices` / `nw list groups`
-- Validate config against schema: `nw schema validate`
+- Regenerate editor schemas: `nw schema install`
+- Inspect schema status: `nw schema info`
 
 More: CLI reference → Configuration-related commands

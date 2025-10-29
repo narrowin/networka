@@ -13,8 +13,7 @@ nw run 192.168.1.1 "/system/clock/print" --platform mikrotik_routeros
 # SSH to device by IP
 nw cli 192.168.1.1 --platform mikrotik_routeros
 
-# Show device info by IP
-nw info 192.168.1.1 --platform mikrotik_routeros
+# (Info requires configured device entries; see notes below)
 ```
 
 ### Multiple IP addresses
@@ -53,7 +52,7 @@ Optional parameters:
 
 - `--port`: SSH port (defaults to 22)
 - `--interactive-auth`: Prompt for username/password instead of environment
-- `--transport`: Transport driver to use for the session; defaults to configuration or Scrapli. Note: nornir-netmiko is not yet supported but coming soon.
+- `--transport`: Transport driver to use for the session (supported on `run`/`cli`)
 
 ## Supported platforms
 
@@ -98,3 +97,8 @@ When IPs are used as the target:
 3. Applies the specified `--platform` for connection parameters
 4. Merges with any configured devices so you can mix both
 5. Executes commands as usual and supports results storage
+
+## Limitations
+
+- `nw info` requires preconfigured devices or groups; it does not accept raw IP addresses.
+- IP targets are supported on commands that accept the `--platform` option (`nw run`, `nw cli`, and other operations built on the device resolver).

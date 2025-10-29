@@ -7,7 +7,7 @@ Networka supports pluggable connection transports. Today, Scrapli is the default
 - Default transport: `scrapli` (stable)
 - Config default override: `general.default_transport_type` in `config/config.yml`
 - Per-device override: `transport_type` in a device entry
-- CLI override: `--transport` on commands like `nw run`, `nw cli`, `nw info`
+- CLI override: `--transport` on commands like `nw run` and `nw cli`
 - nornir-netmiko: not yet supported but coming soon
 
 ## How precedence works
