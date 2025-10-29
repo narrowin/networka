@@ -91,7 +91,7 @@ def register(app: typer.Typer) -> None:
         - nw info system_info --vendor cisco_iosxe  # Show vendor-specific commands
         - nw info sw-acc1,access_switches,health_check  # Mixed types
         """
-        setup_logging("DEBUG" if verbose else "INFO")
+        setup_logging("DEBUG" if verbose else "WARNING")
 
         # Resolve default config path: if user passed the literal default 'config'
         # and it doesn't exist, fall back to the OS default config dir.

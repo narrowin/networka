@@ -61,7 +61,7 @@ def config_backup(
 
     Performs a configuration backup for the specified device or group.
     """
-    setup_logging("DEBUG" if verbose else "INFO")
+    setup_logging("DEBUG" if verbose else "WARNING")
     ctx = CommandContext(
         output_mode=None,  # Use global config theme
         verbose=verbose,
@@ -294,7 +294,7 @@ def comprehensive_backup(
     Performs a comprehensive backup for the specified device or group,
     including vendor-specific configuration and operational data.
     """
-    setup_logging("DEBUG" if verbose else "INFO")
+    setup_logging("DEBUG" if verbose else "WARNING")
     ctx = CommandContext(
         config_file=config_file,
         verbose=verbose,

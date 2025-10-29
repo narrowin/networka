@@ -28,7 +28,7 @@ class _DynamicConsoleProxy:
 console = _DynamicConsoleProxy()
 
 
-def setup_logging(level: str = "INFO") -> None:
+def setup_logging(level: str = "WARNING") -> None:
     """Configure root logging with Rich handler.
 
     Parameters
@@ -40,24 +40,26 @@ def setup_logging(level: str = "INFO") -> None:
 
     # Check if we're in raw mode - if so, disable logging entirely
     output_manager = get_output_manager()
+    suppressed_loggers = [
+        "scrapli",
+        "scrapli.driver",
+        "scrapli.channel",
+        "scrapli.transport",
+        "scrapli_community",
+        "network_toolkit.device",
+        "network_toolkit.transport",
+    ]
     if output_manager.mode == OutputMode.RAW:
         # In raw mode, disable all logging to avoid polluting the output
         # Set the root logger to a very high level to suppress everything
         logging.basicConfig(
             level=logging.CRITICAL + 1,  # Disable all logging
             handlers=[],
+            force=True,
         )
 
         # Also explicitly silence common noisy loggers
-        for logger_name in [
-            "scrapli",
-            "scrapli.driver",
-            "scrapli.channel",
-            "scrapli.transport",
-            "scrapli_community",
-            "network_toolkit.device",
-            "network_toolkit.transport",
-        ]:
+        for logger_name in suppressed_loggers:
             logger = logging.getLogger(logger_name)
             logger.setLevel(logging.CRITICAL + 1)
             logger.disabled = True
@@ -67,9 +69,16 @@ def setup_logging(level: str = "INFO") -> None:
     # Always pull the current themed console at setup time
     console_obj = output_manager.console
 
+    logging.disable(logging.NOTSET)
+    for logger_name in suppressed_loggers:
+        logger = logging.getLogger(logger_name)
+        logger.disabled = False
+        logger.setLevel(logging.NOTSET)
+
     logging.basicConfig(
-        level=getattr(logging, level.upper(), logging.INFO),
+        level=getattr(logging, level.upper(), logging.WARNING),
         format="%(message)s",
         datefmt="[%X]",
         handlers=[RichHandler(console=console_obj, rich_tracebacks=True)],
+        force=True,
     )

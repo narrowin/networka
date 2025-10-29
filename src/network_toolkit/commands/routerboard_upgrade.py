@@ -64,7 +64,7 @@ def register(app: typer.Typer) -> None:
         Uses platform-specific implementations to handle vendor differences
         in BIOS upgrade procedures.
         """
-        setup_logging("DEBUG" if verbose else "INFO")
+        setup_logging("DEBUG" if verbose else "WARNING")
 
         # ACTION command - use global config theme
         ctx = CommandContext(

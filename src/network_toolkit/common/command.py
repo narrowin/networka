@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated, Any, TypeVar
@@ -61,23 +62,32 @@ class CommandContext:
         output_mode: OutputMode | None = None,
     ) -> None:
         """Initialize command context with common setup."""
-        # Set up output mode first (before logging)
-        if output_mode is not None:
-            set_output_mode(output_mode)
+        self.verbose = verbose
 
-        # Set up logging
-        setup_logging("DEBUG" if verbose else "INFO")
-
-        # Load configuration
+        # Load configuration to determine logging and output preferences
         self.config = load_config(config_file)
 
-        # Get output manager
+        # Resolve output mode preference (CLI > config)
+        active_output_mode = output_mode or OutputMode(self.config.general.output_mode)
+        set_output_mode(active_output_mode)
+
+        # Configure logging with config-driven level unless verbose overrides
+        if verbose:
+            logging.disable(logging.NOTSET)
+            setup_logging("DEBUG")
+        elif self.config.general.enable_logging:
+            logging.disable(logging.NOTSET)
+            setup_logging(self.config.general.log_level)
+        else:
+            setup_logging("CRITICAL")
+            logging.disable(logging.CRITICAL)
+
+        # Capture output interfaces after configuration
         self.output = get_output_manager()
         self.console = self.output.console
 
         # Store options for reference
-        self.verbose = verbose
-        self.output_mode = output_mode or self.output.mode
+        self.output_mode = active_output_mode
 
     def print_success(self, message: str, context: str | None = None) -> None:
         """Print success message using unified output."""

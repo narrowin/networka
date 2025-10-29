@@ -59,7 +59,7 @@ def _config_backup_impl(
     MikroTik RouterOS: Uses /export commands
     Cisco IOS/IOS-XE: Uses show running-config commands
     """
-    setup_logging("DEBUG" if verbose else "INFO")
+    setup_logging("DEBUG" if verbose else "WARNING")
 
     # Use standard command context for consistent theming/output
     ctx = CommandContext(config_file=config_file, verbose=verbose, output_mode=None)
@@ -392,7 +392,7 @@ def register(app: typer.Typer) -> None:
         MikroTik RouterOS: Uses /export commands
         Cisco IOS/IOS-XE: Uses show running-config commands
         """
-        setup_logging("DEBUG" if verbose else "INFO")
+        setup_logging("DEBUG" if verbose else "WARNING")
 
         # Use standard command context for consistent theming/output
         ctx = CommandContext(config_file=config_file, verbose=verbose, output_mode=None)

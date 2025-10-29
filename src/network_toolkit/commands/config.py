@@ -1282,7 +1282,7 @@ def register(app: typer.Typer) -> None:
 
         The 'nw' command will automatically find configurations in these locations.
         """
-        setup_logging("DEBUG" if verbose else "INFO")
+        setup_logging("DEBUG" if verbose else "WARNING")
 
         # Show banner for config init
         from network_toolkit.banner import show_banner
@@ -1345,7 +1345,7 @@ def register(app: typer.Typer) -> None:
         ] = False,
     ) -> None:
         """Validate the configuration file and show any issues."""
-        setup_logging("DEBUG" if verbose else "INFO")
+        setup_logging("DEBUG" if verbose else "WARNING")
 
         try:
             # Use the local implementation
@@ -1380,7 +1380,7 @@ def register(app: typer.Typer) -> None:
         ] = False,
     ) -> None:
         """Show supported device types and platform information."""
-        setup_logging("DEBUG" if verbose else "INFO")
+        setup_logging("DEBUG" if verbose else "WARNING")
 
         ctx = CommandContext()
 
@@ -1451,7 +1451,7 @@ def register(app: typer.Typer) -> None:
         List available backups:
           nw config update --list-backups
         """
-        setup_logging("DEBUG" if verbose else "INFO")
+        setup_logging("DEBUG" if verbose else "WARNING")
 
         try:
             _config_update_impl(
