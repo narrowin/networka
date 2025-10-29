@@ -52,7 +52,7 @@ def upgrade(
 
     Uploads and installs firmware upgrade on the specified device or group.
     """
-    setup_logging("DEBUG" if verbose else "INFO")
+    setup_logging("DEBUG" if verbose else "WARNING")
     ctx = CommandContext(config_file=config_file, verbose=verbose, output_mode=None)
     style_manager = ctx.style_manager
 
@@ -317,7 +317,7 @@ def downgrade(
 
     Uploads and installs firmware downgrade on the specified device or group.
     """
-    setup_logging("DEBUG" if verbose else "INFO")
+    setup_logging("DEBUG" if verbose else "WARNING")
     ctx = CommandContext(config_file=config_file, verbose=verbose, output_mode=None)
     style_manager = ctx.style_manager
 
@@ -545,7 +545,7 @@ def bios(
 
     Upgrades device BIOS/RouterBOOT using platform-specific implementations.
     """
-    setup_logging("DEBUG" if verbose else "INFO")
+    setup_logging("DEBUG" if verbose else "WARNING")
     ctx = CommandContext(config_file=config_file, verbose=verbose, output_mode=None)
     style_manager = ctx.style_manager
 

@@ -149,7 +149,7 @@ def register(app: typer.Typer) -> None:
         ] = False,
     ) -> None:
         """List all configured network devices."""
-        setup_logging("DEBUG" if verbose else "INFO")
+        setup_logging("DEBUG" if verbose else "WARNING")
 
         ctx = CommandContext(
             config_file=config_file,
@@ -198,7 +198,7 @@ def register(app: typer.Typer) -> None:
         ] = False,
     ) -> None:
         """List all configured device groups and their members."""
-        setup_logging("DEBUG" if verbose else "INFO")
+        setup_logging("DEBUG" if verbose else "WARNING")
 
         ctx = CommandContext(
             config_file=config_file,
@@ -256,7 +256,7 @@ def register(app: typer.Typer) -> None:
     ) -> None:
         """List all available command sequences, optionally filtered by vendor
         or category."""
-        setup_logging("DEBUG" if verbose else "INFO")
+        setup_logging("DEBUG" if verbose else "WARNING")
 
         ctx = CommandContext(
             config_file=config_file,

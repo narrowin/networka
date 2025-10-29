@@ -387,7 +387,7 @@ def register(app: typer.Typer) -> None:
         - nw ssh sw-acc1,access_switches
         """
 
-        setup_logging("DEBUG" if verbose else "INFO")
+        setup_logging("DEBUG" if verbose else "WARNING")
 
         # Create command context for centralized output management
         ctx = CommandContext(

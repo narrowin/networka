@@ -140,7 +140,7 @@ class GeneralConfig(BaseModel):
     # Command execution settings
     command_timeout: int = 60
     enable_logging: bool = True
-    log_level: str = "INFO"
+    log_level: str = "WARNING"
 
     # Backup retention policy
     backup_retention_days: int = 30

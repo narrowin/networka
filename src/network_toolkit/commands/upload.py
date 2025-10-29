@@ -75,7 +75,7 @@ def register(app: typer.Typer) -> None:
         ] = False,
     ) -> None:
         """Upload a file to a device or to all devices in a group."""
-        setup_logging("DEBUG" if verbose else "INFO")
+        setup_logging("DEBUG" if verbose else "WARNING")
 
         # ACTION command - use global config theme
         ctx = CommandContext(
