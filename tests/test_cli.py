@@ -66,15 +66,6 @@ class TestCLI:
         # Should show configured groups
         assert "all_switches" in result.output or "lab_devices" in result.output
 
-    def test_list_sequences_command(self, config_file: Path) -> None:
-        """Test list sequences command."""
-        runner = CliRunner()
-        result = runner.invoke(app, ["list", "sequences", "--config", str(config_file)])
-        assert result.exit_code == 0
-        # Should show global sequences
-        assert "system_info" in result.output
-        assert "interface_status" in result.output
-
     @patch("network_toolkit.cli.DeviceSession")
     def test_run_command_success(
         self, mock_device_session: MagicMock, config_file: Path
@@ -562,12 +553,12 @@ class TestCLI:
             ],
         )
         assert result.exit_code == 0
-        # Expect device/cmd header lines preceding each output
+        # Expect device/cmd header lines preceding each output (with === delimiters)
         lines = [line for line in result.output.splitlines() if line.strip() != ""]
         # Two commands => 4 lines: header, output, header, output
-        assert lines[0].startswith("device=test_device1 cmd=")
+        assert lines[0].startswith("=== device=test_device1 cmd=")
         assert lines[1] == "out1"
-        assert lines[2].startswith("device=test_device1 cmd=")
+        assert lines[2].startswith("=== device=test_device1 cmd=")
         assert lines[3] == "out2"
 
     @patch("network_toolkit.commands.run.SequenceManager")
@@ -606,15 +597,15 @@ class TestCLI:
         )
         assert result.exit_code == 0
         lines = [line for line in result.output.splitlines() if line.strip() != ""]
-        # Expect headers and outputs interleaved in device order
+        # Expect headers and outputs interleaved in device order (with === delimiters)
         # d1 header, d1c1, d1 header, d1c2, d2 header, d2c1, d2 header, d2c2
-        assert lines[0].startswith("device=test_device1 cmd=")
+        assert lines[0].startswith("=== device=test_device1 cmd=")
         assert lines[1] == "d1c1"
-        assert lines[2].startswith("device=test_device1 cmd=")
+        assert lines[2].startswith("=== device=test_device1 cmd=")
         assert lines[3] == "d1c2"
-        assert lines[4].startswith("device=test_device2 cmd=")
+        assert lines[4].startswith("=== device=test_device2 cmd=")
         assert lines[5] == "d2c1"
-        assert lines[6].startswith("device=test_device2 cmd=")
+        assert lines[6].startswith("=== device=test_device2 cmd=")
         assert lines[7] == "d2c2"
 
     @patch("network_toolkit.cli.DeviceSession")

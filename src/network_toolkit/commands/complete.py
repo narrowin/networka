@@ -78,6 +78,10 @@ def _list_vendors(config: NetworkConfig) -> list[str]:
 def _list_sequences(config: NetworkConfig, *, target: str | None) -> list[str]:
     names: set[str] = set()
 
+    # Global command sequences (vendor-agnostic)
+    if config.global_command_sequences:
+        names.update(config.global_command_sequences.keys())
+
     # Device-specific sequences (either for a specific device/group or across all)
     if config.devices:
         if target and target in config.devices:

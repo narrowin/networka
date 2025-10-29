@@ -358,11 +358,11 @@ class TestResultsManager:
 
         manager = ResultsManager(config, store_results=False)
 
-        # Empty string
-        assert manager._sanitize_filename("") == ""
+        # Empty string should return "output" (fallback for valid filename)
+        assert manager._sanitize_filename("") == "output"
 
-        # Only special characters
-        assert manager._sanitize_filename("///") == ""
+        # Only special characters should return "output" (fallback)
+        assert manager._sanitize_filename("///") == "output"
 
         # Leading/trailing dots and underscores
         assert manager._sanitize_filename("_.test._") == "test"

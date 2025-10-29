@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from network_toolkit.exceptions import DeviceConnectionError, DeviceExecutionError
+from network_toolkit.platforms.base import BackupResult
 from network_toolkit.platforms.mikrotik_routeros.operations import (
     MikroTikRouterOSOperations,
 )
@@ -174,7 +175,9 @@ class TestMikroTikRouterOSOperations:
         # Test backup creation
         result = self.platform_ops.create_backup(backup_sequence)
 
-        assert result is True
+        assert isinstance(result, BackupResult)
+        assert result.success is True
+        assert len(result.text_outputs) == 2
         assert self.mock_session.execute_command.call_count == 2
         self.mock_session.execute_command.assert_any_call(
             "/system backup save name=test"
@@ -201,9 +204,13 @@ class TestMikroTikRouterOSOperations:
             "Command failed"
         )
 
-        # Should raise DeviceExecutionError
-        with pytest.raises(DeviceExecutionError):
-            self.platform_ops.create_backup(backup_sequence)
+        # Should return failed BackupResult (not raise exception)
+        result = self.platform_ops.create_backup(backup_sequence)
+
+        assert isinstance(result, BackupResult)
+        assert result.success is False
+        assert len(result.errors) > 0
+        assert "Command failed" in str(result.errors)
 
     def test_create_backup_with_default_sequence(self) -> None:
         """Test backup creation with empty sequence (uses default)."""
@@ -216,7 +223,8 @@ class TestMikroTikRouterOSOperations:
         # Test backup creation with empty sequence
         result = self.platform_ops.create_backup([])
 
-        assert result is True
+        assert isinstance(result, BackupResult)
+        assert result.success is True
         # Should use default sequence
         assert self.mock_session.execute_command.call_count == 2
 

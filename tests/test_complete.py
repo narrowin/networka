@@ -45,6 +45,12 @@ def mock_config() -> MagicMock:
         "maintenance": ["backup", "update"],
     }
 
+    # Setup global command sequences (vendor-agnostic)
+    config.global_command_sequences = {
+        "global_health": MagicMock(commands=["global health cmd"]),
+        "global_backup": MagicMock(commands=["global backup cmd"]),
+    }
+
     # Setup get_group_members method
     config.get_group_members.return_value = ["sw-acc1"]
 
@@ -237,6 +243,7 @@ class TestListSequences:
         """Test listing sequences when no sequences exist."""
         config = MagicMock(spec=NetworkConfig)
         config.devices = None
+        config.global_command_sequences = None
 
         with patch("network_toolkit.commands.complete.SequenceManager"):
             sequences = _list_sequences(config, target=None)

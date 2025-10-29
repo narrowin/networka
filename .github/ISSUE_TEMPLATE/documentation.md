@@ -6,7 +6,7 @@ labels: documentation
 
 ## Documentation Issue
 
-**Page or Section:** 
+**Page or Section:**
 <!-- Provide a link to the specific documentation page or section -->
 
 **Issue Type:**

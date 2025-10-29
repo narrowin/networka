@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from network_toolkit.exceptions import DeviceConnectionError
-from network_toolkit.platforms.base import UnsupportedOperationError
+from network_toolkit.platforms.base import BackupResult, UnsupportedOperationError
 from network_toolkit.platforms.cisco_ios.operations import CiscoIOSOperations
 from network_toolkit.platforms.cisco_iosxe.operations import CiscoIOSXEOperations
 
@@ -67,11 +67,19 @@ class TestCiscoIOSOperations:
         """Test that backup creation works successfully."""
         # Mock device session
         self.mock_session.is_connected = True
+        # Mock execute_command to return success for both backup command and file checks
+        self.mock_session.execute_command.return_value = "config output"
 
         result = self.platform_ops.create_backup(["show running-config"])
 
-        assert result is True
-        self.mock_session.execute_command.assert_called_with("show running-config")
+        assert isinstance(result, BackupResult)
+        assert result.success is True
+        assert len(result.text_outputs) > 0
+        # Verify the backup command was called (it will be called along with file checks)
+        assert any(
+            call[0][0] == "show running-config"
+            for call in self.mock_session.execute_command.call_args_list
+        )
 
     def test_operation_support_checking(self) -> None:
         """Test that operations are reported as supported."""
@@ -139,11 +147,19 @@ class TestCiscoIOSXEOperations:
         """Test that backup creation works successfully."""
         # Mock device session
         self.mock_session.is_connected = True
+        # Mock execute_command to return success for both backup command and file checks
+        self.mock_session.execute_command.return_value = "config output"
 
         result = self.platform_ops.create_backup(["show running-config"])
 
-        assert result is True
-        self.mock_session.execute_command.assert_called_with("show running-config")
+        assert isinstance(result, BackupResult)
+        assert result.success is True
+        assert len(result.text_outputs) > 0
+        # Verify the backup command was called (it will be called along with file checks)
+        assert any(
+            call[0][0] == "show running-config"
+            for call in self.mock_session.execute_command.call_args_list
+        )
 
     def test_operation_support_checking(self) -> None:
         """Test that operations are reported as supported."""

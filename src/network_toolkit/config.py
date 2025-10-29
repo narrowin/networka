@@ -364,6 +364,7 @@ class NetworkConfig(BaseModel):
     # Multi-vendor support
     vendor_platforms: dict[str, VendorPlatformConfig] | None = None
     vendor_sequences: dict[str, dict[str, VendorSequence]] | None = None
+    global_command_sequences: dict[str, VendorSequence] | None = None
 
     # Helper: device source path accessor (non-schema, uses PrivateAttr on DeviceConfig)
     def get_device_source_path(self, device_name: str) -> Path | None:
@@ -474,6 +475,32 @@ class NetworkConfig(BaseModel):
             Dictionary of group names to CommandSequenceGroup objects
         """
         return self.command_sequence_groups or {}
+
+    def resolve_sequence_commands(
+        self, sequence_name: str, device_name: str
+    ) -> list[str] | None:
+        """
+        Resolve sequence commands for a specific device.
+
+        This method delegates to SequenceManager for actual resolution logic,
+        which considers device-specific, vendor-specific, and global sequences.
+
+        Parameters
+        ----------
+        sequence_name : str
+            Name of the sequence to resolve
+        device_name : str
+            Name of the device for vendor-specific resolution
+
+        Returns
+        -------
+        list[str] | None
+            List of commands if sequence found, None otherwise
+        """
+        from network_toolkit.sequence_manager import SequenceManager
+
+        sm = SequenceManager(self)
+        return sm.resolve(sequence_name, device_name)
 
     def _resolve_vendor_sequence(
         self, sequence_name: str, device_type: str
@@ -1091,13 +1118,56 @@ def load_modular_config(
         # Load vendor-specific sequences (VendorSequence models will carry _source_path)
         vendor_sequences = _load_vendor_sequences(config_dir, sequences_config)
 
+        # Load global command sequences (vendor-agnostic)
+        # Check both sequences_config (from sequences/ files) and main_config (inline)
+        global_sequences_raw = sequences_config.get("sequences", {})
+        if not global_sequences_raw and "global_command_sequences" in main_config:
+            # Also support global_command_sequences key directly in main config
+            global_sequences_raw = main_config.get("global_command_sequences", {})
+
+        global_command_sequences: dict[str, VendorSequence] = {}
+        if global_sequences_raw:
+            # Convert raw dict to VendorSequence objects
+            for seq_name, seq_data in global_sequences_raw.items():
+                if isinstance(seq_data, dict):
+                    global_command_sequences[seq_name] = VendorSequence(**seq_data)
+                elif isinstance(seq_data, list):
+                    # Support simple list of commands
+                    global_command_sequences[seq_name] = VendorSequence(
+                        description=f"Global sequence: {seq_name}",
+                        commands=seq_data,
+                    )
+
+        # Merge inline devices/groups from main config with discovered files
+        # Inline definitions from main config file
+        inline_devices = main_config.get("devices", {})
+        inline_groups = main_config.get("device_groups", {}) or main_config.get(
+            "groups", {}
+        )
+
+        # Track source paths for inline devices/groups
+        for device_name in inline_devices:
+            if device_name not in device_sources:
+                device_sources[device_name] = config_file
+
+        for group_name in inline_groups:
+            if group_name not in group_sources:
+                group_sources[group_name] = config_file
+
+        # Merge: discovered files take precedence over inline (override behavior)
+        final_devices = {**inline_devices, **all_devices}
+        final_groups = {**inline_groups, **all_groups}
+
         # Merge all configs into the expected format
         merged_config: dict[str, Any] = {
             "general": main_config.get("general", {}),
-            "devices": all_devices,
-            "device_groups": all_groups,
+            "devices": final_devices,
+            "device_groups": final_groups,
             "vendor_platforms": sequences_config.get("vendor_platforms", {}),
             "vendor_sequences": vendor_sequences,
+            "global_command_sequences": (
+                global_command_sequences if global_command_sequences else None
+            ),
         }
 
         logging.debug(f"Loaded modular configuration from {config_dir.resolve()}")

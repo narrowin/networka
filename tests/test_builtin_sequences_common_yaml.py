@@ -50,6 +50,7 @@ def test_mikrotik_builtin_sequences_common(sm_isolated: SequenceManager) -> None
         "interface_status",
         "routing_info",
         "security_audit",
+        "backup_config",
     }
     assert set(seqs.keys()) == expected_names
 
@@ -100,6 +101,7 @@ def test_arista_builtin_sequences_common(sm_isolated: SequenceManager) -> None:
         "interface_status",
         "routing_info",
         "security_audit",
+        "backup_config",
     }
     assert set(seqs.keys()) == expected_names
 

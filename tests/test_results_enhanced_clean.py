@@ -78,9 +78,9 @@ class TestResultsManager:
         result = manager._sanitize_filename("._test_file_.")
         assert result == "test_file"
 
-        # Test empty string
+        # Test empty string - should return "output" as fallback
         result = manager._sanitize_filename("")
-        assert result == ""
+        assert result == "output"
 
         # Test long filename truncation
         long_name = "a" * 150
