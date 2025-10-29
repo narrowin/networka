@@ -431,7 +431,7 @@ def install_shell_completions(selected: str) -> tuple[Path | None, Path | None]:
         if selected == "bash":
             cand = sc_dir / "bash_completion_nw.sh"
         else:
-            cand = sc_dir / "zsh_completion_netkit.zsh"
+            cand = sc_dir / "zsh_completion_nw.zsh"
         if cand.exists():
             repo_src = cand
 

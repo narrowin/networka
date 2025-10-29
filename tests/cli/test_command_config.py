@@ -22,20 +22,20 @@ class TestCommandRegistry:
         names = [cmd.name for cmd in COMMAND_REGISTRY]
         assert len(names) == len(set(names))
 
-    def test_ssh_in_executing_operations(self):
-        """Test that SSH command is in the Executing Operations category."""
-        ssh_metadata = get_command_metadata("ssh")
+    def test_cli_in_executing_operations(self):
+        """Test that CLI command is in the Executing Operations category."""
+        cli_metadata = get_command_metadata("cli")
 
-        assert ssh_metadata is not None
-        assert ssh_metadata.category == CommandCategory.EXECUTING_OPERATIONS
-        assert ssh_metadata.name == "ssh"
-        assert "tmux" in ssh_metadata.description.lower()
+        assert cli_metadata is not None
+        assert cli_metadata.category == CommandCategory.EXECUTING_OPERATIONS
+        assert cli_metadata.name == "cli"
+        assert "tmux" in cli_metadata.description.lower()
 
     def test_all_expected_commands_present(self):
         """Test that all expected commands are in the registry."""
         expected_commands = {
             "run",
-            "ssh",
+            "cli",
             "upload",
             "download",  # Executing Operations
             "backup",
@@ -58,7 +58,7 @@ class TestCommandRegistry:
             CommandCategory.EXECUTING_OPERATIONS
         )
         executing_names = {cmd.name for cmd in executing_commands}
-        assert executing_names == {"run", "ssh", "upload", "download"}
+        assert executing_names == {"run", "cli", "upload", "download"}
 
         # Test vendor-specific operations
         vendor_commands = get_commands_by_category(CommandCategory.VENDOR_SPECIFIC)
@@ -81,9 +81,9 @@ class TestCommandLookup:
 
     def test_get_command_metadata_existing(self):
         """Test getting metadata for existing commands."""
-        ssh_metadata = get_command_metadata("ssh")
-        assert ssh_metadata is not None
-        assert ssh_metadata.name == "ssh"
+        cli_metadata = get_command_metadata("cli")
+        assert cli_metadata is not None
+        assert cli_metadata.name == "cli"
 
         run_metadata = get_command_metadata("run")
         assert run_metadata is not None
@@ -104,11 +104,11 @@ class TestCommandLookup:
         orders = [cmd.order for cmd in executing_commands]
         assert orders == sorted(orders)
 
-        # SSH should come after run (order 20 vs 10)
+        # CLI should come after run (order 20 vs 10)
         names = [cmd.name for cmd in executing_commands]
-        ssh_index = names.index("ssh")
+        cli_index = names.index("cli")
         run_index = names.index("run")
-        assert ssh_index > run_index
+        assert cli_index > run_index
 
 
 class TestVisibleCategories:
@@ -150,7 +150,7 @@ class TestCommandNames:
 
         # Should start with executing operations
         assert all_names[0] == "run"  # First in executing operations
-        assert "ssh" in all_names[:4]  # Should be in first 4 (executing operations)
+        assert "cli" in all_names[:4]  # Should be in first 4 (executing operations)
 
         # Hidden commands should be at the end
         assert all_names[-1] == "complete"

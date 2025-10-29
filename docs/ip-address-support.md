@@ -11,7 +11,7 @@ Networka lets you target devices directly by IP address (single or comma-separat
 nw run 192.168.1.1 "/system/clock/print" --platform mikrotik_routeros
 
 # SSH to device by IP
-nw ssh 192.168.1.1 --platform mikrotik_routeros
+nw cli 192.168.1.1 --platform mikrotik_routeros
 
 # Show device info by IP
 nw info 192.168.1.1 --platform mikrotik_routeros
@@ -24,7 +24,7 @@ nw info 192.168.1.1 --platform mikrotik_routeros
 nw run "192.168.1.1,192.168.1.2,192.168.1.3" "/system/clock/print" --platform mikrotik_routeros
 
 # SSH to multiple IPs (opens tmux with multiple panes)
-nw ssh "192.168.1.1,192.168.1.2" --platform mikrotik_routeros
+nw cli "192.168.1.1,192.168.1.2" --platform mikrotik_routeros
 
 # Mix IPs and configured device names
 nw run "192.168.1.1,sw-acc1,192.168.1.2" "/system/clock/print" --platform mikrotik_routeros

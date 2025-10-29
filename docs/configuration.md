@@ -155,12 +155,12 @@ general:
   # Set to true for maximum security (requires manual key management)
 ```
 
-For the `run` and `ssh` commands, you can completely disable all host key verification per-command:
+For the `run` and `cli` commands, you can completely disable all host key verification per-command:
 
 ```bash
 # Completely disable host key verification (INSECURE - lab use only)
 nw run router1 '/system/identity/print' --no-strict-host-key-checking
-nw ssh router1 --no-strict-host-key-checking
+nw cli router1 --no-strict-host-key-checking
 ```
 
 ## Bootstrap configuration (CLI)

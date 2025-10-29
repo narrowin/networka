@@ -39,6 +39,7 @@
 2. Verify no duplicate or confusing messages
 3. Ensure proper exception handling separation
 4. Confirm tests cover real user scenarios
+5. **ALWAYS run `uv run ruff check src/ tests/` and fix all issues**
 
 ## CONFIGURATION FILE LOCATIONS
 

@@ -1,7 +1,7 @@
-"""Hidden completion helper for dynamic shell completions.
+"""Hidden completion command.
 
-This command is intentionally undocumented in user help and prints plain
-newline-separated values for use by completion scripts (bash/zsh/fish).
+This command is used internally by shell completion scripts to dynamically retrieve
+newline-separated values for use by completion scripts (bash/zsh).
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ def _list_commands() -> list[str]:
         "download",
         "backup",
         "firmware",
-        "ssh",
+        "cli",
         "diff",
         "list",
         "config",

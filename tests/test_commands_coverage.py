@@ -21,18 +21,18 @@ pytest.skip(
 class TestCommandsCoverage:
     """Test various commands to improve coverage."""
 
-    def test_ssh_command_basic(self, config_file: Path) -> None:
-        """Test SSH command basic functionality."""
+    def test_cli_command_basic(self, config_file: Path) -> None:
+        """Test CLI command basic functionality."""
         runner = CliRunner()
 
-        # SSH command should handle missing dependencies gracefully
+        # CLI command should handle missing dependencies gracefully
         with patch("network_toolkit.commands.ssh._ensure_tmux_available") as mock_tmux:
             mock_tmux.side_effect = Exception("tmux not available")
 
             result = runner.invoke(
                 app,
                 [
-                    "ssh",
+                    "cli",
                     "test_device1",
                     "--config",
                     str(config_file),
@@ -192,7 +192,7 @@ class TestCommandsCoverage:
         commands_to_test = [
             ["info", "invalid_device"],
             ["run", "invalid_device", "/system/identity/print"],
-            ["ssh", "invalid_device"],
+            ["cli", "invalid_device"],
         ]
 
         for cmd_args in commands_to_test:

@@ -68,7 +68,7 @@ Because a real **Networka** wants the f\*ing lot.”<br><br>
 - **File management**: Upload/download files to/from network devices with verification and error handling
 - **Device backup**: Automated configuration and comprehensive backups with vendor-specific implementations
 - **Firmware management**: Upgrade, downgrade, and BIOS operations with platform validation
-- **SSH session management**: Direct SSH access with tmux integration for interactive sessions
+- **CLI session management**: Direct CLI access with tmux integration for interactive sessions
 
 ### **Advanced Features**
 
