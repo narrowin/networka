@@ -2,13 +2,15 @@
 
 Networka provides a common interface across multiple network operating systems. Vendor guides document platform nuances, supported operations, and recommended workflows.
 
-- MikroTik RouterOS — see guide
-- Cisco IOS / IOS-XE — see guide
-- Arista EOS — needs testing
-- Juniper JunOS — needs testing
-- Nokia SR Linux — see guide
+<!-- AUTO-GENERATED: Do not edit the vendor list manually -->
+<!-- Generated from src/network_toolkit/platforms/registry.py -->
+<!-- Run: uv run python scripts/generate_platform_docs.py -->
 
-Note: To see which vendors currently support firmware and backup operations in your build, run:
+--8<-- "docs/.generated/vendor_list.md"
+
+## Command-Line Status Check
+
+To see which vendors currently support firmware and backup operations in your build, run:
 
 ```bash
 nw firmware vendors

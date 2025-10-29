@@ -206,14 +206,24 @@ tasks:
       - find . -type f -name "*.pyc" -delete 2>/dev/null || true
       - echo "Clean complete!"
 
+  generate-docs:
+    desc: Generate platform documentation from registry
+    cmds:
+      - echo "Generating platform documentation from registry..."
+      - uv run python scripts/generate_platform_docs.py
+
   docs:
     desc: Generate documentation
+    deps:
+      - generate-docs
     cmds:
-      - echo "Generating documentation..."
+      - echo "Building documentation..."
       - uv run mkdocs build --strict
 
   docs:serve:
     desc: Serve documentation locally with live reload
+    deps:
+      - generate-docs
     cmds:
       - echo "Serving documentation on http://0.0.0.0:8000 ..."
       - uv run mkdocs serve -a 0.0.0.0:8000

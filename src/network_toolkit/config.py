@@ -1435,16 +1435,8 @@ def get_supported_device_types() -> set[str]:
     set[str]
         Set of supported device type strings
     """
-    # Extract from the Literal type for consistency
-    return {
-        "mikrotik_routeros",
-        "cisco_iosxe",
-        "cisco_ios",
-        "cisco_iosxr",
-        "cisco_nxos",
-        "juniper_junos",
-        "arista_eos",
-        "nokia_srlinux",
-        "linux",
-        "generic",
-    }
+    from network_toolkit.platforms import (
+        get_supported_device_types as registry_get_types,
+    )
+
+    return registry_get_types()

@@ -6,6 +6,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from network_toolkit.platforms.base import PlatformOperations, UnsupportedOperationError
+from network_toolkit.platforms.registry import (
+    PLATFORM_REGISTRY,
+    PlatformStatus,
+    get_implemented_platforms,
+)
 
 if TYPE_CHECKING:
     from network_toolkit.device import DeviceSession
@@ -62,12 +67,9 @@ def get_platform_operations(session: DeviceSession) -> PlatformOperations:
         return CiscoIOSXEOperations(session)
 
     else:
-        # List supported platforms for error message
-        supported_platforms = [
-            "mikrotik_routeros",
-            "cisco_ios",
-            "cisco_iosxe",
-        ]
+        # List supported platforms for error message using registry
+        implemented = get_implemented_platforms()
+        supported_platforms = list(implemented.keys())
 
         msg = (
             f"Platform operations not implemented for device type '{device_type}'. "
@@ -84,11 +86,8 @@ def get_supported_platforms() -> dict[str, str]:
     dict[str, str]
         Mapping of device_type to platform description
     """
-    return {
-        "mikrotik_routeros": "MikroTik RouterOS",
-        "cisco_ios": "Cisco IOS",
-        "cisco_iosxe": "Cisco IOS-XE",
-    }
+    implemented = get_implemented_platforms()
+    return {device_type: info.display_name for device_type, info in implemented.items()}
 
 
 def is_platform_supported(device_type: str) -> bool:
@@ -102,9 +101,12 @@ def is_platform_supported(device_type: str) -> bool:
     Returns
     -------
     bool
-        True if platform is supported
+        True if platform is supported and fully implemented
     """
-    return device_type in get_supported_platforms()
+    platform_info = PLATFORM_REGISTRY.get(device_type)
+    return (
+        platform_info is not None and platform_info.status == PlatformStatus.IMPLEMENTED
+    )
 
 
 def check_operation_support(device_type: str, operation_name: str) -> tuple[bool, str]:
@@ -122,37 +124,47 @@ def check_operation_support(device_type: str, operation_name: str) -> tuple[bool
     tuple[bool, str]
         (is_supported, error_message_if_not_supported)
     """
-    if not is_platform_supported(device_type):
-        platforms = get_supported_platforms()
-        supported_list = ", ".join(platforms.keys())
+    platform_info = PLATFORM_REGISTRY.get(device_type)
+
+    if platform_info is None:
+        implemented = get_implemented_platforms()
+        supported_list = ", ".join(implemented.keys())
         return (
             False,
             f"Platform '{device_type}' is not supported. Supported platforms: {supported_list}",
         )
 
-    # Get platform name for error messages
-    platform_name = get_supported_platforms()[device_type]
+    if platform_info.status != PlatformStatus.IMPLEMENTED:
+        return (
+            False,
+            f"Platform '{platform_info.display_name}' does not have full operations support yet (status: {platform_info.status.value})",
+        )
 
-    # Check which operations are supported by each platform
-    if device_type in ["cisco_ios", "cisco_iosxe"]:
-        # Cisco platforms support firmware operations but not other operations yet
-        if operation_name in ["firmware_upgrade", "firmware_downgrade"]:
-            return True, ""
-        elif operation_name in ["bios_upgrade", "create_backup"]:
-            return (
-                False,
-                f"Operation '{operation_name}' is not supported on platform '{platform_name}'",
-            )
+    # Map operation names to capability fields
+    capability_mapping = {
+        "firmware_upgrade": "firmware_upgrade",
+        "firmware_downgrade": "firmware_downgrade",
+        "bios_upgrade": "bios_upgrade",
+        "config_backup": "config_backup",
+        "comprehensive_backup": "comprehensive_backup",
+        "create_backup": "comprehensive_backup",  # Alias for comprehensive_backup
+    }
 
-    # MikroTik RouterOS supports all operations
-    if device_type == "mikrotik_routeros":
+    capability_field = capability_mapping.get(operation_name)
+    if capability_field is None:
+        return (
+            False,
+            f"Unknown operation '{operation_name}'",
+        )
+
+    is_supported = getattr(platform_info.capabilities, capability_field, False)
+    if is_supported:
         return True, ""
-
-    # Default case for unknown operations
-    return (
-        False,
-        f"Operation '{operation_name}' is not supported on platform '{platform_name}'",
-    )
+    else:
+        return (
+            False,
+            f"Operation '{operation_name}' is not supported on platform '{platform_info.display_name}'",
+        )
 
 
 def get_platform_file_extensions(device_type: str) -> list[str]:
@@ -168,23 +180,7 @@ def get_platform_file_extensions(device_type: str) -> list[str]:
     list[str]
         List of supported file extensions
     """
-    if device_type == "mikrotik_routeros":
-        from network_toolkit.platforms.mikrotik_routeros.constants import (
-            SUPPORTED_FIRMWARE_EXTENSIONS,
-        )
-
-        return SUPPORTED_FIRMWARE_EXTENSIONS
-    elif device_type == "cisco_ios":
-        from network_toolkit.platforms.cisco_ios.constants import (
-            SUPPORTED_FIRMWARE_EXTENSIONS,
-        )
-
-        return SUPPORTED_FIRMWARE_EXTENSIONS
-    elif device_type == "cisco_iosxe":
-        from network_toolkit.platforms.cisco_iosxe.constants import (
-            SUPPORTED_FIRMWARE_EXTENSIONS,
-        )
-
-        return SUPPORTED_FIRMWARE_EXTENSIONS
-    else:
+    platform_info = PLATFORM_REGISTRY.get(device_type)
+    if platform_info is None:
         return []
+    return platform_info.firmware_extensions

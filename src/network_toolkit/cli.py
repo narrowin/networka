@@ -25,6 +25,7 @@ from network_toolkit.commands.download import register as register_download
 from network_toolkit.commands.firmware import register as register_firmware
 from network_toolkit.commands.info import register as register_info
 from network_toolkit.commands.list import register as register_list
+from network_toolkit.commands.platforms import register as register_platforms
 from network_toolkit.commands.run import register as register_run
 from network_toolkit.commands.schema import register as register_schema
 from network_toolkit.commands.ssh import register as register_ssh
@@ -257,6 +258,7 @@ register_complete(app)
 register_diff(app)
 register_schema(app)
 register_ssh(app)
+register_platforms(app)
 
 # Expose a Click-compatible command for documentation tools (e.g., mkdocs-click)
 # Create this after all subcommands have been registered

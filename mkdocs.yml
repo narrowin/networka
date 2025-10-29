@@ -38,6 +38,7 @@ nav:
     - CLI: reference/cli.md
     - API: reference/api.md
     - Project development: development.md
+    - Adding platform support: adding-platforms.md
     - Documentation guidelines: documentation-guidelines.md
 
 theme:

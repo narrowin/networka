@@ -15,11 +15,7 @@ from network_toolkit.platforms.base import (
     PlatformOperations,
     UnsupportedOperationError,
 )
-from network_toolkit.platforms.cisco_ios.constants import (
-    DEVICE_TYPES,
-    PLATFORM_NAME,
-    SUPPORTED_FIRMWARE_EXTENSIONS,
-)
+from network_toolkit.platforms.registry import get_platform_info
 
 if TYPE_CHECKING:
     pass
@@ -76,9 +72,12 @@ class CiscoIOSOperations(PlatformOperations):
             msg = "Device not connected"
             raise DeviceConnectionError(msg)
 
+        # Get supported extensions from registry
+        supported_extensions = self.get_supported_file_extensions()
+
         # Validate firmware file extension
-        if local_firmware_path.suffix.lower() not in SUPPORTED_FIRMWARE_EXTENSIONS:
-            expected_exts = ", ".join(SUPPORTED_FIRMWARE_EXTENSIONS)
+        if local_firmware_path.suffix.lower() not in supported_extensions:
+            expected_exts = ", ".join(supported_extensions)
             msg = f"Invalid firmware file for Cisco IOS. Expected {expected_exts}, got {local_firmware_path.suffix}"
             raise ValueError(msg)
 
@@ -268,7 +267,7 @@ class CiscoIOSOperations(PlatformOperations):
         verify_before: bool = True,
     ) -> bool:
         """BIOS upgrade is not applicable for Cisco IOS devices."""
-        raise UnsupportedOperationError(PLATFORM_NAME, "bios_upgrade")
+        raise UnsupportedOperationError(self.get_platform_name(), "bios_upgrade")
 
     def create_backup(
         self,
@@ -442,14 +441,20 @@ class CiscoIOSOperations(PlatformOperations):
     @classmethod
     def get_supported_file_extensions(cls) -> list[str]:
         """Get list of supported firmware file extensions for Cisco IOS."""
-        return SUPPORTED_FIRMWARE_EXTENSIONS.copy()
+        platform_info = get_platform_info("cisco_ios")
+        if platform_info is None:
+            return []
+        return platform_info.firmware_extensions.copy()
 
     @classmethod
     def get_platform_name(cls) -> str:
         """Get human-readable platform name."""
-        return PLATFORM_NAME
+        platform_info = get_platform_info("cisco_ios")
+        if platform_info is None:
+            return "Cisco IOS"
+        return platform_info.display_name
 
     @classmethod
     def get_device_types(cls) -> list[str]:
         """Get list of device types supported by this platform."""
-        return DEVICE_TYPES.copy()
+        return ["cisco_ios"]

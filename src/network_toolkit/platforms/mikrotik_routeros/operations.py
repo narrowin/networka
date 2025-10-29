@@ -17,11 +17,7 @@ from network_toolkit.platforms.mikrotik_routeros.confirmation_patterns import (
     MIKROTIK_REBOOT,
     MIKROTIK_ROUTERBOARD_UPGRADE,
 )
-from network_toolkit.platforms.mikrotik_routeros.constants import (
-    DEVICE_TYPES,
-    PLATFORM_NAME,
-    SUPPORTED_FIRMWARE_EXTENSIONS,
-)
+from network_toolkit.platforms.registry import get_platform_info
 
 if TYPE_CHECKING:
     pass
@@ -49,9 +45,12 @@ class MikroTikRouterOSOperations(PlatformOperations):
             msg = "Device not connected"
             raise DeviceConnectionError(msg)
 
+        # Get supported extensions from registry
+        supported_extensions = self.get_supported_file_extensions()
+
         # Validate firmware file extension
-        if local_firmware_path.suffix.lower() not in SUPPORTED_FIRMWARE_EXTENSIONS:
-            expected_exts = ", ".join(SUPPORTED_FIRMWARE_EXTENSIONS)
+        if local_firmware_path.suffix.lower() not in supported_extensions:
+            expected_exts = ", ".join(supported_extensions)
             msg = f"Invalid firmware file for RouterOS. Expected {expected_exts}, got {local_firmware_path.suffix}"
             raise ValueError(msg)
 
@@ -241,9 +240,12 @@ class MikroTikRouterOSOperations(PlatformOperations):
             msg = "Device not connected"
             raise DeviceConnectionError(msg)
 
+        # Get supported extensions from registry
+        supported_extensions = self.get_supported_file_extensions()
+
         # Validate firmware file extension
-        if local_firmware_path.suffix.lower() not in SUPPORTED_FIRMWARE_EXTENSIONS:
-            expected_exts = ", ".join(SUPPORTED_FIRMWARE_EXTENSIONS)
+        if local_firmware_path.suffix.lower() not in supported_extensions:
+            expected_exts = ", ".join(supported_extensions)
             msg = f"Invalid firmware file for RouterOS. Expected {expected_exts}, got {local_firmware_path.suffix}"
             raise ValueError(msg)
 
@@ -718,14 +720,20 @@ class MikroTikRouterOSOperations(PlatformOperations):
     @classmethod
     def get_supported_file_extensions(cls) -> list[str]:
         """Get list of supported firmware file extensions for RouterOS."""
-        return SUPPORTED_FIRMWARE_EXTENSIONS.copy()
+        platform_info = get_platform_info("mikrotik_routeros")
+        if platform_info is None:
+            return []
+        return platform_info.firmware_extensions.copy()
 
     @classmethod
     def get_platform_name(cls) -> str:
         """Get human-readable platform name."""
-        return PLATFORM_NAME
+        platform_info = get_platform_info("mikrotik_routeros")
+        if platform_info is None:
+            return "MikroTik RouterOS"
+        return platform_info.display_name
 
     @classmethod
     def get_device_types(cls) -> list[str]:
         """Get list of device types supported by this platform."""
-        return DEVICE_TYPES.copy()
+        return ["mikrotik_routeros"]
