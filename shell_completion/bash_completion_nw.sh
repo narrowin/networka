@@ -55,7 +55,7 @@ _nw() {
                 if [[ -n "$result" ]]; then
                     echo "$result"
                 else
-                    echo "info run upload download backup firmware ssh diff list config schema complete"
+                    echo "info run upload download backup firmware cli diff list config schema complete"
                 fi
                 return ;;
             devices)
@@ -160,7 +160,7 @@ _nw() {
     local list_devices_opts="$output_opts $common_opts"
     local list_groups_opts="$output_opts $common_opts"
     local list_sequences_opts="--vendor --category $output_opts $common_opts"
-    local ssh_opts="--config -c --auth --user --password --layout --session-name --window-name --reuse --sync --no-sync --use-sshpass --attach --no-attach --platform -p --port $common_opts"
+    local cli_opts="--config -c --auth --user --password --layout --session-name --window-name --reuse --sync --no-sync --use-sshpass --attach --no-attach --platform -p --port $common_opts"
     local info_opts="--interactive-auth -i $output_opts $common_opts"
     local config_validate_opts="$common_opts"
     local config_init_opts="$common_opts --force"
@@ -198,14 +198,14 @@ _nw() {
                 _opts "$run_opts"
             fi
             ;;
-        ssh)
+        cli)
             if [[ ${COMP_CWORD} -eq 2 ]]; then
                 local groups devices
                 groups=$(_nw_list groups)
                 devices=$(_nw_list devices)
                 _opts "$groups $devices"
             else
-                if [[ $cur == -* ]]; then _opts "$ssh_opts"; fi
+                if [[ $cur == -* ]]; then _opts "$cli_opts"; fi
             fi
             ;;
         upload)

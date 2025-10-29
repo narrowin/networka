@@ -23,7 +23,7 @@ nav:
     - Interactive credentials: interactive-credentials.md
     - Transport: transport.md
     - IP address support: ip-address-support.md
-    - tmux SSH sessions: tmux-ssh.md
+    - tmux CLI sessions: tmux-ssh.md
     - Recipes: examples/recipes.md
     - Examples (user sequences): examples/user_sequences/README.md
   - Troubleshooting: troubleshooting.md

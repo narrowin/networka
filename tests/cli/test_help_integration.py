@@ -17,7 +17,7 @@ class TestHelpFormatter:
 
         commands = [
             ("run", "Execute commands"),
-            ("ssh", "SSH to devices"),
+            ("cli", "CLI to devices"),
         ]
 
         formatter.format_category_section(
@@ -101,7 +101,7 @@ class TestCategorizedHelpGroup:
 
         # Should start with executing operations
         assert commands[0] == "run"
-        assert "ssh" in commands[:4]  # Should be early in the list
+        assert "cli" in commands[:4]  # Should be early in the list
 
         # Should end with hidden commands
         assert commands[-1] == "complete"
@@ -139,11 +139,11 @@ class TestCategorizedHelpGroup:
         )  # At least one per visible category
 
 
-class TestSSHCommandPlacement:
-    """Specific tests for SSH command placement."""
+class TestCLICommandPlacement:
+    """Specific tests for CLI command placement."""
 
-    def test_ssh_in_executing_operations_help(self):
-        """Test that SSH appears in Executing Operations in help output."""
+    def test_cli_in_executing_operations_help(self):
+        """Test that CLI appears in Executing Operations in help output."""
         help_group = CategorizedHelpGroup()
         mock_formatter = Mock()
         mock_ctx = Mock()
@@ -173,13 +173,13 @@ class TestSSHCommandPlacement:
         with patch.object(help_group, "get_command", side_effect=mock_get_command):
             help_group.format_commands(mock_ctx, mock_formatter)
 
-        # SSH should be in Executing Operations
+        # CLI should be in Executing Operations
         executing_commands = category_commands.get("Executing Operations", [])
-        assert "ssh" in executing_commands
+        assert "cli" in executing_commands
 
-        # SSH should NOT be in other categories
+        # CLI should NOT be in other categories
         vendor_commands = category_commands.get("Vendor-Specific Operations", [])
         info_commands = category_commands.get("Info & Configuration", [])
 
-        assert "ssh" not in vendor_commands
-        assert "ssh" not in info_commands
+        assert "cli" not in vendor_commands
+        assert "cli" not in info_commands

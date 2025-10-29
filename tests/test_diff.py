@@ -61,7 +61,7 @@ class TestDiffCLI:
             )
 
         assert result.exit_code == 0
-        assert "no changes" in result.output.lower()
+        assert "identical" in result.output.lower()
 
     def test_diff_command_single_device_detects_diff(
         self, config_file: Path, tmp_path: Path
@@ -263,7 +263,7 @@ class TestDiffAdvancedScenarios:
         assert result.exit_code in [0, 1]
         # The output should indicate the result
         assert (
-            "no changes" in result.output.lower()
+            "identical" in result.output.lower()
             or "difference" in result.output.lower()
             or "error" in result.output.lower()
             or "missing baseline" in result.output.lower()

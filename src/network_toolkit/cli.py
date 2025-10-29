@@ -62,7 +62,7 @@ class CategorizedHelpGroup(TyperGroup):
         # Desired categories
         exec_names = [
             "run",
-            "ssh",
+            "cli",
             "diff",
             "upload",
             "download",

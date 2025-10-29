@@ -162,7 +162,6 @@ include = [
     "docs/**",
     # Shell completion helpers and example defaults (useful for users)
     "bash_completion_nw.sh",
-    "fish_completion_nw.fish",
     "zsh_completion_nw.zsh",
     "default_configs/**",
 ]

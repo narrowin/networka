@@ -39,7 +39,7 @@ ssh-keygen -R <hostname_or_ip>
 
 ```bash
 nw run router1 '/system/identity/print' --no-strict-host-key-checking
-nw ssh router1 --no-strict-host-key-checking
+nw cli router1 --no-strict-host-key-checking
 ```
 
 ### Option 3: Enable strict mode globally (maximum security)

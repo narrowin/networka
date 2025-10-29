@@ -458,11 +458,11 @@ def register(app: typer.Typer) -> None:
                 ctx.print_info(f"Device: {dev}")
                 for name, res, note in rows:
                     if res is None:
-                        ctx.print_warning(f"- {name}: {note}")
+                        ctx.print_warning(f"{name}: {note}")
                     elif not res.changed:
-                        ctx.print_success(f"- {name}: no changes")
+                        ctx.print_info(f"{name}: identical")
                     else:
-                        ctx.print_error(f"- {name}: differences")
+                        ctx.print_info(f"{name}: differences found")
                         if res.output:
                             ctx.output.print_output(res.output)
 

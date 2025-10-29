@@ -65,7 +65,7 @@ class TestListCommands:
             "download",
             "backup",
             "firmware",
-            "ssh",
+            "cli",
             "diff",
             "list",
             "config",

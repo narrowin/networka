@@ -50,8 +50,8 @@ class TestCLITransportConfiguration:
                 if call_args and "transport_type" in call_args.kwargs:
                     assert call_args.kwargs["transport_type"] == "scrapli"
 
-    def test_ssh_command_with_transport_option(self):
-        """Test that ssh command accepts transport option."""
+    def test_cli_command_with_transport_option(self):
+        """Test that cli command accepts transport option."""
         runner = CliRunner()
 
         # Mock the actual execution to avoid real network operations
@@ -71,7 +71,7 @@ class TestCLITransportConfiguration:
             result = runner.invoke(
                 app,
                 [
-                    "ssh",
+                    "cli",
                     "192.168.1.1",
                     "--platform",
                     "mikrotik_routeros",
