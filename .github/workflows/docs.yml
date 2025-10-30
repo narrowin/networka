@@ -1,8 +1,6 @@
 name: Docs
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
     branches: [ main ]
     paths:
@@ -68,7 +66,7 @@ jobs:
           path: site
 
   deploy:
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
