@@ -922,6 +922,30 @@ def load_config(config_path: str | Path) -> NetworkConfig:
     return config
 
 
+def create_minimal_config() -> NetworkConfig:
+    """
+    Create a minimal NetworkConfig without requiring config files.
+
+    This is used for IP-based operations with interactive auth where
+    no configuration directory or files are needed.
+
+    Returns
+    -------
+    NetworkConfig
+        A minimal configuration with default settings
+    """
+    return NetworkConfig(
+        general=GeneralConfig(),
+        devices=None,
+        device_groups=None,
+        command_sequence_groups=None,
+        file_operations=None,
+        vendor_platforms=None,
+        vendor_sequences=None,
+        global_command_sequences=None,
+    )
+
+
 def _auto_export_schemas_if_project() -> None:
     """
     Automatically export schemas if we're in a project directory.

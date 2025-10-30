@@ -20,7 +20,6 @@ from network_toolkit.common.output import (
     get_output_mode_from_config,
     set_output_mode,
 )
-from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.ip_device import (
     create_ip_based_config,
@@ -155,11 +154,20 @@ def register(app: typer.Typer) -> None:
         if raw is not None:
             output_mode = OutputMode.RAW
 
+        # Check if we're in IP-only mode with interactive auth - load minimal config
+        # This must happen BEFORE creating CommandContext
+        config = None
+        if is_ip_list(target) and interactive_auth and device_type:
+            from network_toolkit.config import create_minimal_config
+
+            config = create_minimal_config()
+
         # Create command context with proper styling/logging
         ctx = CommandContext(
             output_mode=output_mode,
             verbose=verbose,
             config_file=config_file,
+            config=config,
         )
 
         # Handle interactive authentication if requested
@@ -301,7 +309,8 @@ def register(app: typer.Typer) -> None:
                 return (device_name, None, str(e))
 
         try:
-            config = load_config(config_file)
+            # Config is already loaded in ctx.config (or minimal config for IP-only mode)
+            config = ctx.config
 
             # Apply CLI override for SSH strict host key checking if provided
             if no_strict_host_key_checking:

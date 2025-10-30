@@ -60,12 +60,25 @@ class CommandContext:
         config_file: Path,
         verbose: bool = False,
         output_mode: OutputMode | None = None,
+        config: Any | None = None,
     ) -> None:
-        """Initialize command context with common setup."""
+        """Initialize command context with common setup.
+
+        Parameters
+        ----------
+        config_file : Path
+            Configuration file path (used only if config is None)
+        verbose : bool
+            Enable verbose logging
+        output_mode : OutputMode | None
+            Output decoration mode
+        config : Any | None
+            Pre-loaded configuration (optional, will load from file if not provided)
+        """
         self.verbose = verbose
 
         # Load configuration to determine logging and output preferences
-        self.config = load_config(config_file)
+        self.config = config if config is not None else load_config(config_file)
 
         # Resolve output mode preference (CLI > config)
         active_output_mode = output_mode or OutputMode(self.config.general.output_mode)
