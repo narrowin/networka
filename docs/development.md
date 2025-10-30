@@ -119,7 +119,7 @@ nw --help
 
 ### Release process
 
-**IMPORTANT**: Always use the release script. Manual tag creation will fail due to version validation.
+**IMPORTANT**: Always use the pre-release check script before releasing. The release script will not run without it.
 
 1. **Prepare for release**
 
@@ -128,18 +128,27 @@ nw --help
    git checkout main
    git pull origin main
    git status  # Should show no uncommitted changes
-
-   # Run quality checks
-   task test
-   task lint
-   task format
    ```
 
 2. **Update CHANGELOG.md**
 
    Manually update the changelog with new features, fixes, and changes for the upcoming version.
 
-3. **Execute release**
+3. **Run pre-release quality checks**
+
+   ```bash
+   ./scripts/pre-release-check.sh
+   ```
+
+   This script runs all quality checks locally:
+   - Lint (ruff)
+   - Format check (ruff format)
+   - Type check (mypy)
+   - Full test suite
+
+   If all checks pass, a marker file is created that allows the release script to proceed.
+
+4. **Execute release**
 
    ```bash
    # Test the release process first
@@ -149,7 +158,7 @@ nw --help
    ./scripts/release.sh --version 1.0.0
    ```
 
-   The release script automatically:
+   The release script verifies that pre-release checks passed, then:
 
    - Updates version in `src/network_toolkit/__about__.py`
    - Updates `CHANGELOG.md` with release date
@@ -157,11 +166,18 @@ nw --help
    - Pushes the commit to main
    - Creates and pushes the release tag
 
-4. **Automated GitHub Actions**
+5. **Automated GitHub Actions**
+
+   When the tag is pushed, the release workflow automatically:
+
    - Validates version consistency between tag and code
-   - Builds and tests package on multiple platforms (Linux, Windows, macOS)
+   - Builds wheel and source distribution
+   - Tests installation on multiple platforms (Linux, Windows, macOS) with Python 3.11, 3.12, 3.13
    - Creates GitHub release with build artifacts
+   - Generates release notes from CHANGELOG.md
    - Attaches wheel and source distribution files
+
+   **Note**: Quality checks were already validated by the pre-release script, so the release workflow focuses on building and distributing.
 
 **Never manually create release tags** - this will cause version mismatch errors in the build process.
 

@@ -74,6 +74,53 @@ if ! git diff-index --quiet HEAD --; then
     exit 1
 fi
 
+# Check if pre-release checks were run (unless --force is used)
+if [[ "$FORCE" != true ]]; then
+    MARKER_FILE=".pre-release-passed"
+    CURRENT_COMMIT=$(git rev-parse HEAD)
+
+    if [[ ! -f "$MARKER_FILE" ]]; then
+        echo ""
+        echo "ERROR: Pre-release quality checks not run!"
+        echo ""
+        echo "You must run pre-release checks before creating a release:"
+        echo "   ./scripts/pre-release-check.sh"
+        echo ""
+        echo "This ensures all quality checks pass before pushing the release."
+        echo "Use --force to skip this check (not recommended)."
+        echo ""
+        exit 1
+    fi
+
+    # Verify marker is for current commit
+    MARKER_COMMIT=$(grep "COMMIT_HASH=" "$MARKER_FILE" | cut -d'=' -f2)
+    if [[ "$MARKER_COMMIT" != "$CURRENT_COMMIT" ]]; then
+        echo ""
+        echo "ERROR: Pre-release checks are outdated!"
+        echo ""
+        echo "Code has changed since pre-release checks were run."
+        echo "Marker commit: $MARKER_COMMIT"
+        echo "Current commit: $CURRENT_COMMIT"
+        echo ""
+        echo "Run pre-release checks again:"
+        echo "   ./scripts/pre-release-check.sh"
+        echo ""
+        exit 1
+    fi
+
+    MARKER_TIMESTAMP=$(grep "TIMESTAMP=" "$MARKER_FILE" | cut -d'=' -f2)
+    echo ""
+    echo "✓ Pre-release quality checks verified"
+    echo "   Commit: $MARKER_COMMIT"
+    echo "   Time:   $MARKER_TIMESTAMP"
+    echo ""
+else
+    echo ""
+    echo "WARNING: Skipping pre-release check verification (--force used)"
+    echo "   GitHub Actions will still run quality checks before releasing"
+    echo ""
+fi
+
 # Check if tag already exists
 if git tag | grep -q "^v$VERSION$" && [[ "$FORCE" != true ]]; then
     echo "ERROR: Tag v$VERSION already exists. Use --force to overwrite"
@@ -214,6 +261,13 @@ echo ""
 echo "Release v$VERSION prepared successfully!"
 echo ""
 if [[ "$DRY_RUN" != true ]]; then
+    # Clean up pre-release marker file
+    if [[ -f ".pre-release-passed" ]]; then
+        rm -f ".pre-release-passed"
+        echo "Cleaned up pre-release marker file"
+    fi
+
+    echo ""
     echo "Next steps:"
     echo "   1. GitHub Actions will automatically build and publish to PyPI"
     echo "   2. A GitHub release will be created automatically"

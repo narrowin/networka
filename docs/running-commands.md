@@ -2,7 +2,7 @@
 
 ## Quick Demo
 
-![Networka Commands Demo](../assets/gifs/networka-setup.gif)
+![Networka Commands Demo](assets/gifs/networka-setup.gif)
 
 *See how to execute commands across devices and groups.*
 
