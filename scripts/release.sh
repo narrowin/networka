@@ -34,6 +34,16 @@ while [[ $# -gt 0 ]]; do
             echo "  --dry-run        Show what would be done without making changes"
             echo "  -f, --force      Force release even if version exists"
             echo "  -h, --help       Show this help message"
+            echo ""
+            echo "Example - Full release workflow:"
+            echo "  1. Run pre-release checks:"
+            echo "     ./scripts/pre-release-check.sh"
+            echo ""
+            echo "  2. Create and push the release:"
+            echo "     ./scripts/release.sh -v 1.2.3"
+            echo ""
+            echo "  Tip: Use --dry-run first to preview changes:"
+            echo "     ./scripts/release.sh -v 1.2.3 --dry-run"
             exit 0
             ;;
         *)

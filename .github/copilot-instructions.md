@@ -42,6 +42,7 @@ NONEGOITIABLE: As a first sentence in your response, always state: "I have read 
 3. Ensure proper exception handling separation
 4. Confirm tests cover real user scenarios
 5. **ALWAYS run `uv run ruff check src/ tests/` and fix all issues**
+6. **Follow commit conventions** - See CONTRIBUTING.md for Conventional Commits format
 
 ## CONFIGURATION FILE LOCATIONS
 
