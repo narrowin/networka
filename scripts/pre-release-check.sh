@@ -16,9 +16,9 @@ echo ""
 # Check if we're on main branch
 CURRENT_BRANCH=$(git branch --show-current)
 if [[ "$CURRENT_BRANCH" != "main" ]]; then
-    echo "ERROR: Not on main branch. Current branch: $CURRENT_BRANCH"
-    echo "   Switch to main before running pre-release checks"
-    exit 1
+    echo "WARNING: Not on main branch. Current branch: $CURRENT_BRANCH"
+    echo "   Quality checks can run on any branch, but releases must be from main"
+    echo ""
 fi
 
 # Check for uncommitted changes
@@ -27,16 +27,20 @@ if ! git diff-index --quiet HEAD --; then
     exit 1
 fi
 
-# Ensure we're up to date with remote
-echo "Checking if branch is up to date with remote..."
-git fetch origin main
-LOCAL=$(git rev-parse @)
-REMOTE=$(git rev-parse @{u})
+# Ensure we're up to date with remote (only enforce on main branch)
+if [[ "$CURRENT_BRANCH" == "main" ]]; then
+    echo "Checking if main branch is up to date with remote..."
+    git fetch origin main
+    LOCAL=$(git rev-parse @)
+    REMOTE=$(git rev-parse @{u})
 
-if [[ "$LOCAL" != "$REMOTE" ]]; then
-    echo "ERROR: Your local main branch is not up to date with remote"
-    echo "   Run: git pull origin main"
-    exit 1
+    if [[ "$LOCAL" != "$REMOTE" ]]; then
+        echo "ERROR: Your local main branch is not up to date with remote"
+        echo "   Run: git pull origin main"
+        exit 1
+    fi
+else
+    echo "Skipping remote sync check (not on main branch)"
 fi
 
 # Check if task is available
