@@ -1,14 +1,7 @@
 name: CI
 
 on:
-  push:
-    branches: [ main, develop ]
-    paths:
-      - 'src/**'
-      - 'tests/**'
-      - 'pyproject.toml'
-      - 'uv.lock'
-      - '.github/workflows/**'
+  # Only run on pull requests to validate before merging
   pull_request:
     branches: [ main, develop ]
     paths:
@@ -17,6 +10,15 @@ on:
       - 'pyproject.toml'
       - 'uv.lock'
       - '.github/workflows/**'
+
+  # Allow manual trigger for pre-release checks
+  workflow_dispatch:
+    inputs:
+      python-version:
+        description: 'Python version to test'
+        required: false
+        default: '3.12'
+        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -27,39 +29,4 @@ jobs:
     name: Quality Checks
     uses: ./.github/workflows/quality-checks.yml
     with:
-      python-version: '3.12'
-
-  upload-coverage:
-    name: Upload Coverage
-    runs-on: ubuntu-latest
-    needs: quality-checks
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          version: "0.8.8"
-          enable-cache: true
-
-      - name: Install go-task
-        run: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
-
-      - name: Set up Python
-        run: uv python install 3.12
-
-      - name: Install dependencies
-        run: task install
-
-      - name: Generate coverage report
-        run: task test:ci
-
-      - name: Upload to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage.xml
-          fail_ci_if_error: false
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      python-version: ${{ inputs.python-version || '3.12' }}
