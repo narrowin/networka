@@ -1,5 +1,7 @@
 # Networka (nw) - LLM Development Guide
 
+NONEGOITIABLE: As a first sentence in your response, always state: "I have read and will strictly follow the Copilot Repository Instructions."
+
 # Copilot Repository Instructions (Strict Compliance)
 
 ## Authority & Priority
