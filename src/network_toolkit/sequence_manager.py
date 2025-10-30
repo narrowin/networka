@@ -1,16 +1,14 @@
-"""Unified Sequence Manager for built-in, repo, and user-defined sequences.
+"""Unified Sequence Manager for built-in and user-defined sequences.
 
 This module provides a single place to discover and resolve sequences:
 - Built-in sequences shipped inside the package (src/network_toolkit/builtin_sequences)
-- Repo-provided vendor sequences under config/sequences/<vendor>/*.yml
 - User-defined sequences under ~/.config/networka/sequences/<vendor>/*.yml
 - Custom user sequences under ~/.config/networka/sequences/custom/*.yml
 
 Resolution order (highest wins):
 1. Custom user sequences (sequences/custom/*.yml) - highest precedence
 2. User-defined vendor sequences (sequences/<vendor>/*.yml)
-3. Repo-provided vendor sequences from config/
-4. Built-in sequences shipped with the package
+3. Built-in sequences shipped with the package
 """
 
 from __future__ import annotations
@@ -48,8 +46,7 @@ class SequenceManager:
     Resolution order (highest to lowest precedence):
     1. Custom user sequences (sequences/custom/*.yml)
     2. User vendor sequences (sequences/<vendor>/*.yml)
-    3. Repo vendor sequences (config/sequences/<vendor>/*.yml)
-    4. Built-in sequences (package builtin_sequences/)
+    3. Built-in sequences (package builtin_sequences/)
 
     Contract:
     - list_vendor_sequences(vendor) -> dict[str, SequenceRecord]
@@ -58,9 +55,8 @@ class SequenceManager:
 
     def __init__(self, config: NetworkConfig) -> None:
         self.config = config
-        # Layered stores: builtin < repo < user < custom
+        # Layered stores: builtin < user < custom
         self._builtin: dict[str, dict[str, SequenceRecord]] = {}
-        self._repo: dict[str, dict[str, SequenceRecord]] = {}
         self._user: dict[str, dict[str, SequenceRecord]] = {}
         self._custom: dict[str, dict[str, SequenceRecord]] = {}
         # Preload from known places
@@ -68,31 +64,28 @@ class SequenceManager:
 
     # ---------- Public API ----------
     def list_vendor_sequences(self, vendor: str) -> dict[str, SequenceRecord]:
-        """Get merged sequences for a vendor (custom > user > repo > builtin)."""
+        """Get merged sequences for a vendor (custom > user > builtin)."""
         merged: dict[str, SequenceRecord] = {}
         for layer in (
             self._builtin.get(vendor, {}),
-            self._repo.get(vendor, {}),
             self._user.get(vendor, {}),
             self._custom.get(vendor, {}),  # Custom has highest precedence
         ):
             for name, rec in layer.items():
                 merged[name] = rec
-        # Also include config.vendor_sequences from NetworkConfig as repo-level
+        # Also include config.vendor_sequences from NetworkConfig as lowest precedence
         if self.config.vendor_sequences and vendor in self.config.vendor_sequences:
             for name, vseq in self.config.vendor_sequences[vendor].items():
                 # Only add if not already in merged (respect precedence)
                 if name not in merged:
                     merged[name] = self._record_from_vendor_sequence(
-                        name, vseq, origin="repo", path=None
+                        name, vseq, origin="config", path=None
                     )
         return merged
 
     def list_all_sequences(self) -> dict[str, dict[str, SequenceRecord]]:
         """Return all vendors and their sequences (merged)."""
-        vendors: set[str] = (
-            set(self._builtin) | set(self._repo) | set(self._user) | set(self._custom)
-        )
+        vendors: set[str] = set(self._builtin) | set(self._user) | set(self._custom)
         if self.config.vendor_sequences:
             vendors |= set(self.config.vendor_sequences)
         return {v: self.list_vendor_sequences(v) for v in sorted(vendors)}
@@ -103,7 +96,7 @@ class SequenceManager:
         """Resolve a sequence to a list of commands with precedence.
 
         Order:
-        1. Vendor sequences based on device_type via user > repo > builtin > config.vendor_sequences
+        1. Vendor sequences based on device_type via custom > user > builtin > config.vendor_sequences
         2. Device-specific sequences (legacy) via NetworkConfig
         """
         # 1. Vendor-based
@@ -139,10 +132,6 @@ class SequenceManager:
     # ---------- Internal loading ----------
     def _load_all(self) -> None:
         self._builtin = self._load_from_root(self._builtin_root(), origin="builtin")
-        # Repo paths from modular config
-        repo_root = self._repo_sequences_root()
-        if repo_root:
-            self._repo = self._load_from_root(repo_root, origin="repo")
         # User paths
         user_root = self._user_sequences_root()
         if user_root:
@@ -156,17 +145,6 @@ class SequenceManager:
         # This file lives at src/network_toolkit/sequence_manager.py
         # builtin lives at src/network_toolkit/builtin_sequences
         return Path(__file__).parent / "builtin_sequences"
-
-    def _repo_sequences_root(self) -> Path | None:
-        # Use the stored config source directory (set by load_modular_config)
-        # No fallback - if config doesn't have _config_source_dir, return None
-        if (
-            hasattr(self.config, "_config_source_dir")
-            and self.config._config_source_dir
-        ):
-            sequences_dir = self.config._config_source_dir / "sequences"
-            return sequences_dir if sequences_dir.exists() else None
-        return None
 
     def _user_sequences_root(self) -> Path | None:
         # Use OS-appropriate user config directory

@@ -104,7 +104,7 @@ def test_tui_sequence_resolution_matches_sequence_manager_for_vendor(
     assert tui_cmds == expected_cmds
 
 
-def test_tui_sequence_commands_unknown_returns_none() -> None:
-    data = TuiData("config")
+def test_tui_sequence_commands_unknown_returns_none(mock_repo_config: Path) -> None:
+    data = TuiData(str(mock_repo_config))
     unknown = "__no_such_sequence__"
     assert data.sequence_commands(unknown, None) is None

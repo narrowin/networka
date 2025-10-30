@@ -177,8 +177,8 @@ networka/
 │   └── results_enhanced.py # Results management
 ├── tests/                  # Test suite
 ├── docs/                   # Documentation
+│   └── examples/           # Configuration examples
 ├── scripts/                # Build and utility scripts
-├── config/                 # Example configurations
 └── pyproject.toml         # Project configuration
 ```
 

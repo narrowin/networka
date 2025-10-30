@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -19,7 +18,6 @@ from network_toolkit.commands.config import (
     create_example_sequences,
     detect_shell,
     install_editor_schemas,
-    install_sequences_from_repo,
     install_shell_completions,
 )
 from network_toolkit.exceptions import ConfigurationError
@@ -92,14 +90,23 @@ class TestConfigInitCore:
         create_example_sequences(sequences_dir)
 
         assert sequences_dir.exists()
-        sequences_file = sequences_dir / "sequences.yml"
-        assert sequences_file.exists()
 
-        content = sequences_file.read_text()
-        assert "sequences:" in content
-        assert "health_check:" in content
-        assert "backup_config:" in content
-        assert "commands:" in content
+        # Check custom/ directory was created
+        custom_dir = sequences_dir / "custom"
+        assert custom_dir.exists()
+
+        # Check README was created
+        readme_file = custom_dir / "README.md"
+        assert readme_file.exists()
+        readme_content = readme_file.read_text()
+        assert "Custom Sequences" in readme_content
+        assert "custom/ directory" in readme_content
+
+        # Check example file was created
+        example_file = custom_dir / "example_custom.yml"
+        assert example_file.exists()
+        example_content = example_file.read_text()
+        assert "# Example Custom Sequences" in example_content
 
 
 class TestShellDetection:
@@ -193,50 +200,6 @@ class TestShellCompletions:
 
 class TestSequenceInstallation:
     """Test sequence installation from repositories."""
-
-    @patch("network_toolkit.commands.config._find_git_executable")
-    @patch("subprocess.run")
-    def test_install_sequences_from_repo_success(
-        self, mock_run: Mock, mock_git: Mock, tmp_path: Path
-    ) -> None:
-        """Test successful sequence installation from repository."""
-        mock_git.return_value = "/usr/bin/git"
-        mock_run.return_value = Mock(returncode=0)
-
-        # Create fake repo structure
-        with tempfile.TemporaryDirectory() as temp_dir:
-            repo_path = Path(temp_dir) / "repo"
-            sequences_path = repo_path / "config" / "sequences"
-            sequences_path.mkdir(parents=True)
-
-            # Create a test sequence file
-            test_seq = sequences_path / "test.yml"
-            test_seq.write_text("test_sequence:\n  commands: [test]")
-
-            # Mock the temporary directory to return our prepared structure
-            with patch("tempfile.TemporaryDirectory") as mock_temp:
-                mock_temp.return_value.__enter__.return_value = temp_dir
-
-                dest = tmp_path / "sequences"
-                dest.mkdir(parents=True, exist_ok=True)  # Ensure destination exists
-                install_sequences_from_repo(dest)
-
-                # Verify git clone was called
-                mock_run.assert_called_once()
-                args = mock_run.call_args[0][0]
-                assert "/usr/bin/git" in args
-                assert "clone" in args
-                assert "https://github.com/narrowin/networka.git" in args
-
-    # URL validation tests removed - we now use hardcoded repo URL (KISS principle)
-
-    @patch("shutil.which")
-    def test_install_sequences_no_git(self, mock_which: Mock) -> None:
-        """Test sequence installation when git is not available."""
-        mock_which.return_value = None
-
-        with pytest.raises(ConfigurationError, match="Git executable not found"):
-            install_sequences_from_repo(Path("/tmp"))
 
 
 class TestSchemaInstallation:
@@ -345,24 +308,6 @@ class TestConfigInitImpl:
         mock_devices.assert_called_once_with(tmp_path / "devices")
         mock_groups.assert_called_once_with(tmp_path / "groups")
         mock_seq.assert_called_once_with(tmp_path / "sequences")
-
-    @patch("network_toolkit.commands.config.install_sequences_from_repo")
-    def test_config_init_impl_with_sequences(
-        self, mock_install: Mock, tmp_path: Path
-    ) -> None:
-        """Test config init with sequence installation."""
-        mock_install.return_value = (
-            5,
-            [],
-        )  # Return tuple of (number of files, framework files list)
-
-        _config_init_impl(
-            target_dir=tmp_path,
-            yes=True,
-            install_sequences=True,
-        )
-
-        mock_install.assert_called_once_with(tmp_path / "sequences")
 
     @patch("network_toolkit.commands.config.install_shell_completions")
     @patch("network_toolkit.commands.config.activate_shell_completion")
@@ -493,7 +438,6 @@ class TestErrorHandling:
                 force=False,
                 yes=False,
                 dry_run=False,
-                install_sequences=False,
                 install_completions=False,
                 install_schemas=False,
                 verbose=False,

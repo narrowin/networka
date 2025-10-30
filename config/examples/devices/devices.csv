@@ -1,6 +1,0 @@
-name,host,device_type,description,platform,model,location,tags
-sw-lab-01,192.168.1.10,mikrotik_routeros,Lab Switch 1,mipsbe,CRS326-24G-2S+,Lab Room A,switch;access;lab;test
-sw-lab-02,192.168.1.11,mikrotik_routeros,Lab Switch 2,mipsbe,CRS326-24G-2S+,Lab Room A,switch;access;lab;test
-rtr-edge-01,192.168.1.1,mikrotik_routeros,Edge Router 1,arm,RB4011iGS+,Network Closet,router;edge;critical
-ap-office-01,192.168.1.20,mikrotik_routeros,Office AP 1,arm,cAP ac,Office Floor 1,wireless;access;office
-fw-main-01,192.168.1.254,mikrotik_routeros,Main Firewall,x86,CCR1009-7G-1C-1S+,Data Center,firewall;critical;edge

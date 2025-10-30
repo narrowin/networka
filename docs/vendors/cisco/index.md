@@ -95,15 +95,15 @@ Pre-checks: by default Networka runs the `pre_maintenance` sequence before firmw
 - Comprehensive backup: `nw backup comprehensive <device|group>`
   - Can include `show running-config`, `show startup-config`, `show version`, `show inventory`, etc.
 
-You can define/override sequences under `config/sequences/cisco_iosxe/common.yml` (also applies to many IOS show commands). Device-specific sequences can be set per device in your config.
+You can define/override sequences under `~/.config/networka/sequences/user/cisco_iosxe_custom.yml` (also applies to many IOS show commands). Device-specific sequences can be set per device in your config.
 
 ## Built-in command sequences
 
 Common examples you can reference via `nw run <device> <sequence-name>`:
 
-- `system_info`, `health_check`, `interface_status`, `network_overview`, `routing_info`, `security_audit`
+- `system_info`, `health_check`, `interfaces`, `routing`, `backup_config`, `security`, `logs`
 
-See file: `config/sequences/cisco_iosxe/common.yml` for a rich set of examples that work on IOS-XE and often IOS.
+Built-in sequences are shipped with the package. Use `nw sequence list --vendor cisco_iosxe` to see all available sequences.
 
 ## Examples
 

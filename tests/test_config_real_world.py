@@ -54,23 +54,8 @@ class TestRealWorldConfigLoading:
         )
         assert len(config.devices) > 0, "Should find devices in config/devices/"
 
-        assert config.global_command_sequences is not None, (
-            "Should load global sequences"
-        )
-        assert len(config.global_command_sequences) > 0, (
-            "Should find global sequences in config/sequences/"
-        )
-
-    def test_vendor_sequence_auto_discovery(self, mock_repo_config: Path):
-        """Test that vendor sequence auto-discovery works correctly."""
-        # Check each vendor directory exists for future sequence loading
-        sequences_dir = mock_repo_config / "sequences"
-        if sequences_dir.exists():
-            for vendor_dir in sequences_dir.iterdir():
-                if vendor_dir.is_dir() and not vendor_dir.name.startswith("."):
-                    vendor_name = vendor_dir.name
-                    # Directory exists but may be empty from init - that's OK
-                    assert vendor_dir.is_dir(), f"Should create {vendor_name} directory"
+        # Sequences now come from built-in package, not config directory
+        # So we don't expect global_command_sequences from config files
 
     def test_devices_loading_from_real_config(self, mock_repo_config: Path):
         """Test loading devices from actual config structure."""

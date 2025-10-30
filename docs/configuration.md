@@ -6,10 +6,10 @@ Note on credentials: See Environment variables (TL;DR at the top) for how creden
 
 ## Directory layout
 
-Networka expects a modular configuration rooted at the platform-specific application directory created by `nw config init` (Linux: `~/.config/networka`, macOS: `~/Library/Application Support/networka`, Windows: `%APPDATA%\networka`). Within that root, place configuration under the `config/` directory:
+Networka expects a modular configuration rooted at the platform-specific application directory created by `nw config init` (Linux: `~/.config/networka`, macOS: `~/Library/Application Support/networka`, Windows: `%APPDATA%\networka`):
 
 ```text
-config/
+~/.config/networka/
 ├── config.yml                 # Optional global defaults
 ├── devices/                   # Device definitions (YAML or CSV)
 │   ├── router1.yml
@@ -18,11 +18,15 @@ config/
 │   ├── core.yml
 │   └── teams.csv
 └── sequences/                 # Reusable command sequences per vendor or shared
-    ├── common.yml
-    └── mikrotik_routeros.yml
+    ├── user/                  # User-defined sequences
+    │   └── my_sequences.yml
+    └── custom/                # Highest priority (created by init)
+        └── custom.yml
 ```
 
 Networka loads all files in these folders. Later files override earlier ones when names collide.
+
+Built-in sequences are shipped with the package and don't appear in the config directory.
 
 ## Common concepts (applies to YAML and CSV)
 
@@ -41,7 +45,7 @@ YAML gives you clarity, comments, nesting, and future-proofing. Prefer it for ev
 ### Minimal device
 
 ```yaml
-# config/devices/router1.yml
+# ~/.config/networka/devices/router1.yml
 host: 192.0.2.10
 device_type: mikrotik_routeros
 tags: [edge, router]
@@ -50,13 +54,13 @@ tags: [edge, router]
 ### Group examples
 
 ```yaml
-# config/groups/core.yml
+# ~/.config/networka/groups/core.yml
 name: core
 description: Core network devices
 members: [sw-01, sw-02]
 
 ---
-# config/groups/edge.yml
+# ~/.config/networka/groups/edge.yml
 name: edge
 description: Edge devices
 match_tags: [edge]
@@ -65,7 +69,7 @@ match_tags: [edge]
 ### Sequence example
 
 ```yaml
-# config/sequences/common.yml
+# ~/.config/networka/sequences/user/common.yml
 health_check:
   description: Basic health check
   commands:
@@ -133,7 +137,7 @@ Mixing is supported. If both YAML and CSV define the same device/group/sequence 
 
 ## Global settings (config.yml)
 
-The optional `config/config.yml` file can specify global defaults that apply to all devices. This is particularly useful for SSH security settings and connection timeouts.
+The optional `~/.config/networka/config.yml` file can specify global defaults that apply to all devices. This is particularly useful for SSH security settings and connection timeouts.
 
 ### SSH security settings
 
@@ -147,7 +151,7 @@ The optional `config/config.yml` file can specify global defaults that apply to 
   - When `true`: Strict mode - fails on any unknown or changed host key (most secure, but requires manual key management)
   - With `--no-strict-host-key-checking` flag: Completely disables all verification (INSECURE - lab use only)
 
-Example `config/config.yml`:
+Example `~/.config/networka/config.yml`:
 
 ```yaml
 general:

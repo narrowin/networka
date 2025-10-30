@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -41,8 +42,10 @@ def test_iter_commands_splits_and_trims() -> None:
 
 
 @pytest.mark.asyncio
-async def test_execution_service_build_and_run_plan_smoke(monkeypatch: Any) -> None:
-    data = TuiData("config")
+async def test_execution_service_build_and_run_plan_smoke(
+    monkeypatch: Any, mock_repo_config: Path
+) -> None:
+    data = TuiData(str(mock_repo_config))
     svc = ExecutionService(data, concurrency=2)
 
     devices = data.targets().devices[:2]

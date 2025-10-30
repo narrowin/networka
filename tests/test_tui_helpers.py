@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from network_toolkit.common.resolver import DeviceResolver
 from network_toolkit.config import load_config
 
 
-def test_resolver_is_device_and_is_group() -> None:
-    cfg = load_config("config")
+def test_resolver_is_device_and_is_group(mock_repo_config: Path) -> None:
+    cfg = load_config(str(mock_repo_config))
     r = DeviceResolver(cfg)
 
     # Take first device/group names if present
@@ -20,8 +22,8 @@ def test_resolver_is_device_and_is_group() -> None:
         assert r.is_group(grp)
 
 
-def test_resolver_resolve_targets_devices_and_groups() -> None:
-    cfg = load_config("config")
+def test_resolver_resolve_targets_devices_and_groups(mock_repo_config: Path) -> None:
+    cfg = load_config(str(mock_repo_config))
     r = DeviceResolver(cfg)
 
     if not cfg.devices:
@@ -43,8 +45,8 @@ def test_resolver_resolve_targets_devices_and_groups() -> None:
         assert "no_such_target" in unknown or not unknown  # allow all-valid configs
 
 
-def test_resolver_get_group_members_matches_config() -> None:
-    cfg = load_config("config")
+def test_resolver_get_group_members_matches_config(mock_repo_config: Path) -> None:
+    cfg = load_config(str(mock_repo_config))
     r = DeviceResolver(cfg)
     if not cfg.device_groups:
         pytest.skip("No groups present")
@@ -55,7 +57,7 @@ def test_resolver_get_group_members_matches_config() -> None:
             assert cfg.devices and m in cfg.devices
 
 
-def test_resolver_effective_config_defaults_to_original() -> None:
-    cfg = load_config("config")
+def test_resolver_effective_config_defaults_to_original(mock_repo_config: Path) -> None:
+    cfg = load_config(str(mock_repo_config))
     r = DeviceResolver(cfg)
     assert r.effective_config is cfg

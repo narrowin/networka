@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -10,8 +11,8 @@ from network_toolkit.tui.services import DeviceRunResult, ExecutionService
 
 
 @pytest.mark.asyncio
-async def test_service_respects_pre_start_cancellation(monkeypatch: Any) -> None:
-    data = TuiData("config")
+async def test_service_respects_pre_start_cancellation(mock_repo_config: Path) -> None:
+    data = TuiData(str(mock_repo_config))
     svc = ExecutionService(data, concurrency=2)
     plan = {"d1": ["cmd1"], "d2": ["cmd2"]}
     cancel = CancellationToken()
@@ -47,8 +48,10 @@ async def test_service_respects_pre_start_cancellation(monkeypatch: Any) -> None
 
 
 @pytest.mark.asyncio
-async def test_service_emits_outputs_grouped_and_ordered(monkeypatch: Any) -> None:
-    data = TuiData("config")
+async def test_service_emits_outputs_grouped_and_ordered(
+    monkeypatch: Any, mock_repo_config: Path
+) -> None:
+    data = TuiData(str(mock_repo_config))
     svc = ExecutionService(data, concurrency=2)
     plan = {"a": ["c1", "c2"], "b": ["c3"]}
 

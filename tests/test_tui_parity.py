@@ -18,10 +18,10 @@ def _non_empty_dict(d: dict[str, Any] | None) -> dict[str, Any]:
     return d or {}
 
 
-def test_tui_targets_match_config_devices_and_groups() -> None:
+def test_tui_targets_match_config_devices_and_groups(mock_repo_config: Path) -> None:
     # Load via same discovery as CLI and TUI default
-    cfg: NetworkConfig = load_config("config")
-    data = TuiData("config")
+    cfg: NetworkConfig = load_config(str(mock_repo_config))
+    data = TuiData(str(mock_repo_config))
 
     targets = data.targets()
 
@@ -36,10 +36,10 @@ def test_tui_targets_match_config_devices_and_groups() -> None:
     assert tui_groups == cfg_groups
 
 
-def test_tui_sequences_are_union_of_known_sources() -> None:
-    cfg: NetworkConfig = load_config("config")
+def test_tui_sequences_are_union_of_known_sources(mock_repo_config: Path) -> None:
+    cfg: NetworkConfig = load_config(str(mock_repo_config))
     sm = SequenceManager(cfg)
-    data = TuiData("config")
+    data = TuiData(str(mock_repo_config))
 
     tui_seq = set(data.actions().sequences)
 
@@ -62,8 +62,8 @@ def test_tui_sequences_are_union_of_known_sources() -> None:
     assert "" not in tui_seq
 
 
-def test_all_groups_resolve_to_devices() -> None:
-    cfg: NetworkConfig = load_config("config")
+def test_all_groups_resolve_to_devices(mock_repo_config: Path) -> None:
+    cfg: NetworkConfig = load_config(str(mock_repo_config))
 
     if not cfg.device_groups:
         pytest.skip("No groups defined in config")

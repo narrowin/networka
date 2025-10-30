@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from unittest.mock import Mock, patch
+from pathlib import Path
+from unittest.mock import patch
 
 from typer.testing import CliRunner
 
@@ -11,43 +12,46 @@ from network_toolkit.common.output import OutputMode
 from network_toolkit.common.styles import StyleManager, StyleName
 
 
-def test_color_system_no_color_mode() -> None:
+def test_color_system_no_color_mode(mock_repo_config: Path) -> None:
     """Test that no-color mode works without errors."""
+    from network_toolkit.config import load_config
+
     runner = CliRunner()
 
-    # Create a mock config with empty devices
-    mock_config = Mock()
-    mock_config.devices = {}
+    # Use actual config loading with fixture
+    config = load_config(str(mock_repo_config))
 
-    with patch("network_toolkit.config.load_config", return_value=mock_config):
+    with (
+        patch("network_toolkit.config.load_config", return_value=config),
+        patch("network_toolkit.commands.list.load_config", return_value=config),
+    ):
         # Test the command works in no-color mode
         result = runner.invoke(app, ["list", "devices", "--output-mode", "no-color"])
 
         # Should not crash with color errors
         assert result.exit_code == 0
-        # Should not contain color markup in output
+        # Should not contain color markup in output (or shows "No devices configured")
         assert "[" not in result.stdout or "No devices configured" in result.stdout
 
 
-def test_color_system_default_mode() -> None:
+def test_color_system_default_mode(mock_repo_config: Path) -> None:
     """Test that default color mode works."""
+    from network_toolkit.config import load_config
+
     runner = CliRunner()
 
-    # Create a mock config with a device
-    mock_config = Mock()
-    mock_device = Mock()
-    mock_device.host = "192.168.1.1"
-    mock_device.port = 22
-    mock_device.platform = "routeros"
-    mock_device.groups = []
-    mock_config.devices = {"test-device": mock_device}
+    # Use actual config loading with fixture
+    config = load_config(str(mock_repo_config))
 
-    with patch("network_toolkit.config.load_config", return_value=mock_config):
+    with (
+        patch("network_toolkit.config.load_config", return_value=config),
+        patch("network_toolkit.commands.list.load_config", return_value=config),
+    ):
         # Test the command works in default mode
         result = runner.invoke(app, ["list", "devices"])
 
         # Should not crash
-        assert result.exit_code == 0
+        assert result.exit_code == 0, f"Command failed: {result.stdout}"
 
 
 def test_style_manager_no_color_returns_none() -> None:

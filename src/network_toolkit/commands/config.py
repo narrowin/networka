@@ -10,11 +10,8 @@ from typing import Annotated, cast
 
 import typer
 
-from network_toolkit import __version__
 from network_toolkit.common.command_helpers import CommandContext
-from network_toolkit.common.config_manifest import ConfigManifest
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
-from network_toolkit.common.file_utils import calculate_checksum
 from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import (
     OutputMode,
@@ -216,19 +213,13 @@ groups:
     (groups_dir / "groups.yml").write_text(groups_content)
 
 
-def create_example_sequences(sequences_dir: Path) -> list[Path]:
-    """Create example sequence configurations.
+def create_example_sequences(sequences_dir: Path) -> None:
+    """Create custom sequences directory with example files.
 
-    Returns:
-        List of framework files created (for tracking)
+    Creates custom/ directory for user sequences with README and example files.
+    Built-in sequences are shipped with the package and don't need initialization.
     """
     sequences_dir.mkdir(parents=True, exist_ok=True)
-
-    # Import framework file warning
-    from network_toolkit.common.file_utils import get_framework_file_warning
-
-    warning = get_framework_file_warning()
-    framework_files: list[Path] = []
 
     # Create custom/ directory for user sequences
     custom_dir = sequences_dir / "custom"
@@ -239,7 +230,7 @@ def create_example_sequences(sequences_dir: Path) -> list[Path]:
     custom_readme_content = """# Custom Sequences
 
 This directory is for your custom command sequences. Files here take precedence
-over framework-provided sequences.
+over built-in sequences shipped with the package.
 
 ## Usage
 
@@ -262,111 +253,40 @@ To create vendor-specific sequences, prefix the filename:
 - `cisco_iosxe_custom.yml` - Cisco IOS-XE only
 - `my_sequences.yml` - Available to all vendors
 
-Custom sequences are never modified by `nw config update`.
+## Sequence Resolution
+
+The tool searches for sequences in this order:
+1. custom/ directory (highest priority - you are here)
+2. user/ directory (user-defined sequences)
+3. Built-in sequences (shipped with package)
+
+Use `nw sequence list` to see all available sequences.
 """
     custom_readme.write_text(custom_readme_content)
 
-    sequences_content = (
-        warning
-        + """# Example Command Sequences
-sequences:
-  health_check:
-    description: "Basic device health check"
-    commands:
-      - "/system resource print"
-      - "/interface print brief"
+    # Create example sequence file
+    example_file = custom_dir / "example_custom.yml"
+    example_content = """# Example Custom Sequences
+#
+# Copy this file to create your own sequences.
+# Remove the # at the start of each line to activate.
 
-  backup_config:
-    description: "Backup device configuration"
-    commands:
-      - "/export file=backup"
+# sequences:
+#   my_health_check:
+#     description: "Custom health check for my environment"
+#     commands:
+#       - "show version"
+#       - "show inventory"
+#       - "show environment all"
+#
+#   my_interface_audit:
+#     description: "Audit all interfaces"
+#     commands:
+#       - "show ip interface brief"
+#       - "show interface status"
+#       - "show interface description"
 """
-    )
-
-    seq_file = sequences_dir / "sequences.yml"
-    seq_file.write_text(sequences_content)
-    framework_files.append(seq_file)
-
-    # Create vendor-specific directories (legacy naming for backward compat)
-    (sequences_dir / "mikrotik").mkdir(exist_ok=True)
-    (sequences_dir / "cisco").mkdir(exist_ok=True)
-
-    # Create vendor-specific sequences with warnings
-    mikrotik_content = (
-        warning
-        + """# MikroTik RouterOS Sequences
-system_info:
-  description: "System information and status"
-  commands:
-    - "/system resource print"
-    - "/system identity print"
-    - "/system clock print"
-
-interface_status:
-  description: "Interface status and configuration"
-  commands:
-    - "/interface print brief"
-    - "/ip address print"
-"""
-    )
-
-    cisco_content = (
-        warning
-        + """# Cisco IOS Sequences
-system_info:
-  description: "System information and status"
-  commands:
-    - "show version"
-    - "show running-config | include hostname"
-    - "show clock"
-
-interface_status:
-  description: "Interface status and configuration"
-  commands:
-    - "show ip interface brief"
-    - "show interface status"
-"""
-    )
-
-    mik_file = sequences_dir / "mikrotik" / "system.yml"
-    mik_file.write_text(mikrotik_content)
-    framework_files.append(mik_file)
-
-    cisco_file = sequences_dir / "cisco" / "system.yml"
-    cisco_file.write_text(cisco_content)
-    framework_files.append(cisco_file)
-
-    return framework_files
-
-
-def _validate_git_url(url: str) -> None:
-    """Validate Git URL for security."""
-    if not url:
-        msg = "Git URL cannot be empty"
-        raise ConfigurationError(msg)
-
-    if not url.startswith(("https://", "git@")):
-        msg = "Git URL must use HTTPS or SSH protocol"
-        raise ConfigurationError(msg)
-
-    # Block localhost and private IPs for security
-    if any(
-        pattern in url.lower()
-        for pattern in ["localhost", "127.", "192.168.", "10.", "172."]
-    ):
-        msg = "Private IP addresses not allowed in Git URLs"
-        raise ConfigurationError(msg)
-
-
-def _find_git_executable() -> str:
-    """Find git executable with full path for security."""
-    import shutil as sh
-
-    git_path = sh.which("git")
-    if not git_path:
-        msg = "Git executable not found in PATH"
-        raise ConfigurationError(msg)
-    return git_path
+    example_file.write_text(example_content)
 
 
 def _detect_repo_root() -> Path | None:
@@ -495,94 +415,6 @@ def activate_shell_completion(
         raise FileTransferError(msg) from e
 
 
-def install_sequences_from_repo(dest: Path) -> tuple[int, list[Path]]:
-    """Install sequences from the official Git repository with framework warnings.
-
-    Returns:
-        Tuple of (number of files installed, list of framework file paths)
-    """
-    import subprocess
-    import tempfile
-
-    from network_toolkit.common.file_utils import get_framework_file_warning
-
-    repo_url = "https://github.com/narrowin/networka.git"
-    _validate_git_url(repo_url)
-    git_exe = _find_git_executable()
-    warning = get_framework_file_warning()
-    framework_files: list[Path] = []
-
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        tmp_root = Path(tmp_dir) / "repo"
-        try:
-            subprocess.run(
-                [
-                    git_exe,
-                    "clone",
-                    "--depth",
-                    "1",
-                    "--branch",
-                    "main",
-                    repo_url,
-                    str(tmp_root),
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-
-            src = tmp_root / "config" / "sequences"
-            if not src.exists():
-                logger.debug("No sequences found in repo under config/sequences")
-                return (0, [])
-
-            # Copy sequences to destination with warnings
-            files_copied = 0
-            for item in src.iterdir():
-                if item.name.startswith(".git") or item.name == "custom":
-                    continue
-                target = dest / item.name
-                if item.is_dir():
-                    # Copy directory and add warnings to YAML files
-                    shutil.copytree(item, target, dirs_exist_ok=True)
-                    for yml_file in target.rglob("*.yml"):
-                        _add_warning_to_file(yml_file, warning)
-                        framework_files.append(yml_file)
-                    files_copied += 1
-                elif item.suffix in (".yml", ".yaml"):
-                    # Copy file and add warning
-                    shutil.copy2(item, target)
-                    _add_warning_to_file(target, warning)
-                    framework_files.append(target)
-                    files_copied += 1
-                else:
-                    shutil.copy2(item, target)
-                    files_copied += 1
-
-            logger.debug(
-                f"Copied {files_copied} sequence files from {repo_url} to {dest}"
-            )
-            return (files_copied, framework_files)
-
-        except subprocess.CalledProcessError as e:
-            error_msg = e.stderr if e.stderr else str(e)
-            msg = f"Git clone failed: {error_msg}"
-            raise FileTransferError(msg) from e
-        except OSError as e:
-            msg = f"Failed to copy sequences: {e}"
-            raise FileTransferError(msg) from e
-
-
-def _add_warning_to_file(file_path: Path, warning: str) -> None:
-    """Add framework warning to YAML file if not already present."""
-    try:
-        content = file_path.read_text(encoding="utf-8")
-        if "WARNING: Framework-managed file" not in content:
-            file_path.write_text(warning + content, encoding="utf-8")
-    except Exception as e:
-        logger.debug(f"Could not add warning to {file_path}: {e}")
-
-
 def install_editor_schemas(config_root: Path) -> int:
     """Install JSON schemas and VS Code settings for YAML editor validation.
 
@@ -675,7 +507,6 @@ def _config_init_impl(
     force: bool = False,
     yes: bool = False,
     dry_run: bool = False,
-    install_sequences: bool | None = None,
     install_completions: bool | None = None,
     shell: str | None = None,
     activate_completions: bool | None = None,
@@ -727,8 +558,6 @@ def _config_init_impl(
         return
 
     # Create directory structure and base config only if not skipping
-    framework_files_created: list[Path] = []
-
     if not skip_base_config:
         target_path.mkdir(parents=True, exist_ok=True)
         (target_path / "devices").mkdir(exist_ok=True)
@@ -749,9 +578,7 @@ def _config_init_impl(
         create_example_groups(target_path / "groups")
         ctx.print_success(f"Created example groups: {target_path / 'groups'}")
 
-        seq_files = create_example_sequences(target_path / "sequences")
-        framework_files_created.extend(seq_files)
-        ctx.print_success(f"Created example sequences: {target_path / 'sequences'}")
+        create_example_sequences(target_path / "sequences")
         ctx.print_success(
             f"Created custom sequences directory: {target_path / 'sequences' / 'custom'}"
         )
@@ -762,21 +589,12 @@ def _config_init_impl(
         target_path.mkdir(parents=True, exist_ok=True)
 
     # Handle optional features
-    do_install_sequences = False
     do_install_compl = False
     do_install_schemas = False
     chosen_shell: str | None = None
     do_activate_compl = False
 
     interactive_extras = interactive and not dry_run
-
-    if install_sequences is not None:
-        do_install_sequences = install_sequences
-    elif interactive_extras:
-        do_install_sequences = typer.confirm(
-            "Install additional predefined vendor sequences from GitHub?",
-            default=True,
-        )
 
     # Group all shell completion questions together
     chosen_shell = None
@@ -818,23 +636,6 @@ def _config_init_impl(
         )
 
     # Execute optional installations
-    if do_install_sequences:
-        try:
-            ctx.print_info("Installing additional vendor sequences...")
-            repo_url = "https://github.com/narrowin/networka.git"
-            files_installed, seq_files = install_sequences_from_repo(
-                target_path / "sequences",
-            )
-            framework_files_created.extend(seq_files)
-            if files_installed > 0:
-                ctx.print_success(
-                    f"Installed {files_installed} sequence files from {repo_url}"
-                )
-            else:
-                ctx.print_warning("No sequence files found in repository")
-        except Exception as e:
-            ctx.print_error(f"Failed to install sequences: {e}")
-
     if do_install_compl and chosen_shell:
         try:
             ctx.print_info(f"Installing {chosen_shell} shell completion...")
@@ -869,252 +670,6 @@ def _config_init_impl(
                 ctx.print_warning("No schema files could be downloaded")
         except Exception as e:
             ctx.print_error(f"Failed to install schemas: {e}")
-
-    # Create manifest to track framework files
-    if framework_files_created:
-        try:
-            manifest = ConfigManifest.create_new(__version__)
-            for file_path in framework_files_created:
-                if file_path.exists():
-                    rel_path = file_path.relative_to(target_path)
-                    checksum = calculate_checksum(file_path)
-                    manifest.add_file(str(rel_path), checksum, __version__)
-
-            manifest_file = target_path / ".nw-installed"
-            manifest.save(manifest_file)
-            ctx.print_success(f"Created installation manifest: {manifest_file}")
-            ctx.print_info(
-                f"Tracking {len(manifest.framework_files)} framework files for updates"
-            )
-        except Exception as e:
-            logger.debug(f"Failed to create manifest: {e}")
-            ctx.print_warning("Could not create installation manifest")
-
-
-def _config_update_impl(
-    config_dir: Path | None = None,
-    check_only: bool = False,
-    list_backups: bool = False,
-    force: bool = False,
-    yes: bool = False,
-    verbose: bool = False,
-) -> None:
-    """Implementation logic for config update."""
-    from datetime import UTC, datetime
-
-    from network_toolkit.common.file_utils import (
-        FileType,
-        classify_file,
-        get_framework_file_warning,
-    )
-
-    ctx = CommandContext()
-
-    # Resolve config directory
-    if config_dir is None:
-        config_dir = default_config_root()
-    else:
-        config_dir = Path(config_dir).expanduser().resolve()
-
-    if not config_dir.exists():
-        ctx.print_error(f"Config directory not found: {config_dir}")
-        raise typer.Exit(1)
-
-    # Handle --list-backups
-    if list_backups:
-        backup_root = config_dir / ".backup"
-        if not backup_root.exists() or not any(backup_root.iterdir()):
-            ctx.print_info("No backups found")
-            return
-
-        backups = sorted(
-            [d for d in backup_root.iterdir() if d.is_dir()],
-            reverse=True,
-        )
-        ctx.print_info(f"Available backups in {backup_root}:")
-        for backup_dir in backups:
-            ctx.print_detail_line("BACKUP", backup_dir.name)
-
-        if backups:
-            ctx.print_info("\nTo restore a backup manually:")
-            ctx.print_detail_line(
-                "COMMAND",
-                f"cp -r {backup_root}/<timestamp>/* {config_dir}/",
-            )
-        return
-
-    # Load manifest
-    manifest_file = config_dir / ".nw-installed"
-    if not manifest_file.exists():
-        ctx.print_warning("No installation manifest found")
-        ctx.print_info(
-            "Creating baseline manifest from current files for future updates..."
-        )
-        # Create baseline manifest
-        manifest = ConfigManifest.create_new(__version__)
-        for file in config_dir.rglob("*.yml"):
-            if classify_file(file, config_dir) == FileType.FRAMEWORK:
-                rel_path = file.relative_to(config_dir)
-                manifest.add_file(str(rel_path), calculate_checksum(file), "baseline")
-        manifest.save(manifest_file)
-        ctx.print_success(f"Created baseline manifest: {manifest_file}")
-        if not force:
-            ctx.print_info(
-                "Run 'nw config update' again to check for available updates"
-            )
-            return
-
-    manifest = ConfigManifest.load(manifest_file)
-
-    # Get framework files from repo
-    import subprocess
-    import tempfile
-
-    repo_url = "https://github.com/narrowin/networka.git"
-    ref = "main"
-
-    _validate_git_url(repo_url)
-    git_exe = _find_git_executable()
-    warning = get_framework_file_warning()
-
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        tmp_root = Path(tmp_dir) / "repo"
-        try:
-            # Clone repo to get latest framework files
-            subprocess.run(
-                [
-                    git_exe,
-                    "clone",
-                    "--depth",
-                    "1",
-                    "--branch",
-                    ref,
-                    repo_url,
-                    str(tmp_root),
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-
-            repo_sequences = tmp_root / "config" / "sequences"
-            if not repo_sequences.exists():
-                ctx.print_info("No framework sequences found in repository")
-                return
-
-            # Compare and collect updates
-            updates: list[tuple[Path, Path, str]] = []  # (src, dest, action)
-
-            for repo_file in repo_sequences.rglob("*.yml"):
-                if "custom" in repo_file.parts:
-                    continue  # Skip custom directory
-
-                rel_path = repo_file.relative_to(repo_sequences)
-                user_file = config_dir / "sequences" / rel_path
-
-                # Calculate checksums
-                repo_checksum = calculate_checksum(repo_file)
-
-                if not user_file.exists():
-                    # New file
-                    updates.append((repo_file, user_file, "NEW"))
-                    continue
-
-                # Check if tracked
-                manifest_key = str(Path("sequences") / rel_path)
-                if not manifest.is_file_tracked(manifest_key):
-                    ctx.print_info(f"Skipping user-created file: {rel_path}")
-                    continue
-
-                # Get original checksum
-                file_info = manifest.get_file_info(manifest_key)
-                if not file_info:
-                    continue
-
-                current_checksum = calculate_checksum(user_file)
-
-                if current_checksum != file_info.checksum:
-                    if force:
-                        ctx.print_warning(f"Force updating modified file: {rel_path}")
-                        updates.append((repo_file, user_file, "FORCED"))
-                    else:
-                        ctx.print_info(f"Skipping modified file: {rel_path}")
-                    continue
-
-                if current_checksum == repo_checksum:
-                    # No changes
-                    continue
-
-                # Unmodified and different - safe to update
-                updates.append((repo_file, user_file, "UPDATE"))
-
-            if not updates:
-                ctx.print_success(
-                    "No updates available - all framework files are current"
-                )
-                return
-
-            # Show what will be updated
-            ctx.print_info(f"Found {len(updates)} updates:")
-            for _repo_file, user_file, action in updates:
-                rel_path = user_file.relative_to(config_dir)
-                ctx.print_detail_line(action, str(rel_path))
-
-            if check_only:
-                ctx.print_info("Check complete (use without --check to apply updates)")
-                return
-
-            # Confirm
-            if not yes:
-                if not typer.confirm("Apply these updates?", default=True):
-                    ctx.print_info("Update cancelled")
-                    return
-
-            # Create timestamped backup
-            backup_dir = (
-                config_dir / ".backup" / datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
-            )
-            backup_dir.mkdir(parents=True, exist_ok=True)
-            ctx.print_info(f"Creating backup: {backup_dir}")
-
-            # Apply updates
-            updated_count = 0
-            for repo_file, user_file, _action in updates:
-                try:
-                    # Backup existing file
-                    if user_file.exists():
-                        rel_path = user_file.relative_to(config_dir)
-                        backup_file = backup_dir / rel_path
-                        backup_file.parent.mkdir(parents=True, exist_ok=True)
-                        shutil.copy2(user_file, backup_file)
-
-                    # Copy new file with warning
-                    user_file.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(repo_file, user_file)
-                    _add_warning_to_file(user_file, warning)
-
-                    # Update manifest
-                    rel_path = user_file.relative_to(config_dir)
-                    new_checksum = calculate_checksum(user_file)
-                    manifest.add_file(str(rel_path), new_checksum, __version__)
-
-                    updated_count += 1
-                except Exception as e:
-                    ctx.print_error(f"Failed to update {user_file}: {e}")
-
-            # Save updated manifest
-            manifest.save(manifest_file)
-
-            ctx.print_success(f"Updated {updated_count} framework files")
-            ctx.print_success(f"Backup saved to: {backup_dir}")
-
-        except subprocess.CalledProcessError as e:
-            error_msg = e.stderr if e.stderr else str(e)
-            ctx.print_error(f"Git clone failed: {error_msg}")
-            raise typer.Exit(1) from e
-        except Exception as e:
-            ctx.print_error(f"Update failed: {e}")
-            raise typer.Exit(1) from e
 
 
 def _config_validate_impl(
@@ -1227,13 +782,6 @@ def register(app: typer.Typer) -> None:
         dry_run: Annotated[
             bool, typer.Option("--dry-run", help="Show actions without writing changes")
         ] = False,
-        install_sequences: Annotated[
-            bool | None,
-            typer.Option(
-                "--install-sequences/--no-install-sequences",
-                help="Install additional predefined vendor sequences from GitHub",
-            ),
-        ] = None,
         install_completions: Annotated[
             bool | None,
             typer.Option(
@@ -1270,10 +818,11 @@ def register(app: typer.Typer) -> None:
         - config.yml with core settings
         - devices/ with MikroTik and Cisco examples
         - groups/ with tag-based and explicit groups
-        - sequences/ with global and vendor-specific sequences
+        - sequences/ with example custom sequences
         - JSON schemas for YAML editor validation (optional)
         - Shell completions (optional)
-        - Additional predefined sequences from GitHub (optional)
+
+        All command sequences are built into the tool and available immediately.
 
         Default locations by OS:
         - Linux: ~/.config/networka/
@@ -1297,7 +846,6 @@ def register(app: typer.Typer) -> None:
                 force=force,
                 yes=yes,
                 dry_run=dry_run,
-                install_sequences=install_sequences,
                 install_completions=install_completions,
                 shell=shell,
                 activate_completions=activate_completions,
@@ -1397,76 +945,5 @@ def register(app: typer.Typer) -> None:
         except Exception as e:  # pragma: no cover - unexpected
             ctx.print_error(f"Unexpected error: {e}")
             raise typer.Exit(1) from None
-
-    @config_app.command("update")
-    def update(
-        config_dir: Annotated[
-            Path | None,
-            typer.Option(
-                "--config-dir", "-c", help="Configuration directory to update"
-            ),
-        ] = None,
-        check: Annotated[
-            bool,
-            typer.Option("--check", help="Check for updates without applying them"),
-        ] = False,
-        list_backups: Annotated[
-            bool,
-            typer.Option("--list-backups", help="List available backup timestamps"),
-        ] = False,
-        force: Annotated[
-            bool,
-            typer.Option("--force", help="Update even user-modified framework files"),
-        ] = False,
-        yes: Annotated[
-            bool,
-            typer.Option("--yes", "-y", help="Skip confirmation prompts"),
-        ] = False,
-        verbose: Annotated[
-            bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
-        ] = False,
-    ) -> None:
-        """Update framework-provided configuration files.
-
-        Updates framework-managed sequence files to the latest version while
-        preserving user-created and modified files.
-
-        Protected files (never updated):
-          - .env (credentials)
-          - devices/* (user devices)
-          - groups/* (user groups)
-          - sequences/custom/* (user custom sequences)
-
-        Framework files (safe to update if unmodified):
-          - sequences/*/common.yml (platform sequences)
-          - sequences/sequences.yml (framework config)
-          - schemas/* (JSON schemas)
-
-        Creates timestamped backup in ~/.config/networka/.backup/YYYYMMDD_HHMMSS/
-        before applying updates.
-
-        Manual rollback after an update:
-          cp -r ~/.config/networka/.backup/20251016_153000/* ~/.config/networka/
-
-        List available backups:
-          nw config update --list-backups
-        """
-        setup_logging("DEBUG" if verbose else "WARNING")
-
-        try:
-            _config_update_impl(
-                config_dir=config_dir,
-                check_only=check,
-                list_backups=list_backups,
-                force=force,
-                yes=yes,
-                verbose=verbose,
-            )
-        except typer.Exit:
-            raise
-        except Exception as e:  # pragma: no cover - unexpected
-            ctx = CommandContext()
-            ctx.print_error(f"Unexpected error: {e}")
-            raise typer.Exit(1) from e
 
     app.add_typer(config_app, name="config", rich_help_panel="Info & Configuration")

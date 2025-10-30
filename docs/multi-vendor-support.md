@@ -26,10 +26,10 @@ The architecture is designed to easily support additional vendors by:
 
 ### Vendor-Specific Sequences
 
-Sequences are organized by vendor platform following Scrapli naming conventions:
+Built-in sequences are shipped with the package and organized by vendor platform following Scrapli naming conventions:
 
 ```text
-config/sequences/
+<package>/builtin_sequences/
 ├── mikrotik_routeros/
 │   └── common.yml
 ├── cisco_iosxe/
@@ -39,20 +39,18 @@ config/sequences/
 ├── arista_eos/
 │   └── common.yml
 └── juniper_junos/
-  └── common.yml
+    └── common.yml
 ```
 
 ### Sequence Resolution Order
 
-When executing a sequence, the toolkit resolves commands in this priority order:
+When executing a sequence, the toolkit resolves commands in this priority order (highest to lowest):
 
-1. **Custom user sequences** (`sequences/custom/*.yml` in the user config directory)
-2. **User-defined vendor sequences** (`sequences/<vendor>/*.yml` in the user config directory)
-3. **Repository/vendor sequences** shipped with the project (`config/sequences/<vendor>/*.yml`)
-4. **Built-in sequences** packaged with Networka (`src/network_toolkit/builtin_sequences`)
-5. **Device-specific overrides** defined directly on a device entry
+1. **Custom user sequences** (`~/.config/networka/sequences/custom/*.yml`) - Highest priority
+2. **User-defined sequences** (`~/.config/networka/sequences/user/*.yml`)
+3. **Built-in sequences** (shipped with package)
 
-If a sequence name is defined at multiple levels, the higher level overrides the lower ones. The legacy `config.vendor_sequences` entries remain a fallback only when no higher-precedence definition exists.
+If a sequence name is defined at multiple levels, the higher level overrides the lower ones.
 
 ### Device Configuration
 
@@ -200,12 +198,12 @@ nw run mikrotik_devices system_info
 ### Step 1: Create Vendor Directory
 
 ```bash
-mkdir -p config/sequences/new_vendor
+mkdir -p ~/.config/networka/sequences/user/new_vendor
 ```
 
 ### Step 2: Create Sequence File
 
-Create `config/sequences/new_vendor/common.yml`:
+Create `~/.config/networka/sequences/user/new_vendor_common.yml`:
 
 ```yaml
 sequences:
@@ -219,17 +217,7 @@ sequences:
       # ... vendor-specific commands
 ```
 
-### Step 3: Update Platform Configuration
-
-Add to `sequences.yml`:
-
-```yaml
-vendor_platforms:
-  new_vendor:
-    description: "New Vendor devices"
-    sequence_path: "sequences/new_vendor"
-    default_files: ["common.yml"]
-```
+Sequences are automatically discovered when named following the pattern `<vendor>_*.yml`.
 
 ### Step 4: Configure Devices
 

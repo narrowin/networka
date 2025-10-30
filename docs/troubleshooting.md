@@ -45,7 +45,7 @@ nw cli router1 --no-strict-host-key-checking
 ### Option 3: Enable strict mode globally (maximum security)
 
 ```yaml
-# config/config.yml
+# ~/.config/networka/config.yml
 general:
   ssh_strict_host_key_checking: true  # Fail on any unknown/changed key
 ```
@@ -72,7 +72,7 @@ general:
 
 ## Configuration loading
 
-- Check files are in the correct directories under `config/`.
+- Check files are in the correct directories under `~/.config/networka/`.
 - For CSV, ensure headers match the documented schema.
 - See: Configuration (CSV).
 

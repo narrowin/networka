@@ -20,8 +20,8 @@ from network_toolkit.config import load_config
 from network_toolkit.device import DeviceSession
 from pathlib import Path
 
-# Load configuration
-config = load_config("config/")
+# Load configuration from default location
+config = load_config()
 
 # Upload a file to a single device
 with DeviceSession("router1", config) as session:

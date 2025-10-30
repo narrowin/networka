@@ -1,62 +1,62 @@
-# Built-in Cisco NX-OS Command Sequences
+# Built-in Cisco NX-OS sequences
+# Essential command sequences shipped with Networka
+
 sequences:
   system_info:
-    description: "Complete system information gathering"
+    description: "System information and version"
     category: "information"
-    timeout: 60
+    timeout: 30
     commands:
       - "show version"
       - "show inventory"
-      - "show clock"
       - "show environment"
-      - "show processes cpu"
 
   health_check:
-    description: "Basic health check for device monitoring"
+    description: "Device health status"
     category: "monitoring"
-    timeout: 45
+    timeout: 30
     commands:
       - "show processes cpu"
       - "show system resources"
-      - "show clock"
-      - "show interface status"
       - "show logging last 10"
 
-  interface_status:
-    description: "Detailed interface status and statistics"
+  interfaces:
+    description: "Interface status and configuration"
     category: "network"
-    timeout: 60
+    timeout: 30
     commands:
+      - "show ip interface brief vrf all"
       - "show interface status"
-      - "show interface counters"
       - "show interface description"
-      - "show interface trunk"
 
-  routing_info:
-    description: "Routing table and protocol information"
+  routing:
+    description: "Routing table and neighbors"
     category: "network"
-    timeout: 60
+    timeout: 30
     commands:
-      - "show ip route"
-      - "show ip ospf neighbors"
-      - "show ip bgp summary"
-      - "show ip protocols"
-
-  security_audit:
-    description: "Security configuration audit"
-    category: "security"
-    timeout: 120
-    commands:
-      - "show running-config | include username"
-      - "show aaa"
-      - "show ip access-lists"
-      - "show logging"
+      - "show ip route vrf all"
+      - "show cdp neighbors"
+      - "show ip arp"
 
   backup_config:
-    description: "Create comprehensive device backup"
+    description: "Configuration backup"
     category: "maintenance"
-    timeout: 180
+    timeout: 60
     commands:
       - "show running-config"
       - "show startup-config"
-      - "show version"
+
+  vlans:
+    description: "VLAN configuration"
+    category: "network"
+    timeout: 30
+    commands:
+      - "show vlan brief"
+      - "show spanning-tree summary"
+
+  logs:
+    description: "Recent system logs"
+    category: "monitoring"
+    timeout: 30
+    commands:
+      - "show logging logfile"

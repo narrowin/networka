@@ -86,17 +86,15 @@ Two flavors exist:
 - Comprehensive backup: `nw backup comprehensive <device|group>`
   - Uses export plus system backup (e.g., `/system/backup/save name=nw-system-backup`).
 
-You can also define/override sequences under config: `config/sequences/mikrotik_routeros/common.yml`.
+You can also define/override sequences under: `~/.config/networka/sequences/user/mikrotik_custom.yml`.
 
 ## Built-in command sequences
 
 RouterOS includes built-in sequences you can reference via `nw run <device> <sequence-name>` or include in your configuration. Examples include:
 
-- `system_info`, `health_check`, `interface_status`, `routing_info`, `security_audit`
+- `system_info`, `health_check`, `interfaces`, `routing`, `backup_config`, `firewall`, `logs`
 
-See file: `src/network_toolkit/builtin_sequences/mikrotik_routeros/common.yml`
-
-Project configuration examples for global or device-level sequences live under: `config/sequences/mikrotik_routeros/common.yml`.
+Built-in sequences are shipped with the package. Use `nw sequence list --vendor mikrotik_routeros` to see all available sequences.
 
 ## Examples
 
@@ -117,6 +115,6 @@ nw config-backup router1 --download --delete-remote
 
 ## Notes and tips
 
-- Set `general.firmware_dir` and `general.backup_dir` in `config/config.yml`.
+- Set `general.firmware_dir` and `general.backup_dir` in `~/.config/networka/config.yml`.
 - Transport: SSH is recommended; interactive confirmations are handled by Networka.
 - Results and logs can be stored under `results/` and `logs/` if enabled.

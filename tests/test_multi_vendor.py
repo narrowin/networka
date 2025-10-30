@@ -229,7 +229,7 @@ class TestMultiVendorSupport:
         assert arista_commands is not None
         assert "show version" in arista_commands
         assert "show inventory" in arista_commands
-        assert "show environment" in arista_commands
+        assert "show environment all" in arista_commands
 
     def test_vendor_sequence_resolution_not_found(
         self, multi_vendor_config_dir: Path

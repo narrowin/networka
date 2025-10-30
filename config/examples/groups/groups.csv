@@ -1,8 +1,0 @@
-name,description,members,match_tags
-lab_devices,All devices in the lab environment,sw-lab-01;sw-lab-02,lab
-office_infrastructure,Office networking equipment,,office;wireless
-critical_devices,Mission critical network devices,,critical
-edge_devices,Edge routers and firewalls,,edge
-switches_all,All network switches,,switch
-routers_all,All network routers,,router
-wireless_all,All wireless access points,,wireless
