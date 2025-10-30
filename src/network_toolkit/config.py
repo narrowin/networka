@@ -366,6 +366,9 @@ class NetworkConfig(BaseModel):
     vendor_sequences: dict[str, dict[str, VendorSequence]] | None = None
     global_command_sequences: dict[str, VendorSequence] | None = None
 
+    # Private: track where this config was loaded from (for sequence resolution)
+    _config_source_dir: Path | None = PrivateAttr(default=None)
+
     # Helper: device source path accessor (non-schema, uses PrivateAttr on DeviceConfig)
     def get_device_source_path(self, device_name: str) -> Path | None:
         dev = self.devices.get(device_name) if self.devices else None
@@ -1200,6 +1203,9 @@ def load_modular_config(
 
         # Build the model and then assign private source paths
         model = NetworkConfig(**merged_config)
+
+        # Store the config source directory for sequence resolution
+        model._config_source_dir = config_dir
 
         if model.devices:
             # Persist source on each device instance (private attr via setter)
