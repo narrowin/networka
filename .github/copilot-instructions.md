@@ -41,8 +41,20 @@ NONEGOITIABLE: As a first sentence in your response, always state: "I have read 
 2. Verify no duplicate or confusing messages
 3. Ensure proper exception handling separation
 4. Confirm tests cover real user scenarios
-5. **ALWAYS run `uv run ruff check src/ tests/` and fix all issues**
-6. **Follow commit conventions** - See CONTRIBUTING.md for Conventional Commits format
+5. **MANDATORY: Run `uv run ruff check --fix --unsafe-fixes .` to fix ALL lint issues**
+6. **MANDATORY: Run `uv run pre-commit run --all-files` before ANY commit**
+7. **Follow commit conventions** - See CONTRIBUTING.md for Conventional Commits format
+
+### CRITICAL: Pre-commit Workflow
+
+**NEVER SKIP THIS - ALWAYS RUN THIS WHEN YOU FINISH A TASK AND BEFORE EVERY COMMIT*
+
+```bash
+uv run ruff check --fix --unsafe-fixes .
+uv run pre-commit run --all-files
+```
+
+If pre-commit fails, fix the issues and run again. Do NOT commit until pre-commit passes.
 
 ## CONFIGURATION FILE LOCATIONS
 

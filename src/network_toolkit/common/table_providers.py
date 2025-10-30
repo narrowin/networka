@@ -328,7 +328,7 @@ class SupportedPlatformsTableProvider(BaseModel, BaseTableProvider):
         """Get raw data for JSON/CSV output."""
         lines = []
         for row in self.get_table_rows():
-            platform, device_type, transport, operations = row
+            platform, device_type, transport, _operations = row
             lines.append(
                 f"platform={platform} device_type={device_type} transport={transport}"
             )
@@ -494,7 +494,7 @@ class TransportInfoTableProvider(BaseModel, BaseTableProvider):
         """Get raw data for JSON/CSV output."""
         lines = []
         for row in self.get_table_rows():
-            transport, description, mapping = row
+            transport, description, _mapping = row
             lines.append(f"transport={transport} description={description}")
         return "\n".join(lines)
 
@@ -536,7 +536,7 @@ class DeviceTypesInfoTableProvider(BaseModel, BaseTableProvider):
         """Get raw data for JSON/CSV output."""
         lines = []
         for row in self.get_table_rows():
-            device_type, description, platform_ops, transport = row
+            device_type, description, platform_ops, _transport = row
             lines.append(
                 f"device_type={device_type} description={description} platform_ops={platform_ops}"
             )
