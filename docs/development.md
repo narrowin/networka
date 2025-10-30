@@ -2,6 +2,8 @@
 
 This guide is for contributors and maintainers working on the Networka codebase.
 
+For information about project governance, decision-making, and stability commitments, see [GOVERNANCE.md](https://github.com/narrowin/networka/blob/main/GOVERNANCE.md) in the repository root.
+
 ## Quick start
 
 ### Prerequisites

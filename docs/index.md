@@ -41,6 +41,14 @@ Command completed successfully
 - Rich CLI output with selectable output modes
 - Type-safe internals (mypy), clean CLI (Typer + Rich)
 
+## Project Model
+
+- **License**: Apache 2.0 - unrestricted use
+- **Cost**: Free, no paid features.
+- **Development**: Open source, accepting contributions
+- **Support**: Community via GitHub issues
+- **Maintenance**: [narrowin](https://narrowin.ch/en/about.html) engineering team and community contributors
+
 ## Installation
 
 Start with the Installation, then explore the User guide for config, environment variables, output modes, results, and more.

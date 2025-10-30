@@ -2,6 +2,8 @@
 
 Thank you for your interest in contributing to the Network Toolkit!
 
+For information about project governance, decision-making, and stability commitments, see [GOVERNANCE.md](GOVERNANCE.md).
+
 ## Development Setup
 
 1. Clone the repository:

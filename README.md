@@ -5,6 +5,11 @@
 
 <br/>
 
+Network automation CLI. Apache 2.0 licensed. Fully open-source.
+Originally developed at [narrowin](https://narrowin.ch/en/about.html), now community maintained.
+
+<br/>
+
 **Networka: `Eierlegende Wollmilchsau` of network operations — optimized for your daily workflows.**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
@@ -17,7 +22,7 @@
 
 Networka is a modern CLI tool for automating network devices across multiple vendors. Designed for network engineers who want fast, scalable automation with full cross-platform support.
 
-Built almost entirely with agentic-AI, this is an experiment that turned into something genuinely useful.
+Built with the help of agentic-AI with human in the loo, this started as an experiment that turned into something genuinely useful.
 
 ---
 
@@ -235,7 +240,11 @@ Have a look through existing [Issues](https://github.com/narrowin/networka/issue
 
 ## License
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+Apache License 2.0 - Free for commercial and personal use.
+No paid tiers, no enterprise versions, no licensing restrictions.
+
+Community-driven project with contributions from [narrowin](https://narrowin.ch/en/about.html) and network engineers worldwide.
+See [GOVERNANCE.md](GOVERNANCE.md) for maintenance and decision-making model.
 
 ## Acknowledgments
 
