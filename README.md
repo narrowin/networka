@@ -17,7 +17,6 @@ Originally developed at [narrowin](https://narrowin.ch/en/about.html), now commu
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Type checked with mypy](https://img.shields.io/badge/mypy-checked-blue.svg)](http://mypy-lang.org/)
-[![CI](https://github.com/narrowin/networka/actions/workflows/ci.yml/badge.svg)](https://github.com/narrowin/networka/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/github/actions/workflow/status/narrowin/networka/docs.yml?label=Docs&logo=github)](https://narrowin.github.io/networka/)
 
 Networka is a modern CLI tool for automating network devices across multiple vendors. Designed for network engineers who want fast, scalable automation with full cross-platform support.
