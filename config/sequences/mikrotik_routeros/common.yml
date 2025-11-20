@@ -66,6 +66,18 @@ sequences:
       - "/interface/print"
       - "/interface/bridge/print"
 
+  spanning_tree_analysis:
+    description: "Complete Spanning Tree Protocol analysis"
+    category: "network"
+    timeout: 90
+    commands:
+      - "/interface/bridge/print detail"
+      - "/interface/bridge/port/print detail"
+      - "/interface/bridge/port/monitor [find] once"
+      - "/interface/bridge/monitor bridge once"
+      - "/interface/bridge/vlan/print"
+      - "/log/print where topics~\"rstp\""
+
   routing_info:
     description: "Routing table and protocol information"
     category: "network"
