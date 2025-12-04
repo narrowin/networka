@@ -21,7 +21,7 @@ Originally developed at [narrowin](https://narrowin.ch/en/about.html), now commu
 
 Networka is a modern CLI tool for automating network devices across multiple vendors. Designed for network engineers who want fast, scalable automation with full cross-platform support.
 
-Built with the help of agentic AI with human-in-the-loop, this started as an experiment that turned into something genuinely useful.
+Built with the help of agentic-AI with humans in the loop, this started as an experiment that turned into something genuinely useful.
 
 ---
 

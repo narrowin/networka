@@ -480,16 +480,6 @@
           "title": "Default Transport Type",
           "type": "string"
         },
-        "ssh_config_file": {
-          "default": true,
-          "title": "Ssh Config File",
-          "type": "boolean"
-        },
-        "ssh_strict_host_key_checking": {
-          "default": false,
-          "title": "Ssh Strict Host Key Checking",
-          "type": "boolean"
-        },
         "connection_retries": {
           "default": 3,
           "title": "Connection Retries",

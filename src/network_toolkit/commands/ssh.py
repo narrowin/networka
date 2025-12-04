@@ -101,10 +101,17 @@ def _ensure_libtmux() -> Any:
 
 
 def _resolve_targets(
-    config: NetworkConfig, targets: str, ctx: CommandContext
+    config: NetworkConfig,
+    targets: str,
+    ctx: CommandContext,
+    platform: str | None = None,
+    port: int | None = None,
+    transport_type: str | None = None,
 ) -> Target:
     """Resolve comma-separated targets to a list of devices."""
-    resolver = DeviceResolver(config)
+    resolver = DeviceResolver(
+        config, platform=platform, port=port, transport_type=transport_type
+    )
     devices, unknowns = resolver.resolve_targets(targets)
 
     if unknowns:
@@ -434,7 +441,14 @@ def register(app: typer.Typer) -> None:
                 )
 
             # Use the helper function that properly handles unknown targets
-            tgt = _resolve_targets(config, target, ctx)
+            tgt = _resolve_targets(
+                config,
+                target,
+                ctx,
+                platform=device_type,
+                port=port,
+                transport_type=transport_type,
+            )
 
             # Check platform capabilities after we have config and targets
             platform_caps = get_platform_capabilities()
