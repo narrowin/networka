@@ -67,6 +67,7 @@ def upgrade(
 
         config = load_config(config_file)
         from network_toolkit.device import DeviceSession
+
         device_session = DeviceSession
 
         devices = config.devices or {}
@@ -332,6 +333,7 @@ def downgrade(
 
         config = load_config(config_file)
         from network_toolkit.device import DeviceSession
+
         device_session = DeviceSession
 
         devices = config.devices or {}
@@ -551,6 +553,7 @@ def bios(
     try:
         config = load_config(config_file)
         from network_toolkit.device import DeviceSession
+
         device_session = DeviceSession
 
         devices = config.devices or {}

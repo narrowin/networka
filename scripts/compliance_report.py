@@ -12,16 +12,15 @@ Usage:
 
 import sys
 from dataclasses import dataclass
-from typing import List
 
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.table import Table
 
 from network_toolkit.api.run import RunOptions, run_commands
-from network_toolkit.config import load_config
 from network_toolkit.common.credentials import InteractiveCredentials
+from network_toolkit.config import load_config
 
 # --- Configuration / Business Logic ---
 
@@ -30,6 +29,7 @@ TARGET_DEVICE = "192.168.139.192"
 TARGET_PLATFORM = "linux"
 SSH_USER = "md"
 
+
 @dataclass
 class ComplianceCheck:
     name: str
@@ -37,38 +37,43 @@ class ComplianceCheck:
     # A simple validator function that takes the output string and returns bool
     validator: callable
 
+
 CHECKS = [
     ComplianceCheck(
         name="Kernel Version Check",
         command="uname -r",
-        validator=lambda out: "6." in out or "5." in out  # Example: Require kernel 5.x or 6.x
+        validator=lambda out: "6." in out
+        or "5." in out,  # Example: Require kernel 5.x or 6.x
     ),
     ComplianceCheck(
         name="Root Filesystem",
         command="df -h /",
-        validator=lambda out: "100%" not in out  # Fail if root is 100% full
+        validator=lambda out: "100%" not in out,  # Fail if root is 100% full
     ),
     ComplianceCheck(
         name="System Uptime",
         command="uptime",
-        validator=lambda out: "load average" in out
+        validator=lambda out: "load average" in out,
     ),
     ComplianceCheck(
         name="Critical Service (SSH)",
         command="systemctl is-active ssh",
-        validator=lambda out: "active" in out
-    )
+        validator=lambda out: "active" in out,
+    ),
 ]
 
 # --------------------------------------
 
+
 def main():
     console = Console()
-    console.print(Panel.fit(
-        "[bold blue]Networka Library Demo[/bold blue]\n"
-        "Automated Compliance Reporting Tool",
-        border_style="blue"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold blue]Networka Library Demo[/bold blue]\n"
+            "Automated Compliance Reporting Tool",
+            border_style="blue",
+        )
+    )
 
     # 1. Load Networka Configuration
     try:
@@ -93,14 +98,13 @@ def main():
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
-        console=console
+        console=console,
     ) as progress:
-        
         task_id = progress.add_task("Running compliance checks...", total=len(CHECKS))
 
         for check in CHECKS:
             progress.update(task_id, description=f"Checking: {check.name}")
-            
+
             # --- THE LIBRARY CALL ---
             # Notice how we construct options programmatically for each check
             options = RunOptions(
@@ -109,13 +113,13 @@ def main():
                 config=config,
                 device_type=TARGET_PLATFORM,
                 interactive_creds=creds,
-                no_strict_host_key_checking=True, # For lab demo
+                no_strict_host_key_checking=True,  # For lab demo
             )
 
             try:
                 # Execute synchronously (library handles internal concurrency if target was a group)
                 run_result = run_commands(options)
-                
+
                 # Process the result
                 # Since we targeted a single IP, we expect one command result
                 if not run_result.command_results:
@@ -123,7 +127,7 @@ def main():
                     details = "No results returned"
                 else:
                     cmd_res = run_result.command_results[0]
-                    
+
                     if cmd_res.error:
                         status_str = "[red]ERROR[/red]"
                         details = f"Connection/Command Error: {cmd_res.error}"
@@ -132,14 +136,18 @@ def main():
                         # This is where using a library shines: we can inspect the output object
                         output_text = cmd_res.output or ""
                         is_compliant = check.validator(output_text)
-                        
+
                         if is_compliant:
                             status_str = "[green]PASS[/green]"
-                            details = output_text.strip().split('\n')[0] # Show first line
+                            details = output_text.strip().split("\n")[
+                                0
+                            ]  # Show first line
                             success_count += 1
                         else:
                             status_str = "[bold red]FAIL[/bold red]"
-                            details = f"Validation failed. Output:\n{output_text.strip()}"
+                            details = (
+                                f"Validation failed. Output:\n{output_text.strip()}"
+                            )
 
             except Exception as e:
                 status_str = "[red]EXCEPTION[/red]"
@@ -151,10 +159,11 @@ def main():
     # 4. Final Report
     console.print()
     console.print(results_table)
-    
+
     score = (success_count / len(CHECKS)) * 100
     color = "green" if score == 100 else "yellow" if score > 50 else "red"
     console.print(f"Compliance Score: [bold {color}]{score:.1f}%[/bold {color}]")
+
 
 if __name__ == "__main__":
     sys.exit(main())

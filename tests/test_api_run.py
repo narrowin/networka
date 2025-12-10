@@ -48,7 +48,9 @@ class DummyDeviceSession:
 
 
 @pytest.fixture
-def patch_device_session(monkeypatch: pytest.MonkeyPatch) -> Callable[[DummyDeviceSession], None]:
+def patch_device_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Callable[[DummyDeviceSession], None]:
     """Monkeypatch the DeviceSession used by the API with a dummy implementation."""
 
     def _apply(session_cls: type[DummyDeviceSession]) -> None:
@@ -58,7 +60,9 @@ def patch_device_session(monkeypatch: pytest.MonkeyPatch) -> Callable[[DummyDevi
 
 
 def test_run_commands_single_device_command(
-    sample_config: NetworkConfig, tmp_path: Path, patch_device_session: Callable[[DummyDeviceSession], None]
+    sample_config: NetworkConfig,
+    tmp_path: Path,
+    patch_device_session: Callable[[DummyDeviceSession], None],
 ) -> None:
     patch_device_session(DummyDeviceSession)
 
@@ -89,7 +93,9 @@ def test_run_commands_group_sequence(
     patch_device_session(DummyDeviceSession)
 
     # Force sequence resolution regardless of actual config contents
-    monkeypatch.setattr("network_toolkit.api.run.SequenceManager.exists", lambda _self, _name: True)
+    monkeypatch.setattr(
+        "network_toolkit.api.run.SequenceManager.exists", lambda _self, _name: True
+    )
     monkeypatch.setattr(
         "network_toolkit.api.run.SequenceManager.resolve",
         lambda _self, _name, _device: ["cmd_a", "cmd_b"],
@@ -109,11 +115,15 @@ def test_run_commands_group_sequence(
     assert result.totals.total == 2
     assert result.totals.failed == 0
     assert all(
-        isinstance(device_result, DeviceSequenceResult) for device_result in result.sequence_results
+        isinstance(device_result, DeviceSequenceResult)
+        for device_result in result.sequence_results
     )
     # Ensure deterministic ordering follows group resolution
     assert [r.device for r in result.sequence_results] == result.resolution.resolved
-    assert all(r.outputs == {"cmd_a": f"{r.device}:cmd_a", "cmd_b": f"{r.device}:cmd_b"} for r in result.sequence_results)
+    assert all(
+        r.outputs == {"cmd_a": f"{r.device}:cmd_a", "cmd_b": f"{r.device}:cmd_b"}
+        for r in result.sequence_results
+    )
 
 
 def test_run_commands_unknown_target_raises(sample_config: NetworkConfig) -> None:

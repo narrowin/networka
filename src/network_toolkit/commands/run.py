@@ -369,7 +369,11 @@ def register(app: typer.Typer) -> None:
 
                 _print_sequence_result(device_result)
 
-                if store_results and device_result.stored_paths and output_mode != OutputMode.RAW:
+                if (
+                    store_results
+                    and device_result.stored_paths
+                    and output_mode != OutputMode.RAW
+                ):
                     output_mgr.print_info(
                         f"Results stored: {device_result.stored_paths[-1]}"
                     )
@@ -492,8 +496,7 @@ def register(app: typer.Typer) -> None:
         members = run_result.resolution.resolved
         if output_mode != OutputMode.RAW:
             ctx.print_info(
-                f"Executing command on targets '{target}' "
-                f"({len(members)} devices)"
+                f"Executing command on targets '{target}' ({len(members)} devices)"
             )
             ctx.print_info(f"Command: {command_or_sequence}")
             ctx.print_info(f"Members: {', '.join(members)}")

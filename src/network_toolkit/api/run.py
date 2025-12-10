@@ -113,10 +113,12 @@ def _validate_transport(transport_type: str | None) -> None:
 
 
 def _apply_host_key_setting(
-    config: NetworkConfig, no_strict_host_key_checking: bool
+    config: NetworkConfig, *, no_strict_host_key_checking: bool
 ) -> None:
     if no_strict_host_key_checking:
-        if hasattr(config, "general") and hasattr(config.general, "ssh_strict_host_key_checking"):
+        if hasattr(config, "general") and hasattr(
+            config.general, "ssh_strict_host_key_checking"
+        ):
             config.general.ssh_strict_host_key_checking = False
 
 
@@ -153,6 +155,7 @@ def _resolve_targets(target_expr: str, config: NetworkConfig) -> TargetResolutio
 
 def _build_results_manager(
     config: NetworkConfig,
+    *,
     store_results: bool,
     results_dir: str | None,
     command_context: str,
@@ -258,7 +261,9 @@ def _run_sequence_on_device(
             error=str(exc),
         )
 
-    stored_paths = results_mgr.store_sequence_results(device_name, sequence_name, outputs)
+    stored_paths = results_mgr.store_sequence_results(
+        device_name, sequence_name, outputs
+    )
     return DeviceSequenceResult(
         device=device_name,
         sequence=sequence_name,
@@ -309,7 +314,9 @@ def run_commands(options: RunOptions) -> RunResult:
     config = options.config
     notices: list[str] = []
 
-    _apply_host_key_setting(config, options.no_strict_host_key_checking)
+    _apply_host_key_setting(
+        config, no_strict_host_key_checking=options.no_strict_host_key_checking
+    )
 
     # IP-based targets may require dynamic config creation
     if is_ip_list(options.target):
@@ -342,8 +349,12 @@ def run_commands(options: RunOptions) -> RunResult:
     is_group = len(resolution.resolved) > 1
 
     # Get credential overrides if requested
-    username_override = options.interactive_creds.username if options.interactive_creds else None
-    password_override = options.interactive_creds.password if options.interactive_creds else None
+    username_override = (
+        options.interactive_creds.username if options.interactive_creds else None
+    )
+    password_override = (
+        options.interactive_creds.password if options.interactive_creds else None
+    )
 
     started_at = perf_counter()
 
@@ -364,7 +375,9 @@ def run_commands(options: RunOptions) -> RunResult:
                     ): device
                     for device in resolution.resolved
                 }
-                sequence_results = [future.result() for future in as_completed(future_to_device)]
+                sequence_results = [
+                    future.result() for future in as_completed(future_to_device)
+                ]
         else:
             sequence_results = [
                 _run_sequence_on_device(
@@ -417,7 +430,7 @@ def run_commands(options: RunOptions) -> RunResult:
     # Command mode
     if is_group:
         with ThreadPoolExecutor(max_workers=len(resolution.resolved)) as executor:
-            future_to_device = {
+            future_to_device_cmd = {
                 executor.submit(
                     _run_command_on_device,
                     device,
@@ -430,7 +443,9 @@ def run_commands(options: RunOptions) -> RunResult:
                 ): device
                 for device in resolution.resolved
             }
-            command_results = [future.result() for future in as_completed(future_to_device)]
+            command_results = [
+                future.result() for future in as_completed(future_to_device_cmd)
+            ]
         order_index = {name: idx for idx, name in enumerate(resolution.resolved)}
         command_results.sort(key=lambda r: order_index.get(r.device, 0))
     else:
