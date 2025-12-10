@@ -4,5 +4,6 @@
 """Network Toolkit - Network automation made simple for MikroTik (and beyond)."""
 
 from network_toolkit.__about__ import __version__
+from network_toolkit.client import NetworkaClient
 
-__all__ = ["__version__"]
+__all__ = ["NetworkaClient", "__version__"]
