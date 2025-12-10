@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from importlib import import_module
 from pathlib import Path
-from typing import Annotated, Any, cast
+from typing import Annotated
 
 import typer
 
@@ -67,8 +66,8 @@ def upgrade(
             raise typer.Exit(1)
 
         config = load_config(config_file)
-        module = import_module("network_toolkit.cli")
-        device_session = cast(Any, module).DeviceSession
+        from network_toolkit.device import DeviceSession
+        device_session = DeviceSession
 
         devices = config.devices or {}
         groups = config.device_groups or {}
@@ -332,8 +331,8 @@ def downgrade(
             raise typer.Exit(1)
 
         config = load_config(config_file)
-        module = import_module("network_toolkit.cli")
-        device_session = cast(Any, module).DeviceSession
+        from network_toolkit.device import DeviceSession
+        device_session = DeviceSession
 
         devices = config.devices or {}
         groups = config.device_groups or {}
@@ -551,8 +550,8 @@ def bios(
 
     try:
         config = load_config(config_file)
-        module = import_module("network_toolkit.cli")
-        device_session = cast(Any, module).DeviceSession
+        from network_toolkit.device import DeviceSession
+        device_session = DeviceSession
 
         devices = config.devices or {}
         groups = config.device_groups or {}

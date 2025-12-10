@@ -99,10 +99,10 @@ def register(app: typer.Typer) -> None:
             file_size = local_file.stat().st_size
             remote_name = remote_filename or local_file.name
 
-            # Late import to allow tests to patch `network_toolkit.cli.DeviceSession`
-            from network_toolkit.cli import DeviceSession
+            # Use DeviceSession from device module
+            from network_toolkit.device import DeviceSession
 
-            # Use DeviceSession from CLI module so tests can patch that symbol
+            # Use DeviceSession from device module so tests can patch that symbol
             device_session = DeviceSession
 
             # Determine if target is a device or a group
