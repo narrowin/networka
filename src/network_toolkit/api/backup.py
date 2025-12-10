@@ -231,8 +231,7 @@ def run_backup(options: BackupOptions) -> BackupResult:
 
     # Determine if it's a group (heuristic: if target name is in groups)
     is_group = (
-        options.config.device_groups
-        and options.target in options.config.device_groups
+        options.config.device_groups and options.target in options.config.device_groups
     )
 
     run_timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
@@ -242,12 +241,7 @@ def run_backup(options: BackupOptions) -> BackupResult:
     # Run in parallel
     with ThreadPoolExecutor() as executor:
         future_to_device = {
-            executor.submit(
-                _perform_device_backup,
-                dev,
-                options,
-                run_timestamp
-            ): dev
+            executor.submit(_perform_device_backup, dev, options, run_timestamp): dev
             for dev in resolution.resolved
         }
 
