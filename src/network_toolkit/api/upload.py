@@ -164,11 +164,7 @@ def upload_file(options: UploadOptions) -> UploadResult:
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_device = {
-            executor.submit(
-                _upload_single_device,
-                device,
-                options
-            ): device
+            executor.submit(_upload_single_device, device, options): device
             for device in resolution.resolved
         }
 

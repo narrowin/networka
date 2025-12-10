@@ -33,7 +33,7 @@ class DummyDeviceSession:
         local_path: Path,
         *,
         verify: bool = True,
-        delete_remote: bool = False
+        delete_remote: bool = False,
     ) -> bool:
         # Simulate file creation
         local_path.parent.mkdir(parents=True, exist_ok=True)
@@ -43,7 +43,9 @@ class DummyDeviceSession:
 
 @pytest.fixture
 def patch_device_session(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("network_toolkit.api.download.DeviceSession", DummyDeviceSession)
+    monkeypatch.setattr(
+        "network_toolkit.api.download.DeviceSession", DummyDeviceSession
+    )
 
 
 def test_download_single_device(

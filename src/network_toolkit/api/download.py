@@ -111,18 +111,21 @@ def _download_single_device(
             session.connect()
 
             # Perform download
-            session.download_file(
-                remote_file=options.remote_file,
+            success = session.download_file(
+                remote_filename=options.remote_file,
                 local_path=dest_path,
-                verify=options.verify_download,
+                verify_download=options.verify_download,
                 delete_remote=options.delete_remote,
             )
+
+            if not success:
+                msg = "Download failed"
+                raise NetworkToolkitError(msg)
 
             # Delete remote if requested - handled by download_file now if supported
             # or we can rely on the session method to handle it.
             # The session.download_file signature in base class might not have delete_remote
             # but the command was passing it. Let's assume the session method handles it.
-
 
         file_size = dest_path.stat().st_size if dest_path.exists() else 0
 
@@ -184,10 +187,7 @@ def download_file(options: DownloadOptions) -> DownloadResult:
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_device = {
             executor.submit(
-                _download_single_device,
-                device,
-                options,
-                is_group=is_group
+                _download_single_device, device, options, is_group=is_group
             ): device
             for device in resolution.resolved
         }

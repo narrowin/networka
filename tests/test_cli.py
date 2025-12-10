@@ -173,7 +173,7 @@ class TestCLI:
         # Accept exit code 0 or 1 (might fail due to actual connection attempts)
         assert result.exit_code in [0, 1]
 
-    @patch("network_toolkit.device.DeviceSession")
+    @patch("network_toolkit.api.upload.DeviceSession")
     def test_upload_command(
         self, mock_device_session: MagicMock, config_file: Path, firmware_file: Path
     ) -> None:
@@ -198,18 +198,17 @@ class TestCLI:
         )
         assert result.exit_code == 0
 
-    @patch("network_toolkit.device.DeviceSession")
+    @patch("network_toolkit.api.upload.DeviceSession")
     def test_upload_command_group(
         self, mock_device_session: MagicMock, config_file: Path, firmware_file: Path
     ) -> None:
         """Test upload command with a group target (replaces legacy group-upload)."""
-        # Mock successful file upload to group by faking class-level helper
-        mock_device_session.upload_file_to_devices = MagicMock(
-            return_value={
-                "test_device1": True,
-                "test_device2": True,
-            }
-        )
+        # Mock successful file upload
+        mock_session = MagicMock()
+        mock_session.upload_file.return_value = True
+        mock_session.__enter__ = MagicMock(return_value=mock_session)
+        mock_session.__exit__ = MagicMock(return_value=None)
+        mock_device_session.return_value = mock_session
 
         runner = CliRunner()
         result = runner.invoke(
@@ -222,7 +221,7 @@ class TestCLI:
                 str(config_file),
             ],
         )
-        # Should succeed with our mocked classmethod
+        # Should succeed
         assert result.exit_code == 0
 
     @patch("network_toolkit.device.DeviceSession")

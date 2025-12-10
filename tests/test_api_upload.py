@@ -33,7 +33,7 @@ class DummyDeviceSession:
         remote_filename: str | None = None,
         *,
         verify_upload: bool = True,
-        verify_checksum: bool = False
+        verify_checksum: bool = False,
     ) -> bool:
         return True
 
