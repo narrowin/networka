@@ -16,6 +16,7 @@ def mock_config():
     config.general.results_dir = "results"
     return config
 
+
 @patch("network_toolkit.api.diff.DeviceSession")
 def test_diff_device_to_device_config(mock_session_cls, mock_config, tmp_path):
     # Setup mocks
@@ -26,10 +27,7 @@ def test_diff_device_to_device_config(mock_session_cls, mock_config, tmp_path):
     session_mock.execute_command.side_effect = ["config A", "config B"]
 
     options = DiffOptions(
-        targets="dev1,dev2",
-        subject="config",
-        config=mock_config,
-        save_current=tmp_path
+        targets="dev1,dev2", subject="config", config=mock_config, save_current=tmp_path
     )
 
     result = diff_targets(options)
@@ -40,6 +38,7 @@ def test_diff_device_to_device_config(mock_session_cls, mock_config, tmp_path):
     # The output is a unified diff, so it should contain the lines
     assert "-config A" in result.results[0].outcome.output
     assert "+config B" in result.results[0].outcome.output
+
 
 @patch("network_toolkit.api.diff.DeviceSession")
 def test_diff_baseline_config(mock_session_cls, mock_config, tmp_path):
@@ -53,10 +52,7 @@ def test_diff_baseline_config(mock_session_cls, mock_config, tmp_path):
     session_mock.execute_command.return_value = "config B"
 
     options = DiffOptions(
-        targets="dev1",
-        subject="config",
-        config=mock_config,
-        baseline=tmp_path
+        targets="dev1", subject="config", config=mock_config, baseline=tmp_path
     )
 
     result = diff_targets(options)
@@ -65,6 +61,7 @@ def test_diff_baseline_config(mock_session_cls, mock_config, tmp_path):
     assert len(result.results) == 1
     assert result.results[0].device == "dev1"
     assert result.results[0].outcome.changed is True
+
 
 @patch("network_toolkit.api.diff.DeviceSession")
 def test_diff_baseline_no_change(mock_session_cls, mock_config, tmp_path):
@@ -78,10 +75,7 @@ def test_diff_baseline_no_change(mock_session_cls, mock_config, tmp_path):
     session_mock.execute_command.return_value = "config A"
 
     options = DiffOptions(
-        targets="dev1",
-        subject="config",
-        config=mock_config,
-        baseline=tmp_path
+        targets="dev1", subject="config", config=mock_config, baseline=tmp_path
     )
 
     result = diff_targets(options)

@@ -13,16 +13,14 @@ def mock_config():
     config.device_groups = {"group1": ["dev1"]}
     return config
 
+
 @patch("network_toolkit.api.info.SequenceManager")
 def test_get_info_targets(mock_sm_cls, mock_config):
     mock_sm = MagicMock()
     mock_sm_cls.return_value = mock_sm
     mock_sm.list_all_sequences.return_value = {"vendor1": ["seq1"]}
 
-    options = InfoOptions(
-        targets="dev1,group1,seq1,unknown1",
-        config=mock_config
-    )
+    options = InfoOptions(targets="dev1,group1,seq1,unknown1", config=mock_config)
 
     result = get_info(options)
 

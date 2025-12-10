@@ -119,9 +119,7 @@ def diff_targets(options: DiffOptions) -> DiffResult:
     is_command = subj.startswith("/")
 
     sm = SequenceManager(options.config)
-    mode_label = (
-        "config" if is_config else ("command" if is_command else "sequence")
-    )
+    mode_label = "config" if is_config else ("command" if is_command else "sequence")
     cmd_ctx = f"diff_{options.targets}_{mode_label}_{_sanitize_filename(subj)}"
 
     # Initialize ResultsManager if needed (though we might not use it for storing diffs directly
@@ -201,11 +199,11 @@ def diff_targets(options: DiffOptions) -> DiffResult:
                     current_label=f"{dev_b}:/export compact",
                     ignore_patterns=options.ignore_patterns or [],
                 )
-                results.append(DiffItemResult(
-                    device=f"{dev_a} vs {dev_b}",
-                    subject="config",
-                    outcome=outcome
-                ))
+                results.append(
+                    DiffItemResult(
+                        device=f"{dev_a} vs {dev_b}", subject="config", outcome=outcome
+                    )
+                )
                 if outcome.changed:
                     total_changed += 1
 
@@ -225,36 +223,40 @@ def diff_targets(options: DiffOptions) -> DiffResult:
                     current_label=f"{dev_b}:{subj}",
                     ignore_patterns=options.ignore_patterns or [],
                 )
-                results.append(DiffItemResult(
-                    device=f"{dev_a} vs {dev_b}",
-                    subject=subj,
-                    outcome=outcome
-                ))
+                results.append(
+                    DiffItemResult(
+                        device=f"{dev_a} vs {dev_b}", subject=subj, outcome=outcome
+                    )
+                )
                 if outcome.changed:
                     total_changed += 1
             else:
-                msg = "Device-to-device diff only supports 'config' or a single command."
+                msg = (
+                    "Device-to-device diff only supports 'config' or a single command."
+                )
                 raise NetworkToolkitError(msg)
 
             return DiffResult(
                 results=results,
                 total_changed=total_changed,
                 total_missing=total_missing,
-                device_pair_diff=True
+                device_pair_diff=True,
             )
 
         except Exception as e:
-            results.append(DiffItemResult(
-                device=f"{dev_a} vs {dev_b}",
-                subject=subj,
-                outcome=None,
-                error=str(e)
-            ))
+            results.append(
+                DiffItemResult(
+                    device=f"{dev_a} vs {dev_b}",
+                    subject=subj,
+                    outcome=None,
+                    error=str(e),
+                )
+            )
             return DiffResult(
                 results=results,
                 total_changed=total_changed,
                 total_missing=total_missing,
-                device_pair_diff=True
+                device_pair_diff=True,
             )
 
     # Standard mode: diff against baseline
@@ -285,12 +287,14 @@ def diff_targets(options: DiffOptions) -> DiffResult:
                     base_file = options.baseline
 
                 if not base_file.exists():
-                    results.append(DiffItemResult(
-                        device=dev,
-                        subject="config",
-                        outcome=None,
-                        error=f"Baseline file not found: {base_file}"
-                    ))
+                    results.append(
+                        DiffItemResult(
+                            device=dev,
+                            subject="config",
+                            outcome=None,
+                            error=f"Baseline file not found: {base_file}",
+                        )
+                    )
                     total_missing += 1
                     continue
 
@@ -307,32 +311,35 @@ def diff_targets(options: DiffOptions) -> DiffResult:
                     current_label=f"{dev}:/export compact",
                     ignore_patterns=options.ignore_patterns or [],
                 )
-                results.append(DiffItemResult(
-                    device=dev,
-                    subject="config",
-                    outcome=outcome
-                ))
+                results.append(
+                    DiffItemResult(device=dev, subject="config", outcome=outcome)
+                )
                 if outcome.changed:
                     total_changed += 1
 
             elif is_command:
                 # Diff command vs file
+                cmd_base_file: Path | None
                 if options.baseline.is_dir():
-                    base_file = _find_baseline_file_for_command(options.baseline, subj)
+                    cmd_base_file = _find_baseline_file_for_command(
+                        options.baseline, subj
+                    )
                 else:
-                    base_file = options.baseline
+                    cmd_base_file = options.baseline
 
-                if not base_file or not base_file.exists():
-                    results.append(DiffItemResult(
-                        device=dev,
-                        subject=subj,
-                        outcome=None,
-                        error=f"Baseline file not found for command: {subj}"
-                    ))
+                if not cmd_base_file or not cmd_base_file.exists():
+                    results.append(
+                        DiffItemResult(
+                            device=dev,
+                            subject=subj,
+                            outcome=None,
+                            error=f"Baseline file not found for command: {subj}",
+                        )
+                    )
                     total_missing += 1
                     continue
 
-                base_text = _read_text(base_file)
+                base_text = _read_text(cmd_base_file)
                 with DeviceSession(dev, options.config) as s:
                     curr_text = s.execute_command(subj)
 
@@ -341,15 +348,13 @@ def diff_targets(options: DiffOptions) -> DiffResult:
                 outcome = _diff_texts(
                     baseline_text=base_text,
                     current_text=curr_text,
-                    baseline_label=str(base_file),
+                    baseline_label=str(cmd_base_file),
                     current_label=f"{dev}:{subj}",
                     ignore_patterns=options.ignore_patterns or [],
                 )
-                results.append(DiffItemResult(
-                    device=dev,
-                    subject=subj,
-                    outcome=outcome
-                ))
+                results.append(
+                    DiffItemResult(device=dev, subject=subj, outcome=outcome)
+                )
                 if outcome.changed:
                     total_changed += 1
 
@@ -361,57 +366,58 @@ def diff_targets(options: DiffOptions) -> DiffResult:
 
                 seq_cmds = sm.resolve(dev, subj)
                 if not seq_cmds:
-                    results.append(DiffItemResult(
-                        device=dev,
-                        subject=subj,
-                        outcome=None,
-                        error=f"Sequence '{subj}' empty or not found for {dev}"
-                    ))
+                    results.append(
+                        DiffItemResult(
+                            device=dev,
+                            subject=subj,
+                            outcome=None,
+                            error=f"Sequence '{subj}' empty or not found for {dev}",
+                        )
+                    )
                     continue
 
                 with DeviceSession(dev, options.config) as s:
                     for cmd in seq_cmds:
-                        base_file = _find_baseline_file_for_command(options.baseline, cmd)
-                        if not base_file:
-                            results.append(DiffItemResult(
-                                device=dev,
-                                subject=cmd,
-                                outcome=None,
-                                error="Baseline file missing"
-                            ))
+                        seq_base_file: Path | None = _find_baseline_file_for_command(
+                            options.baseline, cmd
+                        )
+                        if not seq_base_file:
+                            results.append(
+                                DiffItemResult(
+                                    device=dev,
+                                    subject=cmd,
+                                    outcome=None,
+                                    error="Baseline file missing",
+                                )
+                            )
                             total_missing += 1
                             continue
 
-                        base_text = _read_text(base_file)
+                        base_text = _read_text(seq_base_file)
                         curr_text = s.execute_command(cmd)
                         _save_current_artifact(dev, cmd, curr_text)
 
                         outcome = _diff_texts(
                             baseline_text=base_text,
                             current_text=curr_text,
-                            baseline_label=str(base_file),
+                            baseline_label=str(seq_base_file),
                             current_label=f"{dev}:{cmd}",
                             ignore_patterns=options.ignore_patterns or [],
                         )
-                        results.append(DiffItemResult(
-                            device=dev,
-                            subject=cmd,
-                            outcome=outcome
-                        ))
+                        results.append(
+                            DiffItemResult(device=dev, subject=cmd, outcome=outcome)
+                        )
                         if outcome.changed:
                             total_changed += 1
 
         except Exception as e:
-            results.append(DiffItemResult(
-                device=dev,
-                subject=subj,
-                outcome=None,
-                error=str(e)
-            ))
+            results.append(
+                DiffItemResult(device=dev, subject=subj, outcome=None, error=str(e))
+            )
 
     return DiffResult(
         results=results,
         total_changed=total_changed,
         total_missing=total_missing,
-        device_pair_diff=False
+        device_pair_diff=False,
     )
