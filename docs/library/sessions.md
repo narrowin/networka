@@ -1,56 +1,59 @@
 # Persistent Sessions
 
-## Why Use Sessions
+## Automatic Session Management
 
-Opening an SSH connection is expensive. If you need to run multiple commands, open one connection and reuse it:
+`NetworkaClient` automatically manages SSH sessions for you. When you run a command, it checks if a connection to that device already exists. If so, it reuses it; if not, it opens a new one.
 
-**Bad (N connections):**
+To ensure these connections are closed properly when you are done, you should use the client as a context manager.
+
+**Recommended Pattern:**
+
+```python
+from network_toolkit import NetworkaClient
+
+# The 'with' block ensures all connections are closed when done
+with NetworkaClient() as client:
+    # First command opens the connection
+    client.run("router1", "show version")
+
+    # Subsequent commands reuse the same connection automatically
+    client.run("router1", "show ip int brief")
+
+    # You can switch between devices freely
+    client.run("switch1", "show vlan")  # Opens new connection to switch1
+    client.run("router1", "show clock") # Reuses existing connection to router1
+
+# All sessions (router1, switch1) are closed here
+```
+
+## Manual Management (Not Recommended)
+
+If you do not use the context manager, connections will remain open until the script terminates or you manually close them. This can lead to resource leaks in long-running scripts.
+
 ```python
 client = NetworkaClient()
-client.run("router1", "command1")  # Opens connection, runs, closes
-client.run("router1", "command2")  # Opens connection, runs, closes
-client.run("router1", "command3")  # Opens connection, runs, closes
+
+# Opens connection and keeps it open
+client.run("router1", "show version")
+
+# Reuses connection
+client.run("router1", "show ip int brief")
+
+# You must manually close sessions to free resources
+client.close()
 ```
 
-**Good (1 connection):**
-```python
-client = NetworkaClient()
-with DeviceSession("router1", client.config) as session:
-    session.execute_command("command1")
-    session.execute_command("command2")
-    session.execute_command("command3")
-# Connection closes automatically
-```
+## Advanced: Low-Level Session Control
 
-## Basic Pattern
+For very specific use cases where you need direct control over a single session (bypassing the client's pool), you can use `DeviceSession` directly.
 
 ```python
-from network_toolkit import NetworkaClient, DeviceSession
+from network_toolkit import DeviceSession
 
-client = NetworkaClient()
-
+# Manually manage a single session
 with DeviceSession("router1", client.config) as session:
-    # Connection is now open
-    output1 = session.execute_command("/interface/print")
-    output2 = session.execute_command("/system/resource/print")
-    output3 = session.execute_command("/system/clock/print")
-    # All on the same connection
-# Connection automatically closes here
-```
-
-## Session Methods
-
-### execute_command
-
-Run a single command and get output:
-
-```python
-with DeviceSession("router1", client.config) as session:
-    output = session.execute_command("/system/identity/print")
-    print(output)
-```
-
-### upload_file
+    output = session.execute_command("show version")
+```### upload_file
 
 Transfer a file to the device:
 
@@ -85,7 +88,7 @@ Override credentials without changing configuration:
 ```python
 with DeviceSession("router1", client.config,
                    username_override="admin",
-                   password_override="secret") as session:
+                   password_override="secret") as session:  # pragma: allowlist secret
     output = session.execute_command("show version")
 ```
 

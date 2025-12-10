@@ -3,12 +3,10 @@
 ## Minimal Example
 
 ```python
-from network_toolkit import NetworkaClient, DeviceSession
+from network_toolkit import NetworkaClient
 
-client = NetworkaClient()
-
-with DeviceSession("my_router", client.config) as session:
-    output = session.execute_command("show version")
+with NetworkaClient() as client:
+    output = client.run("my_router", "show version")
     print(output)
 ```
 
@@ -16,7 +14,7 @@ That's it. One connection, execute commands, automatic cleanup.
 
 ## Prerequisites
 
-1. Networka installed: `pip install networka`
+1. Networka installed (see [Installation Guide](../getting-started.md#installation))
 2. Device configured in `~/.config/networka/devices/devices.yml`:
 
 ```yaml
@@ -33,16 +31,19 @@ devices:
 Save this as `test.py`:
 
 ```python
-from network_toolkit import NetworkaClient, DeviceSession
+from network_toolkit import NetworkaClient
 
-client = NetworkaClient()
-
-with DeviceSession("my_router", client.config) as session:
-    result = session.execute_command("/system/identity/print")
+with NetworkaClient() as client:
+    # Run a command
+    result = client.run("my_router", "/system/identity/print")
     print(f"Device identity: {result}")
+
+    # Run another command (reuses the same connection!)
+    result2 = client.run("my_router", "/system/resource/print")
+    print(f"Resources: {result2}")
 ```
 
-Run it:
+Run it (ensure networka is installed in your current environment):
 
 ```bash
 python test.py
@@ -60,7 +61,7 @@ result = client.run("my_router", "/system/identity/print")
 print(result.output)
 ```
 
-NetworkaClient opens and closes connections automatically. Use DeviceSession when you need to run multiple commands on the same connection (faster).
+NetworkaClient opens and closes connections automatically. Use `DeviceSession` directly only if you need low-level control over the connection lifecycle or are building a custom integration.
 
 ## Without Configuration Files
 
@@ -80,9 +81,9 @@ config = create_ip_based_config(
 device_name = "ip_192_168_1_1"  # Auto-generated name
 
 from network_toolkit import DeviceSession
-with DeviceSession(device_name, config, 
+with DeviceSession(device_name, config,
                    username_override="admin",
-                   password_override="password") as session:
+                   password_override="password") as session:  # pragma: allowlist secret
     output = session.execute_command("show version")
     print(output)
 ```

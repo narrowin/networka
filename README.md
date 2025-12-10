@@ -100,14 +100,14 @@ Because a real **Networka** wants the f\*ing lot.”<br><br>
 
 ### Quick Install (recommended)
 
-Not on PyPI yet — install from GitHub.
+Install from PyPI using an isolated tool installer.
 
 ```bash
 # Recommended (isolated, user-wide)
-uv tool install git+https://github.com/narrowin/networka.git
+uv tool install networka
 
 # Alternative
-pipx install git+https://github.com/narrowin/networka.git
+pipx install networka
 
 # Verify installation
 nw --help
@@ -133,13 +133,13 @@ More → PATH troubleshooting: https://narrowin.github.io/networka/troubleshooti
 ### Upgrade & Remove
 
 ```bash
-# Upgrade to latest version (from GitHub)
-uv tool install --force git+https://github.com/narrowin/networka.git
+# Upgrade to latest version
+uv tool upgrade networka
 # or
-pipx install --force git+https://github.com/narrowin/networka.git
+pipx upgrade networka
 
 # Remove installation
-uv tool uninstall nw
+uv tool uninstall networka
 # or
 pipx uninstall networka
 ```
@@ -156,7 +156,7 @@ WSL2 quickstart (recommended):
 # In Ubuntu on WSL2
 curl -LsSf https://astral.sh/uv/install.sh | sh
 exec $SHELL
-uv tool install git+https://github.com/narrowin/networka.git
+uv tool install networka
 nw --help
 ```
 

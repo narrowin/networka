@@ -6,6 +6,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 from time import perf_counter
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from network_toolkit.device import DeviceSession
 
 from network_toolkit.common.credentials import InteractiveCredentials
 from network_toolkit.config import NetworkConfig
@@ -78,6 +82,7 @@ class RunOptions:
     store_results: bool = False
     results_dir: str | None = None
     no_strict_host_key_checking: bool = False
+    session_pool: dict[str, DeviceSession] | None = None
 
 
 @dataclass(slots=True)
@@ -176,18 +181,34 @@ def _run_command_on_device(
     password_override: str | None,
     transport_override: str | None,
     results_mgr: ResultsManager,
+    session_pool: dict[str, DeviceSession] | None = None,
 ) -> DeviceCommandResult:
     from network_toolkit.device import DeviceSession
 
     try:
-        with DeviceSession(
-            device_name,
-            config,
-            username_override,
-            password_override,
-            transport_override,
-        ) as session:
+        if session_pool is not None:
+            session = session_pool.get(device_name)
+            if session is None:
+                session = DeviceSession(
+                    device_name,
+                    config,
+                    username_override,
+                    password_override,
+                    transport_override,
+                )
+                session_pool[device_name] = session
+
+            session.connect()
             output = session.execute_command(command)
+        else:
+            with DeviceSession(
+                device_name,
+                config,
+                username_override,
+                password_override,
+                transport_override,
+            ) as session:
+                output = session.execute_command(command)
     except NetworkToolkitError as exc:
         return DeviceCommandResult(
             device=device_name,
@@ -222,6 +243,7 @@ def _run_sequence_on_device(
     transport_override: str | None,
     results_mgr: ResultsManager,
     sequence_manager: SequenceManager,
+    session_pool: dict[str, DeviceSession] | None = None,
 ) -> DeviceSequenceResult:
     from network_toolkit.device import DeviceSession
 
@@ -237,15 +259,34 @@ def _run_sequence_on_device(
             )
 
         outputs: dict[str, str] = {}
-        with DeviceSession(
-            device_name,
-            config,
-            username_override,
-            password_override,
-            transport_override,
-        ) as session:
+
+        session = None
+        if session_pool is not None:
+            session = session_pool.get(device_name)
+            if session is None:
+                session = DeviceSession(
+                    device_name,
+                    config,
+                    username_override,
+                    password_override,
+                    transport_override,
+                )
+                session_pool[device_name] = session
+            session.connect()
+
+        if session:
             for cmd in commands:
                 outputs[cmd] = session.execute_command(cmd)
+        else:
+            with DeviceSession(
+                device_name,
+                config,
+                username_override,
+                password_override,
+                transport_override,
+            ) as session:
+                for cmd in commands:
+                    outputs[cmd] = session.execute_command(cmd)
     except NetworkToolkitError as exc:
         return DeviceSequenceResult(
             device=device_name,
@@ -372,6 +413,7 @@ def run_commands(options: RunOptions) -> RunResult:
                         options.transport_type,
                         results_mgr,
                         sequence_manager,
+                        options.session_pool,
                     ): device
                     for device in resolution.resolved
                 }
@@ -389,6 +431,7 @@ def run_commands(options: RunOptions) -> RunResult:
                     options.transport_type,
                     results_mgr,
                     sequence_manager,
+                    options.session_pool,
                 )
             ]
 
@@ -440,6 +483,7 @@ def run_commands(options: RunOptions) -> RunResult:
                     password_override,
                     options.transport_type,
                     results_mgr,
+                    options.session_pool,
                 ): device
                 for device in resolution.resolved
             }
@@ -458,6 +502,7 @@ def run_commands(options: RunOptions) -> RunResult:
                 password_override,
                 options.transport_type,
                 results_mgr,
+                options.session_pool,
             )
         ]
 

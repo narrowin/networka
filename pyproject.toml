@@ -172,6 +172,9 @@ include = [
     "src/**/*.py",
     "tests/**/*.py",
 ]
+exclude = [
+    "attic",
+]
 
 [tool.ruff.lint]
 select = [
@@ -251,6 +254,8 @@ ban-relative-imports = "all"
 "src/network_toolkit/device.py" = ["FBT001", "FBT002"]
 # Common library modules often need boolean parameters for flexibility
 "src/network_toolkit/common/**/*" = ["FBT001", "FBT002"]
+# Scripts often need boolean flags
+"scripts/**/*" = ["FBT001", "FBT002"]
 
 [tool.mypy]
 python_version = "3.11"

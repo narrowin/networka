@@ -129,7 +129,7 @@ def _resolve_targets(
 class AuthMode(str, Enum):
     KEY_FIRST = "key-first"  # try keys first, fallback to password
     KEY = "key"  # prefer keys/agent only
-    PASSWORD = "password"  # use sshpass only
+    PASSWORD = "password"  # use sshpass only  # pragma: allowlist secret
     INTERACTIVE = "interactive"  # let ssh prompt per-pane
 
 

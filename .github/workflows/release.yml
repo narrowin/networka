@@ -156,12 +156,19 @@ jobs:
         echo "" >> release_notes.txt
         echo "## Installation" >> release_notes.txt
         echo "" >> release_notes.txt
-        echo '### Option 1: Install from GitHub' >> release_notes.txt
+        echo '### Option 1: Install from PyPI (Recommended)' >> release_notes.txt
         echo '```bash' >> release_notes.txt
-        echo "pip install git+https://github.com/narrowin/networka.git@v${VERSION}" >> release_notes.txt
+        echo "uv tool install networka" >> release_notes.txt
+        echo "# or" >> release_notes.txt
+        echo "pipx install networka" >> release_notes.txt
         echo '```' >> release_notes.txt
         echo "" >> release_notes.txt
-        echo '### Option 2: Download and install wheel' >> release_notes.txt
+        echo '### Option 2: Install from GitHub' >> release_notes.txt
+        echo '```bash' >> release_notes.txt
+        echo "uv tool install git+https://github.com/narrowin/networka.git@v${VERSION}" >> release_notes.txt
+        echo '```' >> release_notes.txt
+        echo "" >> release_notes.txt
+        echo '### Option 3: Download and install wheel' >> release_notes.txt
         echo '```bash' >> release_notes.txt
         echo "# Download the .whl file from this release, then:" >> release_notes.txt
         echo "pip install net_worker-${VERSION}-py3-none-any.whl" >> release_notes.txt

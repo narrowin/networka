@@ -21,7 +21,7 @@ device_name = "ip_192_168_1_100"
 
 with DeviceSession(device_name, config,
                    username_override="admin",
-                   password_override="password") as session:
+                   password_override="password") as session:  # pragma: allowlist secret
     output = session.execute_command("/system/identity/print")
     print(output)
 ```
@@ -55,7 +55,7 @@ for ip in ips:
     device_name = f"ip_{ip.replace('.', '_')}"
     with DeviceSession(device_name, config,
                        username_override="admin",
-                       password_override="password") as session:
+                       password_override="password") as session:  # pragma: allowlist secret
         identity = session.execute_command("/system/identity/print")
         print(f"{ip}: {identity}")
 ```
@@ -117,7 +117,7 @@ result = client.run(
     target="192.168.1.100",
     command_or_sequence="/system/identity/print",
     device_type="mikrotik_routeros",  # Required for IP targets
-    interactive_creds={"username": "admin", "password": "password"},
+    interactive_creds={"username": "admin", "password": "password"},  # pragma: allowlist secret
 )
 
 print(result.output)
@@ -176,7 +176,7 @@ with DeviceSession("my_router", config) as session:
 # Use ad-hoc IP
 with DeviceSession("ip_192_168_1_200", config,
                    username_override="admin",
-                   password_override="password") as session:
+                   password_override="password") as session:  # pragma: allowlist secret
     print(session.execute_command("show version"))
 ```
 

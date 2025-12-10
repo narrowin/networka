@@ -11,6 +11,7 @@ Usage:
 """
 
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from rich.console import Console
@@ -18,12 +19,7 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
-from network_toolkit import (
-    DeviceSession,
-    InteractiveCredentials,
-    NetworkaClient,
-    create_ip_based_config,
-)
+from network_toolkit import InteractiveCredentials, NetworkaClient
 
 # --- Configuration / Business Logic ---
 
@@ -45,7 +41,7 @@ class ComplianceCheck:
     name: str
     command: str
     # A simple validator function that takes the output string and returns bool
-    validator: callable
+    validator: Callable[[str], bool]
 
 
 CHECKS = [
@@ -114,15 +110,7 @@ def main():
         console.print(
             f"[yellow]Target '{TARGET_IP}' not found in config. Using as direct IP address.[/yellow]"
         )
-        # Create a temporary config for the IP
-        config = create_ip_based_config(
-            ips=[TARGET_IP],
-            device_type=TARGET_PLATFORM,
-            base_config=client.config,
-        )
-        # When using ad-hoc IP config, the device name in the config is generated
-        # by create_ip_based_config as "ip_<ip_with_underscores>"
-        target = f"ip_{TARGET_IP.replace('.', '_').replace(':', '_')}"
+        target = TARGET_IP
 
     results_table = Table(title=f"Compliance Report: {target}", show_lines=True)
     results_table.add_column("Check Name", style="cyan")
@@ -144,21 +132,41 @@ def main():
         task_id = progress.add_task("Connecting...", total=len(CHECKS))
 
         try:
-            # Open a persistent session
-            with DeviceSession(
-                device_name=target,
-                config=config,
-                username_override=creds.username,
-                password_override=creds.password,
-            ) as session:
+            # Use the client as a context manager for automatic session reuse
+            with client:
                 progress.update(task_id, description="Connected! Running checks...")
 
                 for check in CHECKS:
                     progress.update(task_id, description=f"Checking: {check.name}")
 
                     try:
-                        # Execute command in the existing session
-                        output_text = session.execute_command(check.command)
+                        # Execute command using the client
+                        # The client will automatically reuse the session opened in the 'with' block
+                        if target == TARGET_IP:
+                            result = client.run(
+                                target,
+                                check.command,
+                                interactive_creds=creds,
+                                device_type=TARGET_PLATFORM,
+                            )
+                        else:
+                            result = client.run(
+                                target,
+                                check.command,
+                                interactive_creds=creds,
+                            )
+
+                        # Extract output from RunResult
+                        if not result.command_results:
+                            msg = "No results returned"
+                            raise Exception(msg)
+
+                        cmd_result = result.command_results[0]
+                        if cmd_result.error:
+                            msg = f"Command failed: {cmd_result.error}"
+                            raise Exception(msg)
+
+                        output_text = cmd_result.output or ""
 
                         # Validate
                         is_compliant = check.validator(output_text)

@@ -2,8 +2,6 @@
 """Demo script showing the complete schema workflow."""
 
 import json
-import tempfile
-from pathlib import Path
 
 
 def demo_schema_workflow():

@@ -137,13 +137,13 @@ class ExecutionService:
                             for line in text.rstrip().splitlines():
                                 # Prefix each output line with device name
                                 buf.append(f"{device}: {line}")
-                    except Exception as e:  # noqa: BLE001
+                    except Exception as e:
                         ok = False
                         cb.on_error(f"{device}: command error: {e}")
             cb.on_meta(f"{device}: done")
             buf.append(f"--- Device: {device} done ---")
             return DeviceRunResult(device=device, ok=ok, output_lines=buf)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             ok = False
             cb.on_error(f"{device}: Failed: {e}")
         # Return whatever we collected (may be empty) on failure

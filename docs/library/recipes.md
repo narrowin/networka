@@ -15,11 +15,11 @@ with DeviceSession("router1", client.config) as session:
     # Check current state
     identity = session.execute_command("/system/identity/print")
     print(f"Connected to: {identity}")
-    
+
     # Get system info
     resources = session.execute_command("/system/resource/print")
     print(f"Resources: {resources}")
-    
+
     # Check interfaces
     interfaces = session.execute_command("/interface/print")
     print(f"Interfaces: {interfaces}")
@@ -47,9 +47,9 @@ devices = ["router1", "router2", "router3", "router4"]
 
 results = []
 with ThreadPoolExecutor(max_workers=4) as executor:
-    futures = {executor.submit(get_device_info, dev, client.config): dev 
+    futures = {executor.submit(get_device_info, dev, client.config): dev
                for dev in devices}
-    
+
     for future in as_completed(futures):
         result = future.result()
         results.append(result)
@@ -77,7 +77,7 @@ def check_compliance(device_name, config):
         "uptime": "/system/resource/print",
         "firewall": "/ip/firewall/filter/print",
     }
-    
+
     results = {}
     with DeviceSession(device_name, config) as session:
         for check_name, command in checks.items():
@@ -87,7 +87,7 @@ def check_compliance(device_name, config):
                 "passed": len(output) > 0,
                 "output": output
             }
-    
+
     return results
 
 client = NetworkaClient()
@@ -124,17 +124,17 @@ from network_toolkit import DeviceSession
 with DeviceSession("router1", client.config) as session:
     # Create backup
     session.execute_command("/system/backup/save name=mybackup")
-    
+
     # Download it
     local_path = Path("./backups/router1-backup.backup")
     session.download_file(
         remote_file="mybackup.backup",
         local_path=local_path
     )
-    
+
     # Delete remote backup
     session.execute_command("/file/remove mybackup.backup")
-    
+
     print(f"Backup downloaded to: {local_path}")
 ```
 
@@ -164,11 +164,11 @@ try:
             local_file=script_file,
             remote_path="temp_script.rsc"
         )
-        
+
         # Execute it
         output = session.execute_command("/import temp_script.rsc")
         print(f"Script output: {output}")
-        
+
         # Clean up
         session.execute_command("/file/remove temp_script.rsc")
 finally:
@@ -219,28 +219,28 @@ def safe_execute(device_name, command, config):
         with DeviceSession(device_name, config) as session:
             output = session.execute_command(command)
             return {"success": True, "output": output, "error": None}
-    
+
     except DeviceConnectionError as e:
         return {
             "success": False,
             "output": None,
             "error": f"Connection failed: {e.message}"
         }
-    
+
     except DeviceExecutionError as e:
         return {
             "success": False,
             "output": None,
             "error": f"Command failed: {e.message}"
         }
-    
+
     except NetworkToolkitError as e:
         return {
             "success": False,
             "output": None,
             "error": f"Networka error: {e.message}"
         }
-    
+
     except Exception as e:
         return {
             "success": False,

@@ -11,12 +11,15 @@ from network_toolkit.config import NetworkConfig, load_config
 from network_toolkit.sequence_manager import SequenceManager
 
 if TYPE_CHECKING:
+    from types import TracebackType
+
     from network_toolkit.api.backup import BackupResult
     from network_toolkit.api.diff import DiffResult
     from network_toolkit.api.download import DownloadResult
     from network_toolkit.api.run import RunResult
     from network_toolkit.api.upload import UploadResult
     from network_toolkit.config import DeviceConfig, DeviceGroup
+    from network_toolkit.device import DeviceSession
 
 
 class NetworkaClient:
@@ -28,8 +31,10 @@ class NetworkaClient:
 
     Usage:
         >>> from network_toolkit import NetworkaClient
-        >>> client = NetworkaClient()
-        >>> client.run("router1", "show version")
+        >>> # Use as context manager for automatic session reuse
+        >>> with NetworkaClient() as client:
+        >>>     client.run("router1", "show version")
+        >>>     client.run("router1", "show ip int brief")
     """
 
     def __init__(self, config_path: str | Path | None = None) -> None:
@@ -43,6 +48,7 @@ class NetworkaClient:
         self._config_path = config_path or DEFAULT_CONFIG_PATH
         self._config: NetworkConfig | None = None
         self._sequence_manager: SequenceManager | None = None
+        self._sessions: dict[str, DeviceSession] = {}
 
     @property
     def config(self) -> NetworkConfig:
@@ -111,6 +117,7 @@ class NetworkaClient:
             store_results=store_results,
             results_dir=results_dir,
             no_strict_host_key_checking=no_strict_host_key_checking,
+            session_pool=self._sessions,
         )
         return run_commands(options)
 
@@ -264,3 +271,23 @@ class NetworkaClient:
             verbose=verbose,
         )
         return upload_file(options)
+
+    def close(self) -> None:
+        """Close all active device sessions."""
+        for session in self._sessions.values():
+            try:
+                session.disconnect()
+            except Exception:
+                pass
+        self._sessions.clear()
+
+    def __enter__(self) -> NetworkaClient:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        self.close()

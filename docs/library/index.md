@@ -22,20 +22,26 @@ Networka provides both a CLI and a Python library. Use the library when you need
 
 ### NetworkaClient
 
-High-level client that loads configuration and provides methods for all operations.
+High-level client that loads configuration and provides methods for all operations. It supports context manager usage for automatic session reuse.
 
 ```python
 from network_toolkit import NetworkaClient
 
+# Simple usage
 client = NetworkaClient()
 result = client.run("router1", "show version")
+
+# Efficient usage (reuses connections)
+with NetworkaClient() as client:
+    client.run("router1", "show version")
+    client.run("router1", "show ip int brief")
 ```
 
 See [NetworkaClient API reference](../reference/api.md#network_toolkit.client.NetworkaClient)
 
 ### DeviceSession
 
-Persistent connection manager for executing multiple commands efficiently.
+Low-level persistent connection manager. Generally you should use `NetworkaClient` as a context manager instead.
 
 ```python
 from network_toolkit import NetworkaClient, DeviceSession
@@ -43,7 +49,6 @@ from network_toolkit import NetworkaClient, DeviceSession
 client = NetworkaClient()
 with DeviceSession("router1", client.config) as session:
     version = session.execute_command("show version")
-    uptime = session.execute_command("show uptime")
 ```
 
 See [DeviceSession API reference](../reference/api.md#network_toolkit.device.DeviceSession)
@@ -57,15 +62,7 @@ See [DeviceSession API reference](../reference/api.md#network_toolkit.device.Dev
 
 ## Installation
 
-```bash
-pip install networka
-```
-
-Or with uv:
-
-```bash
-uv pip install networka
-```
+For installation instructions, please refer to the [Getting Started Guide](../getting-started.md#installation).
 
 ## Next Steps
 
