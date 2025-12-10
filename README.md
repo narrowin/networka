@@ -172,6 +172,27 @@ nw config init
 
 ```
 
+### Library API
+
+Use Networka programmatically in your Python applications:
+
+```python
+from network_toolkit import NetworkaClient, DeviceSession
+
+client = NetworkaClient()
+
+with DeviceSession("router1", client.config) as session:
+    output = session.execute_command("show version")
+    print(output)
+```
+
+See the [Library Documentation](https://narrowin.github.io/networka/library/) for:
+
+- Multi-command workflows with persistent sessions
+- Ad-hoc IP targeting without configuration files
+- Credential handling patterns
+- Integration recipes
+
 ### One-liners (no config)
 
 Run directly against an IP without creating files. `--platform` selects the network OS driver; `--interactive-auth` prompts for credentials.

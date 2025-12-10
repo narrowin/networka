@@ -18,10 +18,12 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
-from network_toolkit import NetworkaClient
-from network_toolkit.common.credentials import InteractiveCredentials
-from network_toolkit.device import DeviceSession
-from network_toolkit.ip_device import create_ip_based_config
+from network_toolkit import (
+    DeviceSession,
+    InteractiveCredentials,
+    NetworkaClient,
+    create_ip_based_config,
+)
 
 # --- Configuration / Business Logic ---
 

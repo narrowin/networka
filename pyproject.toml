@@ -9,7 +9,7 @@ description = "Modern Python cli toolkit for network device automation"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
-keywords = ["network", "automation", "mikrotik", "routeros", "cli", "async", "narrowin", "networking", "infrastructure"]
+keywords = ["network", "automation", "mikrotik", "routeros", "cli", "async", "narrowin", "networking", "infrastructure", "library", "sdk", "programmatic", "python-api"]
 authors = [
     { name = "narrowin", email = "contact@narrowin.com" },
 ]
