@@ -18,13 +18,13 @@ def mock_config():
 
     # Mock devices
     dev1 = MagicMock()
-    dev1.hostname = "192.168.1.1"
+    dev1.host = "192.168.1.1"
     dev1.device_type = "cisco_ios"
     dev1.description = "Core Switch"
     dev1.tags = ["core", "cisco"]
 
     dev2 = MagicMock()
-    dev2.hostname = "192.168.1.2"
+    dev2.host = "192.168.1.2"
     dev2.device_type = "mikrotik_routeros"
     dev2.description = None
     dev2.tags = []

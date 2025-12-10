@@ -100,7 +100,9 @@ def get_sequence_list(
     sm = SequenceManager(config)
     result = []
 
-    def _create_info(name: str, seq: SequenceRecord, v_name: str | None) -> SequenceInfo:
+    def _create_info(
+        name: str, seq: SequenceRecord, v_name: str | None
+    ) -> SequenceInfo:
         cmds = []
         if seq.commands:
             if isinstance(seq.commands[0], str):

@@ -24,19 +24,14 @@ Purpose: compact context for LLMs continuing the refactor so the Typer CLI (`nw`
 - Maintain API stability via `network_toolkit/api/__init__.py` exports and versioned result/exception types.
 
 ## Outstanding Work
-- Migrate remaining commands (upload, download, backup, firmware, config, list, info, etc.) into `network_toolkit/api/<command>.py` with matching slim CLI wrappers.
 - Add API-level tests for each migrated command and expand `api/__init__.py` exports.
 - Document programmatic usage and API stability policy once more commands are migrated.
 - Optional: update tooling/docs to encourage direct API use (e.g., enrich `scripts/compliance_report.py` or add examples).
 
 ## Quick Usage Examples
-- Programmatic: `from network_toolkit.api.run import RunOptions, run_commands`
+- Programmatic: `from network_toolkit.api.run imuv run nw list devicesport RunOptions, run_commands`
 - CLI remains: `nw run ...` (delegates to API internally)
 
-## Distilled Next-Session Focus (download/upload)
-- Goal: apply the established API/CLI split to file transfer commands.
-- Targets: move logic out of `network_toolkit/commands/download.py` and `network_toolkit/commands/upload.py` into `network_toolkit/api/download.py` and `network_toolkit/api/upload.py`.
-- API: return typed dataclasses (e.g., `DownloadOptions/DownloadResult`, `UploadOptions/UploadResult`), raise `NetworkToolkitError` on failures, no printing or exits.
-- CLI: Typer wrappers only parse args, call the API, format output (Rich/raw/JSON), and map exceptions to exit codes.
-- Tests: add API-level tests (`tests/test_api_download.py`, `tests/test_api_upload.py`) and keep existing integration tests passing (e.g., `tests/test_file_downloads.py`, `tests/test_file_upload.py`).
-- Reference pattern: follow `api/run.py` + `commands/run.py` for structure and separation of concerns (no backup refactor yet in this codebase; adjust references accordingly).
+## Distilled Next-Session Focus (config)
+- There is no need to migragte remaining commands (`config`, `ssh`, `schema`)!
+- **`vendor_config_backup`**: Investigate `commands/vendor_config_backup.py`. It appears to be a command implementation but is not currently registered in `cli.py`. Determine if it should be refactored to `api/vendor_backup.py` or removed if obsolete.

@@ -89,7 +89,7 @@ class TestUnsupportedOperations:
 class TestCommandLineUnsupportedOperations:
     """Test unsupported operations through command line interface."""
 
-    @patch("network_toolkit.commands.firmware.check_operation_support")
+    @patch("network_toolkit.api.firmware.check_operation_support")
     @patch("network_toolkit.commands.firmware.load_config")
     @patch("network_toolkit.commands.firmware.setup_logging")
     @patch("pathlib.Path.exists")

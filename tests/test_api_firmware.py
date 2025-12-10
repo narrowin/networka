@@ -45,7 +45,10 @@ def test_upgrade_firmware_device_success(
     mock_platform_ops.get_platform_name.return_value = "Cisco IOS"
 
     # Mock get_platform_operations to return our mock ops
-    with patch("network_toolkit.api.firmware.get_platform_operations", return_value=mock_platform_ops):
+    with patch(
+        "network_toolkit.api.firmware.get_platform_operations",
+        return_value=mock_platform_ops,
+    ):
         options = FirmwareUpgradeOptions(
             target="dev1",
             firmware_file=firmware_file,

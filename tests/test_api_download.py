@@ -29,10 +29,10 @@ class DummyDeviceSession:
 
     def download_file(
         self,
-        remote_file: str,
+        remote_filename: str,
         local_path: Path,
         *,
-        verify: bool = True,
+        verify_download: bool = True,
         delete_remote: bool = False,
     ) -> bool:
         # Simulate file creation

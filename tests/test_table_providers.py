@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import pytest
 
+from network_toolkit.api.list import get_device_list, get_group_list
 from network_toolkit.common.table_providers import (
     DeviceInfoTableProvider,
     DeviceListTableProvider,
@@ -41,9 +42,10 @@ class TestDeviceListTableProvider:
             device_groups={},
         )
 
-        provider = DeviceListTableProvider(config=config)
+        provider = DeviceListTableProvider(devices=get_device_list(config))
 
-        assert provider.config == config
+        assert len(provider.devices) == 1
+        assert provider.devices[0].name == "test_device"
 
     def test_device_list_table_definition(self) -> None:
         """Test table definition for device list."""
@@ -52,7 +54,7 @@ class TestDeviceListTableProvider:
             devices={},
             device_groups={},
         )
-        provider = DeviceListTableProvider(config=config)
+        provider = DeviceListTableProvider(devices=get_device_list(config))
 
         definition = provider.get_table_definition()
 
@@ -71,7 +73,7 @@ class TestDeviceListTableProvider:
             devices={},
             device_groups={},
         )
-        provider = DeviceListTableProvider(config=config)
+        provider = DeviceListTableProvider(devices=get_device_list(config))
 
         rows = provider.get_table_rows()
 
@@ -94,7 +96,7 @@ class TestDeviceListTableProvider:
             device_groups={},
         )
 
-        provider = DeviceListTableProvider(config=config)
+        provider = DeviceListTableProvider(devices=get_device_list(config))
 
         rows = provider.get_table_rows()
 
@@ -123,7 +125,7 @@ class TestDeviceListTableProvider:
             device_groups={},
         )
 
-        provider = DeviceListTableProvider(config=config)
+        provider = DeviceListTableProvider(devices=get_device_list(config))
 
         raw_output = provider.get_raw_output()
 
@@ -146,7 +148,7 @@ class TestDeviceListTableProvider:
             device_groups={},
         )
 
-        provider = DeviceListTableProvider(config=config)
+        provider = DeviceListTableProvider(devices=get_device_list(config))
 
         verbose_info = provider.get_verbose_info()
 
@@ -171,9 +173,10 @@ class TestGroupListTableProvider:
             },
         )
 
-        provider = GroupListTableProvider(config=config)
+        provider = GroupListTableProvider(groups=get_group_list(config))
 
-        assert provider.config == config
+        assert len(provider.groups) == 1
+        assert provider.groups[0].name == "test_group"
 
     def test_group_list_table_definition(self) -> None:
         """Test table definition for group list."""
@@ -182,7 +185,7 @@ class TestGroupListTableProvider:
             devices={},
             device_groups={},
         )
-        provider = GroupListTableProvider(config=config)
+        provider = GroupListTableProvider(groups=get_group_list(config))
 
         definition = provider.get_table_definition()
 
@@ -213,7 +216,7 @@ class TestGroupListTableProvider:
             },
         )
 
-        provider = GroupListTableProvider(config=config)
+        provider = GroupListTableProvider(groups=get_group_list(config))
 
         rows = provider.get_table_rows()
 
@@ -409,7 +412,7 @@ class TestTableProviderIntegration:
             device_groups={},
         )
 
-        provider = DeviceListTableProvider(config=config)
+        provider = DeviceListTableProvider(devices=get_device_list(config))
 
         # Test table structure
         definition = provider.get_table_definition()
@@ -477,12 +480,12 @@ class TestTableProviderEdgeCases:
         )
 
         # Empty devices
-        device_provider = DeviceListTableProvider(config=config)
+        device_provider = DeviceListTableProvider(devices=get_device_list(config))
         assert device_provider.get_table_rows() == []
         assert device_provider.get_raw_output().strip() == ""
 
         # Empty groups
-        group_provider = GroupListTableProvider(config=config)
+        group_provider = GroupListTableProvider(groups=get_group_list(config))
         assert group_provider.get_table_rows() == []
 
     @pytest.mark.skip("Complex provider APIs need refactoring")
@@ -523,7 +526,7 @@ class TestTableProviderEdgeCases:
             device_groups={},
         )
 
-        provider = DeviceListTableProvider(config=config)
+        provider = DeviceListTableProvider(devices=get_device_list(config))
         rows = provider.get_table_rows()
 
         assert len(rows) == 1
