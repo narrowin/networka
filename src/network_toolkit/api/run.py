@@ -260,7 +260,6 @@ def _run_sequence_on_device(
 
         outputs: dict[str, str] = {}
 
-        session = None
         if session_pool is not None:
             session = session_pool.get(device_name)
             if session is None:
@@ -273,8 +272,6 @@ def _run_sequence_on_device(
                 )
                 session_pool[device_name] = session
             session.connect()
-
-        if session:
             for cmd in commands:
                 outputs[cmd] = session.execute_command(cmd)
         else:

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -30,6 +32,7 @@ class BackupOptions:
     download: bool = True
     delete_remote: bool = False
     verbose: bool = False
+    session_pool: dict[str, DeviceSession] | None = None
 
 
 @dataclass(slots=True)
@@ -100,6 +103,24 @@ def _resolve_backup_sequence(config: NetworkConfig, device_name: str) -> list[st
     return sequence_commands or []
 
 
+@contextmanager
+def _get_session(
+    device_name: str,
+    config: NetworkConfig,
+    session_pool: dict[str, DeviceSession] | None = None,
+) -> Iterator[DeviceSession]:
+    if session_pool is not None:
+        session = session_pool.get(device_name)
+        if session is None:
+            session = DeviceSession(device_name, config)
+            session_pool[device_name] = session
+        session.connect()
+        yield session
+    else:
+        with DeviceSession(device_name, config) as session:
+            yield session
+
+
 def _perform_device_backup(
     device_name: str,
     options: BackupOptions,
@@ -107,7 +128,7 @@ def _perform_device_backup(
 ) -> DeviceBackupResult:
     """Perform backup for a single device."""
     try:
-        with DeviceSession(device_name, options.config) as session:
+        with _get_session(device_name, options.config, options.session_pool) as session:
             # Get platform-specific operations
             try:
                 platform_ops = get_platform_operations(session)

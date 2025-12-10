@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from time import perf_counter
@@ -26,6 +28,7 @@ class UploadOptions:
     checksum_verify: bool = False
     max_concurrent: int = 5
     verbose: bool = False
+    session_pool: dict[str, DeviceSession] | None = None
 
 
 @dataclass(slots=True)
@@ -82,13 +85,31 @@ def _resolve_targets(target_expr: str, config: NetworkConfig) -> TargetResolutio
     return TargetResolution(resolved=devices, unknown=unknowns, ip_mode=False)
 
 
+@contextmanager
+def _get_session(
+    device_name: str,
+    config: NetworkConfig,
+    session_pool: dict[str, DeviceSession] | None = None,
+) -> Iterator[DeviceSession]:
+    if session_pool is not None:
+        session = session_pool.get(device_name)
+        if session is None:
+            session = DeviceSession(device_name, config)
+            session_pool[device_name] = session
+        session.connect()
+        yield session
+    else:
+        with DeviceSession(device_name, config) as session:
+            yield session
+
+
 def _upload_single_device(
     device_name: str,
     options: UploadOptions,
 ) -> DeviceUploadResult:
     """Execute upload for a single device."""
     try:
-        with DeviceSession(device_name, options.config) as session:
+        with _get_session(device_name, options.config, options.session_pool) as session:
             session.connect()
 
             success = session.upload_file(

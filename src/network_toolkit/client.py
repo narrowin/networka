@@ -29,6 +29,10 @@ class NetworkaClient:
     This client encapsulates configuration loading and provides a unified interface
     for executing commands, running backups, transferring files, and more.
 
+    Note:
+        This client is not thread-safe. If you need to perform operations concurrently
+        across threads, create a separate NetworkaClient instance for each thread.
+
     Usage:
         >>> from network_toolkit import NetworkaClient
         >>> # Use as context manager for automatic session reuse
@@ -149,6 +153,7 @@ class NetworkaClient:
             download=download,
             delete_remote=delete_remote,
             verbose=verbose,
+            session_pool=self._sessions,
         )
         return run_backup(options)
 
@@ -192,6 +197,7 @@ class NetworkaClient:
             store_results=store_results,
             results_dir=results_dir,
             verbose=verbose,
+            session_pool=self._sessions,
         )
         return diff_targets(options)
 
@@ -229,6 +235,7 @@ class NetworkaClient:
             delete_remote=delete_remote,
             verify_download=verify_download,
             verbose=verbose,
+            session_pool=self._sessions,
         )
         return download_file(options)
 
@@ -269,6 +276,7 @@ class NetworkaClient:
             checksum_verify=checksum_verify,
             max_concurrent=max_concurrent,
             verbose=verbose,
+            session_pool=self._sessions,
         )
         return upload_file(options)
 

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import difflib
 import re
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -27,6 +29,7 @@ class DiffOptions:
     store_results: bool = False
     results_dir: str | None = None
     verbose: bool = False
+    session_pool: dict[str, DeviceSession] | None = None
 
 
 @dataclass
@@ -87,6 +90,24 @@ def _make_unified_diff(
 ) -> str:
     diff = difflib.unified_diff(a_lines, b_lines, fromfile=a_label, tofile=b_label)
     return "\n".join(diff)
+
+
+@contextmanager
+def _get_session(
+    device_name: str,
+    config: NetworkConfig,
+    session_pool: dict[str, DeviceSession] | None = None,
+) -> Iterator[DeviceSession]:
+    if session_pool is not None:
+        session = session_pool.get(device_name)
+        if session is None:
+            session = DeviceSession(device_name, config)
+            session_pool[device_name] = session
+        session.connect()
+        yield session
+    else:
+        with DeviceSession(device_name, config) as session:
+            yield session
 
 
 def _diff_texts(
@@ -184,9 +205,9 @@ def diff_targets(options: DiffOptions) -> DiffResult:
 
         try:
             if is_config:
-                with DeviceSession(dev_a, options.config) as sa:
+                with _get_session(dev_a, options.config, options.session_pool) as sa:
                     curr_a = sa.execute_command("/export compact")
-                with DeviceSession(dev_b, options.config) as sb:
+                with _get_session(dev_b, options.config, options.session_pool) as sb:
                     curr_b = sb.execute_command("/export compact")
 
                 _save_current_artifact(dev_a, "export_compact", curr_a)
@@ -208,9 +229,9 @@ def diff_targets(options: DiffOptions) -> DiffResult:
                     total_changed += 1
 
             elif is_command:
-                with DeviceSession(dev_a, options.config) as sa:
+                with _get_session(dev_a, options.config, options.session_pool) as sa:
                     curr_a = sa.execute_command(subj)
-                with DeviceSession(dev_b, options.config) as sb:
+                with _get_session(dev_b, options.config, options.session_pool) as sb:
                     curr_b = sb.execute_command(subj)
 
                 _save_current_artifact(dev_a, subj, curr_a)
@@ -299,7 +320,7 @@ def diff_targets(options: DiffOptions) -> DiffResult:
                     continue
 
                 base_text = _read_text(base_file)
-                with DeviceSession(dev, options.config) as s:
+                with _get_session(dev, options.config, options.session_pool) as s:
                     curr_text = s.execute_command("/export compact")
 
                 _save_current_artifact(dev, "export_compact", curr_text)
@@ -340,7 +361,7 @@ def diff_targets(options: DiffOptions) -> DiffResult:
                     continue
 
                 base_text = _read_text(cmd_base_file)
-                with DeviceSession(dev, options.config) as s:
+                with _get_session(dev, options.config, options.session_pool) as s:
                     curr_text = s.execute_command(subj)
 
                 _save_current_artifact(dev, subj, curr_text)
@@ -376,7 +397,7 @@ def diff_targets(options: DiffOptions) -> DiffResult:
                     )
                     continue
 
-                with DeviceSession(dev, options.config) as s:
+                with _get_session(dev, options.config, options.session_pool) as s:
                     for cmd in seq_cmds:
                         seq_base_file: Path | None = _find_baseline_file_for_command(
                             options.baseline, cmd

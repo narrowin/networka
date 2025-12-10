@@ -19,6 +19,7 @@ def mock_config():
     config.sequences = {}
     return config
 
+
 @patch("network_toolkit.client.load_config")
 @patch("network_toolkit.device.DeviceSession")
 def test_client_reuses_session(mock_device_session_cls, mock_load_config, mock_config):
@@ -60,6 +61,7 @@ def test_client_reuses_session(mock_device_session_cls, mock_load_config, mock_c
     # Close client
     client.close()
     assert mock_session.disconnect.call_count == 1
+
 
 @patch("network_toolkit.client.load_config")
 @patch("network_toolkit.device.DeviceSession")
