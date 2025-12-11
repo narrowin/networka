@@ -14,6 +14,10 @@ Short install video (30s):
 
 [asciinema placeholder – will be embedded here]
 
+### tmux requirement for `nw cli`
+
+The multi-pane CLI command (`nw cli`) requires tmux on your PATH. Install it with `brew install tmux` (macOS), `apt install tmux` (Debian/Ubuntu), or your distro’s package manager. Without tmux the command falls back to sequential SSH sessions.
+
 ## Verify installation
 
 ```bash
