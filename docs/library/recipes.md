@@ -4,50 +4,48 @@ Common patterns for Networka library usage.
 
 ## Multi-Command Workflow
 
-Execute a sequence of commands with validation:
+Execute a sequence of commands with validation using `client.run()`:
 
 ```python
-from network_toolkit import NetworkaClient, DeviceSession
+from network_toolkit import NetworkaClient
 
-client = NetworkaClient()
-
-with DeviceSession("router1", client.config) as session:
+with NetworkaClient() as client:
     # Check current state
-    identity = session.execute_command("/system/identity/print")
-    print(f"Connected to: {identity}")
+    identity = client.run("router1", "/system/identity/print")
+    print(f"Connected to: {identity.output}")
 
     # Get system info
-    resources = session.execute_command("/system/resource/print")
-    print(f"Resources: {resources}")
+    resources = client.run("router1", "/system/resource/print")
+    print(f"Resources: {resources.output}")
 
     # Check interfaces
-    interfaces = session.execute_command("/interface/print")
-    print(f"Interfaces: {interfaces}")
+    interfaces = client.run("router1", "/interface/print")
+    print(f"Interfaces: {interfaces.output}")
 ```
 
 ## Parallel Device Operations
 
-Run the same command on multiple devices simultaneously:
+Run the same command on multiple devices simultaneously. Note that `NetworkaClient` is not thread-safe, so we create a new instance for each thread.
 
 ```python
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from network_toolkit import NetworkaClient, DeviceSession
+from network_toolkit import NetworkaClient
 
-def get_device_info(device_name, config):
+def get_device_info(device_name):
     """Execute command on a single device."""
+    # Create a new client for each thread
+    client = NetworkaClient()
     try:
-        with DeviceSession(device_name, config) as session:
-            output = session.execute_command("/system/identity/print")
-            return {"device": device_name, "output": output, "error": None}
+        result = client.run(device_name, "/system/identity/print")
+        return {"device": device_name, "output": result.output, "error": None}
     except Exception as e:
         return {"device": device_name, "output": None, "error": str(e)}
 
-client = NetworkaClient()
 devices = ["router1", "router2", "router3", "router4"]
 
 results = []
 with ThreadPoolExecutor(max_workers=4) as executor:
-    futures = {executor.submit(get_device_info, dev, client.config): dev
+    futures = {executor.submit(get_device_info, dev): dev
                for dev in devices}
 
     for future in as_completed(futures):
@@ -68,9 +66,9 @@ print(f"\nCompleted: {success}/{len(devices)} successful")
 Parse command output and validate against requirements:
 
 ```python
-from network_toolkit import NetworkaClient, DeviceSession
+from network_toolkit import NetworkaClient
 
-def check_compliance(device_name, config):
+def check_compliance(device_name):
     """Run compliance checks on a device."""
     checks = {
         "identity": "/system/identity/print",
@@ -79,19 +77,19 @@ def check_compliance(device_name, config):
     }
 
     results = {}
-    with DeviceSession(device_name, config) as session:
+    # Use context manager for efficient session reuse across checks
+    with NetworkaClient() as client:
         for check_name, command in checks.items():
-            output = session.execute_command(command)
+            result = client.run(device_name, command)
             # Example validation
             results[check_name] = {
-                "passed": len(output) > 0,
-                "output": output
+                "passed": len(result.output) > 0,
+                "output": result.output
             }
 
     return results
 
-client = NetworkaClient()
-compliance = check_compliance("router1", client.config)
+compliance = check_compliance("router1")
 
 for check, result in compliance.items():
     status = "PASS" if result["passed"] else "FAIL"

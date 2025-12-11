@@ -45,7 +45,7 @@ client.close()
 
 ## Advanced: Low-Level Session Control
 
-For very specific use cases where you need direct control over a single session (bypassing the client's pool), you can use `DeviceSession` directly.
+For very specific use cases where you need direct control over a single session (bypassing the client's pool), you can use `DeviceSession` directly. This is rarely needed as `client.run()` handles session reuse automatically.
 
 ```python
 from network_toolkit import DeviceSession
@@ -53,43 +53,55 @@ from network_toolkit import DeviceSession
 # Manually manage a single session
 with DeviceSession("router1", client.config) as session:
     output = session.execute_command("show version")
-```### upload_file
+```
+
+## File Transfer
+
+For file transfers, use the high-level client methods which handle connection management automatically.
+
+### Upload
 
 Transfer a file to the device:
 
 ```python
-from pathlib import Path
-
-with DeviceSession("router1", client.config) as session:
-    session.upload_file(
-        local_file=Path("firmware.npk"),
-        remote_path="firmware.npk"
-    )
+client.upload(
+    target="router1",
+    local_file="firmware.npk",
+    remote_filename="firmware.npk"
+)
 ```
 
-### download_file
+### Download
 
 Download a file from the device:
 
 ```python
-from pathlib import Path
-
-with DeviceSession("router1", client.config) as session:
-    session.download_file(
-        remote_file="backup.rsc",
-        local_path=Path("./backups/backup.rsc")
-    )
+client.download(
+    target="router1",
+    remote_file="backup.rsc",
+    local_path="./backups/backup.rsc"
+)
 ```
 
 ## Custom Credentials
 
-Override credentials without changing configuration:
+Override credentials without changing configuration by passing `interactive_creds` to `client.run()`:
 
 ```python
-with DeviceSession("router1", client.config,
-                   username_override="admin",
-                   password_override="secret") as session:  # pragma: allowlist secret
-    output = session.execute_command("show version")
+from network_toolkit.common.credentials import InteractiveCredentials
+
+# Create credentials object
+creds = InteractiveCredentials(
+    username="admin",
+    password="secret_password"  # pragma: allowlist secret
+)
+
+# Use credentials for this specific run
+client.run(
+    "router1",
+    "show version",
+    interactive_creds=creds
+)
 ```
 
 ## Error Handling

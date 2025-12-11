@@ -94,9 +94,9 @@ Because a real **Networka** wants the f\*ing lot.”<br><br>
 ### System Requirements
 
 - **Operating System**: Linux, macOS, or Windows
-- **Python**: 3.11, 3.12, or 3.13
 - **Network Access**: SSH connectivity to target devices
 - **Package Manager**: uv (recommended) or pip
+- **tmux for `nw cli`**: Install tmux to use the multi-pane CLI command (`brew install tmux` on macOS, `apt install tmux` on Debian/Ubuntu). libtmux is installed automatically with Networka.
 
 ### Quick Install (recommended)
 

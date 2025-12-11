@@ -18,6 +18,24 @@ Networka provides both a CLI and a Python library. Use the library when you need
 - Running parallel operations across devices
 - Parsing and processing command output programmatically
 
+## Feature Support
+
+The Python library supports the core automation features of Networka. Some management and interactive features are currently CLI-only.
+
+| Feature | CLI Command | Library Method |
+|---------|-------------|----------------|
+| **Command Execution** | `nw run` | `client.run()` |
+| **Sequence Execution** | `nw run` | `client.run()` |
+| **File Upload** | `nw upload` | `client.upload()` |
+| **File Download** | `nw download` | `client.download()` |
+| **Config Backup** | `nw backup` | `client.backup()` |
+| **Config Diff** | `nw diff` | `client.diff()` |
+| **Firmware Upgrade** | `nw firmware upgrade` | *Not yet supported* |
+| **RouterOS Upgrade** | `nw routerboard-upgrade` | *Not yet supported* |
+| **Interactive SSH** | `nw ssh` | *Not supported (interactive)* |
+| **Config Management** | `nw config ...` | *Not supported* |
+| **Inventory List** | `nw list` | *Access via `client.devices`* |
+
 ## Key Classes
 
 ### NetworkaClient
@@ -41,11 +59,12 @@ See [NetworkaClient API reference](../reference/api.md#network_toolkit.client.Ne
 
 ### DeviceSession
 
-Low-level persistent connection manager. Generally you should use `NetworkaClient` as a context manager instead.
+Low-level persistent connection manager. Generally you should use `NetworkaClient` as a context manager instead, as it handles session pooling automatically.
 
 ```python
 from network_toolkit import NetworkaClient, DeviceSession
 
+# Only use DeviceSession directly if you need to bypass the client's session management
 client = NetworkaClient()
 with DeviceSession("router1", client.config) as session:
     version = session.execute_command("show version")

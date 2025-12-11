@@ -68,24 +68,17 @@ NetworkaClient opens and closes connections automatically. Use `DeviceSession` d
 Don't have a config file? Connect directly to an IP:
 
 ```python
-from network_toolkit import NetworkaClient, create_ip_based_config
+from network_toolkit import NetworkaClient
 
 client = NetworkaClient()
 
-config = create_ip_based_config(
-    ips=["192.168.1.1"],
-    device_type="mikrotik_routeros",
-    base_config=client.config,
+# Connect to an IP address (requires device_type)
+result = client.run(
+    "192.168.1.1",
+    "show version",
+    device_type="mikrotik_routeros"
 )
-
-device_name = "ip_192_168_1_1"  # Auto-generated name
-
-from network_toolkit import DeviceSession
-with DeviceSession(device_name, config,
-                   username_override="admin",
-                   password_override="password") as session:  # pragma: allowlist secret
-    output = session.execute_command("show version")
-    print(output)
+print(result.output)
 ```
 
 See [ad-hoc targets](adhoc-targets.md) for details.
