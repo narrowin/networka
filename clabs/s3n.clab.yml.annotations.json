@@ -1,0 +1,69 @@
+{
+  "freeTextAnnotations": [],
+  "freeShapeAnnotations": [],
+  "groupStyleAnnotations": [],
+  "cloudNodeAnnotations": [],
+  "nodeAnnotations": [
+    {
+      "id": "sw-acc1",
+      "icon": "router",
+      "position": {
+        "x": 105,
+        "y": 105
+      },
+      "geoCoordinates": {
+        "lat": 48.684826888402256,
+        "lng": 9.007895390625677
+      }
+    },
+    {
+      "id": "sw-acc2",
+      "icon": "router",
+      "position": {
+        "x": 203,
+        "y": 105
+      },
+      "geoCoordinates": {
+        "lat": 48.684826888402256,
+        "lng": 9.007895390625677
+      }
+    },
+    {
+      "id": "sw-dist1",
+      "icon": "router",
+      "position": {
+        "x": 161,
+        "y": 63
+      },
+      "geoCoordinates": {
+        "lat": 48.684826888402256,
+        "lng": 9.007895390625677
+      }
+    },
+    {
+      "id": "linux1",
+      "icon": "router",
+      "position": {
+        "x": 105,
+        "y": 203
+      },
+      "geoCoordinates": {
+        "lat": 48.684826888402256,
+        "lng": 9.007895390625677
+      }
+    },
+    {
+      "id": "linux2",
+      "icon": "router",
+      "position": {
+        "x": 203,
+        "y": 203
+      },
+      "geoCoordinates": {
+        "lat": 48.684826888402256,
+        "lng": 9.007895390625677
+      }
+    }
+  ],
+  "aliasEndpointAnnotations": []
+}
