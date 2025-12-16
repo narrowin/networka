@@ -554,11 +554,9 @@ class TestCLI:
         assert result.exit_code == 0
         # Expect device/cmd header lines preceding each output (with === delimiters)
         lines = [line for line in result.output.splitlines() if line.strip() != ""]
-        # Two commands => 4 lines: header, output, header, output
-        assert lines[0].startswith("=== device=test_device1 cmd=")
-        assert lines[1] == "out1"
-        assert lines[2].startswith("=== device=test_device1 cmd=")
-        assert lines[3] == "out2"
+        # Two commands => 2 lines: output, output
+        assert lines[0] == "out1"
+        assert lines[1] == "out2"
 
     @patch("network_toolkit.api.run.SequenceManager")
     @patch("network_toolkit.device.DeviceSession")
@@ -597,15 +595,11 @@ class TestCLI:
         assert result.exit_code == 0
         lines = [line for line in result.output.splitlines() if line.strip() != ""]
         # Expect headers and outputs interleaved in device order (with === delimiters)
-        # d1 header, d1c1, d1 header, d1c2, d2 header, d2c1, d2 header, d2c2
-        assert lines[0].startswith("=== device=test_device1 cmd=")
-        assert lines[1] == "d1c1"
-        assert lines[2].startswith("=== device=test_device1 cmd=")
-        assert lines[3] == "d1c2"
-        assert lines[4].startswith("=== device=test_device2 cmd=")
-        assert lines[5] == "d2c1"
-        assert lines[6].startswith("=== device=test_device2 cmd=")
-        assert lines[7] == "d2c2"
+        # d1c1, d1c2, d2c1, d2c2
+        assert lines[0] == "d1c1"
+        assert lines[1] == "d1c2"
+        assert lines[2] == "d2c1"
+        assert lines[3] == "d2c2"
 
     @patch("network_toolkit.device.DeviceSession")
     def test_run_single_command_raw_json(

@@ -90,7 +90,6 @@ class OutputManager:
                 + "\n"
             )
         elif self.mode == OutputMode.RAW:
-            sys.stdout.write(f"=== device={device} cmd={command} ===\n")
             sys.stdout.write(f"{output}\n")
         else:
             # Use style manager for semantic styling

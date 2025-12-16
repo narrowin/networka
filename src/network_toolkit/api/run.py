@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
+from functools import partial
 from pathlib import Path
 from time import perf_counter
 from typing import TYPE_CHECKING
@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from network_toolkit.device import DeviceSession
 
+from network_toolkit.api.execution import execute_parallel
 from network_toolkit.common.credentials import InteractiveCredentials
 from network_toolkit.config import NetworkConfig
 from network_toolkit.exceptions import NetworkToolkitError
@@ -397,40 +398,22 @@ def run_commands(options: RunOptions) -> RunResult:
     started_at = perf_counter()
 
     if is_sequence:
+        run_func = partial(
+            _run_sequence_on_device,
+            config=config,
+            sequence_name=options.command_or_sequence,
+            username_override=username_override,
+            password_override=password_override,
+            transport_override=options.transport_type,
+            results_mgr=results_mgr,
+            sequence_manager=sequence_manager,
+            session_pool=options.session_pool,
+        )
+
         if is_group:
-            with ThreadPoolExecutor(max_workers=len(resolution.resolved)) as executor:
-                future_to_device = {
-                    executor.submit(
-                        _run_sequence_on_device,
-                        device,
-                        config,
-                        options.command_or_sequence,
-                        username_override,
-                        password_override,
-                        options.transport_type,
-                        results_mgr,
-                        sequence_manager,
-                        options.session_pool,
-                    ): device
-                    for device in resolution.resolved
-                }
-                sequence_results = [
-                    future.result() for future in as_completed(future_to_device)
-                ]
+            sequence_results = execute_parallel(resolution.resolved, run_func)
         else:
-            sequence_results = [
-                _run_sequence_on_device(
-                    resolution.resolved[0],
-                    config,
-                    options.command_or_sequence,
-                    username_override,
-                    password_override,
-                    options.transport_type,
-                    results_mgr,
-                    sequence_manager,
-                    options.session_pool,
-                )
-            ]
+            sequence_results = [run_func(resolution.resolved[0])]
 
         totals = RunTotals(
             total=len(sequence_results),
@@ -468,40 +451,23 @@ def run_commands(options: RunOptions) -> RunResult:
         )
 
     # Command mode
+    run_cmd_func = partial(
+        _run_command_on_device,
+        config=config,
+        command=options.command_or_sequence,
+        username_override=username_override,
+        password_override=password_override,
+        transport_override=options.transport_type,
+        results_mgr=results_mgr,
+        session_pool=options.session_pool,
+    )
+
     if is_group:
-        with ThreadPoolExecutor(max_workers=len(resolution.resolved)) as executor:
-            future_to_device_cmd = {
-                executor.submit(
-                    _run_command_on_device,
-                    device,
-                    config,
-                    options.command_or_sequence,
-                    username_override,
-                    password_override,
-                    options.transport_type,
-                    results_mgr,
-                    options.session_pool,
-                ): device
-                for device in resolution.resolved
-            }
-            command_results = [
-                future.result() for future in as_completed(future_to_device_cmd)
-            ]
+        command_results = execute_parallel(resolution.resolved, run_cmd_func)
         order_index = {name: idx for idx, name in enumerate(resolution.resolved)}
         command_results.sort(key=lambda r: order_index.get(r.device, 0))
     else:
-        command_results = [
-            _run_command_on_device(
-                resolution.resolved[0],
-                config,
-                options.command_or_sequence,
-                username_override,
-                password_override,
-                options.transport_type,
-                results_mgr,
-                options.session_pool,
-            )
-        ]
+        command_results = [run_cmd_func(resolution.resolved[0])]
 
     totals = RunTotals(
         total=len(command_results),
