@@ -34,6 +34,21 @@ Networka loads all files in these folders. Later files override earlier ones whe
 
 Credentials come from environment variables; see Environment variables for details.
 
+## Using Nornir / Containerlab inventory (optional) {#nornir-inventory}
+
+Networka can import inventory from a Nornir **SimpleInventory** file layout, including Containerlab’s generated `nornir-simple-inventory.yml`.
+
+Configure this in `config/config.yml`:
+
+```yaml
+inventory:
+  source: nornir_simple
+  nornir_inventory_dir: /path/to/clab-<lab-dir>   # or a direct file path
+  merge_mode: replace
+```
+
+See `docs/nornir-inventory.md` for the full workflow and options.
+
 ## YAML (preferred) {#yaml}
 
 YAML gives you clarity, comments, nesting, and future-proofing. Prefer it for everything beyond one-off imports.

@@ -37,6 +37,7 @@ Command completed successfully
 
 - Multi-vendor automation (MikroTik, Cisco, Arista, Juniper, …)
 - Flexible configuration (YAML/CSV), tags and groups
+- Containerlab-friendly: consume generated `nornir-simple-inventory.yml` directly
 - Vendor-aware sequences and backups
 - Rich CLI output with selectable output modes
 - Type-safe internals (mypy), clean CLI (Typer + Rich)

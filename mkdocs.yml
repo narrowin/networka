@@ -12,6 +12,7 @@ nav:
       - Platform compatibility: platform-compatibility.md
   - User guide:
     - Configuration: configuration.md
+    - Nornir & Containerlab inventory: nornir-inventory.md
     - Environment variables: environment-variables.md
     - Running commands: running-commands.md
     - Results: results.md
