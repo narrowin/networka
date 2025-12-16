@@ -30,7 +30,12 @@ import typer
 from rich.markup import escape
 from rich.syntax import Syntax
 
-from network_toolkit.api.diff import DiffItemResult, DiffOptions, diff_targets
+from network_toolkit.api.diff import (
+    DiffItemResult,
+    DiffOptions,
+    diff_files,
+    diff_targets,
+)
 from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.output import OutputMode
@@ -89,6 +94,14 @@ def register(app: typer.Typer) -> None:
                 ),
             ),
         ] = None,
+        heuristic: Annotated[
+            bool,
+            typer.Option(
+                "--heuristic",
+                "-H",
+                help="Use heuristic operational state diffing (ignores timestamps, counters, etc.).",
+            ),
+        ] = False,
         config_file: Annotated[
             Path, typer.Option("--config", "-c", help="Configuration file path")
         ] = DEFAULT_CONFIG_PATH,
@@ -133,6 +146,25 @@ def register(app: typer.Typer) -> None:
             config_file=config_file,
         )
 
+        # Check for local file diff first
+        target_path = Path(target)
+        subject_path = Path(subject)
+        if (
+            target_path.exists()
+            and target_path.is_file()
+            and subject_path.exists()
+            and subject_path.is_file()
+        ):
+            outcome = diff_files(
+                target_path, subject_path, heuristic=heuristic, ignore_patterns=ignore
+            )
+            if outcome.changed:
+                print(outcome.output)
+                raise typer.Exit(1)
+            else:
+                print("No differences found.")
+                raise typer.Exit(0)
+
         try:
             config = load_config(config_file)
         except Exception as e:  # pragma: no cover - load errors covered elsewhere
@@ -149,6 +181,7 @@ def register(app: typer.Typer) -> None:
             store_results=store_results,
             results_dir=results_dir,
             verbose=verbose,
+            heuristic=heuristic,
         )
 
         try:
