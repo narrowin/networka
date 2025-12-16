@@ -8,7 +8,6 @@ from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
-from functools import partial
 from pathlib import Path
 
 from network_toolkit.api.execution import execute_parallel
@@ -364,6 +363,9 @@ def diff_targets(options: DiffOptions) -> DiffResult:
         command_context=cmd_ctx,
     )
 
+    def _save_current_artifact(device: str, name: str, text: str) -> None:
+        _save_artifact(device, name, text, options.save_current)
+
     # Resolve targets
     def resolve_targets(target_expr: str) -> tuple[list[str], list[str]]:
         requested = [t.strip() for t in target_expr.split(",") if t.strip()]
@@ -393,55 +395,80 @@ def diff_targets(options: DiffOptions) -> DiffResult:
     total_changed = 0
     total_missing = 0
 
+    def _is_missing_baseline_error(error: str | None) -> bool:
+        if not error:
+            return False
+        return error.startswith("Baseline file missing") or error.startswith(
+            "Baseline file not found"
+        )
+
     # Device-to-device mode: exactly two devices and no baseline
     if options.baseline is None and len(devices) == 2:
         dev_a, dev_b = devices[0], devices[1]
 
         try:
+            if is_config:
 
-            def _fetch_device_output(dev: str) -> str:
-                with _get_session(dev, options.config, options.session_pool) as s:
-                    if is_config:
-                        return s.execute_command("/export compact")
-                    elif is_command:
-                        return s.execute_command(subj)
-                    else:
-                        msg = "Device-to-device diff only supports 'config' or a single command."
-                        raise NetworkToolkitError(msg)
+                def _fetch_output(device: str) -> str:
+                    with _get_session(
+                        device, options.config, options.session_pool
+                    ) as session:
+                        return session.execute_command("/export compact")
 
-            with ThreadPoolExecutor(max_workers=2) as executor:
-                future_a = executor.submit(_fetch_device_output, dev_a)
-                future_b = executor.submit(_fetch_device_output, dev_b)
-                curr_a = future_a.result()
-                curr_b = future_b.result()
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    fut_a = executor.submit(_fetch_output, dev_a)
+                    fut_b = executor.submit(_fetch_output, dev_b)
+                    curr_a = fut_a.result()
+                    curr_b = fut_b.result()
 
-            _save_artifact(
-                dev_a,
-                "export_compact" if is_config else subj,
-                curr_a,
-                options.save_current,
-            )
-            _save_artifact(
-                dev_b,
-                "export_compact" if is_config else subj,
-                curr_b,
-                options.save_current,
-            )
+                _save_current_artifact(dev_a, "export_compact", curr_a)
+                _save_current_artifact(dev_b, "export_compact", curr_b)
 
-            outcome = _diff_texts(
-                baseline_text=curr_a,
-                current_text=curr_b,
-                baseline_label=f"{dev_a}:{subj}",
-                current_label=f"{dev_b}:{subj}",
-                ignore_patterns=options.ignore_patterns or [],
-            )
-            results.append(
-                DiffItemResult(
-                    device=f"{dev_a} vs {dev_b}", subject=subj, outcome=outcome
+                outcome = _diff_texts(
+                    baseline_text=curr_a,
+                    current_text=curr_b,
+                    baseline_label=f"{dev_a}:/export compact",
+                    current_label=f"{dev_b}:/export compact",
+                    ignore_patterns=options.ignore_patterns or [],
                 )
-            )
-            if outcome.changed:
-                total_changed += 1
+                results.append(
+                    DiffItemResult(
+                        device=f"{dev_a} vs {dev_b}", subject="config", outcome=outcome
+                    )
+                )
+                if outcome.changed:
+                    total_changed += 1
+
+            elif is_command:
+
+                def _fetch_output(device: str) -> str:
+                    with _get_session(
+                        device, options.config, options.session_pool
+                    ) as session:
+                        return session.execute_command(subj)
+
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    fut_a = executor.submit(_fetch_output, dev_a)
+                    fut_b = executor.submit(_fetch_output, dev_b)
+                    curr_a = fut_a.result()
+                    curr_b = fut_b.result()
+
+                _save_current_artifact(dev_a, subj, curr_a)
+                _save_current_artifact(dev_b, subj, curr_b)
+                outcome = _diff_texts(
+                    baseline_text=curr_a,
+                    current_text=curr_b,
+                    baseline_label=f"{dev_a}:{subj}",
+                    current_label=f"{dev_b}:{subj}",
+                    ignore_patterns=options.ignore_patterns or [],
+                )
+                results.append(
+                    DiffItemResult(
+                        device=f"{dev_a} vs {dev_b}", subject=subj, outcome=outcome
+                    )
+                )
+                if outcome.changed:
+                    total_changed += 1
 
             return DiffResult(
                 results=results,
@@ -467,40 +494,172 @@ def diff_targets(options: DiffOptions) -> DiffResult:
             )
 
     # Standard mode: diff against baseline
-    if not options.baseline:
+    baseline = options.baseline
+    if baseline is None:
         msg = "Baseline path is required (unless comparing exactly two devices)."
         raise NetworkToolkitError(msg)
 
-    if not options.baseline.exists():
-        msg = f"Baseline path not found: {options.baseline}"
+    if not baseline.exists():
+        msg = f"Baseline path not found: {baseline}"
         raise NetworkToolkitError(msg)
 
-    # Parallel execution
-    parallel_results = execute_parallel(
-        devices,
-        partial(_perform_device_diff, options=options, sequence_manager=sm),
+    def _perform_device_diff(dev: str) -> list[DiffItemResult]:
+        try:
+            if is_config:
+                if baseline.is_dir():
+                    cand = baseline / f"{dev}.rsc"
+                    if not cand.exists():
+                        cand = baseline / f"{dev}.txt"
+                    if not cand.exists():
+                        matches = list(baseline.glob(f"*{dev}*"))
+                        if matches:
+                            cand = matches[0]
+                    base_file = cand
+                else:
+                    base_file = baseline
+
+                if not base_file.exists():
+                    return [
+                        DiffItemResult(
+                            device=dev,
+                            subject="config",
+                            outcome=None,
+                            error=f"Baseline file not found: {base_file}",
+                        )
+                    ]
+
+                base_text = _read_text(base_file)
+                with _get_session(dev, options.config, options.session_pool) as s:
+                    curr_text = s.execute_command("/export compact")
+
+                _save_current_artifact(dev, "export_compact", curr_text)
+
+                outcome = _diff_texts(
+                    baseline_text=base_text,
+                    current_text=curr_text,
+                    baseline_label=str(base_file),
+                    current_label=f"{dev}:/export compact",
+                    ignore_patterns=options.ignore_patterns or [],
+                )
+                return [DiffItemResult(device=dev, subject="config", outcome=outcome)]
+
+            if is_command:
+                if baseline.is_dir():
+                    cmd_base_file = _find_baseline_file_for_command(baseline, subj)
+                else:
+                    cmd_base_file = baseline
+
+                if not cmd_base_file or not cmd_base_file.exists():
+                    return [
+                        DiffItemResult(
+                            device=dev,
+                            subject=subj,
+                            outcome=None,
+                            error=f"Baseline file not found for command: {subj}",
+                        )
+                    ]
+
+                base_text = _read_text(cmd_base_file)
+                with _get_session(dev, options.config, options.session_pool) as s:
+                    curr_text = s.execute_command(subj)
+
+                _save_current_artifact(dev, subj, curr_text)
+
+                outcome = _diff_texts(
+                    baseline_text=base_text,
+                    current_text=curr_text,
+                    baseline_label=str(cmd_base_file),
+                    current_label=f"{dev}:{subj}",
+                    ignore_patterns=options.ignore_patterns or [],
+                )
+                return [DiffItemResult(device=dev, subject=subj, outcome=outcome)]
+
+            # Sequence diff is handled in the caller for clarity.
+            return [
+                DiffItemResult(
+                    device=dev,
+                    subject=subj,
+                    outcome=None,
+                    error="Unsupported diff mode",
+                )
+            ]
+        except Exception as e:
+            return [
+                DiffItemResult(device=dev, subject=subj, outcome=None, error=str(e))
+            ]
+
+    if is_config or is_command:
+        if len(devices) > 1 and options.session_pool is None:
+            batched = execute_parallel(devices, _perform_device_diff)
+            results = [item for batch in batched for item in batch]
+        else:
+            for dev in devices:
+                results.extend(_perform_device_diff(dev))
+    else:
+        for dev in devices:
+            try:
+                if not baseline.is_dir():
+                    msg = "For sequence diff, baseline must be a directory."
+                    raise NetworkToolkitError(msg)
+
+                seq_cmds = sm.resolve(dev, subj)
+                if not seq_cmds:
+                    results.append(
+                        DiffItemResult(
+                            device=dev,
+                            subject=subj,
+                            outcome=None,
+                            error=f"Sequence '{subj}' empty or not found for {dev}",
+                        )
+                    )
+                    continue
+
+                with _get_session(dev, options.config, options.session_pool) as s:
+                    for cmd in seq_cmds:
+                        seq_base_file = _find_baseline_file_for_command(baseline, cmd)
+                        if not seq_base_file:
+                            results.append(
+                                DiffItemResult(
+                                    device=dev,
+                                    subject=cmd,
+                                    outcome=None,
+                                    error="Baseline file missing",
+                                )
+                            )
+                            continue
+
+                        base_text = _read_text(seq_base_file)
+                        curr_text = s.execute_command(cmd)
+                        _save_current_artifact(dev, cmd, curr_text)
+
+                        outcome = _diff_texts(
+                            baseline_text=base_text,
+                            current_text=curr_text,
+                            baseline_label=str(seq_base_file),
+                            current_label=f"{dev}:{cmd}",
+                            ignore_patterns=options.ignore_patterns or [],
+                        )
+                        results.append(
+                            DiffItemResult(device=dev, subject=cmd, outcome=outcome)
+                        )
+
+            except Exception as e:
+                results.append(
+                    DiffItemResult(device=dev, subject=subj, outcome=None, error=str(e))
+                )
+
+    results.sort(key=lambda item: (item.device, item.subject))
+    total_changed = sum(
+        1 for item in results if item.outcome is not None and item.outcome.changed
+    )
+    total_missing = sum(
+        1
+        for item in results
+        if item.outcome is None and _is_missing_baseline_error(item.error)
     )
 
-    # Flatten results
-    flat_results: list[DiffItemResult] = []
-    for res_list in parallel_results:
-        flat_results.extend(res_list)
-
-    # Sort by device name
-    flat_results.sort(key=lambda x: x.device)
-
-    # Calculate totals
-    for res in flat_results:
-        if res.error and "Baseline file missing" in res.error:
-            total_missing += 1
-        elif res.outcome and res.outcome.changed:
-            total_changed += 1
-        elif res.error and "Baseline file not found" in res.error:
-            # This covers the case where the whole device failed due to missing baseline
-            total_missing += 1
-
     return DiffResult(
-        results=flat_results,
+        results=results,
         total_changed=total_changed,
         total_missing=total_missing,
         device_pair_diff=False,
