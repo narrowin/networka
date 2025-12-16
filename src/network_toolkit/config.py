@@ -22,7 +22,7 @@ from network_toolkit.credentials import (
     ConnectionParameterBuilder,
     EnvironmentCredentialManager,
 )
-from network_toolkit.exceptions import NetworkToolkitError
+from network_toolkit.exceptions import ConfigurationError, NetworkToolkitError
 
 
 def _resolve_fallback_config_path(original_hint: Path | None = None) -> Path | None:
@@ -1185,6 +1185,55 @@ def load_modular_config(
         final_devices = {**inline_devices, **all_devices}
         final_groups = {**inline_groups, **all_groups}
 
+        # Optional: source devices/groups from Nornir SimpleInventory (including containerlab output)
+        inventory_cfg = cast(dict[str, Any], main_config.get("inventory", {}) or {})
+        inventory_source = str(inventory_cfg.get("source", "networka")).strip().lower()
+        if inventory_source == "nornir_simple":
+            merge_mode = str(inventory_cfg.get("merge_mode", "replace")).strip().lower()
+            if merge_mode != "replace":
+                msg = "inventory.merge_mode is not supported in v1; use 'replace'"
+                raise ConfigurationError(msg, details={"merge_mode": merge_mode})
+
+            inv_path_raw = inventory_cfg.get("nornir_inventory_dir")
+            if not inv_path_raw or not isinstance(inv_path_raw, str):
+                msg = "inventory.nornir_inventory_dir is required when inventory.source is 'nornir_simple'"
+                raise ConfigurationError(msg, details={"inventory": inventory_cfg})
+
+            credentials_mode = (
+                str(inventory_cfg.get("credentials_mode", "env")).strip().lower()
+            )
+            group_membership = (
+                str(inventory_cfg.get("group_membership", "extended")).strip().lower()
+            )
+            platform_mapping = (
+                str(inventory_cfg.get("platform_mapping", "none")).strip().lower()
+            )
+            connect_host = (
+                str(inventory_cfg.get("connect_host", "inventory_hostname"))
+                .strip()
+                .lower()
+            )
+
+            from network_toolkit.inventory.nornir_simple import (
+                compile_nornir_simple_inventory,
+            )
+
+            compiled = compile_nornir_simple_inventory(
+                config_dir=config_dir,
+                inventory_path=Path(inv_path_raw),
+                credentials_mode=credentials_mode,
+                group_membership=group_membership,
+                platform_mapping=platform_mapping,
+                connect_host=connect_host,
+            )
+
+            final_devices = compiled.devices
+            final_groups = compiled.device_groups
+
+            # Replace any previously collected sources to reflect inventory origin
+            device_sources = compiled.device_sources
+            group_sources = compiled.group_sources
+
         # Merge all configs into the expected format
         merged_config: dict[str, Any] = {
             "general": main_config.get("general", {}),
@@ -1225,6 +1274,9 @@ def load_modular_config(
     except yaml.YAMLError as e:
         msg = f"Invalid YAML in modular configuration: {config_dir}"
         raise ValueError(msg) from e
+    except NetworkToolkitError:
+        # Preserve domain-specific configuration/validation errors.
+        raise
     except FileNotFoundError:
         # Re-raise FileNotFoundError as-is for missing config files
         raise
