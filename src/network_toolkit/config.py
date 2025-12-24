@@ -23,6 +23,9 @@ from network_toolkit.credentials import (
     EnvironmentCredentialManager,
 )
 from network_toolkit.exceptions import ConfigurationError, NetworkToolkitError
+from network_toolkit.inventory.catalog import InventoryCatalog, set_inventory_catalog
+from network_toolkit.inventory.nornir_simple import compile_nornir_simple_inventory
+from network_toolkit.runtime import get_runtime_settings
 
 
 def _resolve_fallback_config_path(original_hint: Path | None = None) -> Path | None:
@@ -279,10 +282,15 @@ class DeviceConfig(BaseModel):
 
     # Private: where this device was loaded from
     _source_path: Path | None = PrivateAttr(default=None)
+    _inventory_source_id: str | None = PrivateAttr(default=None)
 
     def set_source_path(self, path: Path) -> None:
         """Set the source path where this device was defined."""
         self._source_path = path
+
+    def set_inventory_source_id(self, source_id: str) -> None:
+        """Set the inventory source id for this device."""
+        self._inventory_source_id = source_id
 
 
 class GroupCredentials(BaseModel):
@@ -302,10 +310,15 @@ class DeviceGroup(BaseModel):
 
     # Private: where this group was loaded from
     _source_path: Path | None = PrivateAttr(default=None)
+    _inventory_source_id: str | None = PrivateAttr(default=None)
 
     def set_source_path(self, path: Path) -> None:
         """Set the source path where this group was defined."""
         self._source_path = path
+
+    def set_inventory_source_id(self, source_id: str) -> None:
+        """Set the inventory source id for this group."""
+        self._inventory_source_id = source_id
 
 
 class VendorPlatformConfig(BaseModel):
@@ -368,6 +381,7 @@ class NetworkConfig(BaseModel):
 
     # Private: track where this config was loaded from (for sequence resolution)
     _config_source_dir: Path | None = PrivateAttr(default=None)
+    _inventory_catalog: InventoryCatalog | None = PrivateAttr(default=None)
 
     # Helper: device source path accessor (non-schema, uses PrivateAttr on DeviceConfig)
     def get_device_source_path(self, device_name: str) -> Path | None:
@@ -376,12 +390,24 @@ class NetworkConfig(BaseModel):
             return None
         return getattr(dev, "_source_path", None)
 
+    def get_device_inventory_source_id(self, device_name: str) -> str | None:
+        dev = self.devices.get(device_name) if self.devices else None
+        if dev is None:
+            return None
+        return getattr(dev, "_inventory_source_id", None)
+
     # Helper: group source path accessor (non-schema, uses PrivateAttr on DeviceGroup)
     def get_group_source_path(self, group_name: str) -> Path | None:
         grp = self.device_groups.get(group_name) if self.device_groups else None
         if grp is None:
             return None
         return getattr(grp, "_source_path", None)
+
+    def get_group_inventory_source_id(self, group_name: str) -> str | None:
+        grp = self.device_groups.get(group_name) if self.device_groups else None
+        if grp is None:
+            return None
+        return getattr(grp, "_inventory_source_id", None)
 
     def get_device_connection_params(
         self,
@@ -1185,54 +1211,222 @@ def load_modular_config(
         final_devices = {**inline_devices, **all_devices}
         final_groups = {**inline_groups, **all_groups}
 
-        # Optional: source devices/groups from Nornir SimpleInventory (including containerlab output)
+        # Optional: additive inventory sources (Nornir SimpleInventory + Containerlab)
         inventory_cfg = cast(dict[str, Any], main_config.get("inventory", {}) or {})
-        inventory_source = str(inventory_cfg.get("source", "networka")).strip().lower()
-        if inventory_source == "nornir_simple":
-            merge_mode = str(inventory_cfg.get("merge_mode", "replace")).strip().lower()
-            if merge_mode != "replace":
-                msg = "inventory.merge_mode is not supported in v1; use 'replace'"
-                raise ConfigurationError(msg, details={"merge_mode": merge_mode})
+        device_inventory_ids: dict[str, str] = dict.fromkeys(final_devices, "config")
+        group_inventory_ids: dict[str, str] = dict.fromkeys(final_groups, "config")
 
-            inv_path_raw = inventory_cfg.get("nornir_inventory_dir")
-            if not inv_path_raw or not isinstance(inv_path_raw, str):
-                msg = "inventory.nornir_inventory_dir is required when inventory.source is 'nornir_simple'"
-                raise ConfigurationError(msg, details={"inventory": inventory_cfg})
+        def _get_str_opt(key: str) -> str | None:
+            val = inventory_cfg.get(key)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+            return None
+
+        def _get_bool_opt(key: str, *, default: bool) -> bool:
+            val = inventory_cfg.get(key)
+            if val is None:
+                return default
+            if isinstance(val, bool):
+                return val
+            if isinstance(val, str):
+                return val.strip().lower() in {"1", "true", "yes", "y", "on"}
+            return bool(val)
+
+        def _is_containerlab_inventory_path(path: Path) -> bool:
+            try:
+                if path.is_file():
+                    return path.name.startswith(
+                        "nornir-simple-inventory."
+                    ) and path.suffix.lower() in {
+                        ".yml",
+                        ".yaml",
+                    }
+                if path.is_dir():
+                    if (path / "nornir-simple-inventory.yml").exists():
+                        return True
+                    if (path / "nornir-simple-inventory.yaml").exists():
+                        return True
+            except Exception:
+                return False
+            return False
+
+        def _containerlab_prefix_for_path(path: Path) -> str | None:
+            try:
+                if (
+                    path.is_dir()
+                    and path.name.startswith("clab-")
+                    and len(path.name) > 5
+                ):
+                    return path.name
+                if path.is_file():
+                    parent = path.parent
+                    if (
+                        parent.name.startswith("clab-")
+                        and len(parent.name) > 5
+                        and parent.is_dir()
+                    ):
+                        return parent.name
+            except Exception:
+                return None
+            return None
+
+        def _resolve_inventory_root(base: Path, raw: Path) -> Path:
+            p = raw
+            if not p.is_absolute():
+                p = base / p
+            return p.resolve()
+
+        def _unique_source_id(base_id: str, used: set[str]) -> str:
+            candidate = base_id
+            idx = 2
+            while candidate in used:
+                candidate = f"{base_id}_{idx}"
+                idx += 1
+            used.add(candidate)
+            return candidate
+
+        def _source_id_for_path(path: Path) -> str:
+            try:
+                if path.is_dir():
+                    return path.name or "inventory"
+                if path.is_file() and path.name.startswith("nornir-simple-inventory."):
+                    return path.parent.name or path.stem or "inventory"
+                return path.stem or path.name or "inventory"
+            except Exception:
+                return "inventory"
+
+        discover_local = _get_bool_opt("discover_local", default=True)
+
+        inv_dirs_raw: list[str] = []
+        inv_single = _get_str_opt("nornir_inventory_dir")
+        if inv_single:
+            inv_dirs_raw.append(inv_single)
+
+        inv_list = inventory_cfg.get("nornir_inventory_dirs")
+        if isinstance(inv_list, list):
+            for item in inv_list:
+                if isinstance(item, str) and item.strip():
+                    inv_dirs_raw.append(item.strip())
+
+        runtime = get_runtime_settings()
+        cli_inventory_paths = list(runtime.inventory_paths or [])
+
+        local_inventory_paths: list[Path] = []
+        if discover_local:
+            cwd = Path.cwd()
+            local_candidates: list[Path] = []
+            try:
+                local_candidates.append(cwd)
+                for child in cwd.iterdir():
+                    if child.is_dir() and child.name.startswith("clab-"):
+                        local_candidates.append(child)
+            except Exception:
+                local_candidates = []
+
+            for cand in local_candidates:
+                if not _is_containerlab_inventory_path(cand):
+                    continue
+                local_inventory_paths.append(cand)
+
+        inventory_source = str(inventory_cfg.get("source", "")).strip().lower()
+        if inventory_source == "nornir_simple" and not (
+            inv_dirs_raw or cli_inventory_paths or local_inventory_paths
+        ):
+            msg = (
+                "No Nornir inventory sources found; set inventory.nornir_inventory_dir(s), "
+                "pass --inventory, or ensure a local containerlab inventory exists"
+            )
+            raise ConfigurationError(msg, details={"inventory": inventory_cfg})
+
+        # Compile all inventory sources; merge non-conflicting entries into the config view.
+        # Conflicts are handled at execution time via ambiguity checks.
+        compiled_sources: list[dict[str, Any]] = []
+        used_source_ids: set[str] = {"config"}
+
+        def _compile_one(
+            *,
+            kind: str,
+            raw_path: Path,
+            base_dir: Path,
+        ) -> None:
+            resolved_root = _resolve_inventory_root(base_dir, raw_path)
+            is_containerlab = _is_containerlab_inventory_path(resolved_root)
+            containerlab_prefix = (
+                _containerlab_prefix_for_path(resolved_root)
+                if is_containerlab
+                else None
+            )
 
             credentials_mode = (
-                str(inventory_cfg.get("credentials_mode", "env")).strip().lower()
-            )
-            group_membership = (
-                str(inventory_cfg.get("group_membership", "extended")).strip().lower()
-            )
+                _get_str_opt("credentials_mode")
+                or ("inventory" if is_containerlab else "env")
+            ).lower()
+            group_membership = (_get_str_opt("group_membership") or "extended").lower()
             platform_mapping = (
-                str(inventory_cfg.get("platform_mapping", "none")).strip().lower()
-            )
+                _get_str_opt("platform_mapping")
+                or ("netmiko_to_networka" if is_containerlab else "none")
+            ).lower()
             connect_host = (
-                str(inventory_cfg.get("connect_host", "inventory_hostname"))
-                .strip()
-                .lower()
-            )
+                _get_str_opt("connect_host")
+                or (
+                    "containerlab_longname"
+                    if (is_containerlab and containerlab_prefix)
+                    else "inventory_hostname"
+                )
+            ).lower()
 
-            from network_toolkit.inventory.nornir_simple import (
-                compile_nornir_simple_inventory,
+            source_id = _unique_source_id(
+                _source_id_for_path(resolved_root), used_source_ids
             )
-
             compiled = compile_nornir_simple_inventory(
-                config_dir=config_dir,
-                inventory_path=Path(inv_path_raw),
+                config_dir=base_dir,
+                inventory_path=resolved_root,
                 credentials_mode=credentials_mode,
                 group_membership=group_membership,
                 platform_mapping=platform_mapping,
                 connect_host=connect_host,
             )
 
-            final_devices = compiled.devices
-            final_groups = compiled.device_groups
+            compiled_sources.append(
+                {
+                    "source_id": source_id,
+                    "kind": kind,
+                    "root": resolved_root,
+                    "devices": compiled.devices,
+                    "device_groups": compiled.device_groups,
+                    "device_sources": compiled.device_sources,
+                    "group_sources": compiled.group_sources,
+                }
+            )
 
-            # Replace any previously collected sources to reflect inventory origin
-            device_sources = compiled.device_sources
-            group_sources = compiled.group_sources
+            for dev_name, dev_cfg in compiled.devices.items():
+                if dev_name in final_devices:
+                    continue
+                final_devices[dev_name] = dev_cfg
+                device_sources[dev_name] = compiled.device_sources.get(
+                    dev_name, resolved_root
+                )
+                device_inventory_ids[dev_name] = source_id
+
+            for grp_name, grp_cfg in compiled.device_groups.items():
+                if grp_name in final_groups:
+                    continue
+                final_groups[grp_name] = grp_cfg
+                group_sources[grp_name] = compiled.group_sources.get(
+                    grp_name, resolved_root
+                )
+                group_inventory_ids[grp_name] = source_id
+
+        for raw in inv_dirs_raw:
+            _compile_one(
+                kind="config_inventory", raw_path=Path(raw), base_dir=config_dir
+            )
+
+        for raw_path in cli_inventory_paths:
+            _compile_one(kind="cli", raw_path=raw_path, base_dir=Path.cwd())
+
+        for raw_path in local_inventory_paths:
+            _compile_one(kind="discovered", raw_path=raw_path, base_dir=Path.cwd())
 
         # Merge all configs into the expected format
         merged_config: dict[str, Any] = {
@@ -1262,12 +1456,69 @@ def load_modular_config(
                 src = device_sources.get(_name)
                 if src is not None:
                     _dev.set_source_path(src)
+                _dev.set_inventory_source_id(device_inventory_ids.get(_name, "config"))
 
         if model.device_groups:
             for _name, _grp in model.device_groups.items():
                 src = group_sources.get(_name)
                 if src is not None:
                     _grp.set_source_path(src)
+                _grp.set_inventory_source_id(group_inventory_ids.get(_name, "config"))
+
+        # Attach full inventory catalog for ambiguity detection and source-aware listing.
+        catalog = InventoryCatalog()
+        cfg_devices = model.devices or {}
+        cfg_groups = model.device_groups or {}
+        catalog.add_source(
+            source_id="config",
+            kind="config",
+            root=config_dir.resolve(),
+            inventory_file=config_file.resolve(),
+            devices={
+                k: v
+                for k, v in cfg_devices.items()
+                if device_inventory_ids.get(k) == "config"
+            },
+            groups={
+                k: v
+                for k, v in cfg_groups.items()
+                if group_inventory_ids.get(k) == "config"
+            },
+        )
+
+        for inv_src in compiled_sources:
+            src_id = cast(str, inv_src["source_id"])
+            root = cast(Path, inv_src["root"])
+            devices_raw = cast(dict[str, Any], inv_src["devices"])
+            groups_raw = cast(dict[str, Any], inv_src["device_groups"])
+            device_srcs = cast(dict[str, Path], inv_src["device_sources"])
+            group_srcs = cast(dict[str, Path], inv_src["group_sources"])
+            inv_file = next(iter(device_srcs.values()), None)
+
+            src_devices: dict[str, DeviceConfig] = {}
+            for name, dev_dict in devices_raw.items():
+                dev_obj = DeviceConfig(**dev_dict)
+                dev_obj.set_source_path(device_srcs.get(name, root))
+                dev_obj.set_inventory_source_id(src_id)
+                src_devices[name] = dev_obj
+
+            src_groups: dict[str, DeviceGroup] = {}
+            for name, grp_dict in groups_raw.items():
+                grp_obj = DeviceGroup(**grp_dict)
+                grp_obj.set_source_path(group_srcs.get(name, root))
+                grp_obj.set_inventory_source_id(src_id)
+                src_groups[name] = grp_obj
+
+            catalog.add_source(
+                source_id=src_id,
+                kind=cast(str, inv_src["kind"]),
+                root=root,
+                inventory_file=inv_file,
+                devices=src_devices,
+                groups=src_groups,
+            )
+
+        set_inventory_catalog(model, catalog)
 
         return model
 
