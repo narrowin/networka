@@ -17,7 +17,7 @@ from network_toolkit.common.table_generator import (
     TableDefinition,
 )
 from network_toolkit.config import NetworkConfig, get_supported_device_types
-from network_toolkit.credentials import EnvironmentCredentialManager
+from network_toolkit.credentials import CredentialResolver, EnvironmentCredentialManager
 from network_toolkit.ip_device import (
     get_supported_device_types as get_device_descriptions,
 )
@@ -42,6 +42,7 @@ class DeviceListTableProvider(BaseModel, BaseTableProvider):
             title="Devices",
             columns=[
                 TableColumn(header="Name", style=StyleName.DEVICE),
+                TableColumn(header="Source", style=StyleName.WARNING),
                 TableColumn(header="Host", style=StyleName.HOST),
                 TableColumn(header="Type", style=StyleName.PLATFORM),
                 TableColumn(header="Description", style=StyleName.SUCCESS),
@@ -59,6 +60,7 @@ class DeviceListTableProvider(BaseModel, BaseTableProvider):
             rows.append(
                 [
                     device.name,
+                    device.source or "config",
                     device.hostname,
                     device.device_type,
                     device.description or "N/A",
@@ -76,8 +78,9 @@ class DeviceListTableProvider(BaseModel, BaseTableProvider):
         for device in self.devices:
             tags_str = ",".join(device.tags or []) if device.tags else "none"
             platform = device.device_type
+            source = device.source or "config"
             lines.append(
-                f"device={device.name} host={device.hostname} platform={platform} tags={tags_str}"
+                f"device={device.name} source={source} host={device.hostname} platform={platform} tags={tags_str}"
             )
         return "\n".join(lines)
 
@@ -107,6 +110,7 @@ class GroupListTableProvider(BaseModel, BaseTableProvider):
             title="Groups",
             columns=[
                 TableColumn(header="Group Name", style=StyleName.GROUP),
+                TableColumn(header="Source", style=StyleName.WARNING),
                 TableColumn(header="Description", style=StyleName.SUCCESS),
                 TableColumn(header="Match Tags", style=StyleName.WARNING),
                 TableColumn(header="Members", style=StyleName.DEVICE),
@@ -123,6 +127,7 @@ class GroupListTableProvider(BaseModel, BaseTableProvider):
             rows.append(
                 [
                     group.name,
+                    group.source or "config",
                     group.description or "",
                     ", ".join(group.match_tags) if group.match_tags else "N/A",
                     ", ".join(group.members) if group.members else "None",
@@ -140,8 +145,9 @@ class GroupListTableProvider(BaseModel, BaseTableProvider):
             members_str = ",".join(group.members) if group.members else "none"
             tags_str = ",".join(group.match_tags or []) if group.match_tags else "none"
             description = group.description or ""
+            source = group.source or "config"
             lines.append(
-                f"group={group.name} description={description} tags={tags_str} members={members_str}"
+                f"group={group.name} source={source} description={description} tags={tags_str} members={members_str}"
             )
         return "\n".join(lines)
 
@@ -557,6 +563,7 @@ class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
             ["Tags", ", ".join(device_config.tags) if device_config.tags else "None"]
         )
         rows.append(["Source", self._get_device_source()])
+        rows.append(["Inventory Source", self._get_device_inventory_source()])
 
         # Connection parameters
         username_override = (
@@ -620,8 +627,6 @@ class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
 
     def _get_credential_source(self, credential_type: str) -> str:
         """Get the source of a credential using the same logic as CredentialResolver."""
-        from network_toolkit.credentials import CredentialResolver
-
         # Check interactive override
         if self.interactive_creds:
             if credential_type == "username" and getattr(
@@ -712,7 +717,11 @@ class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
             return f"device={self.device_name} error=not_found"
 
         device_config = devices[self.device_name]
-        return f"device={self.device_name} host={device_config.host} type={device_config.device_type}"
+        source = self._get_device_inventory_source()
+        return (
+            f"device={self.device_name} source={source} host={device_config.host} "
+            f"type={device_config.device_type}"
+        )
 
     def get_verbose_info(self) -> list[str] | None:
         """Get additional verbose information."""
@@ -731,6 +740,13 @@ class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
             return str(src_path.resolve())
         except Exception:
             return str(src_path)
+
+    def _get_device_inventory_source(self) -> str:
+        try:
+            source_id = self.config.get_device_inventory_source_id(self.device_name)
+        except Exception:
+            source_id = None
+        return source_id or "config"
 
 
 class GroupInfoTableProvider(BaseModel, BaseTableProvider):
@@ -769,6 +785,7 @@ class GroupInfoTableProvider(BaseModel, BaseTableProvider):
         rows.append(["Name", self.group_name])
         rows.append(["Description", getattr(group, "description", "N/A") or "N/A"])
         rows.append(["Source", self._get_group_source()])
+        rows.append(["Inventory Source", self._get_group_inventory_source()])
         rows.append(["Device Count", str(len(group_members))])
         rows.append(["Devices", ", ".join(group_members) if group_members else "None"])
 
@@ -784,6 +801,13 @@ class GroupInfoTableProvider(BaseModel, BaseTableProvider):
         except Exception:
             return "unknown"
 
+    def _get_group_inventory_source(self) -> str:
+        try:
+            source_id = self.config.get_group_inventory_source_id(self.group_name)
+        except Exception:
+            source_id = None
+        return source_id or "config"
+
     def get_raw_output(self) -> str | None:
         """Get raw data for JSON/CSV output."""
         device_groups = self.config.device_groups or {}
@@ -796,7 +820,8 @@ class GroupInfoTableProvider(BaseModel, BaseTableProvider):
         except Exception:
             device_count = 0
 
-        return f"group={self.group_name} device_count={device_count}"
+        source = self._get_group_inventory_source()
+        return f"group={self.group_name} source={source} device_count={device_count}"
 
     def get_verbose_info(self) -> list[str] | None:
         """Get additional verbose information."""
