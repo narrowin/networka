@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -15,6 +16,22 @@ import yaml
 
 from network_toolkit.config import NetworkConfig
 from network_toolkit.device import DeviceSession
+from network_toolkit.runtime import reset_runtime_settings
+
+
+@pytest.fixture(autouse=True)
+def _isolate_home_dir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """Prevent tests from reading/writing the real user home directory."""
+    home_dir = tmp_path_factory.mktemp("home")
+    monkeypatch.setenv("HOME", str(home_dir))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(home_dir / ".config"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(home_dir / ".local" / "share"))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(home_dir / ".cache"))
+    # Stabilize Rich/Click output width so tables don't truncate test strings.
+    monkeypatch.setenv("COLUMNS", "200")
+    monkeypatch.setenv("LINES", "50")
 
 
 @pytest.fixture
@@ -200,6 +217,13 @@ def mock_command_result() -> MagicMock:
     result.failed = False
     result.channel_log = "test log"
     return result
+
+
+@pytest.fixture(autouse=True)
+def _reset_runtime_settings_fixture() -> Iterator[None]:
+    reset_runtime_settings()
+    yield
+    reset_runtime_settings()
 
 
 @pytest.fixture
