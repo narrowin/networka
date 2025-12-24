@@ -18,6 +18,7 @@ from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.styles import StyleName
 from network_toolkit.config import DeviceConfig, NetworkConfig, load_config
 from network_toolkit.exceptions import NetworkToolkitError
+from network_toolkit.inventory.resolve import resolve_named_targets, select_named_target
 from network_toolkit.platforms import UnsupportedOperationError, get_platform_operations
 
 MAX_LIST_PREVIEW = 10
@@ -75,10 +76,8 @@ def _config_backup_impl(
 
         devices = config.devices or {}
         groups = config.device_groups or {}
-        is_device = target_name in devices
-        is_group = target_name in groups
-
-        if not (is_device or is_group):
+        target_kind = select_named_target(config, target_name)
+        if target_kind not in {"device", "group"}:
             ctx.output_manager.print_text(
                 style_manager.format_message(
                     f"Error: '{target_name}' not found as device or group in configuration",
@@ -231,7 +230,7 @@ def _config_backup_impl(
                 )
                 return False
 
-        if is_device:
+        if target_kind == "device":
             ok = process_device(target_name)
             if not ok:
                 raise typer.Exit(1)
@@ -243,13 +242,7 @@ def _config_backup_impl(
             return
 
         # Group path
-        members: list[str] = []
-        try:
-            members = config.get_group_members(target_name)
-        except Exception:
-            grp = groups.get(target_name)
-            if grp and getattr(grp, "members", None):
-                members = grp.members or []
+        members = resolve_named_targets(config, target_name).resolved_devices
 
         if not members:
             ctx.output_manager.print_text(
@@ -408,10 +401,9 @@ def register(app: typer.Typer) -> None:
 
             devices = config.devices or {}
             groups = config.device_groups or {}
-            is_device = target_name in devices
-            is_group = target_name in groups
+            target_kind = select_named_target(config, target_name)
 
-            if not (is_device or is_group):
+            if target_kind not in {"device", "group"}:
                 ctx.output_manager.print_text(
                     style_manager.format_message(
                         f"Error: '{target_name}' not found as device or group in configuration",
@@ -570,7 +562,7 @@ def register(app: typer.Typer) -> None:
                     )
                     return False
 
-            if is_device:
+            if target_kind == "device":
                 ok = process_device(target_name)
                 if not ok:
                     raise typer.Exit(1)
@@ -582,13 +574,7 @@ def register(app: typer.Typer) -> None:
                 return
 
             # Group path
-            members: list[str] = []
-            try:
-                members = config.get_group_members(target_name)
-            except Exception:
-                grp = groups.get(target_name)
-                if grp and getattr(grp, "members", None):
-                    members = grp.members or []
+            members = resolve_named_targets(config, target_name).resolved_devices
 
             if not members:
                 ctx.output_manager.print_text(

@@ -294,9 +294,7 @@ def register(app: typer.Typer) -> None:
                             }
                         )
                     else:
-                        output_mgr.print_command_output(
-                            device_result.device, cmd, output
-                        )
+                        output_mgr.print_output(output)
                 return
 
             output_mgr.print_info(f"Device: {device_result.device}")
@@ -334,11 +332,7 @@ def register(app: typer.Typer) -> None:
                         }
                     )
                 else:
-                    output_mgr.print_command_output(
-                        device_result.device,
-                        device_result.command,
-                        device_result.output,
-                    )
+                    output_mgr.print_output(device_result.output)
                 return
 
             output_mgr.print_info(f"Device: {device_result.device}")

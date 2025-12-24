@@ -14,6 +14,7 @@ from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.logging import setup_logging
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
+from network_toolkit.inventory.resolve import resolve_named_targets, select_named_target
 
 
 def register(app: typer.Typer) -> None:
@@ -76,19 +77,14 @@ def register(app: typer.Typer) -> None:
         try:
             config = load_config(config_file)
 
-            # Check if target exists in config (for summary purposes)
-            devices = config.devices or {}
-            groups = config.device_groups or {}
-            is_device = target_name in devices
-            is_group = target_name in groups
-
-            if not (is_device or is_group):
+            target_kind = select_named_target(config, target_name)
+            if target_kind not in {"device", "group"}:
                 ctx.print_error(
                     f"'{target_name}' not found as device or group in configuration"
                 )
                 raise typer.Exit(1)
 
-            if is_device:
+            if target_kind == "device":
                 # Show summary
                 transport_type = config.get_transport_type(target_name)
                 ctx.print_info("File Download Details:")
@@ -105,13 +101,7 @@ def register(app: typer.Typer) -> None:
                 ctx.print_blank_line()
             else:
                 # Group summary
-                try:
-                    members = config.get_group_members(target_name)
-                except Exception:
-                    group_obj = groups.get(target_name)
-                    members = (
-                        group_obj.members if group_obj and group_obj.members else []
-                    )
+                members = resolve_named_targets(config, target_name).resolved_devices
 
                 if not members:
                     ctx.print_error(f"No devices found in group '{target_name}'")
