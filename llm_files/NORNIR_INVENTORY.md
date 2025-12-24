@@ -121,19 +121,35 @@ Containerlab generates a single-file Nornir inventory in the lab directory:
 
 ```yaml
 inventory:
-  source: nornir_simple
+  # Default-on: discover local containerlab inventories in CWD.
+  # Only includes inventories when the file exists:
+  # - ./nornir-simple-inventory.(yml|yaml)
+  # - ./clab-*/nornir-simple-inventory.(yml|yaml)  (direct children only)
+  discover_local: true
+
+  # Optional: add one or more Nornir SimpleInventory sources (dir or file).
   nornir_inventory_dir: ./nornir_inventory
+  nornir_inventory_dirs:
+    - ./nornir_inventory
+    - ./other_inventory
+
+  # Inventory adapter behavior (applies to all sources in v1)
   credentials_mode: env            # env | inventory
   group_membership: extended       # extended | direct (default: extended)
   platform_mapping: none           # none | netmiko_to_networka
-  merge_mode: replace              # v1: replace only
+  connect_host: inventory_hostname # inventory_hostname | host_key | containerlab_longname
 ```
 
 ### CLI behavior
 
-- `nw list devices`, `nw run`, and completions work the same because they still see `config.devices`.
-- Groups are available by name and resolve via `get_group_members` exactly as before.
-- Tag-based groups are not created (unless added later).
+- Inventory sources are additive:
+  - Networka config (`devices/`, `groups/`, inline `config.yml`)
+  - Inventories configured via `inventory.nornir_inventory_dir(s)`
+  - Inventories provided via CLI `--inventory` (repeatable)
+  - Local discovered containerlab inventories (default-on)
+- `nw list devices`/`nw list groups` show a `Source` column per entry.
+- If a device/group name exists in multiple inventories, execution errors with an ambiguity message unless `--inventory-prefer` selects a source (you can copy the `Source` value).
+- Tag-based groups (`match_tags`) remain supported only for Networka config groups (v1).
 
 ---
 
@@ -259,19 +275,18 @@ This mapping should be explicit and documented to prevent silent mismatches.
 
 ### Phase 0 — Decide configuration contract (1 small PR)
 
-1. Add a new top-level optional config section to `config.yml`:
-   - `inventory.source` with allowed values: `networka` (default), `nornir_simple`
-   - `inventory.nornir_inventory_dir` path (required when `nornir_simple`)
-     - Decided: relative paths resolve relative to Networka config dir (not CWD).
-     - May point to either:
-       - a directory containing `hosts.(yaml|yml)` (and optional `groups.(yaml|yml)`, `defaults.(yaml|yml)`), or
-       - a directory containing Containerlab’s `nornir-simple-inventory.(yaml|yml)`, or
-       - a direct path to a single inventory file (`*.yaml|*.yml`) containing host entries (Containerlab-style).
-   - `inventory.merge_mode`: `replace` (v1 only; `merge` explicitly out of scope)
+1. Add/extend a top-level optional config section in `config.yml`:
+   - `inventory.discover_local`: `true|false` (default: `true`)
+   - `inventory.nornir_inventory_dir`: single path (dir or file)
+   - `inventory.nornir_inventory_dirs`: list of paths (dir or file)
    - `inventory.credentials_mode`: `env|inventory`
    - `inventory.group_membership`: `extended|direct`
    - `inventory.platform_mapping`: `none|netmiko_to_networka`
-2. Update JSON schema export (if used) and docs to reflect the new fields.
+   - `inventory.connect_host`: `inventory_hostname|host_key|containerlab_longname`
+2. Add global CLI options:
+   - `--inventory PATH` (repeatable): add inventory sources at runtime
+   - `--inventory-prefer VALUE`: pick a source when a name is ambiguous (`config`, a path, or a discovered id like `clab-s3n`)
+3. Update docs to reflect additive behavior and ambiguity handling.
 
 ### Phase 1 — Add Nornir loader + compiler (adapter module)
 
@@ -311,13 +326,12 @@ Implementation notes:
 Modify config loading (where modular config is assembled) to:
 
 1. Load `general`, sequences, vendor sequences, file ops as today.
-2. Based on `inventory.source`:
-   - `networka`: keep current devices/groups loading.
-   - `nornir_simple`:
-     - Load and compile Nornir inventory
-     - Apply `merge_mode`:
-       - `replace` (v1): ignore/overwrite any loaded devices/groups
-3. Ensure `config.devices`/`config.device_groups` are populated before anything else uses them.
+2. Collect inventory sources (additive):
+   - Config inventories from `inventory.nornir_inventory_dir(s)`
+   - CLI inventories from `--inventory`
+   - Local containerlab discovery when `inventory.discover_local` is enabled
+3. Compile each inventory into Networka device/group definitions and build a catalog that retains duplicates.
+4. Keep `config.devices`/`config.device_groups` compatible by loading a merged view (non-conflicting names), and resolve conflicts at execution time via ambiguity checks.
 
 ### Phase 3 — Tighten behaviors and error messages
 
@@ -337,7 +351,7 @@ Modify config loading (where modular config is assembled) to:
    - how credentials work in `env` vs `inventory` mode
 2. Add a minimal example inventory directory in docs (not necessarily shipped in package).
 
-### Phase 5 — Tests (unit tests only)
+### Phase 5 — Tests (functional, no real network required)
 
 Add tests that:
 
@@ -354,9 +368,20 @@ Add tests that:
 4. Verify group env credential lookup works for compiled groups (requires `DeviceGroup.credentials` to be present, even if empty).
 5. Verify ambiguous group env credentials fail fast under `credentials_mode: env` with a clear message and remediation guidance.
 
-Dependency strategy for tests:
+Also add tests for:
 
-- Add `nornir` to dev/test extras (or skip tests when not installed).
+1. Default-on local discovery (`CWD/clab-*/nornir-simple-inventory.yml`) and config flag to disable it.
+2. Multiple inventory sources (config + CLI + discovered) being additive.
+3. Ambiguous device/group errors and `--inventory-prefer` selecting the intended source.
+
+---
+
+## Potential improvements after v1
+
+- Per-inventory overrides (credentials/platform/connect_host) instead of applying one set of options to all sources.
+- Richer discovery (opt-in recursion, configurable patterns, ignore lists).
+- More explicit source selection UX (e.g., `clab-s3n:sw-acc1` target syntax) instead of a global prefer flag.
+- Better list rendering for duplicates (grouping by name, diffing conflicting fields).
 
 ---
 
