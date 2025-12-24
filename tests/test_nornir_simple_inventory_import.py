@@ -234,3 +234,52 @@ def test_nornir_simple_inventory_ambiguous_group_env_credentials_fails(
     finally:
         os.environ.pop("NW_PASSWORD_SPINE", None)
         os.environ.pop("NW_PASSWORD_LEAF", None)
+
+
+def test_nornir_simple_inventory_partial_credentials_different_groups_fails(
+    tmp_path: Path,
+) -> None:
+    """Test that partial credentials from different groups are detected as ambiguous.
+
+    This catches "franken-credentials" where username comes from one group
+    and password from another - which will cause confusing auth failures.
+    """
+    inventory_file = tmp_path / "nornir-simple-inventory.yml"
+    _write_yaml(
+        inventory_file,
+        {
+            "node1": {
+                "hostname": "10.0.0.1",
+                "platform": "linux",
+                "groups": ["spine", "leaf"],
+            }
+        },
+    )
+
+    _write_yaml(
+        tmp_path / "config.yml",
+        {
+            "general": {"timeout": 30},
+            "inventory": {
+                "source": "nornir_simple",
+                "nornir_inventory_dir": "nornir-simple-inventory.yml",
+                "merge_mode": "replace",
+                "credentials_mode": "env",
+                "group_membership": "extended",
+            },
+        },
+    )
+
+    import os
+
+    # Username from spine group, password from leaf group => franken-credentials
+    os.environ["NW_USER_SPINE"] = "spine_user"
+    os.environ["NW_PASSWORD_LEAF"] = "leaf_password"
+    try:
+        with pytest.raises(
+            ConfigurationError, match="Partial credentials from different groups"
+        ):
+            load_modular_config(tmp_path)
+    finally:
+        os.environ.pop("NW_USER_SPINE", None)
+        os.environ.pop("NW_PASSWORD_LEAF", None)
