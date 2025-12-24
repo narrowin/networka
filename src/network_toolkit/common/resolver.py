@@ -8,6 +8,9 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from network_toolkit.exceptions import NetworkToolkitError
+from network_toolkit.inventory.catalog import get_inventory_catalog
+from network_toolkit.inventory.resolve import resolve_named_targets, select_named_target
 from network_toolkit.ip_device import (
     create_ip_based_config,
     extract_ips_from_target,
@@ -16,6 +19,9 @@ from network_toolkit.ip_device import (
 
 if TYPE_CHECKING:
     from network_toolkit.config import NetworkConfig
+
+
+logger = logging.getLogger(__name__)
 
 
 class DeviceResolver:
@@ -104,18 +110,24 @@ class DeviceResolver:
                 devices.append(name)
 
         for name in requested:
-            if config.devices and name in config.devices:
+            kind = select_named_target(config, name)
+            if kind == "device":
                 _add_device(name)
                 continue
-            if config.device_groups and name in config.device_groups:
+            if kind == "group":
                 try:
-                    for member in config.get_group_members(name):
-                        _add_device(member)
-                    continue
+                    if get_inventory_catalog(config) is None:
+                        members = self.get_group_members(name)
+                    else:
+                        members = resolve_named_targets(config, name).resolved_devices
+                except NetworkToolkitError:
+                    raise
                 except Exception as exc:
-                    # Group exists but has no valid members - log and skip it
-                    logging.warning(f"Failed to resolve group {name}: {exc}")
+                    logger.debug("Failed to resolve group %s: %s", name, exc)
                     continue
+                for member in members:
+                    _add_device(member)
+                continue
             unknowns.append(name)
 
         return devices, unknowns

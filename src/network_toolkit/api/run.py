@@ -8,13 +8,12 @@ from pathlib import Path
 from time import perf_counter
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from network_toolkit.device import DeviceSession
-
+import network_toolkit.device as device_module
 from network_toolkit.api.execution import execute_parallel
 from network_toolkit.common.credentials import InteractiveCredentials
 from network_toolkit.config import NetworkConfig
 from network_toolkit.exceptions import NetworkToolkitError
+from network_toolkit.inventory.resolve import resolve_named_targets
 from network_toolkit.ip_device import (
     create_ip_based_config as _create_ip_based_config,
 )
@@ -27,6 +26,9 @@ from network_toolkit.ip_device import (
 from network_toolkit.results_enhanced import ResultsManager
 from network_toolkit.sequence_manager import SequenceManager
 from network_toolkit.transport.factory import get_transport_factory
+
+if TYPE_CHECKING:  # pragma: no cover
+    from network_toolkit.device import DeviceSession
 
 
 @dataclass(slots=True)
@@ -138,25 +140,12 @@ def _resolve_targets(target_expr: str, config: NetworkConfig) -> TargetResolutio
             ip_mode=True,
         )
 
-    requested = [t.strip() for t in target_expr.split(",") if t.strip()]
-    devices: list[str] = []
-    unknowns: list[str] = []
-
-    def _add_device(name: str) -> None:
-        if name not in devices:
-            devices.append(name)
-
-    for name in requested:
-        if config.devices and name in config.devices:
-            _add_device(name)
-            continue
-        if config.device_groups and name in config.device_groups:
-            for member in config.get_group_members(name):
-                _add_device(member)
-            continue
-        unknowns.append(name)
-
-    return TargetResolution(resolved=devices, unknown=unknowns, ip_mode=False)
+    resolution = resolve_named_targets(config, target_expr)
+    return TargetResolution(
+        resolved=resolution.resolved_devices,
+        unknown=resolution.unknown_targets,
+        ip_mode=False,
+    )
 
 
 def _build_results_manager(
@@ -184,13 +173,11 @@ def _run_command_on_device(
     results_mgr: ResultsManager,
     session_pool: dict[str, DeviceSession] | None = None,
 ) -> DeviceCommandResult:
-    from network_toolkit.device import DeviceSession
-
     try:
         if session_pool is not None:
             session = session_pool.get(device_name)
             if session is None:
-                session = DeviceSession(
+                session = device_module.DeviceSession(
                     device_name,
                     config,
                     username_override,
@@ -202,7 +189,7 @@ def _run_command_on_device(
             session.connect()
             output = session.execute_command(command)
         else:
-            with DeviceSession(
+            with device_module.DeviceSession(
                 device_name,
                 config,
                 username_override,
@@ -246,8 +233,6 @@ def _run_sequence_on_device(
     sequence_manager: SequenceManager,
     session_pool: dict[str, DeviceSession] | None = None,
 ) -> DeviceSequenceResult:
-    from network_toolkit.device import DeviceSession
-
     try:
         commands = sequence_manager.resolve(sequence_name, device_name)
         if not commands:
@@ -264,7 +249,7 @@ def _run_sequence_on_device(
         if session_pool is not None:
             session = session_pool.get(device_name)
             if session is None:
-                session = DeviceSession(
+                session = device_module.DeviceSession(
                     device_name,
                     config,
                     username_override,
@@ -276,7 +261,7 @@ def _run_sequence_on_device(
             for cmd in commands:
                 outputs[cmd] = session.execute_command(cmd)
         else:
-            with DeviceSession(
+            with device_module.DeviceSession(
                 device_name,
                 config,
                 username_override,

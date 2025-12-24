@@ -15,6 +15,7 @@ from network_toolkit.api.run import RunTotals, TargetResolution
 from network_toolkit.config import NetworkConfig
 from network_toolkit.device import DeviceSession
 from network_toolkit.exceptions import NetworkToolkitError
+from network_toolkit.inventory.resolve import resolve_named_targets
 from network_toolkit.ip_device import extract_ips_from_target, is_ip_list
 from network_toolkit.platforms import (
     UnsupportedOperationError,
@@ -74,25 +75,12 @@ def _resolve_targets(target_expr: str, config: NetworkConfig) -> TargetResolutio
             ip_mode=True,
         )
 
-    requested = [t.strip() for t in target_expr.split(",") if t.strip()]
-    devices: list[str] = []
-    unknowns: list[str] = []
-
-    def _add_device(name: str) -> None:
-        if name not in devices:
-            devices.append(name)
-
-    for name in requested:
-        if config.devices and name in config.devices:
-            _add_device(name)
-            continue
-        if config.device_groups and name in config.device_groups:
-            for member in config.get_group_members(name):
-                _add_device(member)
-            continue
-        unknowns.append(name)
-
-    return TargetResolution(resolved=devices, unknown=unknowns, ip_mode=False)
+    resolution = resolve_named_targets(config, target_expr)
+    return TargetResolution(
+        resolved=resolution.resolved_devices,
+        unknown=resolution.unknown_targets,
+        ip_mode=False,
+    )
 
 
 def _resolve_backup_sequence(config: NetworkConfig, device_name: str) -> list[str]:

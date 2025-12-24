@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from network_toolkit.config import NetworkConfig
 from network_toolkit.exceptions import NetworkToolkitError
+from network_toolkit.inventory.resolve import select_named_target
 from network_toolkit.sequence_manager import SequenceManager
 
 
@@ -51,13 +52,9 @@ def get_info(options: InfoOptions) -> InfoResult:
     all_sequences = sm.list_all_sequences()
 
     def _determine_target_type(target: str) -> str:
-        # Check if it's a device
-        if options.config.devices and target in options.config.devices:
-            return "device"
-
-        # Check if it's a group
-        if options.config.device_groups and target in options.config.device_groups:
-            return "group"
+        resolved = select_named_target(options.config, target)
+        if resolved is not None:
+            return resolved
 
         # Check if it's a vendor sequence
         for vendor_sequences in all_sequences.values():

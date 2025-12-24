@@ -16,6 +16,7 @@ from network_toolkit.api.state_diff import StateDiffer
 from network_toolkit.config import NetworkConfig
 from network_toolkit.device import DeviceSession
 from network_toolkit.exceptions import NetworkToolkitError
+from network_toolkit.inventory.resolve import resolve_named_targets
 from network_toolkit.results_enhanced import ResultsManager
 from network_toolkit.sequence_manager import SequenceManager
 
@@ -364,27 +365,9 @@ def diff_targets(options: DiffOptions) -> DiffResult:
         command_context=cmd_ctx,
     )
 
-    # Resolve targets
-    def resolve_targets(target_expr: str) -> tuple[list[str], list[str]]:
-        requested = [t.strip() for t in target_expr.split(",") if t.strip()]
-        devices: list[str] = []
-        unknowns: list[str] = []
-
-        def _add(name: str) -> None:
-            if name not in devices:
-                devices.append(name)
-
-        for name in requested:
-            if options.config.devices and name in options.config.devices:
-                _add(name)
-            elif options.config.device_groups and name in options.config.device_groups:
-                for m in options.config.get_group_members(name):
-                    _add(m)
-            else:
-                unknowns.append(name)
-        return devices, unknowns
-
-    devices, unknown = resolve_targets(options.targets)
+    target_resolution = resolve_named_targets(options.config, options.targets)
+    devices = target_resolution.resolved_devices
+    unknown = target_resolution.unknown_targets
     if unknown and not devices:
         msg = f"Target(s) not found: {', '.join(unknown)}"
         raise NetworkToolkitError(msg)
