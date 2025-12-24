@@ -6,10 +6,17 @@
 These settings are populated by the CLI callback and read by config loading
 and target resolution logic. Programmatic callers that do not use the CLI
 will see default (empty) settings.
+
+Thread Safety
+-------------
+All functions in this module are thread-safe. The global _RUNTIME state
+is protected by a lock to prevent race conditions when multiple threads
+access or modify settings concurrently.
 """
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -23,11 +30,17 @@ class RuntimeSettings:
 
 
 _RUNTIME = RuntimeSettings()
+_RUNTIME_LOCK = threading.Lock()
 
 
 def get_runtime_settings() -> RuntimeSettings:
-    """Return current runtime settings."""
-    return _RUNTIME
+    """Return current runtime settings.
+
+    Note: The returned object is a direct reference to the global state.
+    Callers should not modify it directly; use set_runtime_settings() instead.
+    """
+    with _RUNTIME_LOCK:
+        return _RUNTIME
 
 
 def set_runtime_settings(
@@ -46,12 +59,16 @@ def set_runtime_settings(
         present in multiple inventories. Supported values include "config",
         a filesystem path, or a discovered source id (e.g., "clab-s3n").
     """
-    if inventory_paths is not None:
-        _RUNTIME.inventory_paths = list(inventory_paths)
-    _RUNTIME.inventory_prefer = inventory_prefer.strip() if inventory_prefer else None
+    with _RUNTIME_LOCK:
+        if inventory_paths is not None:
+            _RUNTIME.inventory_paths = list(inventory_paths)
+        _RUNTIME.inventory_prefer = (
+            inventory_prefer.strip() if inventory_prefer else None
+        )
 
 
 def reset_runtime_settings() -> None:
     """Reset runtime settings to defaults (useful in tests)."""
-    _RUNTIME.inventory_paths = []
-    _RUNTIME.inventory_prefer = None
+    with _RUNTIME_LOCK:
+        _RUNTIME.inventory_paths = []
+        _RUNTIME.inventory_prefer = None

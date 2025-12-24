@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
 from time import perf_counter
-from typing import TYPE_CHECKING
 
 import network_toolkit.device as device_module
 from network_toolkit.api.execution import execute_parallel
@@ -25,10 +25,10 @@ from network_toolkit.ip_device import (
 )
 from network_toolkit.results_enhanced import ResultsManager
 from network_toolkit.sequence_manager import SequenceManager
+from network_toolkit.session_pool import SessionPoolProtocol
 from network_toolkit.transport.factory import get_transport_factory
 
-if TYPE_CHECKING:  # pragma: no cover
-    from network_toolkit.device import DeviceSession
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -85,7 +85,7 @@ class RunOptions:
     store_results: bool = False
     results_dir: str | None = None
     no_strict_host_key_checking: bool = False
-    session_pool: dict[str, DeviceSession] | None = None
+    session_pool: SessionPoolProtocol | None = None
 
 
 @dataclass(slots=True)
@@ -171,23 +171,19 @@ def _run_command_on_device(
     password_override: str | None,
     transport_override: str | None,
     results_mgr: ResultsManager,
-    session_pool: dict[str, DeviceSession] | None = None,
+    session_pool: SessionPoolProtocol | None = None,
 ) -> DeviceCommandResult:
     try:
         if session_pool is not None:
-            session = session_pool.get(device_name)
-            if session is None:
-                session = device_module.DeviceSession(
-                    device_name,
-                    config,
-                    username_override,
-                    password_override,
-                    transport_override,
-                )
-                session_pool[device_name] = session
-
-            session.connect()
-            output = session.execute_command(command)
+            output = _execute_with_session_pool(
+                device_name,
+                config,
+                command,
+                username_override,
+                password_override,
+                transport_override,
+                session_pool,
+            )
         else:
             with device_module.DeviceSession(
                 device_name,
@@ -204,7 +200,8 @@ def _run_command_on_device(
             output=None,
             error=exc.message,
         )
-    except Exception as exc:  # pragma: no cover - unexpected path
+    except Exception as exc:
+        logger.debug("Unexpected error executing command on %s: %s", device_name, exc)
         return DeviceCommandResult(
             device=device_name,
             command=command,
@@ -222,6 +219,63 @@ def _run_command_on_device(
     )
 
 
+def _execute_with_session_pool(
+    device_name: str,
+    config: NetworkConfig,
+    command: str,
+    username_override: str | None,
+    password_override: str | None,
+    transport_override: str | None,
+    session_pool: SessionPoolProtocol,
+) -> str:
+    """
+    Execute a command using a session from the pool, with stale session retry.
+
+    If the session fails (e.g., connection died), removes it from the pool,
+    creates a fresh session, and retries once.
+    """
+    session = session_pool.get(device_name)
+    if session is None:
+        session = device_module.DeviceSession(
+            device_name,
+            config,
+            username_override,
+            password_override,
+            transport_override,
+        )
+        session_pool[device_name] = session
+
+    try:
+        session.connect()
+        return session.execute_command(command)
+    except Exception as first_error:
+        # Session might be stale - remove it and retry with fresh session
+        logger.debug(
+            "Session for %s failed, attempting fresh connection: %s",
+            device_name,
+            first_error,
+        )
+        session_pool.remove(device_name)
+        try:
+            session.disconnect()
+        except Exception:
+            pass  # Ignore disconnect errors on stale session
+
+        # Create fresh session and retry once
+        session = device_module.DeviceSession(
+            device_name,
+            config,
+            username_override,
+            password_override,
+            transport_override,
+        )
+        session.connect()
+        output = session.execute_command(command)
+        # Re-add to pool on success
+        session_pool[device_name] = session
+        return output
+
+
 def _run_sequence_on_device(
     device_name: str,
     config: NetworkConfig,
@@ -231,7 +285,7 @@ def _run_sequence_on_device(
     transport_override: str | None,
     results_mgr: ResultsManager,
     sequence_manager: SequenceManager,
-    session_pool: dict[str, DeviceSession] | None = None,
+    session_pool: SessionPoolProtocol | None = None,
 ) -> DeviceSequenceResult:
     try:
         commands = sequence_manager.resolve(sequence_name, device_name)
@@ -247,19 +301,15 @@ def _run_sequence_on_device(
         outputs: dict[str, str] = {}
 
         if session_pool is not None:
-            session = session_pool.get(device_name)
-            if session is None:
-                session = device_module.DeviceSession(
-                    device_name,
-                    config,
-                    username_override,
-                    password_override,
-                    transport_override,
-                )
-                session_pool[device_name] = session
-            session.connect()
-            for cmd in commands:
-                outputs[cmd] = session.execute_command(cmd)
+            outputs = _execute_sequence_with_session_pool(
+                device_name,
+                config,
+                commands,
+                username_override,
+                password_override,
+                transport_override,
+                session_pool,
+            )
         else:
             with device_module.DeviceSession(
                 device_name,
@@ -277,7 +327,8 @@ def _run_sequence_on_device(
             outputs=None,
             error=exc.message,
         )
-    except Exception as exc:  # pragma: no cover - unexpected path
+    except Exception as exc:
+        logger.debug("Unexpected error executing sequence on %s: %s", device_name, exc)
         return DeviceSequenceResult(
             device=device_name,
             sequence=sequence_name,
@@ -295,6 +346,67 @@ def _run_sequence_on_device(
         error=None,
         stored_paths=stored_paths,
     )
+
+
+def _execute_sequence_with_session_pool(
+    device_name: str,
+    config: NetworkConfig,
+    commands: list[str],
+    username_override: str | None,
+    password_override: str | None,
+    transport_override: str | None,
+    session_pool: SessionPoolProtocol,
+) -> dict[str, str]:
+    """
+    Execute a sequence of commands using a session from the pool, with stale session retry.
+
+    If the session fails, removes it from the pool, creates a fresh session, and retries.
+    """
+    session = session_pool.get(device_name)
+    if session is None:
+        session = device_module.DeviceSession(
+            device_name,
+            config,
+            username_override,
+            password_override,
+            transport_override,
+        )
+        session_pool[device_name] = session
+
+    try:
+        session.connect()
+        outputs: dict[str, str] = {}
+        for cmd in commands:
+            outputs[cmd] = session.execute_command(cmd)
+        return outputs
+    except Exception as first_error:
+        # Session might be stale - remove it and retry with fresh session
+        logger.debug(
+            "Session for %s failed during sequence, attempting fresh connection: %s",
+            device_name,
+            first_error,
+        )
+        session_pool.remove(device_name)
+        try:
+            session.disconnect()
+        except Exception:
+            pass  # Ignore disconnect errors on stale session
+
+        # Create fresh session and retry once
+        session = device_module.DeviceSession(
+            device_name,
+            config,
+            username_override,
+            password_override,
+            transport_override,
+        )
+        session.connect()
+        outputs = {}
+        for cmd in commands:
+            outputs[cmd] = session.execute_command(cmd)
+        # Re-add to pool on success
+        session_pool[device_name] = session
+        return outputs
 
 
 def _prepare_config_for_ips(

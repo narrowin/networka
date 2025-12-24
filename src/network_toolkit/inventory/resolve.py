@@ -23,8 +23,20 @@ if TYPE_CHECKING:
 
 @dataclass(slots=True)
 class TargetResolutionResult:
+    """Result of target resolution.
+
+    Attributes:
+        resolved_devices: List of device names that were successfully resolved.
+        unknown_targets: List of target names that could not be resolved.
+        config: The config object with resolved devices/groups populated.
+            This is the same object that was passed in (mutated in place for
+            efficiency). Callers should use this reference to access the
+            resolved device definitions.
+    """
+
     resolved_devices: list[str]
     unknown_targets: list[str]
+    config: NetworkConfig | None = None
 
 
 def select_named_target(
@@ -70,13 +82,19 @@ def resolve_named_targets(
       preference is provided.
     - Expands groups into their member devices, selecting devices from the same
       inventory source as the group definition.
-    - Mutates the provided config so selected devices/groups are present in
-      config.devices/config.device_groups with the chosen definitions.
+    - Populates selected devices/groups into config.devices/config.device_groups
+      with the chosen definitions.
+
+    Returns:
+        TargetResolutionResult with resolved_devices, unknown_targets, and the
+        config object with resolved entries populated.
     """
     prefer_token = _prefer_token(prefer)
     requested = [t.strip() for t in target_expr.split(",") if t.strip()]
     if not requested:
-        return TargetResolutionResult(resolved_devices=[], unknown_targets=[])
+        return TargetResolutionResult(
+            resolved_devices=[], unknown_targets=[], config=config
+        )
 
     catalog = get_inventory_catalog(config)
     if catalog is None:
@@ -107,7 +125,9 @@ def resolve_named_targets(
             _apply_device_selection(config, member_name, member_entry)
             _add_device(member_name)
 
-    return TargetResolutionResult(resolved_devices=resolved, unknown_targets=unknown)
+    return TargetResolutionResult(
+        resolved_devices=resolved, unknown_targets=unknown, config=config
+    )
 
 
 def list_unique_device_names(config: NetworkConfig) -> list[str]:
@@ -168,7 +188,9 @@ def _resolve_simple(
             continue
         unknowns.append(name)
 
-    return TargetResolutionResult(resolved_devices=devices, unknown_targets=unknowns)
+    return TargetResolutionResult(
+        resolved_devices=devices, unknown_targets=unknowns, config=config
+    )
 
 
 def _apply_device_selection(

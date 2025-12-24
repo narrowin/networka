@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import difflib
+import logging
 import re
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
@@ -19,6 +20,9 @@ from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.inventory.resolve import resolve_named_targets
 from network_toolkit.results_enhanced import ResultsManager
 from network_toolkit.sequence_manager import SequenceManager
+from network_toolkit.session_pool import SessionPoolProtocol
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -34,7 +38,7 @@ class DiffOptions:
     store_results: bool = False
     results_dir: str | None = None
     verbose: bool = False
-    session_pool: dict[str, DeviceSession] | None = None
+    session_pool: SessionPoolProtocol | None = None
     heuristic: bool = False
 
 
@@ -102,15 +106,36 @@ def _make_unified_diff(
 def _get_session(
     device_name: str,
     config: NetworkConfig,
-    session_pool: dict[str, DeviceSession] | None = None,
+    session_pool: SessionPoolProtocol | None = None,
 ) -> Iterator[DeviceSession]:
+    """Get a session, with stale session retry when using a pool."""
     if session_pool is not None:
         session = session_pool.get(device_name)
         if session is None:
             session = DeviceSession(device_name, config)
             session_pool[device_name] = session
-        session.connect()
-        yield session
+
+        try:
+            session.connect()
+            yield session
+        except Exception as first_error:
+            # Session might be stale - remove it and retry with fresh session
+            logger.debug(
+                "Session for %s failed, attempting fresh connection: %s",
+                device_name,
+                first_error,
+            )
+            session_pool.remove(device_name)
+            try:
+                session.disconnect()
+            except Exception:
+                pass  # Ignore disconnect errors on stale session
+
+            # Create fresh session and retry once
+            session = DeviceSession(device_name, config)
+            session.connect()
+            session_pool[device_name] = session
+            yield session
     else:
         with DeviceSession(device_name, config) as session:
             yield session

@@ -297,7 +297,16 @@ def _load_yaml_mapping(path: Path, label: str) -> dict[str, Any]:
             data = yaml.safe_load(f) or {}
     except yaml.YAMLError as exc:
         msg = f"Invalid YAML in {label}"
-        raise ConfigurationError(msg, details={"path": str(path)}) from exc
+        details: dict[str, Any] = {"path": str(path)}
+        # Preserve line number information from YAML parser
+        if hasattr(exc, "problem_mark") and exc.problem_mark is not None:
+            mark = exc.problem_mark
+            details["line"] = mark.line + 1  # 0-indexed to 1-indexed
+            details["column"] = mark.column + 1
+            msg = f"{msg} at line {mark.line + 1}, column {mark.column + 1}"
+        if hasattr(exc, "problem") and exc.problem:
+            details["problem"] = exc.problem
+        raise ConfigurationError(msg, details=details) from exc
     except OSError as exc:  # pragma: no cover
         msg = f"Failed reading {label}"
         raise ConfigurationError(

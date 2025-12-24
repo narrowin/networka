@@ -1399,8 +1399,23 @@ def load_modular_config(
                 }
             )
 
+            prefer = runtime.inventory_prefer
             for dev_name, dev_cfg in compiled.devices.items():
                 if dev_name in final_devices:
+                    if prefer is None:
+                        existing_source = device_inventory_ids.get(dev_name, "config")
+                        msg = (
+                            f"Device '{dev_name}' exists in multiple inventory sources: "
+                            f"'{existing_source}' and '{source_id}'. "
+                            "Use --prefer to specify which source to use."
+                        )
+                        raise ConfigurationError(
+                            msg,
+                            details={
+                                "device": dev_name,
+                                "sources": [existing_source, source_id],
+                            },
+                        )
                     continue
                 final_devices[dev_name] = dev_cfg
                 device_sources[dev_name] = compiled.device_sources.get(
@@ -1410,6 +1425,20 @@ def load_modular_config(
 
             for grp_name, grp_cfg in compiled.device_groups.items():
                 if grp_name in final_groups:
+                    if prefer is None:
+                        existing_source = group_inventory_ids.get(grp_name, "config")
+                        msg = (
+                            f"Group '{grp_name}' exists in multiple inventory sources: "
+                            f"'{existing_source}' and '{source_id}'. "
+                            "Use --prefer to specify which source to use."
+                        )
+                        raise ConfigurationError(
+                            msg,
+                            details={
+                                "group": grp_name,
+                                "sources": [existing_source, source_id],
+                            },
+                        )
                     continue
                 final_groups[grp_name] = grp_cfg
                 group_sources[grp_name] = compiled.group_sources.get(

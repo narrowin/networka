@@ -9,6 +9,7 @@ from network_toolkit.common.credentials import InteractiveCredentials
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.config import NetworkConfig, load_config
 from network_toolkit.sequence_manager import SequenceManager
+from network_toolkit.session_pool import SessionPool
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -19,7 +20,6 @@ if TYPE_CHECKING:
     from network_toolkit.api.run import RunResult
     from network_toolkit.api.upload import UploadResult
     from network_toolkit.config import DeviceConfig, DeviceGroup
-    from network_toolkit.device import DeviceSession
 
 
 class NetworkaClient:
@@ -29,9 +29,10 @@ class NetworkaClient:
     This client encapsulates configuration loading and provides a unified interface
     for executing commands, running backups, transferring files, and more.
 
-    Note:
-        This client is not thread-safe. If you need to perform operations concurrently
-        across threads, create a separate NetworkaClient instance for each thread.
+    Thread Safety:
+        This client is thread-safe. The session pool is protected by a lock, allowing
+        safe concurrent access from multiple threads. Session pooling transparently
+        handles stale connections by removing them and retrying with fresh sessions.
 
     Usage:
         >>> from network_toolkit import NetworkaClient
@@ -52,7 +53,7 @@ class NetworkaClient:
         self._config_path = config_path or DEFAULT_CONFIG_PATH
         self._config: NetworkConfig | None = None
         self._sequence_manager: SequenceManager | None = None
-        self._sessions: dict[str, DeviceSession] = {}
+        self._session_pool = SessionPool()
 
     @property
     def config(self) -> NetworkConfig:
@@ -121,7 +122,7 @@ class NetworkaClient:
             store_results=store_results,
             results_dir=results_dir,
             no_strict_host_key_checking=no_strict_host_key_checking,
-            session_pool=self._sessions,
+            session_pool=self._session_pool,
         )
         return run_commands(options)
 
@@ -153,7 +154,7 @@ class NetworkaClient:
             download=download,
             delete_remote=delete_remote,
             verbose=verbose,
-            session_pool=self._sessions,
+            session_pool=self._session_pool,
         )
         return run_backup(options)
 
@@ -197,7 +198,7 @@ class NetworkaClient:
             store_results=store_results,
             results_dir=results_dir,
             verbose=verbose,
-            session_pool=self._sessions,
+            session_pool=self._session_pool,
         )
         return diff_targets(options)
 
@@ -235,7 +236,7 @@ class NetworkaClient:
             delete_remote=delete_remote,
             verify_download=verify_download,
             verbose=verbose,
-            session_pool=self._sessions,
+            session_pool=self._session_pool,
         )
         return download_file(options)
 
@@ -276,18 +277,13 @@ class NetworkaClient:
             checksum_verify=checksum_verify,
             max_concurrent=max_concurrent,
             verbose=verbose,
-            session_pool=self._sessions,
+            session_pool=self._session_pool,
         )
         return upload_file(options)
 
     def close(self) -> None:
         """Close all active device sessions."""
-        for session in self._sessions.values():
-            try:
-                session.disconnect()
-            except Exception:
-                pass
-        self._sessions.clear()
+        self._session_pool.close_all()
 
     def __enter__(self) -> NetworkaClient:
         return self
