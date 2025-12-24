@@ -30,19 +30,22 @@ def execute_parallel(
     Returns
     -------
     list[R]
-        List of results in completion order (NOT input order).
-        The caller is responsible for sorting if order matters.
+        List of results in the same order as the input items.
     """
     if not items:
         return []
 
     workers = max_workers if max_workers is not None else len(items)
-    results: list[R] = []
+    results: list[R] = [None] * len(items)  # type: ignore[list-item]
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        future_to_item = {executor.submit(func, item): item for item in items}
+        future_to_index = {
+            executor.submit(func, item): index for index, item in enumerate(items)
+        }
 
-        for future in as_completed(future_to_item):
-            results.append(future.result())
+        for future in as_completed(future_to_index):
+            index = future_to_index[future]
+            results[index] = future.result()
 
+    # `results` is fully populated because we submitted exactly one future per item.
     return results
