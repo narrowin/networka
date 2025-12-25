@@ -261,7 +261,7 @@ def sync_ssh_config(
     # Handle removed hosts (only those with marker)
     if prune:
         for name in list(existing.keys()):
-            if name not in ssh_hosts and existing[name].get(SSH_CONFIG_SOURCE_MARKER):
+            if name not in ssh_hosts and SSH_CONFIG_SOURCE_MARKER in existing[name]:
                 del existing[name]
                 removed.append(name)
 

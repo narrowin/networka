@@ -212,8 +212,8 @@ def parse_ssh_config(options: SSHConfigOptions) -> dict[str, SSHHost]:
             msg,
             details={"path": str(path), "error": str(e)},
         ) from e
-    except Exception as e:
-        msg = f"Failed to parse SSH config: {path}"
+    except OSError as e:
+        msg = f"Failed to read SSH config: {path}"
         raise ConfigurationError(
             msg,
             details={"path": str(path), "error": str(e)},
