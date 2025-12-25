@@ -32,7 +32,7 @@ The Python library supports the core automation features of Networka. Some manag
 | **Config Diff** | `nw diff` | `client.diff()` |
 | **Firmware Upgrade** | `nw firmware upgrade` | *Not yet supported* |
 | **RouterOS Upgrade** | `nw routerboard-upgrade` | *Not yet supported* |
-| **Interactive SSH** | `nw ssh` | *Not supported (interactive)* |
+| **Interactive SSH** | `nw cli` | *Not supported (interactive)* |
 | **Config Management** | `nw config ...` | *Not supported* |
 | **Inventory List** | `nw list` | *Access via `client.devices`* |
 
