@@ -115,12 +115,9 @@ class DeviceSession:
                 self._connection_params[key] = value
 
         logger.info(f"Initialized session for device: {device_name}")
-        # Filter sensitive fields before logging
-        safe_params = {
-            k: v
-            for k, v in self._connection_params.items()
-            if k not in ("auth_password", "password")
-        }
+        # Log only non-sensitive connection parameters
+        safe_keys = ("host", "port", "auth_username", "platform", "auth_strict_key")
+        safe_params = {k: self._connection_params.get(k) for k in safe_keys}
         logger.debug(f"Connection parameters: {safe_params}")
 
     def connect(self) -> None:
