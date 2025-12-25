@@ -1327,6 +1327,10 @@ def load_modular_config(
                 if not _is_containerlab_inventory_path(cand):
                     continue
                 local_inventory_paths.append(cand)
+                logging.info(
+                    "Auto-discovered local inventory: %s (use --inventory to override)",
+                    cand,
+                )
 
         inventory_source = str(inventory_cfg.get("source", "")).strip().lower()
         if inventory_source == "nornir_simple" and not (

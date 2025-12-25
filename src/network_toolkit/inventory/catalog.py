@@ -160,14 +160,63 @@ class InventoryCatalog:
                 )
 
         msg = f"Ambiguous target '{name}' found in multiple inventories"
+        # Build conflict details showing what differs between sources
+        conflicts = _build_conflict_details(entries)
         raise NetworkToolkitError(
             msg,
             details={
                 "name": name,
                 "prefer": prefer,
                 "candidates": [e.ref.source_id for e in entries],
+                "conflicts": conflicts,
             },
         )
+
+
+def _build_conflict_details(entries: list[Any]) -> dict[str, Any]:
+    """Build details showing what differs between conflicting entries.
+
+    For devices, shows host and device_type differences.
+    For groups, shows member and description differences.
+    """
+    if not entries:
+        return {}
+
+    conflicts: dict[str, Any] = {}
+
+    # Check if these are DeviceEntry or GroupEntry
+    first = entries[0]
+    if hasattr(first, "device"):
+        # DeviceEntry - compare host and device_type
+        hosts = {}
+        device_types = {}
+        for e in entries:
+            source = e.ref.source_id
+            hosts[source] = e.device.host
+            device_types[source] = e.device.device_type
+
+        # Only include if values differ
+        if len(set(hosts.values())) > 1:
+            conflicts["host"] = hosts
+        if len(set(device_types.values())) > 1:
+            conflicts["device_type"] = device_types
+
+    elif hasattr(first, "group"):
+        # GroupEntry - compare members and description
+        members = {}
+        descriptions = {}
+        for e in entries:
+            source = e.ref.source_id
+            members[source] = e.group.members or []
+            descriptions[source] = e.group.description
+
+        # Only include if values differ
+        if len({tuple(m) for m in members.values()}) > 1:
+            conflicts["members"] = members
+        if len(set(descriptions.values())) > 1:
+            conflicts["description"] = descriptions
+
+    return conflicts
 
 
 def _prefer_matches(prefer: str, ref: InventorySourceRef) -> bool:
