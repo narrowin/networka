@@ -6,6 +6,7 @@ continues to operate on `NetworkConfig.devices` and `NetworkConfig.device_groups
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 from dataclasses import dataclass
@@ -15,6 +16,8 @@ from typing import Any
 import yaml
 
 from network_toolkit.exceptions import ConfigurationError
+
+logger = logging.getLogger(__name__)
 
 _SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
@@ -476,7 +479,7 @@ def _fail_on_ambiguous_group_env_credentials(
 
         # Track which groups provide each credential type
         groups_with_user: list[str] = []
-        groups_with_password: list[str] = []
+        groups_with_pass: list[str] = []
 
         for group in sorted(groups):
             u = os.getenv(env_var_name(group, "USER"))
@@ -492,15 +495,22 @@ def _fail_on_ambiguous_group_env_credentials(
                 if u:
                     groups_with_user.append(group)
                 if p:
-                    groups_with_password.append(group)
+                    groups_with_pass.append(group)
 
         # Check for partial credentials from different groups first (more specific error)
         # This catches "franken-credentials" where username comes from one group and
         # password from another, which will cause confusing auth failures
-        if groups_with_user and groups_with_password:
+        if groups_with_user and groups_with_pass:
             user_groups = set(groups_with_user)
-            password_groups = set(groups_with_password)
-            if user_groups != password_groups:
+            pass_groups = set(groups_with_pass)
+            if user_groups != pass_groups:
+                logger.warning(
+                    "Credential ambiguity for device '%s': username from groups %s, "
+                    "password from groups %s",
+                    device_name,
+                    sorted(groups_with_user),
+                    sorted(groups_with_pass),
+                )
                 msg = (
                     "Partial credentials from different groups (username and password from "
                     "different sources). Set device-specific env vars or consolidate credentials."
@@ -510,17 +520,17 @@ def _fail_on_ambiguous_group_env_credentials(
                     details={
                         "device": device_name,
                         "username_from_groups": sorted(groups_with_user),
-                        "password_from_groups": sorted(groups_with_password),
+                        "password_from_groups": sorted(groups_with_pass),
                         "env_vars_found": {
                             group: {
                                 "user": env_var_name(group, "USER")
                                 if group in user_groups
                                 else None,
                                 "password": env_var_name(group, "PASSWORD")
-                                if group in password_groups
+                                if group in pass_groups
                                 else None,
                             }
-                            for group in user_groups | password_groups
+                            for group in user_groups | pass_groups
                         },
                         "remediation": {
                             "device_env_vars": [
@@ -536,6 +546,11 @@ def _fail_on_ambiguous_group_env_credentials(
         # This is now checked after partial credentials, covering the case where multiple
         # groups each provide complete or overlapping credentials
         if len(groups_with_creds) > 1:
+            logger.warning(
+                "Multiple groups provide credentials for device '%s': %s",
+                device_name,
+                [g["group"] for g in groups_with_creds],
+            )
             msg = (
                 "Ambiguous group-level env credentials for device (multiple matching groups). "
                 "Set device-specific env vars, consolidate to one group, or use inventory credentials."

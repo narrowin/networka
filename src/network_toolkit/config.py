@@ -1031,6 +1031,250 @@ def _is_project_config(config_path: Path) -> bool:
         return False
 
 
+def _load_device_defaults(config_dir: Path) -> dict[str, Any]:
+    """Load device defaults from _defaults.yml if it exists."""
+    devices_dir = config_dir / "devices"
+    if not devices_dir.exists():
+        return {}
+
+    defaults_file = devices_dir / "_defaults.yml"
+    if not defaults_file.exists():
+        return {}
+
+    try:
+        with defaults_file.open("r", encoding="utf-8") as df:
+            defaults_config: dict[str, Any] = yaml.safe_load(df) or {}
+            return defaults_config.get("defaults", {})
+    except yaml.YAMLError as e:
+        logging.warning(f"Invalid YAML in defaults file {defaults_file}: {e}")
+        return {}
+
+
+def _load_devices(
+    config_dir: Path,
+    device_files: list[Path],
+    device_defaults: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Path]]:
+    """Load devices from YAML and CSV files.
+
+    Returns:
+        Tuple of (devices dict, device_sources mapping)
+    """
+    all_devices: dict[str, Any] = {}
+    device_sources: dict[str, Path] = {}
+
+    for device_file in device_files:
+        if device_file.name == "_defaults.yml":
+            continue
+
+        if device_file.suffix.lower() == ".csv":
+            file_devices = _load_csv_devices(device_file)
+            for _device_name, device_config in file_devices.items():
+                for key, default_value in device_defaults.items():
+                    if getattr(device_config, key, None) is None:
+                        setattr(device_config, key, default_value)
+                device_sources[_device_name] = device_file
+            all_devices.update(file_devices)
+        else:
+            try:
+                with device_file.open("r", encoding="utf-8") as df:
+                    device_yaml_config: dict[str, Any] = yaml.safe_load(df) or {}
+                    file_devices_node = cast(
+                        dict[str, dict[str, Any]],
+                        device_yaml_config.get("devices", {}) or {},
+                    )
+                    typed_file_devices: dict[str, dict[str, Any]] = {}
+                    for _device_name, device_dict in file_devices_node.items():
+                        for key, default_value in device_defaults.items():
+                            if key not in device_dict:
+                                device_dict[key] = default_value
+                        device_dict.setdefault("device_type", "linux")
+                        device_sources[_device_name] = device_file
+                        typed_file_devices[_device_name] = device_dict
+                    all_devices.update(typed_file_devices)
+            except yaml.YAMLError as e:
+                logging.warning(f"Invalid YAML in {device_file}: {e}")
+
+    return all_devices, device_sources
+
+
+def _load_groups(
+    config_dir: Path,
+    group_files: list[Path],
+) -> tuple[dict[str, Any], dict[str, Path]]:
+    """Load groups from YAML and CSV files.
+
+    Returns:
+        Tuple of (groups dict, group_sources mapping)
+    """
+    all_groups: dict[str, Any] = {}
+    group_sources: dict[str, Path] = {}
+
+    for group_file in group_files:
+        if group_file.suffix.lower() == ".csv":
+            file_groups = _load_csv_groups(group_file)
+            for _group_name in file_groups.keys():
+                group_sources[_group_name] = group_file
+            all_groups.update(file_groups)
+        else:
+            try:
+                with group_file.open("r", encoding="utf-8") as gf:
+                    group_yaml_config: dict[str, Any] = yaml.safe_load(gf) or {}
+                    file_groups_node = cast(
+                        dict[str, dict[str, Any]],
+                        group_yaml_config.get("groups", {}) or {},
+                    )
+                    for _group_name in file_groups_node.keys():
+                        group_sources[_group_name] = group_file
+                    all_groups.update(file_groups_node)
+            except yaml.YAMLError as e:
+                logging.warning(f"Invalid YAML in {group_file}: {e}")
+
+    return all_groups, group_sources
+
+
+def _load_sequences(
+    config_dir: Path,
+    main_config: dict[str, Any],
+) -> tuple[
+    dict[str, Any], dict[str, VendorSequence], dict[str, dict[str, VendorSequence]]
+]:
+    """Load vendor-specific and global command sequences.
+
+    Returns:
+        Tuple of (sequences_config, global_command_sequences, vendor_sequences)
+    """
+    sequence_files = _discover_config_files(config_dir, "sequences")
+    sequences_config: dict[str, Any] = {}
+
+    for seq_file in sequence_files:
+        if seq_file.suffix.lower() != ".csv":
+            try:
+                with seq_file.open("r", encoding="utf-8") as sf:
+                    seq_yaml_config: dict[str, Any] = yaml.safe_load(sf) or {}
+                    if not sequences_config:
+                        sequences_config = seq_yaml_config
+                    else:
+                        sequences_config = _merge_configs(
+                            sequences_config, seq_yaml_config
+                        )
+            except yaml.YAMLError as e:
+                logging.warning(f"Invalid YAML in {seq_file}: {e}")
+
+    vendor_sequences = _load_vendor_sequences(config_dir, sequences_config)
+
+    global_sequences_raw = sequences_config.get("sequences", {})
+    if not global_sequences_raw and "global_command_sequences" in main_config:
+        global_sequences_raw = main_config.get("global_command_sequences", {})
+
+    global_command_sequences: dict[str, VendorSequence] = {}
+    if global_sequences_raw:
+        for seq_name, seq_data in global_sequences_raw.items():
+            if isinstance(seq_data, dict):
+                global_command_sequences[seq_name] = VendorSequence(**seq_data)
+            elif isinstance(seq_data, list):
+                global_command_sequences[seq_name] = VendorSequence(
+                    description=f"Global sequence: {seq_name}",
+                    commands=seq_data,
+                )
+
+    return sequences_config, global_command_sequences, vendor_sequences
+
+
+def _is_containerlab_inventory_path(path: Path) -> bool:
+    """Check if a path is a containerlab inventory (nornir-simple-inventory file)."""
+    try:
+        if path.is_file():
+            return path.name.startswith(
+                "nornir-simple-inventory."
+            ) and path.suffix.lower() in {
+                ".yml",
+                ".yaml",
+            }
+        if path.is_dir():
+            if (path / "nornir-simple-inventory.yml").exists():
+                return True
+            if (path / "nornir-simple-inventory.yaml").exists():
+                return True
+    except Exception:
+        return False
+    return False
+
+
+def _containerlab_prefix_for_path(path: Path) -> str | None:
+    """Extract containerlab prefix (clab-*) from path if present."""
+    try:
+        if path.is_dir() and path.name.startswith("clab-") and len(path.name) > 5:
+            return path.name
+        if path.is_file():
+            parent = path.parent
+            if (
+                parent.name.startswith("clab-")
+                and len(parent.name) > 5
+                and parent.is_dir()
+            ):
+                return parent.name
+    except Exception:
+        return None
+    return None
+
+
+def _resolve_inventory_root(base: Path, raw: Path) -> Path:
+    """Resolve an inventory path relative to a base directory."""
+    p = raw
+    if not p.is_absolute():
+        p = base / p
+    return p.resolve()
+
+
+def _unique_source_id(base_id: str, used: set[str]) -> str:
+    """Generate a unique source ID by appending a suffix if needed."""
+    candidate = base_id
+    idx = 2
+    while candidate in used:
+        candidate = f"{base_id}_{idx}"
+        idx += 1
+    used.add(candidate)
+    return candidate
+
+
+def _source_id_for_path(path: Path) -> str:
+    """Derive a source ID from an inventory path."""
+    try:
+        if path.is_dir():
+            return path.name or "inventory"
+        if path.is_file() and path.name.startswith("nornir-simple-inventory."):
+            return path.parent.name or path.stem or "inventory"
+        return path.stem or path.name or "inventory"
+    except Exception:
+        return "inventory"
+
+
+def _discover_local_inventories() -> list[Path]:
+    """Discover containerlab inventories in current directory and clab-* subdirs."""
+    local_inventory_paths: list[Path] = []
+    cwd = Path.cwd()
+    local_candidates: list[Path] = []
+
+    try:
+        local_candidates.append(cwd)
+        for child in cwd.iterdir():
+            if child.is_dir() and child.name.startswith("clab-"):
+                local_candidates.append(child)
+    except Exception:
+        return []
+
+    for cand in local_candidates:
+        if _is_containerlab_inventory_path(cand):
+            local_inventory_paths.append(cand)
+            logging.info(
+                "Auto-discovered local inventory: %s (use --inventory to override)",
+                cand,
+            )
+
+    return local_inventory_paths
+
+
 def load_modular_config(
     config_dir: Path, *, main_config_path: Path | None = None
 ) -> NetworkConfig:
@@ -1060,136 +1304,19 @@ def load_modular_config(
             msg = "Invalid YAML in configuration file"
             raise ValueError(msg) from e
 
-        # Enhanced device loading with CSV support and subdirectory discovery
-        all_devices: dict[str, Any] = {}
-        device_defaults: dict[str, Any] = {}
+        # Load devices, groups, and sequences using helper functions
+        device_defaults = _load_device_defaults(config_dir)
         device_files = _discover_config_files(config_dir, "devices")
-        device_sources: dict[str, Path] = {}
+        all_devices, device_sources = _load_devices(
+            config_dir, device_files, device_defaults
+        )
 
-        # Load defaults first
-        devices_dir = config_dir / "devices"
-        if devices_dir.exists():
-            defaults_file = devices_dir / "_defaults.yml"
-            if defaults_file.exists():
-                try:
-                    with defaults_file.open("r", encoding="utf-8") as df:
-                        defaults_config: dict[str, Any] = yaml.safe_load(df) or {}
-                        device_defaults = defaults_config.get("defaults", {})
-                except yaml.YAMLError as e:
-                    logging.warning(
-                        f"Invalid YAML in defaults file {defaults_file}: {e}"
-                    )
-
-        # Load device files
-        for device_file in device_files:
-            # Skip defaults file as it's handled separately
-            if device_file.name == "_defaults.yml":
-                continue
-
-            if device_file.suffix.lower() == ".csv":
-                file_devices = _load_csv_devices(device_file)
-                # Apply defaults to CSV devices
-                for _device_name, device_config in file_devices.items():
-                    for key, default_value in device_defaults.items():
-                        if getattr(device_config, key, None) is None:
-                            setattr(device_config, key, default_value)
-                    # Track source file for each device
-                    device_sources[_device_name] = device_file
-                all_devices.update(file_devices)
-            else:
-                try:
-                    with device_file.open("r", encoding="utf-8") as df:
-                        device_yaml_config: dict[str, Any] = yaml.safe_load(df) or {}
-                        file_devices_node = cast(
-                            dict[str, dict[str, Any]],
-                            device_yaml_config.get("devices", {}) or {},
-                        )
-                        # Apply defaults to YAML devices and collect into a typed dict
-                        typed_file_devices: dict[str, dict[str, Any]] = {}
-                        for _device_name, device_dict in file_devices_node.items():
-                            # Apply defaults
-                            for key, default_value in device_defaults.items():
-                                if key not in device_dict:
-                                    device_dict[key] = default_value
-                            # Ensure a valid device_type default for YAML devices
-                            device_dict.setdefault("device_type", "linux")
-                            # Track source file for each device
-                            device_sources[_device_name] = device_file
-                            typed_file_devices[_device_name] = device_dict
-                        all_devices.update(typed_file_devices)
-                except yaml.YAMLError as e:
-                    logging.warning(f"Invalid YAML in {device_file}: {e}")
-
-        # Enhanced group loading with CSV support and subdirectory discovery
-        all_groups: dict[str, Any] = {}
         group_files = _discover_config_files(config_dir, "groups")
-        group_sources: dict[str, Path] = {}
+        all_groups, group_sources = _load_groups(config_dir, group_files)
 
-        for group_file in group_files:
-            if group_file.suffix.lower() == ".csv":
-                file_groups = _load_csv_groups(group_file)
-                # Track source per group name
-                for _group_name in file_groups.keys():
-                    group_sources[_group_name] = group_file
-                all_groups.update(file_groups)
-            else:
-                try:
-                    with group_file.open("r", encoding="utf-8") as gf:
-                        group_yaml_config: dict[str, Any] = yaml.safe_load(gf) or {}
-                        file_groups_node = cast(
-                            dict[str, dict[str, Any]],
-                            group_yaml_config.get("groups", {}) or {},
-                        )
-                        for _group_name in file_groups_node.keys():
-                            group_sources[_group_name] = group_file
-                        all_groups.update(file_groups_node)
-                except yaml.YAMLError as e:
-                    logging.warning(f"Invalid YAML in {group_file}: {e}")
-
-        # Load vendor-specific sequences from config files
-        sequence_files = _discover_config_files(config_dir, "sequences")
-        sequences_config: dict[str, Any] = {}
-
-        for seq_file in sequence_files:
-            if (
-                seq_file.suffix.lower() != ".csv"
-            ):  # Only process YAML files for vendor config
-                try:
-                    with seq_file.open("r", encoding="utf-8") as sf:
-                        seq_yaml_config: dict[str, Any] = yaml.safe_load(sf) or {}
-
-                        # Keep track of other sequence config for vendor sequences
-                        if not sequences_config:
-                            sequences_config = seq_yaml_config
-                        else:
-                            sequences_config = _merge_configs(
-                                sequences_config, seq_yaml_config
-                            )
-                except yaml.YAMLError as e:
-                    logging.warning(f"Invalid YAML in {seq_file}: {e}")
-
-        # Load vendor-specific sequences (VendorSequence models will carry _source_path)
-        vendor_sequences = _load_vendor_sequences(config_dir, sequences_config)
-
-        # Load global command sequences (vendor-agnostic)
-        # Check both sequences_config (from sequences/ files) and main_config (inline)
-        global_sequences_raw = sequences_config.get("sequences", {})
-        if not global_sequences_raw and "global_command_sequences" in main_config:
-            # Also support global_command_sequences key directly in main config
-            global_sequences_raw = main_config.get("global_command_sequences", {})
-
-        global_command_sequences: dict[str, VendorSequence] = {}
-        if global_sequences_raw:
-            # Convert raw dict to VendorSequence objects
-            for seq_name, seq_data in global_sequences_raw.items():
-                if isinstance(seq_data, dict):
-                    global_command_sequences[seq_name] = VendorSequence(**seq_data)
-                elif isinstance(seq_data, list):
-                    # Support simple list of commands
-                    global_command_sequences[seq_name] = VendorSequence(
-                        description=f"Global sequence: {seq_name}",
-                        commands=seq_data,
-                    )
+        sequences_config, global_command_sequences, vendor_sequences = _load_sequences(
+            config_dir, main_config
+        )
 
         # Merge inline devices/groups from main config with discovered files
         # Inline definitions from main config file
@@ -1232,69 +1359,6 @@ def load_modular_config(
                 return val.strip().lower() in {"1", "true", "yes", "y", "on"}
             return bool(val)
 
-        def _is_containerlab_inventory_path(path: Path) -> bool:
-            try:
-                if path.is_file():
-                    return path.name.startswith(
-                        "nornir-simple-inventory."
-                    ) and path.suffix.lower() in {
-                        ".yml",
-                        ".yaml",
-                    }
-                if path.is_dir():
-                    if (path / "nornir-simple-inventory.yml").exists():
-                        return True
-                    if (path / "nornir-simple-inventory.yaml").exists():
-                        return True
-            except Exception:
-                return False
-            return False
-
-        def _containerlab_prefix_for_path(path: Path) -> str | None:
-            try:
-                if (
-                    path.is_dir()
-                    and path.name.startswith("clab-")
-                    and len(path.name) > 5
-                ):
-                    return path.name
-                if path.is_file():
-                    parent = path.parent
-                    if (
-                        parent.name.startswith("clab-")
-                        and len(parent.name) > 5
-                        and parent.is_dir()
-                    ):
-                        return parent.name
-            except Exception:
-                return None
-            return None
-
-        def _resolve_inventory_root(base: Path, raw: Path) -> Path:
-            p = raw
-            if not p.is_absolute():
-                p = base / p
-            return p.resolve()
-
-        def _unique_source_id(base_id: str, used: set[str]) -> str:
-            candidate = base_id
-            idx = 2
-            while candidate in used:
-                candidate = f"{base_id}_{idx}"
-                idx += 1
-            used.add(candidate)
-            return candidate
-
-        def _source_id_for_path(path: Path) -> str:
-            try:
-                if path.is_dir():
-                    return path.name or "inventory"
-                if path.is_file() and path.name.startswith("nornir-simple-inventory."):
-                    return path.parent.name or path.stem or "inventory"
-                return path.stem or path.name or "inventory"
-            except Exception:
-                return "inventory"
-
         discover_local = _get_bool_opt("discover_local", default=True)
 
         inv_dirs_raw: list[str] = []
@@ -1311,26 +1375,9 @@ def load_modular_config(
         runtime = get_runtime_settings()
         cli_inventory_paths = list(runtime.inventory_paths or [])
 
-        local_inventory_paths: list[Path] = []
-        if discover_local:
-            cwd = Path.cwd()
-            local_candidates: list[Path] = []
-            try:
-                local_candidates.append(cwd)
-                for child in cwd.iterdir():
-                    if child.is_dir() and child.name.startswith("clab-"):
-                        local_candidates.append(child)
-            except Exception:
-                local_candidates = []
-
-            for cand in local_candidates:
-                if not _is_containerlab_inventory_path(cand):
-                    continue
-                local_inventory_paths.append(cand)
-                logging.info(
-                    "Auto-discovered local inventory: %s (use --inventory to override)",
-                    cand,
-                )
+        local_inventory_paths: list[Path] = (
+            _discover_local_inventories() if discover_local else []
+        )
 
         inventory_source = str(inventory_cfg.get("source", "")).strip().lower()
         if inventory_source == "nornir_simple" and not (

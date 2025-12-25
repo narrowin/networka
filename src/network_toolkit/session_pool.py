@@ -91,12 +91,21 @@ class SessionPool:
     def close_all(self) -> None:
         """Disconnect and remove all sessions."""
         with self._lock:
+            failed_devices: list[str] = []
             for device_name, session in self._sessions.items():
                 try:
                     session.disconnect()
-                except Exception:
-                    logger.debug("Failed to disconnect session for %s", device_name)
+                except Exception as e:
+                    logger.warning(
+                        "Failed to disconnect session for %s: %s", device_name, e
+                    )
+                    failed_devices.append(device_name)
             self._sessions.clear()
+            if failed_devices:
+                logger.warning(
+                    "Sessions failed to disconnect cleanly: %s",
+                    ", ".join(failed_devices),
+                )
 
     def __len__(self) -> int:
         """Return the number of sessions in the pool."""
