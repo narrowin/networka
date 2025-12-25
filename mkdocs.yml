@@ -146,7 +146,7 @@ markdown_extensions:
 
 extra:
   announcement: >-
-    Onboarding first: our docs aim to get you to your first successful `nw run` in minutes. If a step slows users down, we fix or remove it. Defaults should work, commands are copy‑pasteable, and every page shows the shortest path to success.
+    From install to first command in seconds. Lightweight CLI automation for network engineers who want results now.
 
 watch:
   - src

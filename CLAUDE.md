@@ -2,6 +2,17 @@
 
 **MANDATORY**: Always start EVERY response with: "I have read and will strictly follow the Copilot Repository Instructions." (not just the first response - every single reply must begin with this statement)
 
+## CRITICAL - Do Not
+
+- **NEVER add AI/LLM attribution to commits, PRs, or code** - no "Generated with Claude Code", no "Co-Authored-By: Claude", no robot emojis, nothing
+- Skip pre-commit checks
+- Create .md files without explicit request (use `llm-plans/` for planning)
+- Add emojis or decorative symbols anywhere
+- Commit without running `uv run pre-commit run --all-files`
+- Edit `docs/reference/cli.md` manually (it's auto-generated)
+
+---
+
 Multi-vendor CLI toolkit for network device automation via SSH. Uses Typer for CLI, Scrapli for transport.
 
 ## Tech Stack
@@ -95,8 +106,6 @@ Exception hierarchy: `NetworkToolkitError` > `ConfigurationError`, `DeviceConnec
 
 - Imports at top of file only
 - Type annotations on all functions
-- No emojis anywhere (code, docs, comments, help text)
-- No AI/LLM attribution in commits, PRs, or code
 - Prefer deletion over complexity
 - No over-engineering or backward-compatibility hacks
 
@@ -125,12 +134,3 @@ feat(cli): add SSH config sync command
 fix(transport): resolve connection timeout
 docs: update installation guide
 ```
-
-## Do Not
-
-- Skip pre-commit checks
-- Create .md files without explicit request (use `llm-plans/` for planning)
-- Add emojis or decorative symbols
-- Add AI attribution to commits or PRs
-- Commit without running `uv run pre-commit run --all-files`
-- Edit `docs/reference/cli.md` manually (it's auto-generated)
