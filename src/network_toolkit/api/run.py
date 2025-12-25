@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
 from time import perf_counter
+from typing import TypeVar
 
 import network_toolkit.device as device_module
 from network_toolkit.api.execution import execute_parallel
@@ -29,6 +31,8 @@ from network_toolkit.session_pool import SessionPoolProtocol
 from network_toolkit.transport.factory import get_transport_factory
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 
 @dataclass(slots=True)
@@ -219,37 +223,43 @@ def _run_command_on_device(
     )
 
 
-def _execute_with_session_pool(
+def _with_session_retry(
     device_name: str,
     config: NetworkConfig,
-    command: str,
     username_override: str | None,
     password_override: str | None,
     transport_override: str | None,
     session_pool: SessionPoolProtocol,
-) -> str:
+    execute_fn: Callable[[device_module.DeviceSession], T],
+) -> T:
     """
-    Execute a command using a session from the pool, with stale session retry.
+    Execute an operation using a pooled session with stale session retry.
 
     If the session fails (e.g., connection died), removes it from the pool,
     creates a fresh session, and retries once.
+
+    Args:
+        execute_fn: Callable that takes a connected session and returns result
     """
-    session = session_pool.get(device_name)
-    if session is None:
-        session = device_module.DeviceSession(
+
+    def create_session() -> device_module.DeviceSession:
+        return device_module.DeviceSession(
             device_name,
             config,
             username_override,
             password_override,
             transport_override,
         )
+
+    session = session_pool.get(device_name)
+    if session is None:
+        session = create_session()
         session_pool[device_name] = session
 
     try:
         session.connect()
-        return session.execute_command(command)
+        return execute_fn(session)
     except Exception as first_error:
-        # Session might be stale - remove it and retry with fresh session
         logger.debug(
             "Session for %s failed, attempting fresh connection: %s",
             device_name,
@@ -259,21 +269,34 @@ def _execute_with_session_pool(
         try:
             session.disconnect()
         except Exception:
-            pass  # Ignore disconnect errors on stale session
+            pass
 
-        # Create fresh session and retry once
-        session = device_module.DeviceSession(
-            device_name,
-            config,
-            username_override,
-            password_override,
-            transport_override,
-        )
+        session = create_session()
         session.connect()
-        output = session.execute_command(command)
-        # Re-add to pool on success
+        result = execute_fn(session)
         session_pool[device_name] = session
-        return output
+        return result
+
+
+def _execute_with_session_pool(
+    device_name: str,
+    config: NetworkConfig,
+    command: str,
+    username_override: str | None,
+    password_override: str | None,
+    transport_override: str | None,
+    session_pool: SessionPoolProtocol,
+) -> str:
+    """Execute a single command using a pooled session with retry."""
+    return _with_session_retry(
+        device_name,
+        config,
+        username_override,
+        password_override,
+        transport_override,
+        session_pool,
+        lambda s: s.execute_command(command),
+    )
 
 
 def _run_sequence_on_device(
@@ -357,56 +380,20 @@ def _execute_sequence_with_session_pool(
     transport_override: str | None,
     session_pool: SessionPoolProtocol,
 ) -> dict[str, str]:
-    """
-    Execute a sequence of commands using a session from the pool, with stale session retry.
+    """Execute a sequence of commands using a pooled session with retry."""
 
-    If the session fails, removes it from the pool, creates a fresh session, and retries.
-    """
-    session = session_pool.get(device_name)
-    if session is None:
-        session = device_module.DeviceSession(
-            device_name,
-            config,
-            username_override,
-            password_override,
-            transport_override,
-        )
-        session_pool[device_name] = session
+    def execute_all(session: device_module.DeviceSession) -> dict[str, str]:
+        return {cmd: session.execute_command(cmd) for cmd in commands}
 
-    try:
-        session.connect()
-        outputs: dict[str, str] = {}
-        for cmd in commands:
-            outputs[cmd] = session.execute_command(cmd)
-        return outputs
-    except Exception as first_error:
-        # Session might be stale - remove it and retry with fresh session
-        logger.debug(
-            "Session for %s failed during sequence, attempting fresh connection: %s",
-            device_name,
-            first_error,
-        )
-        session_pool.remove(device_name)
-        try:
-            session.disconnect()
-        except Exception:
-            pass  # Ignore disconnect errors on stale session
-
-        # Create fresh session and retry once
-        session = device_module.DeviceSession(
-            device_name,
-            config,
-            username_override,
-            password_override,
-            transport_override,
-        )
-        session.connect()
-        outputs = {}
-        for cmd in commands:
-            outputs[cmd] = session.execute_command(cmd)
-        # Re-add to pool on success
-        session_pool[device_name] = session
-        return outputs
+    return _with_session_retry(
+        device_name,
+        config,
+        username_override,
+        password_override,
+        transport_override,
+        session_pool,
+        execute_all,
+    )
 
 
 def _prepare_config_for_ips(

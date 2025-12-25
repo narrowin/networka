@@ -6,6 +6,7 @@ continues to operate on `NetworkConfig.devices` and `NetworkConfig.device_groups
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 from dataclasses import dataclass
@@ -15,6 +16,8 @@ from typing import Any
 import yaml
 
 from network_toolkit.exceptions import ConfigurationError
+
+logger = logging.getLogger(__name__)
 
 _SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
@@ -501,6 +504,13 @@ def _fail_on_ambiguous_group_env_credentials(
             user_groups = set(groups_with_user)
             password_groups = set(groups_with_password)
             if user_groups != password_groups:
+                logger.warning(
+                    "Credential ambiguity for device '%s': username from groups %s, "
+                    "password from groups %s",
+                    device_name,
+                    sorted(groups_with_user),
+                    sorted(groups_with_password),
+                )
                 msg = (
                     "Partial credentials from different groups (username and password from "
                     "different sources). Set device-specific env vars or consolidate credentials."
@@ -536,6 +546,11 @@ def _fail_on_ambiguous_group_env_credentials(
         # This is now checked after partial credentials, covering the case where multiple
         # groups each provide complete or overlapping credentials
         if len(groups_with_creds) > 1:
+            logger.warning(
+                "Multiple groups provide credentials for device '%s': %s",
+                device_name,
+                [g["group"] for g in groups_with_creds],
+            )
             msg = (
                 "Ambiguous group-level env credentials for device (multiple matching groups). "
                 "Set device-specific env vars, consolidate to one group, or use inventory credentials."
