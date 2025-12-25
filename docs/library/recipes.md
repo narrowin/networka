@@ -12,15 +12,18 @@ from network_toolkit import NetworkaClient
 with NetworkaClient() as client:
     # Check current state
     identity = client.run("router1", "/system/identity/print")
-    print(f"Connected to: {identity.output}")
+    if identity.command_results:
+        print(f"Connected to: {identity.command_results[0].output}")
 
     # Get system info
     resources = client.run("router1", "/system/resource/print")
-    print(f"Resources: {resources.output}")
+    if resources.command_results:
+        print(f"Resources: {resources.command_results[0].output}")
 
     # Check interfaces
     interfaces = client.run("router1", "/interface/print")
-    print(f"Interfaces: {interfaces.output}")
+    if interfaces.command_results:
+        print(f"Interfaces: {interfaces.command_results[0].output}")
 ```
 
 ## Parallel Device Operations
@@ -37,7 +40,8 @@ def get_device_info(device_name):
     client = NetworkaClient()
     try:
         result = client.run(device_name, "/system/identity/print")
-        return {"device": device_name, "output": result.output, "error": None}
+        output = result.command_results[0].output if result.command_results else None
+        return {"device": device_name, "output": output, "error": None}
     except Exception as e:
         return {"device": device_name, "output": None, "error": str(e)}
 
@@ -82,9 +86,10 @@ def check_compliance(device_name):
         for check_name, command in checks.items():
             result = client.run(device_name, command)
             # Example validation
+            output = result.command_results[0].output if result.command_results else ""
             results[check_name] = {
-                "passed": len(result.output) > 0,
-                "output": result.output
+                "passed": len(output) > 0 if output else False,
+                "output": output
             }
 
     return results

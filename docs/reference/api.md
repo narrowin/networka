@@ -83,6 +83,8 @@ All Networka exceptions inherit from `NetworkToolkitError`.
 
 Result objects returned by various operations.
 
+### Run Results
+
 ::: network_toolkit.api.run.RunResult
     options:
       show_root_heading: true
@@ -93,15 +95,36 @@ Result objects returned by various operations.
       show_root_heading: true
       show_source: false
 
+::: network_toolkit.api.run.DeviceSequenceResult
+    options:
+      show_root_heading: true
+      show_source: false
+
+### Backup Results
+
 ::: network_toolkit.api.backup.BackupResult
     options:
       show_root_heading: true
       show_source: false
 
+::: network_toolkit.api.backup.DeviceBackupResult
+    options:
+      show_root_heading: true
+      show_source: false
+
+### Diff Results
+
 ::: network_toolkit.api.diff.DiffResult
     options:
       show_root_heading: true
       show_source: false
+
+::: network_toolkit.api.diff.DiffItemResult
+    options:
+      show_root_heading: true
+      show_source: false
+
+### Transfer Results
 
 ::: network_toolkit.api.download.DownloadResult
     options:
@@ -109,6 +132,67 @@ Result objects returned by various operations.
       show_source: false
 
 ::: network_toolkit.api.upload.UploadResult
+    options:
+      show_root_heading: true
+      show_source: false
+
+## Programmatic API Functions
+
+These functions are exported from `network_toolkit.api` for direct use.
+
+### Command Execution
+
+::: network_toolkit.api.run.run_commands
+    options:
+      show_root_heading: true
+      show_source: false
+
+### Backup Operations
+
+::: network_toolkit.api.backup.run_backup
+    options:
+      show_root_heading: true
+      show_source: false
+
+### Diff Operations
+
+::: network_toolkit.api.diff.diff_targets
+    options:
+      show_root_heading: true
+      show_source: false
+
+### File Transfer
+
+::: network_toolkit.api.download.download_file
+    options:
+      show_root_heading: true
+      show_source: false
+
+::: network_toolkit.api.upload.upload_file
+    options:
+      show_root_heading: true
+      show_source: false
+
+### Inventory Queries
+
+::: network_toolkit.api.list.get_device_list
+    options:
+      show_root_heading: true
+      show_source: false
+
+::: network_toolkit.api.list.get_group_list
+    options:
+      show_root_heading: true
+      show_source: false
+
+::: network_toolkit.api.list.get_sequence_list
+    options:
+      show_root_heading: true
+      show_source: false
+
+### Parallel Execution
+
+::: network_toolkit.api.execution.execute_parallel
     options:
       show_root_heading: true
       show_source: false
