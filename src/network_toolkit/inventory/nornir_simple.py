@@ -479,7 +479,7 @@ def _fail_on_ambiguous_group_env_credentials(
 
         # Track which groups provide each credential type
         groups_with_user: list[str] = []
-        groups_with_password: list[str] = []
+        groups_with_pass: list[str] = []
 
         for group in sorted(groups):
             u = os.getenv(env_var_name(group, "USER"))
@@ -495,21 +495,21 @@ def _fail_on_ambiguous_group_env_credentials(
                 if u:
                     groups_with_user.append(group)
                 if p:
-                    groups_with_password.append(group)
+                    groups_with_pass.append(group)
 
         # Check for partial credentials from different groups first (more specific error)
         # This catches "franken-credentials" where username comes from one group and
         # password from another, which will cause confusing auth failures
-        if groups_with_user and groups_with_password:
+        if groups_with_user and groups_with_pass:
             user_groups = set(groups_with_user)
-            password_groups = set(groups_with_password)
-            if user_groups != password_groups:
+            pass_groups = set(groups_with_pass)
+            if user_groups != pass_groups:
                 logger.warning(
                     "Credential ambiguity for device '%s': username from groups %s, "
                     "password from groups %s",
                     device_name,
                     sorted(groups_with_user),
-                    sorted(groups_with_password),
+                    sorted(groups_with_pass),
                 )
                 msg = (
                     "Partial credentials from different groups (username and password from "
@@ -520,17 +520,17 @@ def _fail_on_ambiguous_group_env_credentials(
                     details={
                         "device": device_name,
                         "username_from_groups": sorted(groups_with_user),
-                        "password_from_groups": sorted(groups_with_password),
+                        "password_from_groups": sorted(groups_with_pass),
                         "env_vars_found": {
                             group: {
                                 "user": env_var_name(group, "USER")
                                 if group in user_groups
                                 else None,
                                 "password": env_var_name(group, "PASSWORD")
-                                if group in password_groups
+                                if group in pass_groups
                                 else None,
                             }
-                            for group in user_groups | password_groups
+                            for group in user_groups | pass_groups
                         },
                         "remediation": {
                             "device_env_vars": [

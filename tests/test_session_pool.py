@@ -65,7 +65,8 @@ class TestSessionPoolBasicOperations:
         assert "router1" not in pool
 
     def test_remove_returns_none_for_missing(self, pool: SessionPool) -> None:
-        assert pool.remove("nonexistent") is None
+        result = pool.remove("nonexistent")
+        assert result is None
 
     def test_contains_checks_presence(
         self, pool: SessionPool, mock_session: MagicMock
