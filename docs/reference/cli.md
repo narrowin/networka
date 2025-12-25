@@ -699,19 +699,27 @@ First run creates the file. Subsequent runs:
 
 - Optionally prune hosts removed from SSH config (--prune)
 
+Examples:
+
+    nw sync ssh-config                    # Use defaults
+
+    nw sync ssh-config --dry-run          # Preview changes
+
+    nw sync ssh-config ~/.ssh/config.d/routers -o routers.yml
+
 **Usage**:
 
 ```console
-$ nw sync ssh-config [OPTIONS] SSH_CONFIG_PATH
+$ nw sync ssh-config [OPTIONS] [SSH_CONFIG_PATH]
 ```
 
 **Arguments**:
 
-* `SSH_CONFIG_PATH`: Path to SSH config file  [required]
+* `[SSH_CONFIG_PATH]`: Path to SSH config file (default: ~/.ssh/config)
 
 **Options**:
 
-* `-o, --output PATH`: Output YAML inventory file  [required]
+* `-o, --output PATH`: Output YAML inventory file (default: &lt;config&gt;/devices/ssh-hosts.yml)
 * `--default-device-type TEXT`: Default device_type for new hosts  [default: generic]
 * `--include TEXT`: Include hosts matching pattern (can repeat)
 * `--exclude TEXT`: Exclude hosts matching pattern (can repeat)

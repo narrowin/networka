@@ -100,6 +100,20 @@ Exception hierarchy: `NetworkToolkitError` > `ConfigurationError`, `DeviceConnec
 - Prefer deletion over complexity
 - No over-engineering or backward-compatibility hacks
 
+## CLI UX Guidelines
+
+- **Sensible defaults**: Commands should work with zero arguments when possible. Use `~/.ssh/config` as default input, `<config-dir>/devices/` as default output, etc.
+- **Progressive disclosure**: Simple case first, options for power users. `nw sync ssh-config` should just work; `--include`, `--exclude`, `--prune` are optional.
+- **Predictable paths**: Use `common/paths.py` and `common/defaults.py` for platform-appropriate config directories.
+- **Help text**: Include examples in docstrings. Show the simple case first.
+
+## Documentation Guidelines
+
+- Update docs when adding/changing CLI commands
+- Run `uv run python scripts/generate_cli_docs.py` after CLI changes
+- Preview with `uv run mkdocs serve` before committing doc changes
+- Keep examples minimal - show the simplest working command first
+
 ## Commit Conventions
 
 Follow Conventional Commits: `type(scope): description`

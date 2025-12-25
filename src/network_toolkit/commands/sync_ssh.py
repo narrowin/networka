@@ -9,11 +9,16 @@ import typer
 import yaml
 
 from network_toolkit.common.logging import setup_logging
+from network_toolkit.common.paths import default_modular_config_dir
 from network_toolkit.exceptions import ConfigurationError
 from network_toolkit.inventory.ssh_config import SSHConfigOptions, parse_ssh_config
 
 # Marker to identify hosts that were synced from SSH config
 SSH_CONFIG_SOURCE_MARKER = "_ssh_config_source"
+
+# Default paths
+DEFAULT_SSH_CONFIG = Path("~/.ssh/config")
+DEFAULT_OUTPUT_FILE = "devices/ssh-hosts.yml"
 
 # Create a sub-app for sync commands
 sync_app = typer.Typer(
@@ -75,25 +80,27 @@ def _write_inventory(path: Path, inventory: dict[str, dict[str, Any]]) -> None:
     path.write_text(yaml_output, encoding="utf-8")
 
 
+def _get_default_output_path() -> Path:
+    """Get the default output path for SSH config sync."""
+    return default_modular_config_dir() / DEFAULT_OUTPUT_FILE
+
+
 @sync_app.command("ssh-config")
 def sync_ssh_config(
     ssh_config_path: Annotated[
-        Path,
+        Path | None,
         typer.Argument(
-            help="Path to SSH config file",
-            exists=True,
-            resolve_path=True,
+            help="Path to SSH config file (default: ~/.ssh/config)",
         ),
-    ],
+    ] = None,
     output: Annotated[
-        Path,
+        Path | None,
         typer.Option(
             "--output",
             "-o",
-            help="Output YAML inventory file",
-            resolve_path=True,
+            help="Output YAML inventory file (default: <config>/devices/ssh-hosts.yml)",
         ),
-    ],
+    ] = None,
     default_device_type: Annotated[
         str,
         typer.Option(
@@ -149,11 +156,32 @@ def sync_ssh_config(
     - Preserve manual edits (device_type, tags, description, etc.)
 
     - Optionally prune hosts removed from SSH config (--prune)
+
+    Examples:
+
+        nw sync ssh-config                    # Use defaults
+
+        nw sync ssh-config --dry-run          # Preview changes
+
+        nw sync ssh-config ~/.ssh/config.d/routers -o routers.yml
     """
     setup_logging("DEBUG" if verbose else "WARNING")
 
+    # Apply defaults
+    resolved_ssh_config = (
+        ssh_config_path.expanduser()
+        if ssh_config_path
+        else DEFAULT_SSH_CONFIG.expanduser()
+    )
+    resolved_output = output.expanduser() if output else _get_default_output_path()
+
+    # Validate SSH config exists
+    if not resolved_ssh_config.exists():
+        msg = f"SSH config file not found: {resolved_ssh_config}"
+        raise typer.BadParameter(msg)
+
     options = SSHConfigOptions(
-        path=ssh_config_path,
+        path=resolved_ssh_config,
         default_device_type=default_device_type,
         include_patterns=include,
         exclude_patterns=exclude,
@@ -163,7 +191,7 @@ def sync_ssh_config(
     ssh_hosts = parse_ssh_config(options)
 
     # Load existing output file if it exists
-    existing = _load_existing_inventory(output)
+    existing = _load_existing_inventory(resolved_output)
 
     # Track changes
     added: list[str] = []
@@ -255,8 +283,8 @@ def sync_ssh_config(
 
     # Write output
     if not dry_run:
-        _write_inventory(output, existing)
-        typer.echo(f"Wrote {len(existing)} devices to {output}")
+        _write_inventory(resolved_output, existing)
+        typer.echo(f"Wrote {len(existing)} devices to {resolved_output}")
     else:
         typer.echo("[DRY RUN] No changes written")
 

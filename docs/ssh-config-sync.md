@@ -10,7 +10,17 @@ Sync SSH config hosts to YAML inventory in seconds.
 ## Minimal working example
 
 ```bash
-nw sync ssh-config ~/.ssh/config -o ~/.config/networka/config/devices/ssh-hosts.yml
+nw sync ssh-config
+```
+
+This uses sensible defaults:
+- Input: `~/.ssh/config`
+- Output: `<config-dir>/devices/ssh-hosts.yml`
+
+Override when needed:
+
+```bash
+nw sync ssh-config ~/.ssh/config.d/routers -o routers.yml
 ```
 
 **Expected output (first run):**
@@ -33,7 +43,8 @@ Wrote 6 devices to /home/user/.config/networka/config/devices/ssh-hosts.yml
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--output PATH` | `-o` | Output YAML inventory file (required) |
+| `SSH_CONFIG_PATH` | | Path to SSH config file (default: `~/.ssh/config`) |
+| `--output PATH` | `-o` | Output YAML inventory file (default: `<config>/devices/ssh-hosts.yml`) |
 | `--default-device-type TEXT` | | Default device_type for new hosts (default: `generic`) |
 | `--include PATTERN` | | Include hosts matching pattern (can repeat) |
 | `--exclude PATTERN` | | Exclude hosts matching pattern (can repeat) |
