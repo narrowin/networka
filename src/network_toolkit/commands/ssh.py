@@ -47,6 +47,8 @@ from network_toolkit.ip_device import (
 
 app_help = (
     "Open tmux with CLI panes for a device or group.\n\n"
+    "Requires tmux installed and available on PATH; without tmux the command "
+    "falls back to sequential SSH sessions.\n\n"
     "Synchronized typing is ENABLED by default - keystrokes go to all panes.\n"
     "Use --no-sync to disable at startup.\n\n"
     "Quick controls:\n"

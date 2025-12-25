@@ -1,18 +1,22 @@
 # Installation
 
-## Installation (not on PyPI yet)
+## Installation
 
-Install from GitHub using an isolated tool installer.
+Install from PyPI using an isolated tool installer (recommended).
 
 ```bash
-uv tool install git+https://github.com/narrowin/networka.git
+uv tool install networka
 # or
-pipx install git+https://github.com/narrowin/networka.git
+pipx install networka
 ```
 
 Short install video (30s):
 
 [asciinema placeholder – will be embedded here]
+
+### tmux requirement for `nw cli`
+
+The multi-pane CLI command (`nw cli`) requires tmux on your PATH. Install it with `brew install tmux` (macOS), `apt install tmux` (Debian/Ubuntu), or your distro’s package manager. Without tmux the command falls back to sequential SSH sessions.
 
 ## Verify installation
 

@@ -4,9 +4,9 @@ on:
   workflow_call:
     inputs:
       python-version:
-        description: 'Python version for quality checks'
+        description: "Python version for quality checks"
         required: false
-        default: '3.12'
+        default: "3.13"
         type: string
 
 env:

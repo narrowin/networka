@@ -3,21 +3,21 @@ name: CI
 on:
   # Only run on pull requests to validate before merging
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
     paths:
-      - 'src/**'
-      - 'tests/**'
-      - 'pyproject.toml'
-      - 'uv.lock'
-      - '.github/workflows/**'
+      - "src/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/**"
 
   # Allow manual trigger for pre-release checks
   workflow_dispatch:
     inputs:
       python-version:
-        description: 'Python version to test'
+        description: "Python version to test"
         required: false
-        default: '3.12'
+        default: "3.13"
         type: string
 
 concurrency:
@@ -27,6 +27,10 @@ concurrency:
 jobs:
   quality-checks:
     name: Quality Checks
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
     uses: ./.github/workflows/quality-checks.yml
     with:
-      python-version: ${{ inputs.python-version || '3.12' }}
+      python-version: ${{ matrix.python-version }}

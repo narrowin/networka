@@ -8,11 +8,13 @@ from typing import Annotated
 
 import typer
 
+from network_toolkit.api.upload import UploadOptions, upload_file
 from network_toolkit.common.command import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.logging import setup_logging
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
+from network_toolkit.inventory.resolve import resolve_named_targets, select_named_target
 
 MAX_LIST_PREVIEW = 10
 
@@ -99,19 +101,10 @@ def register(app: typer.Typer) -> None:
             file_size = local_file.stat().st_size
             remote_name = remote_filename or local_file.name
 
-            # Late import to allow tests to patch `network_toolkit.cli.DeviceSession`
-            from network_toolkit.cli import DeviceSession
-
-            # Use DeviceSession from CLI module so tests can patch that symbol
-            device_session = DeviceSession
-
-            # Determine if target is a device or a group
             devices = config.devices or {}
             groups = config.device_groups or {}
-            is_device = target_name in devices
-            is_group = target_name in groups
-
-            if not (is_device or is_group):
+            target_kind = select_named_target(config, target_name)
+            if target_kind not in {"device", "group"}:
                 ctx.print_error(
                     f"'{target_name}' not found as device or group in configuration"
                 )
@@ -129,7 +122,7 @@ def register(app: typer.Typer) -> None:
                     ctx.print_info("Known groups: " + preview)
                 raise typer.Exit(1)
 
-            if is_device:
+            if target_kind == "device":
                 transport_type = config.get_transport_type(target_name)
                 ctx.print_info("File Upload Details:")
                 ctx.print_info(f"  Device: {target_name}")
@@ -142,87 +135,73 @@ def register(app: typer.Typer) -> None:
                     f"  Checksum verify: {'Yes' if checksum_verify else 'No'}"
                 )
                 output.print_blank_line()
-
-                with output.status(f"Uploading {local_file.name} to {target_name}..."):
-                    with device_session(target_name, config) as session:
-                        success = session.upload_file(
-                            local_path=local_file,
-                            remote_filename=remote_filename,
-                            verify_upload=verify,
-                            verify_checksum=checksum_verify,
-                        )
-
-                if success:
-                    ctx.print_success("Upload successful")
-                    ctx.print_success(
-                        f"File '{local_file.name}' uploaded to {target_name} as '{remote_name}'"
-                    )
-                else:
-                    ctx.print_error("Upload failed")
-                    raise typer.Exit(1)
-                return
-
-            # Group path
-            members: list[str] = []
-            try:
-                members = config.get_group_members(target_name)
-            except Exception:
-                # Fallback manual resolution (shouldn't happen)
-                group_obj = groups.get(target_name)
-                if group_obj and getattr(group_obj, "members", None):
-                    members = group_obj.members or []
-
-            if not members:
-                ctx.print_error(f"No devices found in group '{target_name}'")
-                raise typer.Exit(1)
-
-            ctx.print_info("Group File Upload Details:")
-            ctx.print_info(f"  Group: {target_name}")
-            ctx.print_info(f"  Devices: {len(members)} ({', '.join(members)})")
-            ctx.print_info(f"  Local file: {local_file}")
-            ctx.print_info(f"  Remote name: {remote_name}")
-            ctx.print_info(f"  File size: {file_size:,} bytes")
-            ctx.print_info(f"  Max concurrent: {max_concurrent}")
-            ctx.print_info(f"  Verify upload: {'Yes' if verify else 'No'}")
-            ctx.print_info(f"  Checksum verify: {'Yes' if checksum_verify else 'No'}")
-            output.print_blank_line()
-
-            with output.status(
-                f"Uploading {local_file.name} to {len(members)} devices...",
-            ):
-                results = device_session.upload_file_to_devices(
-                    device_names=members,
-                    config=config,
-                    local_path=local_file,
-                    remote_filename=remote_filename,
-                    verify_upload=verify,
-                    verify_checksum=checksum_verify,
-                    max_concurrent=max_concurrent,
-                )
-
-            successful = sum(results.values())
-            total = len(members)
-
-            ctx.print_info("Group Upload Results:")
-            ctx.print_success(f"  Successful: {successful}/{total}")
-            if total - successful > 0:
-                ctx.print_error(f"  Failed: {total - successful}/{total}")
-            output.print_blank_line()
-
-            ctx.print_info("Per-Device Results:")
-            for dev in members:
-                ok = results.get(dev, False)
-                if ok:
-                    ctx.print_success(f"  {dev}")
-                else:
-                    ctx.print_error(f"  {dev}")
-
-            if successful < total:
-                ctx.print_warning("Warning:")
-                ctx.print_warning(f"{total - successful} device(s) failed")
-                raise typer.Exit(1)
             else:
-                ctx.print_success("All uploads completed successfully!")
+                # Group path
+                members = resolve_named_targets(config, target_name).resolved_devices
+
+                if not members:
+                    ctx.print_error(f"No devices found in group '{target_name}'")
+                    raise typer.Exit(1)
+
+                ctx.print_info("Group File Upload Details:")
+                ctx.print_info(f"  Group: {target_name}")
+                ctx.print_info(f"  Devices: {len(members)} ({', '.join(members)})")
+                ctx.print_info(f"  Local file: {local_file}")
+                ctx.print_info(f"  Remote name: {remote_name}")
+                ctx.print_info(f"  File size: {file_size:,} bytes")
+                ctx.print_info(f"  Max concurrent: {max_concurrent}")
+                ctx.print_info(f"  Verify upload: {'Yes' if verify else 'No'}")
+                ctx.print_info(
+                    f"  Checksum verify: {'Yes' if checksum_verify else 'No'}"
+                )
+                output.print_blank_line()
+
+            options = UploadOptions(
+                target=target_name,
+                local_file=local_file,
+                config=config,
+                remote_filename=remote_filename,
+                verify=verify,
+                checksum_verify=checksum_verify,
+                max_concurrent=max_concurrent,
+                verbose=verbose,
+            )
+
+            with output.status(f"Uploading {local_file.name} to {target_name}..."):
+                result = upload_file(options)
+
+            if result.is_group:
+                successful = result.totals.succeeded
+                total = result.totals.total
+
+                ctx.print_info("Group Upload Results:")
+                ctx.print_success(f"  Successful: {successful}/{total}")
+                if total - successful > 0:
+                    ctx.print_error(f"  Failed: {total - successful}/{total}")
+                output.print_blank_line()
+
+                ctx.print_info("Per-Device Results:")
+                for res in result.device_results:
+                    if res.success:
+                        ctx.print_success(f"  {res.device}")
+                    else:
+                        ctx.print_error(f"  {res.device}")
+
+                if successful < total:
+                    ctx.print_warning("Warning:")
+                    ctx.print_warning(f"{total - successful} device(s) failed")
+                    raise typer.Exit(1)
+                else:
+                    ctx.print_success("All uploads completed successfully!")
+            elif result.totals.succeeded > 0:
+                ctx.print_success("Upload successful")
+                res = result.device_results[0]
+                ctx.print_success(
+                    f"File '{local_file.name}' uploaded to {target_name} as '{res.remote_path}'"
+                )
+            else:
+                ctx.print_error("Upload failed")
+                raise typer.Exit(1)
 
         except NetworkToolkitError as e:
             ctx.print_error(f"Error: {e.message}")

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
+from network_toolkit.api.list import DeviceInfo, GroupInfo, SequenceInfo
 from network_toolkit.common.styles import StyleName
 from network_toolkit.common.table_generator import (
     BaseTableProvider,
@@ -16,7 +17,7 @@ from network_toolkit.common.table_generator import (
     TableDefinition,
 )
 from network_toolkit.config import NetworkConfig, get_supported_device_types
-from network_toolkit.credentials import EnvironmentCredentialManager
+from network_toolkit.credentials import CredentialResolver, EnvironmentCredentialManager
 from network_toolkit.ip_device import (
     get_supported_device_types as get_device_descriptions,
 )
@@ -31,7 +32,7 @@ if TYPE_CHECKING:
 class DeviceListTableProvider(BaseModel, BaseTableProvider):
     """Provides device list table data using Pydantic v2."""
 
-    config: NetworkConfig
+    devices: list[DeviceInfo]
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -41,6 +42,7 @@ class DeviceListTableProvider(BaseModel, BaseTableProvider):
             title="Devices",
             columns=[
                 TableColumn(header="Name", style=StyleName.DEVICE),
+                TableColumn(header="Source", style=StyleName.WARNING),
                 TableColumn(header="Host", style=StyleName.HOST),
                 TableColumn(header="Type", style=StyleName.PLATFORM),
                 TableColumn(header="Description", style=StyleName.SUCCESS),
@@ -50,43 +52,45 @@ class DeviceListTableProvider(BaseModel, BaseTableProvider):
 
     def get_table_rows(self) -> list[list[str]]:
         """Get table rows for device list."""
-        if not self.config.devices:
+        if not self.devices:
             return []
 
         rows = []
-        for name, device_config in self.config.devices.items():
+        for device in self.devices:
             rows.append(
                 [
-                    name,
-                    device_config.host,
-                    device_config.device_type,
-                    device_config.description or "N/A",
-                    ", ".join(device_config.tags) if device_config.tags else "None",
+                    device.name,
+                    device.source or "config",
+                    device.hostname,
+                    device.device_type,
+                    device.description or "N/A",
+                    ", ".join(device.tags) if device.tags else "None",
                 ]
             )
         return rows
 
     def get_raw_output(self) -> str:
         """Get raw mode output for device list."""
-        if not self.config.devices:
+        if not self.devices:
             return ""
 
         lines = []
-        for name, device in self.config.devices.items():
+        for device in self.devices:
             tags_str = ",".join(device.tags or []) if device.tags else "none"
-            platform = device.platform or "unknown"
+            platform = device.device_type
+            source = device.source or "config"
             lines.append(
-                f"device={name} host={device.host} platform={platform} tags={tags_str}"
+                f"device={device.name} source={source} host={device.hostname} platform={platform} tags={tags_str}"
             )
         return "\n".join(lines)
 
     def get_verbose_info(self) -> list[str] | None:
         """Get verbose information for device list."""
-        if not self.config.devices:
+        if not self.devices:
             return None
 
         return [
-            f"Total devices: {len(self.config.devices)}",
+            f"Total devices: {len(self.devices)}",
             "Usage Examples:",
             "  nw run <device_name> <command>",
             "  nw info <device_name>",
@@ -96,7 +100,7 @@ class DeviceListTableProvider(BaseModel, BaseTableProvider):
 class GroupListTableProvider(BaseModel, BaseTableProvider):
     """Provides group list table data using Pydantic v2."""
 
-    config: NetworkConfig
+    groups: list[GroupInfo]
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -106,6 +110,7 @@ class GroupListTableProvider(BaseModel, BaseTableProvider):
             title="Groups",
             columns=[
                 TableColumn(header="Group Name", style=StyleName.GROUP),
+                TableColumn(header="Source", style=StyleName.WARNING),
                 TableColumn(header="Description", style=StyleName.SUCCESS),
                 TableColumn(header="Match Tags", style=StyleName.WARNING),
                 TableColumn(header="Members", style=StyleName.DEVICE),
@@ -114,49 +119,45 @@ class GroupListTableProvider(BaseModel, BaseTableProvider):
 
     def get_table_rows(self) -> list[list[str]]:
         """Get table rows for group list."""
-        if not self.config.device_groups:
+        if not self.groups:
             return []
 
         rows = []
-        for name, group in self.config.device_groups.items():
-            # Use the proven get_group_members method
-            members = self.config.get_group_members(name)
-
+        for group in self.groups:
             rows.append(
                 [
-                    name,
-                    group.description,
+                    group.name,
+                    group.source or "config",
+                    group.description or "",
                     ", ".join(group.match_tags) if group.match_tags else "N/A",
-                    ", ".join(members) if members else "None",
+                    ", ".join(group.members) if group.members else "None",
                 ]
             )
         return rows
 
     def get_raw_output(self) -> str:
         """Get raw mode output for group list."""
-        if not self.config.device_groups:
+        if not self.groups:
             return ""
 
         lines = []
-        for name, group in self.config.device_groups.items():
-            # Use the proven get_group_members method
-            group_members = self.config.get_group_members(name)
-
-            members_str = ",".join(group_members) if group_members else "none"
+        for group in self.groups:
+            members_str = ",".join(group.members) if group.members else "none"
             tags_str = ",".join(group.match_tags or []) if group.match_tags else "none"
             description = group.description or ""
+            source = group.source or "config"
             lines.append(
-                f"group={name} description={description} tags={tags_str} members={members_str}"
+                f"group={group.name} source={source} description={description} tags={tags_str} members={members_str}"
             )
         return "\n".join(lines)
 
     def get_verbose_info(self) -> list[str] | None:
         """Get verbose information for group list."""
-        if not self.config.device_groups:
+        if not self.groups:
             return None
 
         return [
-            f"Total groups: {len(self.config.device_groups)}",
+            f"Total groups: {len(self.groups)}",
             "Usage Examples:",
             "  nw run <group_name> <command>",
             "  nw info <group_name>",
@@ -204,14 +205,17 @@ class TransportTypesTableProvider(BaseModel, BaseTableProvider):
 class VendorSequencesTableProvider(BaseModel, BaseTableProvider):
     """Provider for vendor sequences table."""
 
-    config: NetworkConfig
+    sequences: list[SequenceInfo]
     vendor_filter: str | None = None
     verbose: bool = False
+
+    model_config = {"arbitrary_types_allowed": True}
 
     def get_table_definition(self) -> TableDefinition:
         columns = [
             TableColumn(header="Sequence Name", style=StyleName.DEVICE),
             TableColumn(header="Description", style=StyleName.SUCCESS),
+            TableColumn(header="Vendor", style=StyleName.WARNING),
             TableColumn(header="Category", style=StyleName.WARNING),
             TableColumn(header="Commands", style=StyleName.OUTPUT),
         ]
@@ -232,73 +236,46 @@ class VendorSequencesTableProvider(BaseModel, BaseTableProvider):
     def get_table_rows(self) -> list[list[str]]:
         """Get vendor sequences data."""
         rows = []
-        vendor_sequences = self.config.vendor_sequences or {}
 
-        for vendor_name, sequences in vendor_sequences.items():
-            if self.vendor_filter and vendor_name != self.vendor_filter:
-                continue
+        for seq in self.sequences:
+            commands_str = ", ".join(seq.commands) if seq.commands else "N/A"
 
-            for seq_name, sequence in sequences.items():
-                # Handle both string commands and command objects
-                if hasattr(sequence, "commands"):
-                    if isinstance(sequence.commands[0], str):
-                        commands_str = ", ".join(sequence.commands)
-                    else:
-                        commands_str = ", ".join(
-                            [cmd.command for cmd in sequence.commands]
-                        )
-                else:
-                    commands_str = "N/A"
+            row = [
+                seq.name,
+                seq.description or "N/A",
+                seq.vendor or "N/A",
+                seq.category,
+                (commands_str[:50] + "..." if len(commands_str) > 50 else commands_str),
+            ]
 
-                row = [
-                    seq_name,
-                    getattr(sequence, "description", "N/A") or "N/A",
-                    vendor_name,
-                    (
-                        commands_str[:50] + "..."
-                        if len(commands_str) > 50
-                        else commands_str
-                    ),
-                ]
+            if self.verbose:
+                timeout = str(seq.timeout) if seq.timeout is not None else "Default"
+                device_types = (
+                    ", ".join(seq.device_types) if seq.device_types else "All"
+                )
+                row.extend([timeout, device_types])
 
-                if self.verbose:
-                    timeout = str(getattr(sequence, "timeout", "Default")) or "Default"
-                    device_types = (
-                        ", ".join(getattr(sequence, "device_types", [])) or "All"
-                    )
-                    row.extend([timeout, device_types])
-
-                rows.append(row)
+            rows.append(row)
 
         return rows
 
     def get_raw_output(self) -> str | None:
         """Get raw data for JSON/CSV output."""
-        vendor_sequences = self.config.vendor_sequences or {}
-        if self.vendor_filter:
-            sequences = vendor_sequences.get(self.vendor_filter, {})
-            lines = []
-            for seq_name, _sequence in sequences.items():
-                lines.append(f"vendor={self.vendor_filter} sequence={seq_name}")
-            return "\n".join(lines)
-        else:
-            lines = []
-            for vendor_name, sequences in vendor_sequences.items():
-                for seq_name in sequences.keys():
-                    lines.append(f"vendor={vendor_name} sequence={seq_name}")
-            return "\n".join(lines)
+        lines = []
+        for seq in self.sequences:
+            lines.append(f"vendor={seq.vendor} sequence={seq.name}")
+        return "\n".join(lines)
 
     def get_verbose_info(self) -> list[str] | None:
         """Get additional verbose information."""
-        vendor_sequences = self.config.vendor_sequences or {}
         if self.vendor_filter:
-            sequences = vendor_sequences.get(self.vendor_filter, {})
-            return [f"Vendor: {self.vendor_filter}, Sequences: {len(sequences)}"]
+            return [f"Vendor: {self.vendor_filter}, Sequences: {len(self.sequences)}"]
         else:
-            total_vendors = len(vendor_sequences)
-            total_sequences = sum(len(seqs) for seqs in vendor_sequences.values())
+            # Count unique vendors
+            vendors = {seq.vendor for seq in self.sequences if seq.vendor}
             return [
-                f"Total vendors: {total_vendors}, Total sequences: {total_sequences}"
+                f"Total Vendors: {len(vendors)}",
+                f"Total Sequences: {len(self.sequences)}",
             ]
 
 
@@ -586,6 +563,7 @@ class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
             ["Tags", ", ".join(device_config.tags) if device_config.tags else "None"]
         )
         rows.append(["Source", self._get_device_source()])
+        rows.append(["Inventory Source", self._get_device_inventory_source()])
 
         # Connection parameters
         username_override = (
@@ -649,8 +627,6 @@ class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
 
     def _get_credential_source(self, credential_type: str) -> str:
         """Get the source of a credential using the same logic as CredentialResolver."""
-        from network_toolkit.credentials import CredentialResolver
-
         # Check interactive override
         if self.interactive_creds:
             if credential_type == "username" and getattr(
@@ -741,7 +717,11 @@ class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
             return f"device={self.device_name} error=not_found"
 
         device_config = devices[self.device_name]
-        return f"device={self.device_name} host={device_config.host} type={device_config.device_type}"
+        source = self._get_device_inventory_source()
+        return (
+            f"device={self.device_name} source={source} host={device_config.host} "
+            f"type={device_config.device_type}"
+        )
 
     def get_verbose_info(self) -> list[str] | None:
         """Get additional verbose information."""
@@ -760,6 +740,13 @@ class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
             return str(src_path.resolve())
         except Exception:
             return str(src_path)
+
+    def _get_device_inventory_source(self) -> str:
+        try:
+            source_id = self.config.get_device_inventory_source_id(self.device_name)
+        except Exception:
+            source_id = None
+        return source_id or "config"
 
 
 class GroupInfoTableProvider(BaseModel, BaseTableProvider):
@@ -798,6 +785,7 @@ class GroupInfoTableProvider(BaseModel, BaseTableProvider):
         rows.append(["Name", self.group_name])
         rows.append(["Description", getattr(group, "description", "N/A") or "N/A"])
         rows.append(["Source", self._get_group_source()])
+        rows.append(["Inventory Source", self._get_group_inventory_source()])
         rows.append(["Device Count", str(len(group_members))])
         rows.append(["Devices", ", ".join(group_members) if group_members else "None"])
 
@@ -813,6 +801,13 @@ class GroupInfoTableProvider(BaseModel, BaseTableProvider):
         except Exception:
             return "unknown"
 
+    def _get_group_inventory_source(self) -> str:
+        try:
+            source_id = self.config.get_group_inventory_source_id(self.group_name)
+        except Exception:
+            source_id = None
+        return source_id or "config"
+
     def get_raw_output(self) -> str | None:
         """Get raw data for JSON/CSV output."""
         device_groups = self.config.device_groups or {}
@@ -825,7 +820,8 @@ class GroupInfoTableProvider(BaseModel, BaseTableProvider):
         except Exception:
             device_count = 0
 
-        return f"group={self.group_name} device_count={device_count}"
+        source = self._get_group_inventory_source()
+        return f"group={self.group_name} source={source} device_count={device_count}"
 
     def get_verbose_info(self) -> list[str] | None:
         """Get additional verbose information."""

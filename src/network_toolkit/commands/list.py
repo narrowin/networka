@@ -19,7 +19,6 @@ from network_toolkit.common.table_providers import (
 )
 from network_toolkit.config import NetworkConfig, load_config
 from network_toolkit.exceptions import NetworkToolkitError
-from network_toolkit.sequence_manager import SequenceManager, SequenceRecord
 
 if TYPE_CHECKING:
     pass
@@ -29,11 +28,14 @@ def _list_devices_impl(
     config: NetworkConfig, ctx: CommandContext, *, verbose: bool
 ) -> None:
     """Implementation logic for listing devices."""
-    if not config.devices:
+    from network_toolkit.api.list import get_device_list
+
+    devices = get_device_list(config)
+    if not devices:
         ctx.print_warning("No devices configured")
         return
 
-    provider = DeviceListTableProvider(config=config)
+    provider = DeviceListTableProvider(devices=devices)
     ctx.render_table(provider, verbose)
 
 
@@ -41,54 +43,14 @@ def _list_groups_impl(
     config: NetworkConfig, ctx: CommandContext, *, verbose: bool
 ) -> None:
     """Implementation logic for listing groups."""
-    if not config.device_groups:
+    from network_toolkit.api.list import get_group_list
+
+    groups = get_group_list(config)
+    if not groups:
         ctx.print_warning("No device groups configured")
         return
 
-    provider = GroupListTableProvider(config=config)
-    ctx.render_table(provider, verbose)
-
-
-def _list_vendor_sequences_impl(
-    vendor: str,
-    sequences: dict[str, SequenceRecord],
-    category_filter: str | None,
-    config: NetworkConfig,
-    ctx: CommandContext,
-    *,
-    verbose: bool = False,
-) -> None:
-    """Implementation logic for listing vendor sequences."""
-    if not sequences:
-        ctx.print_warning(f"No sequences found for vendor '{vendor}'.")
-        return
-
-    filtered_sequences = {
-        name: seq
-        for name, seq in sequences.items()
-        if category_filter is None or seq.category == category_filter
-    }
-
-    if not filtered_sequences:
-        ctx.print_warning(f"No sequences found for category '{category_filter}'.")
-        return
-
-    provider = VendorSequencesTableProvider(
-        config=config, vendor_filter=vendor, verbose=verbose
-    )
-    ctx.render_table(provider, verbose)
-
-
-def _show_all_vendor_sequences(
-    sequences: dict[str, dict[str, SequenceRecord]],
-    category_filter: str | None,
-    config: NetworkConfig,
-    ctx: CommandContext,
-    *,
-    verbose: bool = False,
-) -> None:
-    """Show sequences for all vendors."""
-    provider = VendorSequencesTableProvider(config=config, verbose=verbose)
+    provider = GroupListTableProvider(groups=groups)
     ctx.render_table(provider, verbose)
 
 
@@ -101,22 +63,23 @@ def _list_sequences_impl(
     verbose: bool,
 ) -> None:
     """Implementation logic for listing sequences."""
-    sm = SequenceManager(config)
+    from network_toolkit.api.list import get_sequence_list
 
-    # Vendor sequences (built-in + repo + user + config)
-    if vendor:
-        vendor_seqs = sm.list_vendor_sequences(vendor)
-        _list_vendor_sequences_impl(
-            vendor, vendor_seqs, category, config, ctx, verbose=verbose
-        )
-    else:
-        all_vendor = sm.list_all_sequences()
-        if all_vendor:
-            _show_all_vendor_sequences(
-                all_vendor, category, config, ctx, verbose=verbose
-            )
+    sequences = get_sequence_list(config, vendor=vendor, category=category)
+
+    if not sequences:
+        if vendor:
+            ctx.print_warning(f"No sequences found for vendor '{vendor}'.")
+        elif category:
+            ctx.print_warning(f"No sequences found for category '{category}'.")
         else:
             ctx.print_warning("No vendor-specific sequences found.")
+        return
+
+    provider = VendorSequencesTableProvider(
+        sequences=sequences, vendor_filter=vendor, verbose=verbose
+    )
+    ctx.render_table(provider, verbose)
 
 
 def register(app: typer.Typer) -> None:

@@ -69,7 +69,7 @@ $ nw info [OPTIONS] TARGETS
 
 **Options**:
 
-* `-c, --config PATH`: Configuration directory or file path  [default: /home/mischa/.config/networka]
+* `-c, --config PATH`: Configuration directory or file path  [default: /Users/md/Library/Application Support/networka]
 * `--vendor TEXT`: Show vendor-specific commands for sequences (e.g., cisco_iosxe, mikrotik_routeros)
 * `-o, --output-mode [default|light|dark|no-color|raw|json]`: Output decoration mode: default, light, dark, no-color, raw
 * `-v, --verbose`: Enable verbose logging
@@ -93,7 +93,7 @@ $ nw run [OPTIONS] TARGET COMMAND_OR_SEQUENCE
 
 **Options**:
 
-* `-c, --config PATH`: Configuration directory or file path  [default: /home/mischa/.config/networka]
+* `-c, --config PATH`: Configuration directory or file path  [default: /Users/md/Library/Application Support/networka]
 * `-v, --verbose`: Enable verbose logging
 * `-s, --store-results`: Store command results to files
 * `--results-dir TEXT`: Override results directory
@@ -126,7 +126,7 @@ $ nw upload [OPTIONS] <device|group> LOCAL_FILE
 * `--verify / --no-verify`: Verify upload by checking file exists  [default: verify]
 * `--checksum-verify / --no-checksum-verify`: Verify file integrity using checksums (uses config default if not specified)  [default: no-checksum-verify]
 * `-j, --max-concurrent INTEGER`: Maximum concurrent uploads when target is a group  [default: 5]
-* `-c, --config PATH`: Configuration file path  [default: /home/mischa/.config/networka]
+* `-c, --config PATH`: Configuration file path  [default: /Users/md/Library/Application Support/networka]
 * `-v, --verbose`: Enable verbose output
 * `--help`: Show this message and exit.
 
@@ -150,7 +150,7 @@ $ nw download [OPTIONS] <device|group> REMOTE_FILE LOCAL_PATH
 
 * `--delete-remote / --keep-remote`: Delete remote file after successful download  [default: keep-remote]
 * `--verify / --no-verify`: Verify download by comparing file sizes  [default: verify]
-* `-c, --config PATH`: Configuration file path  [default: /home/mischa/.config/networka]
+* `-c, --config PATH`: Configuration file path  [default: /Users/md/Library/Application Support/networka]
 * `-v, --verbose`: Enable verbose output
 * `--help`: Show this message and exit.
 
@@ -181,7 +181,7 @@ $ nw diff [OPTIONS] TARGET SUBJECT
 * `-b, --baseline PATH`: Baseline file (for config/command) or directory (for sequence).
 * `--ignore TEXT`: Regex to ignore lines; repeat for multiple patterns.
 * `--save-current PATH`: Optional path to save the current fetched state (file or directory).
-* `-c, --config PATH`: Configuration file path  [default: /home/mischa/.config/networka]
+* `-c, --config PATH`: Configuration file path  [default: /Users/md/Library/Application Support/networka]
 * `-o, --output-mode [default|light|dark|no-color|raw|json]`: Output decoration mode: default, light, dark, no-color, raw
 * `-v, --verbose`: Enable verbose logging
 * `-s, --store-results`: Store diff outputs to files
@@ -191,6 +191,8 @@ $ nw diff [OPTIONS] TARGET SUBJECT
 ## `nw cli`
 
 Open tmux with CLI panes for a device or group.
+
+Requires tmux installed and available on PATH; without tmux the command falls back to sequential SSH sessions.
 
 Synchronized typing is ENABLED by default - keystrokes go to all panes.
 Use --no-sync to disable at startup.
@@ -215,7 +217,7 @@ $ nw cli [OPTIONS] TARGET
 
 **Options**:
 
-* `-c, --config PATH`: Path to config dir or YAML  [default: /home/mischa/.config/networka]
+* `-c, --config PATH`: Path to config dir or YAML  [default: /Users/md/Library/Application Support/networka]
 * `--auth [key-first|key|password|interactive]`: Authentication mode: key-first (default), key, password, interactive  [default: key-first]
 * `--user TEXT`: Override username for SSH
 * `--password TEXT`: Override password for SSH
@@ -264,7 +266,7 @@ $ nw list devices [OPTIONS]
 
 **Options**:
 
-* `-c, --config PATH`: Configuration file path  [default: /home/mischa/.config/networka]
+* `-c, --config PATH`: Configuration file path  [default: /Users/md/Library/Application Support/networka]
 * `-o, --output-mode [default|light|dark|no-color|raw|json]`: Output decoration mode: default, light, dark, no-color, raw
 * `-v, --verbose`: Enable verbose logging
 * `--help`: Show this message and exit.
@@ -281,7 +283,7 @@ $ nw list groups [OPTIONS]
 
 **Options**:
 
-* `-c, --config PATH`: Configuration file path  [default: /home/mischa/.config/networka]
+* `-c, --config PATH`: Configuration file path  [default: /Users/md/Library/Application Support/networka]
 * `-o, --output-mode [default|light|dark|no-color|raw|json]`: Output decoration mode: default, light, dark, no-color, raw
 * `-v, --verbose`: Show detailed information
 * `--help`: Show this message and exit.
@@ -299,7 +301,7 @@ $ nw list sequences [OPTIONS]
 
 **Options**:
 
-* `-c, --config PATH`: Configuration file path  [default: /home/mischa/.config/networka]
+* `-c, --config PATH`: Configuration file path  [default: /Users/md/Library/Application Support/networka]
 * `-v, --vendor TEXT`: Filter by vendor platform
 * `--category TEXT`: Filter by sequence category
 * `-o, --output-mode [default|light|dark|no-color|raw|json]`: Output decoration mode: default, light, dark, no-color, raw
@@ -383,7 +385,7 @@ $ nw config validate [OPTIONS]
 
 **Options**:
 
-* `-c, --config PATH`: Configuration file path  [default: /home/mischa/.config/networka]
+* `-c, --config PATH`: Configuration file path  [default: /Users/md/Library/Application Support/networka]
 * `-o, --output-mode [default|light|dark|no-color|raw|json]`: Output decoration mode: default, light, dark, no-color, raw
 * `-v, --verbose`: Show detailed validation information
 * `--help`: Show this message and exit.
@@ -463,9 +465,6 @@ $ nw backup [OPTIONS] COMMAND [ARGS]...
 **Commands**:
 
 * `config`: Backup device configuration.
-* `comprehensive`: Perform comprehensive backup including...
-* `vendors`: Show which vendors support backup operations.
-* `vendor-config`: Create device configuration backup using...
 
 ### `nw backup config`
 
@@ -487,77 +486,7 @@ $ nw backup config [OPTIONS] TARGET_NAME
 
 * `--download / --no-download`: Download created backup/export files after running the sequence  [default: download]
 * `--delete-remote / --keep-remote`: Delete remote backup/export files after successful download  [default: keep-remote]
-* `-c, --config PATH`: Configuration file path  [default: /home/mischa/.config/networka]
-* `-v, --verbose`: Enable verbose output
-* `--help`: Show this message and exit.
-
-### `nw backup comprehensive`
-
-Perform comprehensive backup including vendor-specific data.
-
-Performs a comprehensive backup for the specified device or group,
-including vendor-specific configuration and operational data.
-
-**Usage**:
-
-```console
-$ nw backup comprehensive [OPTIONS] TARGET_NAME
-```
-
-**Arguments**:
-
-* `TARGET_NAME`: Device or group name  [required]
-
-**Options**:
-
-* `--download / --no-download`: Download created backup/export files after running the sequence  [default: download]
-* `--delete-remote / --keep-remote`: Delete remote backup/export files after successful download  [default: keep-remote]
-* `-c, --config PATH`: Configuration file path  [default: /home/mischa/.config/networka]
-* `-v, --verbose`: Enable verbose output
-* `--help`: Show this message and exit.
-
-### `nw backup vendors`
-
-Show which vendors support backup operations.
-
-Lists all supported vendors and their backup operation capabilities.
-
-**Usage**:
-
-```console
-$ nw backup vendors [OPTIONS]
-```
-
-**Options**:
-
-* `--help`: Show this message and exit.
-
-### `nw backup vendor-config`
-
-Create device configuration backup using vendor-specific platform methods.
-
-Creates a text representation of the device configuration using
-platform-specific implementations rather than command sequences.
-This provides direct vendor API access for configuration export operations.
-
-MikroTik RouterOS: Uses /export commands
-Cisco IOS/IOS-XE: Uses show running-config commands
-
-**Usage**:
-
-```console
-$ nw backup vendor-config [OPTIONS] <device|group>
-```
-
-**Arguments**:
-
-* `<device|group>`: Device or group name from configuration  [required]
-
-**Options**:
-
-* `--download / --no-download`: Download created configuration backup files after running the sequence  [default: download]
-* `--delete-remote / --keep-remote`: Delete remote configuration backup files after successful download  [default: keep-remote]
-* `-c, --config PATH`: Configuration file path  [default: /home/mischa/.config/networka]
+* `-c, --config PATH`: Configuration file path  [default: /Users/md/Library/Application Support/networka]
 * `-v, --verbose`: Enable verbose output
 * `--help`: Show this message and exit.
 
@@ -603,7 +532,7 @@ $ nw firmware upgrade [OPTIONS] TARGET_NAME FIRMWARE_FILE
 
 * `--precheck-sequence TEXT`: Pre-check sequence name  [default: pre_maintenance]
 * `--skip-precheck`: Skip pre-check sequence
-* `-c, --config PATH`: Configuration file path  [default: /home/mischa/.config/networka]
+* `-c, --config PATH`: Configuration file path  [default: /Users/md/Library/Application Support/networka]
 * `-v, --verbose`: Enable verbose output
 * `--help`: Show this message and exit.
 
@@ -628,7 +557,7 @@ $ nw firmware downgrade [OPTIONS] TARGET_NAME FIRMWARE_FILE
 
 * `--precheck-sequence TEXT`: Pre-check sequence name  [default: pre_maintenance]
 * `--skip-precheck`: Skip pre-check sequence
-* `-c, --config PATH`: Configuration file path  [default: /home/mischa/.config/networka]
+* `-c, --config PATH`: Configuration file path  [default: /Users/md/Library/Application Support/networka]
 * `-v, --verbose`: Enable verbose output
 * `--help`: Show this message and exit.
 
@@ -652,7 +581,7 @@ $ nw firmware bios [OPTIONS] TARGET_NAME
 
 * `--precheck-sequence TEXT`: Pre-check sequence name  [default: pre_maintenance]
 * `--skip-precheck`: Skip pre-check sequence
-* `-c, --config PATH`: Configuration file path  [default: /home/mischa/.config/networka]
+* `-c, --config PATH`: Configuration file path  [default: /Users/md/Library/Application Support/networka]
 * `-v, --verbose`: Enable verbose output
 * `--help`: Show this message and exit.
 

@@ -8,7 +8,7 @@ title: Networka
 First, install networka:
 
 ```bash
-uv tool install git+https://github.com/narrowin/networka.git
+uv tool install networka
 ```
 
 Goal: run a command against a device without creating any files.
@@ -37,6 +37,7 @@ Command completed successfully
 
 - Multi-vendor automation (MikroTik, Cisco, Arista, Juniper, …)
 - Flexible configuration (YAML/CSV), tags and groups
+- Containerlab-friendly: consume generated `nornir-simple-inventory.yml` directly
 - Vendor-aware sequences and backups
 - Rich CLI output with selectable output modes
 - Type-safe internals (mypy), clean CLI (Typer + Rich)
@@ -51,6 +52,6 @@ Command completed successfully
 
 ## Installation
 
-Start with the Installation, then explore the User guide for config, environment variables, output modes, results, and more.
+Start with the [Installation Guide](getting-started.md#installation), then explore the User guide for config, environment variables, output modes, results, and more.
 
 Python 3.11+ is required.

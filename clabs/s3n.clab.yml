@@ -1,0 +1,60 @@
+---
+name: s3n
+
+mgmt:
+  network: s3n-clab
+  ipv4-subnet: 10.10.1.0/24
+
+topology:
+  defaults:
+    kind: mikrotik_ros
+    image: ghcr.io/narrowin/vrnetlab_mikrotik_routeros:7.20.6
+
+  nodes:
+    sw-acc1:
+      mgmt-ipv4: 10.10.1.11
+      labels:
+        nornir-group: lab_s3n
+        nornir-group-2: access
+        nornir-group-3: mikrotik
+    sw-acc2:
+      mgmt-ipv4: 10.10.1.12
+      labels:
+        nornir-group: lab_s3n
+        nornir-group-2: access
+        nornir-group-3: mikrotik
+    sw-dist1:
+      mgmt-ipv4: 10.10.1.13
+      labels:
+        nornir-group: lab_s3n
+        nornir-group-2: distribution
+        nornir-group-3: mikrotik
+    linux1:
+      kind: linux
+      image: ghcr.io/srl-labs/network-multitool
+      mgmt-ipv4: 10.10.1.101
+      labels:
+        nornir-group: lab_s3n
+        nornir-group-2: linux
+      exec:
+        - ip address add 10.1.1.1/24 dev eth1
+    linux2:
+      kind: linux
+      image: ghcr.io/srl-labs/network-multitool
+      mgmt-ipv4: 10.10.1.102
+      labels:
+        nornir-group: lab_s3n
+        nornir-group-2: linux
+      exec:
+        - ip address add 10.1.1.2/24 dev eth1
+
+  links:
+    # sw-acc1 <-> sw-dist1
+    - endpoints: ["sw-acc1:ether24", "sw-dist1:ether12"]
+    - endpoints: ["sw-acc1:ether23", "sw-dist1:ether11"]
+    # sw-acc2 <-> sw-dist1
+    - endpoints: ["sw-acc2:ether24", "sw-dist1:ether10"]
+    # linux1 <-> sw-acc1
+    - endpoints: ["sw-acc1:ether2", "linux1:eth1"]
+    # linux2 <-> sw-acc2
+    - endpoints: ["sw-acc2:ether2", "linux2:eth1"]

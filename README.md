@@ -21,8 +21,6 @@ Originally developed at [narrowin](https://narrowin.ch/en/about.html), now commu
 
 Networka is a modern CLI tool for automating network devices across multiple vendors. Designed for network engineers who want fast, scalable automation with full cross-platform support.
 
-Built with the help of agentic-AI with humans in the loop, this started as an experiment that turned into something genuinely useful.
-
 ---
 
 ## _The Networka Monologue_
@@ -94,20 +92,20 @@ Because a real **Networka** wants the f\*ing lot.”<br><br>
 ### System Requirements
 
 - **Operating System**: Linux, macOS, or Windows
-- **Python**: 3.11, 3.12, or 3.13
 - **Network Access**: SSH connectivity to target devices
 - **Package Manager**: uv (recommended) or pip
+- **tmux for `nw cli`**: Install tmux to use the multi-pane CLI command (`brew install tmux` on macOS, `apt install tmux` on Debian/Ubuntu). libtmux is installed automatically with Networka.
 
 ### Quick Install (recommended)
 
-Not on PyPI yet — install from GitHub.
+Install from PyPI using an isolated tool installer.
 
 ```bash
 # Recommended (isolated, user-wide)
-uv tool install git+https://github.com/narrowin/networka.git
+uv tool install networka
 
 # Alternative
-pipx install git+https://github.com/narrowin/networka.git
+pipx install networka
 
 # Verify installation
 nw --help
@@ -133,13 +131,13 @@ More → PATH troubleshooting: https://narrowin.github.io/networka/troubleshooti
 ### Upgrade & Remove
 
 ```bash
-# Upgrade to latest version (from GitHub)
-uv tool install --force git+https://github.com/narrowin/networka.git
+# Upgrade to latest version
+uv tool upgrade networka
 # or
-pipx install --force git+https://github.com/narrowin/networka.git
+pipx upgrade networka
 
 # Remove installation
-uv tool uninstall nw
+uv tool uninstall networka
 # or
 pipx uninstall networka
 ```
@@ -156,7 +154,7 @@ WSL2 quickstart (recommended):
 # In Ubuntu on WSL2
 curl -LsSf https://astral.sh/uv/install.sh | sh
 exec $SHELL
-uv tool install git+https://github.com/narrowin/networka.git
+uv tool install networka
 nw --help
 ```
 
@@ -171,6 +169,27 @@ Get up and running with config init command:
 nw config init
 
 ```
+
+### Library API
+
+Use Networka programmatically in your Python applications:
+
+```python
+from network_toolkit import NetworkaClient, DeviceSession
+
+client = NetworkaClient()
+
+with DeviceSession("router1", client.config) as session:
+    output = session.execute_command("show version")
+    print(output)
+```
+
+See the [Library Documentation](https://narrowin.github.io/networka/library/) for:
+
+- Multi-command workflows with persistent sessions
+- Ad-hoc IP targeting without configuration files
+- Credential handling patterns
+- Integration recipes
 
 ### One-liners (no config)
 

@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
+from network_toolkit.api.diff import DiffOutcome
 from network_toolkit.cli import app
-from network_toolkit.commands.diff import DiffOutcome
 
 
 def _write(p: Path, text: str) -> Path:
@@ -40,7 +40,7 @@ class TestDiffCLI:
 
         baseline = _write(tmp_path / "baseline.txt", "hello\n")
 
-        with patch("network_toolkit.cli.DeviceSession") as mock_session_cls:
+        with patch("network_toolkit.api.diff.DeviceSession") as mock_session_cls:
             sess = MagicMock()
             sess.__enter__.return_value = sess
             sess.__exit__.return_value = None
@@ -61,7 +61,10 @@ class TestDiffCLI:
             )
 
         assert result.exit_code == 0
-        assert "identical" in result.output.lower()
+        assert (
+            "match" in result.output.lower()
+            or "no differences found" in result.output.lower()
+        )
 
     def test_diff_command_single_device_detects_diff(
         self, config_file: Path, tmp_path: Path
@@ -70,7 +73,7 @@ class TestDiffCLI:
 
         baseline = _write(tmp_path / "baseline.txt", "hello\n")
 
-        with patch("network_toolkit.cli.DeviceSession") as mock_session_cls:
+        with patch("network_toolkit.api.diff.DeviceSession") as mock_session_cls:
             sess = MagicMock()
             sess.__enter__.return_value = sess
             sess.__exit__.return_value = None
@@ -103,7 +106,7 @@ class TestDiffCLI:
         # usage error -> exit code 2
         assert result.exit_code == 2
 
-    @patch("network_toolkit.commands.diff.SequenceManager")
+    @patch("network_toolkit.api.diff.SequenceManager")
     def test_diff_sequence_with_missing_baseline_files(
         self, mock_sm: MagicMock, config_file: Path, tmp_path: Path
     ) -> None:
@@ -121,7 +124,7 @@ class TestDiffCLI:
         cmd1_file = baseline_dir / "cmd__system_identity_print.txt"
         _write(cmd1_file, "id: router\n")
 
-        with patch("network_toolkit.cli.DeviceSession") as mock_session_cls:
+        with patch("network_toolkit.api.diff.DeviceSession") as mock_session_cls:
             sess = MagicMock()
             sess.__enter__.return_value = sess
             sess.__exit__.return_value = None
@@ -144,7 +147,7 @@ class TestDiffCLI:
 
         # One missing baseline file -> exit 1
         assert result.exit_code == 1
-        assert "No baseline file found" in result.output
+        assert "Baseline file missing" in result.output
 
 
 class TestDiffAdvancedScenarios:
@@ -154,7 +157,7 @@ class TestDiffAdvancedScenarios:
         """Test device-to-device comparison without baseline."""
         runner = CliRunner()
 
-        with patch("network_toolkit.cli.DeviceSession") as mock_session_cls:
+        with patch("network_toolkit.api.diff.DeviceSession") as mock_session_cls:
             sess1 = MagicMock()
             sess1.__enter__.return_value = sess1
             sess1.__exit__.return_value = None
@@ -192,7 +195,7 @@ class TestDiffAdvancedScenarios:
             "# RouterOS script\n/system identity set name=old-router\n",
         )
 
-        with patch("network_toolkit.cli.DeviceSession") as mock_session_cls:
+        with patch("network_toolkit.api.diff.DeviceSession") as mock_session_cls:
             sess = MagicMock()
             sess.__enter__.return_value = sess
             sess.__exit__.return_value = None
@@ -228,7 +231,7 @@ class TestDiffAdvancedScenarios:
         """Test sequence diff where all baseline files match."""
         runner = CliRunner()
 
-        with patch("network_toolkit.commands.diff.SequenceManager") as mock_sm:
+        with patch("network_toolkit.api.diff.SequenceManager") as mock_sm:
             sm_inst = mock_sm.return_value
             sm_inst.resolve.return_value = [
                 "/system/identity/print",
@@ -239,7 +242,7 @@ class TestDiffAdvancedScenarios:
             _write(baseline_dir / "cmd__system_identity_print.txt", "id: router\n")
             _write(baseline_dir / "cmd__system_resource_print.txt", "cpu: 10%\n")
 
-            with patch("network_toolkit.cli.DeviceSession") as mock_session_cls:
+            with patch("network_toolkit.api.diff.DeviceSession") as mock_session_cls:
                 sess = MagicMock()
                 sess.__enter__.return_value = sess
                 sess.__exit__.return_value = None
@@ -263,7 +266,8 @@ class TestDiffAdvancedScenarios:
         assert result.exit_code in [0, 1]
         # The output should indicate the result
         assert (
-            "identical" in result.output.lower()
+            "match" in result.output.lower()
+            or "no differences found" in result.output.lower()
             or "difference" in result.output.lower()
             or "error" in result.output.lower()
             or "missing baseline" in result.output.lower()
@@ -302,7 +306,7 @@ class TestDiffAdvancedScenarios:
         runner = CliRunner()
         baseline = _write(tmp_path / "baseline.txt", "hello\n")
 
-        with patch("network_toolkit.cli.DeviceSession") as mock_session_cls:
+        with patch("network_toolkit.api.diff.DeviceSession") as mock_session_cls:
             mock_session_cls.side_effect = Exception("Connection failed")
 
             result = runner.invoke(
@@ -324,7 +328,7 @@ class TestDiffAdvancedScenarios:
         """Test diff with missing baseline file."""
         runner = CliRunner()
 
-        with patch("network_toolkit.cli.DeviceSession") as mock_session_cls:
+        with patch("network_toolkit.api.diff.DeviceSession") as mock_session_cls:
             sess = MagicMock()
             sess.__enter__.return_value = sess
             sess.__exit__.return_value = None
@@ -346,7 +350,7 @@ class TestDiffAdvancedScenarios:
 
         assert result.exit_code == 1
 
-    @patch("network_toolkit.commands.diff.SequenceManager")
+    @patch("network_toolkit.api.diff.SequenceManager")
     def test_diff_sequence_resolution_error(
         self, mock_sm: MagicMock, config_file: Path, tmp_path: Path
     ) -> None:
@@ -379,7 +383,7 @@ class TestDiffAdvancedScenarios:
         runner = CliRunner()
         baseline = _write(tmp_path / "baseline.txt", "hello\n")
 
-        with patch("network_toolkit.cli.DeviceSession") as mock_session_cls:
+        with patch("network_toolkit.api.diff.DeviceSession") as mock_session_cls:
             sess = MagicMock()
             sess.__enter__.return_value = sess
             sess.__exit__.return_value = None

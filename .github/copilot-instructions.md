@@ -17,6 +17,9 @@ NONEGOITIABLE: As a first sentence in your response, always state: "I have read 
 2. **No backward compatibility concerns** - Project has no users yet
 3. **Production-ready code** - Not a prototype
 4. **ABSOLUTELY NO EMOJIS OR DECORATIVE SYMBOLS** - NOT IN CODE, NOT IN HELP TEXT, NOT IN DOCS OR MARKDOWN, NOT IN COMMENTS
+5. **Keep asking back until fully clear** - Always ask back for clarification until you are 95% sure we have the same understanding about the requirements, implementation, and solution
+
+Specify, generate, test, repeat.
 
 ## QUALITY STANDARDS
 

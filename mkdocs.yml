@@ -12,6 +12,7 @@ nav:
       - Platform compatibility: platform-compatibility.md
   - User guide:
     - Configuration: configuration.md
+    - Nornir & Containerlab inventory: nornir-inventory.md
     - Environment variables: environment-variables.md
     - Running commands: running-commands.md
     - Results: results.md
@@ -26,6 +27,12 @@ nav:
     - tmux CLI sessions: tmux-ssh.md
     - Recipes: examples/recipes.md
     - Examples (user sequences): examples/user_sequences/README.md
+  - Library (Python API):
+      - Overview: library/index.md
+      - Quickstart: library/quickstart.md
+      - Sessions: library/sessions.md
+      - Ad-hoc Targets: library/adhoc-targets.md
+      - Recipes: library/recipes.md
   - Troubleshooting: troubleshooting.md
   - Vendors:
       - Overview: vendors/index.md

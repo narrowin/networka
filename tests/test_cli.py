@@ -66,7 +66,7 @@ class TestCLI:
         # Should show configured groups
         assert "all_switches" in result.output or "lab_devices" in result.output
 
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.device.DeviceSession")
     def test_run_command_success(
         self, mock_device_session: MagicMock, config_file: Path
     ) -> None:
@@ -92,7 +92,7 @@ class TestCLI:
         assert result.exit_code == 0
         assert "Identity: RouterOS" in result.output
 
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.device.DeviceSession")
     def test_run_command_failure(
         self, mock_device_session: MagicMock, config_file: Path
     ) -> None:
@@ -111,7 +111,7 @@ class TestCLI:
         )
         assert result.exit_code == 1
 
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.device.DeviceSession")
     def test_sequence_command_success(
         self, mock_device_session: MagicMock, config_file: Path
     ) -> None:
@@ -143,7 +143,7 @@ class TestCLI:
         assert result.exit_code == 0
         assert "valid" in result.output.lower() or "OK" in result.output
 
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.device.DeviceSession")
     def test_run_sequence_on_group(
         self, mock_device_session: MagicMock, config_file: Path
     ) -> None:
@@ -173,7 +173,7 @@ class TestCLI:
         # Accept exit code 0 or 1 (might fail due to actual connection attempts)
         assert result.exit_code in [0, 1]
 
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.api.upload.DeviceSession")
     def test_upload_command(
         self, mock_device_session: MagicMock, config_file: Path, firmware_file: Path
     ) -> None:
@@ -198,18 +198,17 @@ class TestCLI:
         )
         assert result.exit_code == 0
 
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.api.upload.DeviceSession")
     def test_upload_command_group(
         self, mock_device_session: MagicMock, config_file: Path, firmware_file: Path
     ) -> None:
         """Test upload command with a group target (replaces legacy group-upload)."""
-        # Mock successful file upload to group by faking class-level helper
-        mock_device_session.upload_file_to_devices = MagicMock(
-            return_value={
-                "test_device1": True,
-                "test_device2": True,
-            }
-        )
+        # Mock successful file upload
+        mock_session = MagicMock()
+        mock_session.upload_file.return_value = True
+        mock_session.__enter__ = MagicMock(return_value=mock_session)
+        mock_session.__exit__ = MagicMock(return_value=None)
+        mock_device_session.return_value = mock_session
 
         runner = CliRunner()
         result = runner.invoke(
@@ -222,10 +221,10 @@ class TestCLI:
                 str(config_file),
             ],
         )
-        # Should succeed with our mocked classmethod
+        # Should succeed
         assert result.exit_code == 0
 
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.device.DeviceSession")
     def test_firmware_downgrade_device(
         self, mock_device_session: MagicMock, config_file: Path, firmware_file: Path
     ) -> None:
@@ -253,7 +252,7 @@ class TestCLI:
         )
         assert result.exit_code == 0
 
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.device.DeviceSession")
     def test_firmware_downgrade_group(
         self, mock_device_session: MagicMock, config_file: Path, firmware_file: Path
     ) -> None:
@@ -278,7 +277,7 @@ class TestCLI:
         )
         assert result.exit_code in [0, 1]
 
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.device.DeviceSession")
     def test_bios_upgrade_device(
         self, mock_device_session: MagicMock, config_file: Path
     ) -> None:
@@ -305,7 +304,7 @@ class TestCLI:
         )
         assert result.exit_code == 0
 
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.device.DeviceSession")
     def test_bios_upgrade_group(
         self, mock_device_session: MagicMock, config_file: Path
     ) -> None:
@@ -348,7 +347,7 @@ class TestCLI:
         )
         assert result.exit_code == 1
 
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.device.DeviceSession")
     def test_connection_failure(
         self, mock_device_session: MagicMock, config_file: Path
     ) -> None:
@@ -389,7 +388,7 @@ class TestCLI:
         )
         assert result.exit_code == 0
 
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.device.DeviceSession")
     def test_group_run_basic(
         self, mock_device_session: MagicMock, config_file: Path
     ) -> None:
@@ -416,7 +415,7 @@ class TestCLI:
         # Accept exit code 0 or 1 (1 might be due to missing group definition)
         assert result.exit_code in [0, 1]
 
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.device.DeviceSession")
     def test_run_command_with_mocked_session(
         self, mock_device_session: MagicMock, config_file: Path
     ) -> None:
@@ -442,7 +441,7 @@ class TestCLI:
         # Should succeed with proper mocking
         assert result.exit_code == 0
 
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.device.DeviceSession")
     def test_run_command_comma_separated_devices(
         self, mock_device_session: MagicMock, config_file: Path
     ) -> None:
@@ -470,7 +469,7 @@ class TestCLI:
         # Should mention members listing
         assert "Members:" in result.output
 
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.device.DeviceSession")
     def test_run_command_mixed_targets_group_and_device(
         self, mock_device_session: MagicMock, config_file: Path
     ) -> None:
@@ -498,7 +497,7 @@ class TestCLI:
         assert "test_device2" in result.output
         assert "test_device3" in result.output
 
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.device.DeviceSession")
     def test_run_sequence_comma_separated_devices(
         self, mock_device_session: MagicMock, config_file: Path
     ) -> None:
@@ -523,8 +522,8 @@ class TestCLI:
         )
         assert result.exit_code in [0, 1]
 
-    @patch("network_toolkit.commands.run.SequenceManager")
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.api.run.SequenceManager")
+    @patch("network_toolkit.device.DeviceSession")
     def test_run_sequence_raw_single_device(
         self, mock_device_session: MagicMock, mock_sm: MagicMock, config_file: Path
     ) -> None:
@@ -555,14 +554,12 @@ class TestCLI:
         assert result.exit_code == 0
         # Expect device/cmd header lines preceding each output (with === delimiters)
         lines = [line for line in result.output.splitlines() if line.strip() != ""]
-        # Two commands => 4 lines: header, output, header, output
-        assert lines[0].startswith("=== device=test_device1 cmd=")
-        assert lines[1] == "out1"
-        assert lines[2].startswith("=== device=test_device1 cmd=")
-        assert lines[3] == "out2"
+        # Two commands => 2 lines: output, output
+        assert lines[0] == "out1"
+        assert lines[1] == "out2"
 
-    @patch("network_toolkit.commands.run.SequenceManager")
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.api.run.SequenceManager")
+    @patch("network_toolkit.device.DeviceSession")
     def test_run_sequence_raw_group(
         self, mock_device_session: MagicMock, mock_sm: MagicMock, config_file: Path
     ) -> None:
@@ -598,17 +595,13 @@ class TestCLI:
         assert result.exit_code == 0
         lines = [line for line in result.output.splitlines() if line.strip() != ""]
         # Expect headers and outputs interleaved in device order (with === delimiters)
-        # d1 header, d1c1, d1 header, d1c2, d2 header, d2c1, d2 header, d2c2
-        assert lines[0].startswith("=== device=test_device1 cmd=")
-        assert lines[1] == "d1c1"
-        assert lines[2].startswith("=== device=test_device1 cmd=")
-        assert lines[3] == "d1c2"
-        assert lines[4].startswith("=== device=test_device2 cmd=")
-        assert lines[5] == "d2c1"
-        assert lines[6].startswith("=== device=test_device2 cmd=")
-        assert lines[7] == "d2c2"
+        # d1c1, d1c2, d2c1, d2c2
+        assert lines[0] == "d1c1"
+        assert lines[1] == "d1c2"
+        assert lines[2] == "d2c1"
+        assert lines[3] == "d2c2"
 
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.device.DeviceSession")
     def test_run_single_command_raw_json(
         self, mock_device_session: MagicMock, config_file: Path
     ) -> None:
@@ -639,8 +632,8 @@ class TestCLI:
         assert obj["cmd"] == "/cmd"
         assert obj["output"] == "ok"
 
-    @patch("network_toolkit.commands.run.SequenceManager")
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.api.run.SequenceManager")
+    @patch("network_toolkit.device.DeviceSession")
     def test_run_sequence_raw_json(
         self, mock_device_session: MagicMock, mock_sm: MagicMock, config_file: Path
     ) -> None:

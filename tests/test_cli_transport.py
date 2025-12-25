@@ -17,10 +17,8 @@ class TestCLITransportConfiguration:
         # Mock the actual execution to avoid real network operations
         with (
             patch("network_toolkit.common.command.load_config") as mock_load_config,
-            patch("network_toolkit.commands.run.SequenceManager"),
-            patch(
-                "network_toolkit.commands.run.create_ip_based_config"
-            ) as mock_create_ip,
+            patch("network_toolkit.api.run.SequenceManager"),
+            patch("network_toolkit.api.run._create_ip_based_config") as mock_create_ip,
         ):
             # Setup mocks
             mock_config = MagicMock()

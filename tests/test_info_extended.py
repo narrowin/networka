@@ -140,6 +140,7 @@ class TestInfoExtendedFunctionality:
         with (
             patch("network_toolkit.commands.info.load_config") as mock_load_config,
             patch("network_toolkit.commands.info.SequenceManager") as mock_sm_class,
+            patch("network_toolkit.api.info.SequenceManager") as mock_sm_api_class,
         ):
             mock_config = Mock()
             mock_config.devices = None
@@ -149,6 +150,7 @@ class TestInfoExtendedFunctionality:
 
             mock_sm = Mock()
             mock_sm_class.return_value = mock_sm
+            mock_sm_api_class.return_value = mock_sm
             mock_sm.list_all_sequences.return_value = {}
 
             result = runner.invoke(

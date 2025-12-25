@@ -1,19 +1,114 @@
 # API Reference
 
-!!! info
-The API reference is not yet implemented. Coming soon.
+Complete reference documentation for Networka's Python API.
 
-<!-- Enable this when the API docs are ready to publish
-::: network_toolkit
--->
+## Core Classes
 
-## Planned coverage
+### NetworkaClient
 
-- Configuration models (`network_toolkit.config.*`) — Pydantic v2 models for devices, groups, sequences, and general settings
-- Device session (`network_toolkit.device.DeviceSession`) — SSH session management, command execution, file transfer
-- Exceptions (`network_toolkit.exceptions.*`) — typed error hierarchy for connection, auth, timeouts, execution, configuration
-- Results management (`network_toolkit.results.*`) — structured results, storage, and output formatting
-- Commands/operations (`network_toolkit.commands.*`) — reusable operations backing the CLI (run, upload/download, backup, firmware)
-- Common utilities (`network_toolkit.common.*`) — logging, output manager, and helpers used across modules
+High-level client for all Networka operations.
 
-See Development guide for contribution details: `docs/development.md`.
+::: network_toolkit.client.NetworkaClient
+    options:
+      show_root_heading: true
+      show_source: false
+      members:
+        - __init__
+        - config
+        - devices
+        - groups
+        - run
+        - backup
+        - diff
+        - download
+        - upload
+
+### DeviceSession
+
+Persistent session manager for network device connections.
+
+::: network_toolkit.device.DeviceSession
+    options:
+      show_root_heading: true
+      show_source: false
+      members:
+        - __init__
+        - connect
+        - disconnect
+        - execute_command
+        - upload_file
+        - download_file
+
+## Utilities
+
+### create_ip_based_config
+
+Create device configurations from IP addresses.
+
+::: network_toolkit.ip_device.create_ip_based_config
+    options:
+      show_root_heading: true
+      show_source: false
+
+## Exceptions
+
+All Networka exceptions inherit from `NetworkToolkitError`.
+
+::: network_toolkit.exceptions.NetworkToolkitError
+    options:
+      show_root_heading: true
+      show_source: false
+
+::: network_toolkit.exceptions.DeviceConnectionError
+    options:
+      show_root_heading: true
+      show_source: false
+
+::: network_toolkit.exceptions.DeviceExecutionError
+    options:
+      show_root_heading: true
+      show_source: false
+
+::: network_toolkit.exceptions.FileTransferError
+    options:
+      show_root_heading: true
+      show_source: false
+
+::: network_toolkit.exceptions.ConfigurationError
+    options:
+      show_root_heading: true
+      show_source: false
+
+## Result Types
+
+Result objects returned by various operations.
+
+::: network_toolkit.api.run.RunResult
+    options:
+      show_root_heading: true
+      show_source: false
+
+::: network_toolkit.api.run.DeviceCommandResult
+    options:
+      show_root_heading: true
+      show_source: false
+
+::: network_toolkit.api.backup.BackupResult
+    options:
+      show_root_heading: true
+      show_source: false
+
+::: network_toolkit.api.diff.DiffResult
+    options:
+      show_root_heading: true
+      show_source: false
+
+::: network_toolkit.api.download.DownloadResult
+    options:
+      show_root_heading: true
+      show_source: false
+
+::: network_toolkit.api.upload.UploadResult
+    options:
+      show_root_heading: true
+      show_source: false

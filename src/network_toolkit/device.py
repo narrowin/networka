@@ -100,16 +100,20 @@ class DeviceSession:
 
         # Add SSH host key acceptance settings for first-time connections
         # https://scrapli.dev/user_guide/basic_usage/#ssh-key-verification
-        self._connection_params.update(
-            {
-                "auth_strict_key": config.general.ssh_strict_host_key_checking,
-                "ssh_config_file": config.general.ssh_config_file,
-                "timeout_socket": 10,  # Socket timeout
-                "timeout_transport": 30,  # Transport timeout
-                "timeout_ops": 30,  # Operations timeout
-                "channel_lock": True,  # Ensure thread-safe channel operations
-            }
-        )
+
+        # Only set defaults if not already provided by config/overrides
+        defaults = {
+            "auth_strict_key": config.general.ssh_strict_host_key_checking,
+            "ssh_config_file": config.general.ssh_config_file,
+            "timeout_socket": 10,  # Socket timeout
+            "timeout_transport": 30,  # Transport timeout
+            "timeout_ops": 30,  # Operations timeout
+            "channel_lock": True,  # Ensure thread-safe channel operations
+        }
+
+        for key, value in defaults.items():
+            if key not in self._connection_params:
+                self._connection_params[key] = value
 
         logger.info(f"Initialized session for device: {device_name}")
         logger.debug(f"All connection parameters: {self._connection_params}")
