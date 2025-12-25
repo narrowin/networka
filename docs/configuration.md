@@ -47,7 +47,17 @@ inventory:
   merge_mode: replace
 ```
 
-See `docs/nornir-inventory.md` for the full workflow and options.
+See [Nornir & Containerlab inventory](nornir-inventory.md) for the full workflow and options.
+
+## Syncing from SSH config {#ssh-config-sync}
+
+Already have hosts in `~/.ssh/config`? Sync them to a YAML inventory:
+
+```bash
+nw sync ssh-config
+```
+
+See [SSH config sync](ssh-config-sync.md) for filtering, updates, and advanced usage.
 
 ## YAML (preferred) {#yaml}
 
