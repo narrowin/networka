@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -116,7 +115,13 @@ class DeviceSession:
                 self._connection_params[key] = value
 
         logger.info(f"Initialized session for device: {device_name}")
-        logger.debug(f"All connection parameters: {self._connection_params}")
+        # Filter sensitive fields before logging
+        safe_params = {
+            k: v
+            for k, v in self._connection_params.items()
+            if k not in ("auth_password", "password")
+        }
+        logger.debug(f"Connection parameters: {safe_params}")
 
     def connect(self) -> None:
         """Establish connection to the device.
@@ -146,7 +151,6 @@ class DeviceSession:
             username = self._connection_params.get("auth_username")
             password = self._connection_params.get("auth_password")
             password_len = len(password) if isinstance(password, str) else 0
-            show_plain_pw = os.getenv("NW_SHOW_PLAINTEXT_PASSWORDS", "0") == "1"
 
             # Create transport via factory and open with retry
             transport_factory = get_transport_factory(transport_type)
@@ -158,13 +162,6 @@ class DeviceSession:
                     logger.info(
                         f"Opening connection to '{host}' on port '{port}' as user '{username}' (attempt {attempt}/{max(1, attempts)}; password_len={password_len})"
                     )
-                    if show_plain_pw:
-                        logger.warning(
-                            "NW_SHOW_PLAINTEXT_PASSWORDS=1 is set; logging plaintext password (unsafe)."
-                        )
-                        logger.warning(
-                            f"Password used for '{self.device_name}' is: {password!r}"
-                        )
                     # If transport exposes underlying driver, prefer opening it to
                     # satisfy tests that patch `network_toolkit.device.Scrapli().open`.
                     raw_drv = getattr(self._transport, "_raw_driver", None)
