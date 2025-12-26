@@ -28,6 +28,8 @@ $ nw [OPTIONS] COMMAND [ARGS]...
 
 * `--version`: Show version information
 * `-h, --help`: Show this message and exit
+* `--inventory PATH`: Additional inventory path(s) to load (Nornir SimpleInventory/Containerlab). Repeatable.
+* `--inventory-prefer TEXT`: Preferred inventory source when a device/group name is ambiguous. Use &#x27;config&#x27;, a filesystem path, or a discovered id like &#x27;clab-s3n&#x27;.
 
 **Commands**:
 
@@ -42,6 +44,7 @@ $ nw [OPTIONS] COMMAND [ARGS]...
 * `backup`: Backup operations for network devices
 * `firmware`: Firmware management operations
 * `schema`: JSON schema management commands
+* `sync`: Sync inventory from external sources
 
 ## `nw info`
 
@@ -181,6 +184,7 @@ $ nw diff [OPTIONS] TARGET SUBJECT
 * `-b, --baseline PATH`: Baseline file (for config/command) or directory (for sequence).
 * `--ignore TEXT`: Regex to ignore lines; repeat for multiple patterns.
 * `--save-current PATH`: Optional path to save the current fetched state (file or directory).
+* `-H, --heuristic`: Use heuristic operational state diffing (ignores timestamps, counters, etc.).
 * `-c, --config PATH`: Configuration file path  [default: /Users/md/Library/Application Support/networka]
 * `-o, --output-mode [default|light|dark|no-color|raw|json]`: Output decoration mode: default, light, dark, no-color, raw
 * `-v, --verbose`: Enable verbose logging
@@ -661,4 +665,65 @@ $ nw schema info [OPTIONS]
 **Options**:
 
 * `-v, --verbose`
+* `--help`: Show this message and exit.
+
+## `nw sync`
+
+Sync inventory from external sources
+
+**Usage**:
+
+```console
+$ nw sync [OPTIONS] COMMAND [ARGS]...
+```
+
+**Options**:
+
+* `--help`: Show this message and exit.
+
+**Commands**:
+
+* `ssh-config`: Sync devices from SSH config to YAML...
+
+### `nw sync ssh-config`
+
+Sync devices from SSH config to YAML inventory.
+
+First run creates the file. Subsequent runs:
+
+- Add new hosts from SSH config
+
+- Update host/user/port if changed in SSH config
+
+- Preserve manual edits (device_type, tags, description, etc.)
+
+- Optionally prune hosts removed from SSH config (--prune)
+
+Examples:
+
+    nw sync ssh-config                    # Use defaults
+
+    nw sync ssh-config --dry-run          # Preview changes
+
+    nw sync ssh-config ~/.ssh/config.d/routers -o routers.yml
+
+**Usage**:
+
+```console
+$ nw sync ssh-config [OPTIONS] [SSH_CONFIG_PATH]
+```
+
+**Arguments**:
+
+* `[SSH_CONFIG_PATH]`: Path to SSH config file (default: ~/.ssh/config)
+
+**Options**:
+
+* `-o, --output PATH`: Output YAML inventory file (default: &lt;config&gt;/devices/ssh-hosts.yml)
+* `--default-device-type TEXT`: Default device_type for new hosts  [default: generic]
+* `--include TEXT`: Include hosts matching pattern (can repeat)
+* `--exclude TEXT`: Exclude hosts matching pattern (can repeat)
+* `--prune`: Remove hosts no longer in SSH config
+* `--dry-run`: Show changes without writing
+* `-v, --verbose`: Enable verbose output
 * `--help`: Show this message and exit.

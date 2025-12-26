@@ -18,7 +18,8 @@ result = client.run(
     device_type="mikrotik_routeros"
 )
 
-print(result.output)
+if result.command_results:
+    print(result.command_results[0].output)
 ```
 
 ## Multiple IPs

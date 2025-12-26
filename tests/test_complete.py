@@ -95,7 +95,7 @@ class TestListDevices:
         """Test listing devices when devices exist."""
         devices = _list_devices(mock_config)
 
-        assert devices == ["sw-acc1", "rt-edge1"]
+        assert devices == ["rt-edge1", "sw-acc1"]
 
     def test_list_devices_with_empty_config(self) -> None:
         """Test listing devices when no devices exist."""
@@ -121,7 +121,7 @@ class TestListGroups:
         """Test listing groups when groups exist."""
         groups = _list_groups(mock_config)
 
-        assert groups == ["office_switches", "edge_routers"]
+        assert groups == ["edge_routers", "office_switches"]
 
     def test_list_groups_with_empty_config(self) -> None:
         """Test listing groups when no groups exist."""

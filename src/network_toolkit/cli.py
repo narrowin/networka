@@ -14,6 +14,7 @@ from typer.core import TyperGroup
 from typer.main import get_command as _get_click_command
 
 from network_toolkit import __version__
+from network_toolkit.banner import show_banner
 
 # Command registration: import command factories that attach to `app`
 # Each module defines a `register(app)` function that adds its commands.
@@ -28,10 +29,14 @@ from network_toolkit.commands.list import register as register_list
 from network_toolkit.commands.run import register as register_run
 from network_toolkit.commands.schema import register as register_schema
 from network_toolkit.commands.ssh import register as register_ssh
+from network_toolkit.commands.sync_ssh import register as register_sync
 from network_toolkit.commands.upload import register as register_upload
+from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import get_output_manager
 from network_toolkit.config import NetworkConfig
+from network_toolkit.device import DeviceSession as _DeviceSession
+from network_toolkit.runtime import set_runtime_settings
 
 
 class _DynamicConsoleProxy:
@@ -47,9 +52,6 @@ class _DynamicConsoleProxy:
 
 # Dynamic console that always reflects the active OutputManager
 console = _DynamicConsoleProxy()
-
-# Keep this import here to preserve tests that patch `network_toolkit.cli.DeviceSession`
-from network_toolkit.device import DeviceSession as _DeviceSession  # noqa: E402
 
 
 # Preserve insertion order and group commands under a single Commands section
@@ -142,20 +144,41 @@ def main(
     help_flag: Annotated[
         bool, typer.Option("--help", "-h", help="Show this message and exit")
     ] = False,
+    inventory: Annotated[
+        list[Path] | None,
+        typer.Option(
+            "--inventory",
+            help=(
+                "Additional inventory path(s) to load (Nornir SimpleInventory/Containerlab). "
+                "Repeatable."
+            ),
+            show_default=False,
+        ),
+    ] = None,
+    inventory_prefer: Annotated[
+        str | None,
+        typer.Option(
+            "--inventory-prefer",
+            help=(
+                "Preferred inventory source when a device/group name is ambiguous. "
+                "Use 'config', a filesystem path, or a discovered id like 'clab-s3n'."
+            ),
+            show_default=False,
+        ),
+    ] = None,
 ) -> None:
     """Configure global settings for the network toolkit."""
-    if version:
-        from network_toolkit.common.command_helpers import CommandContext
+    set_runtime_settings(
+        inventory_paths=list(inventory or []), inventory_prefer=inventory_prefer
+    )
 
+    if version:
         cmd_ctx = CommandContext()
         cmd_ctx.print_info(f"Networka (nw) version {__version__}")
         raise typer.Exit()
 
     # If help flag is used or no command is invoked, show banner and help
     if help_flag or ctx.invoked_subcommand is None:
-        from network_toolkit.banner import show_banner
-        from network_toolkit.common.command_helpers import CommandContext
-
         cmd_ctx = CommandContext()
         # Show banner first
         show_banner()
@@ -180,10 +203,10 @@ def _handle_file_downloads(
     Returns:
         Dict mapping remote_file names to download status messages.
     """
-    from network_toolkit.common.command_helpers import CommandContext
-
     # Create a context for centralized output
-    ctx = CommandContext()
+    from network_toolkit.common import command_helpers
+
+    ctx = command_helpers.CommandContext()
 
     results: dict[str, str] = {}
 
@@ -257,6 +280,7 @@ register_complete(app)
 register_diff(app)
 register_schema(app)
 register_ssh(app)
+register_sync(app)
 
 # Expose a Click-compatible command for documentation tools (e.g., mkdocs-click)
 # Create this after all subcommands have been registered

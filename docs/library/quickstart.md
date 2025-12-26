@@ -58,7 +58,8 @@ from network_toolkit import NetworkaClient
 
 client = NetworkaClient()
 result = client.run("my_router", "/system/identity/print")
-print(result.output)
+if result.command_results:
+    print(result.command_results[0].output)
 ```
 
 NetworkaClient opens and closes connections automatically. Use `DeviceSession` directly only if you need low-level control over the connection lifecycle or are building a custom integration.
@@ -78,7 +79,8 @@ result = client.run(
     "show version",
     device_type="mikrotik_routeros"
 )
-print(result.output)
+if result.command_results:
+    print(result.command_results[0].output)
 ```
 
 See [ad-hoc targets](adhoc-targets.md) for details.

@@ -59,12 +59,13 @@ class TestDeviceListTableProvider:
         definition = provider.get_table_definition()
 
         assert definition.title == "Devices"
-        assert len(definition.columns) == 5
+        assert len(definition.columns) == 6
         assert definition.columns[0].header == "Name"
-        assert definition.columns[1].header == "Host"
-        assert definition.columns[2].header == "Type"
-        assert definition.columns[3].header == "Description"
-        assert definition.columns[4].header == "Tags"
+        assert definition.columns[1].header == "Source"
+        assert definition.columns[2].header == "Host"
+        assert definition.columns[3].header == "Type"
+        assert definition.columns[4].header == "Description"
+        assert definition.columns[5].header == "Tags"
 
     def test_device_list_table_rows_empty(self) -> None:
         """Test table rows with empty devices."""
@@ -103,6 +104,7 @@ class TestDeviceListTableProvider:
         assert len(rows) == 1
         assert rows[0] == [
             "test_device",
+            "config",
             "192.168.1.1",
             "mikrotik_routeros",
             "Test device",
@@ -190,11 +192,12 @@ class TestGroupListTableProvider:
         definition = provider.get_table_definition()
 
         assert definition.title == "Groups"
-        assert len(definition.columns) == 4
+        assert len(definition.columns) == 5
         assert definition.columns[0].header == "Group Name"
-        assert definition.columns[1].header == "Description"
-        assert definition.columns[2].header == "Match Tags"
-        assert definition.columns[3].header == "Members"
+        assert definition.columns[1].header == "Source"
+        assert definition.columns[2].header == "Description"
+        assert definition.columns[3].header == "Match Tags"
+        assert definition.columns[4].header == "Members"
 
     def test_group_list_table_rows_with_groups(self) -> None:
         """Test table rows with actual groups."""
@@ -222,9 +225,10 @@ class TestGroupListTableProvider:
 
         assert len(rows) == 1
         assert rows[0][0] == "test_group"
-        assert rows[0][1] == "Test group"
-        assert "device1" in rows[0][3]
-        assert "device2" in rows[0][3]
+        assert rows[0][1] == "config"
+        assert rows[0][2] == "Test group"
+        assert "device1" in rows[0][4]
+        assert "device2" in rows[0][4]
 
 
 class TestSupportedPlatformsTableProvider:
@@ -416,7 +420,7 @@ class TestTableProviderIntegration:
 
         # Test table structure
         definition = provider.get_table_definition()
-        assert len(definition.columns) == 5
+        assert len(definition.columns) == 6
 
         # Test data content
         rows = provider.get_table_rows()
@@ -531,7 +535,8 @@ class TestTableProviderEdgeCases:
 
         assert len(rows) == 1
         assert rows[0][0] == "minimal_device"
-        assert rows[0][1] == "192.168.1.100"
-        assert rows[0][2] == "mikrotik_routeros"
-        assert rows[0][3] == "N/A"  # No description
-        assert rows[0][4] == "None"  # No tags
+        assert rows[0][1] == "config"
+        assert rows[0][2] == "192.168.1.100"
+        assert rows[0][3] == "mikrotik_routeros"
+        assert rows[0][4] == "N/A"  # No description
+        assert rows[0][5] == "None"  # No tags

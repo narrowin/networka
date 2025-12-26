@@ -2,19 +2,20 @@
 
 from __future__ import annotations
 
+import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
 from time import perf_counter
-from typing import TYPE_CHECKING
+from typing import TypeVar
 
-if TYPE_CHECKING:
-    from network_toolkit.device import DeviceSession
-
+import network_toolkit.device as device_module
 from network_toolkit.api.execution import execute_parallel
 from network_toolkit.common.credentials import InteractiveCredentials
 from network_toolkit.config import NetworkConfig
 from network_toolkit.exceptions import NetworkToolkitError
+from network_toolkit.inventory.resolve import resolve_named_targets
 from network_toolkit.ip_device import (
     create_ip_based_config as _create_ip_based_config,
 )
@@ -26,7 +27,12 @@ from network_toolkit.ip_device import (
 )
 from network_toolkit.results_enhanced import ResultsManager
 from network_toolkit.sequence_manager import SequenceManager
+from network_toolkit.session_pool import SessionPoolProtocol
 from network_toolkit.transport.factory import get_transport_factory
+
+logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 
 @dataclass(slots=True)
@@ -83,7 +89,7 @@ class RunOptions:
     store_results: bool = False
     results_dir: str | None = None
     no_strict_host_key_checking: bool = False
-    session_pool: dict[str, DeviceSession] | None = None
+    session_pool: SessionPoolProtocol | None = None
 
 
 @dataclass(slots=True)
@@ -138,25 +144,12 @@ def _resolve_targets(target_expr: str, config: NetworkConfig) -> TargetResolutio
             ip_mode=True,
         )
 
-    requested = [t.strip() for t in target_expr.split(",") if t.strip()]
-    devices: list[str] = []
-    unknowns: list[str] = []
-
-    def _add_device(name: str) -> None:
-        if name not in devices:
-            devices.append(name)
-
-    for name in requested:
-        if config.devices and name in config.devices:
-            _add_device(name)
-            continue
-        if config.device_groups and name in config.device_groups:
-            for member in config.get_group_members(name):
-                _add_device(member)
-            continue
-        unknowns.append(name)
-
-    return TargetResolution(resolved=devices, unknown=unknowns, ip_mode=False)
+    resolution = resolve_named_targets(config, target_expr)
+    return TargetResolution(
+        resolved=resolution.resolved_devices,
+        unknown=resolution.unknown_targets,
+        ip_mode=False,
+    )
 
 
 def _build_results_manager(
@@ -182,27 +175,21 @@ def _run_command_on_device(
     password_override: str | None,
     transport_override: str | None,
     results_mgr: ResultsManager,
-    session_pool: dict[str, DeviceSession] | None = None,
+    session_pool: SessionPoolProtocol | None = None,
 ) -> DeviceCommandResult:
-    from network_toolkit.device import DeviceSession
-
     try:
         if session_pool is not None:
-            session = session_pool.get(device_name)
-            if session is None:
-                session = DeviceSession(
-                    device_name,
-                    config,
-                    username_override,
-                    password_override,
-                    transport_override,
-                )
-                session_pool[device_name] = session
-
-            session.connect()
-            output = session.execute_command(command)
+            output = _execute_with_session_pool(
+                device_name,
+                config,
+                command,
+                username_override,
+                password_override,
+                transport_override,
+                session_pool,
+            )
         else:
-            with DeviceSession(
+            with device_module.DeviceSession(
                 device_name,
                 config,
                 username_override,
@@ -217,7 +204,8 @@ def _run_command_on_device(
             output=None,
             error=exc.message,
         )
-    except Exception as exc:  # pragma: no cover - unexpected path
+    except Exception as exc:
+        logger.debug("Unexpected error executing command on %s: %s", device_name, exc)
         return DeviceCommandResult(
             device=device_name,
             command=command,
@@ -235,6 +223,82 @@ def _run_command_on_device(
     )
 
 
+def _with_session_retry(
+    device_name: str,
+    config: NetworkConfig,
+    username_override: str | None,
+    password_override: str | None,
+    transport_override: str | None,
+    session_pool: SessionPoolProtocol,
+    execute_fn: Callable[[device_module.DeviceSession], T],
+) -> T:
+    """
+    Execute an operation using a pooled session with stale session retry.
+
+    If the session fails (e.g., connection died), removes it from the pool,
+    creates a fresh session, and retries once.
+
+    Args:
+        execute_fn: Callable that takes a connected session and returns result
+    """
+
+    def create_session() -> device_module.DeviceSession:
+        return device_module.DeviceSession(
+            device_name,
+            config,
+            username_override,
+            password_override,
+            transport_override,
+        )
+
+    session = session_pool.get(device_name)
+    if session is None:
+        session = create_session()
+        session_pool[device_name] = session
+
+    try:
+        session.connect()
+        return execute_fn(session)
+    except Exception as first_error:
+        logger.debug(
+            "Session for %s failed, attempting fresh connection: %s",
+            device_name,
+            first_error,
+        )
+        session_pool.remove(device_name)
+        try:
+            session.disconnect()
+        except Exception:
+            pass
+
+        session = create_session()
+        session.connect()
+        result = execute_fn(session)
+        session_pool[device_name] = session
+        return result
+
+
+def _execute_with_session_pool(
+    device_name: str,
+    config: NetworkConfig,
+    command: str,
+    username_override: str | None,
+    password_override: str | None,
+    transport_override: str | None,
+    session_pool: SessionPoolProtocol,
+) -> str:
+    """Execute a single command using a pooled session with retry."""
+    return _with_session_retry(
+        device_name,
+        config,
+        username_override,
+        password_override,
+        transport_override,
+        session_pool,
+        lambda s: s.execute_command(command),
+    )
+
+
 def _run_sequence_on_device(
     device_name: str,
     config: NetworkConfig,
@@ -244,10 +308,8 @@ def _run_sequence_on_device(
     transport_override: str | None,
     results_mgr: ResultsManager,
     sequence_manager: SequenceManager,
-    session_pool: dict[str, DeviceSession] | None = None,
+    session_pool: SessionPoolProtocol | None = None,
 ) -> DeviceSequenceResult:
-    from network_toolkit.device import DeviceSession
-
     try:
         commands = sequence_manager.resolve(sequence_name, device_name)
         if not commands:
@@ -262,21 +324,17 @@ def _run_sequence_on_device(
         outputs: dict[str, str] = {}
 
         if session_pool is not None:
-            session = session_pool.get(device_name)
-            if session is None:
-                session = DeviceSession(
-                    device_name,
-                    config,
-                    username_override,
-                    password_override,
-                    transport_override,
-                )
-                session_pool[device_name] = session
-            session.connect()
-            for cmd in commands:
-                outputs[cmd] = session.execute_command(cmd)
+            outputs = _execute_sequence_with_session_pool(
+                device_name,
+                config,
+                commands,
+                username_override,
+                password_override,
+                transport_override,
+                session_pool,
+            )
         else:
-            with DeviceSession(
+            with device_module.DeviceSession(
                 device_name,
                 config,
                 username_override,
@@ -292,7 +350,8 @@ def _run_sequence_on_device(
             outputs=None,
             error=exc.message,
         )
-    except Exception as exc:  # pragma: no cover - unexpected path
+    except Exception as exc:
+        logger.debug("Unexpected error executing sequence on %s: %s", device_name, exc)
         return DeviceSequenceResult(
             device=device_name,
             sequence=sequence_name,
@@ -309,6 +368,31 @@ def _run_sequence_on_device(
         outputs=outputs,
         error=None,
         stored_paths=stored_paths,
+    )
+
+
+def _execute_sequence_with_session_pool(
+    device_name: str,
+    config: NetworkConfig,
+    commands: list[str],
+    username_override: str | None,
+    password_override: str | None,
+    transport_override: str | None,
+    session_pool: SessionPoolProtocol,
+) -> dict[str, str]:
+    """Execute a sequence of commands using a pooled session with retry."""
+
+    def execute_all(session: device_module.DeviceSession) -> dict[str, str]:
+        return {cmd: session.execute_command(cmd) for cmd in commands}
+
+    return _with_session_retry(
+        device_name,
+        config,
+        username_override,
+        password_override,
+        transport_override,
+        session_pool,
+        execute_all,
     )
 
 

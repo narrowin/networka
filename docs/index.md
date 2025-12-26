@@ -37,9 +37,22 @@ Command completed successfully
 
 - Multi-vendor automation (MikroTik, Cisco, Arista, Juniper, …)
 - Flexible configuration (YAML/CSV), tags and groups
+- Containerlab-friendly: consume generated `nornir-simple-inventory.yml` directly
 - Vendor-aware sequences and backups
 - Rich CLI output with selectable output modes
 - Type-safe internals (mypy), clean CLI (Typer + Rich)
+
+## Networka vs the alternatives
+
+| | Networka | Ansible | Nornir |
+|---|---|---|---|
+| Primary interface | CLI commands | YAML playbooks | Python scripts |
+| Time to first command | Seconds after install | After writing playbook + inventory | After writing Python script |
+| Learning curve | Familiar CLI patterns | YAML, Jinja2, modules | Python programming |
+| Execution | Concurrent by default | Sequential by default | Depends on implementation |
+| Best for | Daily operations, ad-hoc commands | Infrastructure-as-code, compliance | Custom automation frameworks |
+
+Networka is built for network engineers who want to run commands now. Ansible excels at declarative infrastructure-as-code. Nornir shines when you need full Python programmability. Different tools, each great at what they do.
 
 ## Project Model
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
@@ -13,7 +14,11 @@ from network_toolkit.api.run import RunTotals, TargetResolution
 from network_toolkit.config import NetworkConfig
 from network_toolkit.device import DeviceSession
 from network_toolkit.exceptions import NetworkToolkitError
+from network_toolkit.inventory.resolve import resolve_named_targets
 from network_toolkit.ip_device import extract_ips_from_target, is_ip_list
+from network_toolkit.session_pool import SessionPoolProtocol
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -28,7 +33,7 @@ class UploadOptions:
     checksum_verify: bool = False
     max_concurrent: int = 5
     verbose: bool = False
-    session_pool: dict[str, DeviceSession] | None = None
+    session_pool: SessionPoolProtocol | None = None
 
 
 @dataclass(slots=True)
@@ -64,40 +69,48 @@ def _resolve_targets(target_expr: str, config: NetworkConfig) -> TargetResolutio
             ip_mode=True,
         )
 
-    requested = [t.strip() for t in target_expr.split(",") if t.strip()]
-    devices: list[str] = []
-    unknowns: list[str] = []
-
-    def _add_device(name: str) -> None:
-        if name not in devices:
-            devices.append(name)
-
-    for name in requested:
-        if config.devices and name in config.devices:
-            _add_device(name)
-            continue
-        if config.device_groups and name in config.device_groups:
-            for member in config.get_group_members(name):
-                _add_device(member)
-            continue
-        unknowns.append(name)
-
-    return TargetResolution(resolved=devices, unknown=unknowns, ip_mode=False)
+    resolution = resolve_named_targets(config, target_expr)
+    return TargetResolution(
+        resolved=resolution.resolved_devices,
+        unknown=resolution.unknown_targets,
+        ip_mode=False,
+    )
 
 
 @contextmanager
 def _get_session(
     device_name: str,
     config: NetworkConfig,
-    session_pool: dict[str, DeviceSession] | None = None,
+    session_pool: SessionPoolProtocol | None = None,
 ) -> Iterator[DeviceSession]:
+    """Get a session, with stale session retry when using a pool."""
     if session_pool is not None:
         session = session_pool.get(device_name)
         if session is None:
             session = DeviceSession(device_name, config)
             session_pool[device_name] = session
-        session.connect()
-        yield session
+
+        try:
+            session.connect()
+            yield session
+        except Exception as first_error:
+            # Session might be stale - remove it and retry with fresh session
+            logger.debug(
+                "Session for %s failed, attempting fresh connection: %s",
+                device_name,
+                first_error,
+            )
+            session_pool.remove(device_name)
+            try:
+                session.disconnect()
+            except Exception:
+                pass  # Ignore disconnect errors on stale session
+
+            # Create fresh session and retry once
+            session = DeviceSession(device_name, config)
+            session.connect()
+            session_pool[device_name] = session
+            yield session
     else:
         with DeviceSession(device_name, config) as session:
             yield session

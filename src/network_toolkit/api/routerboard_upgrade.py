@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from network_toolkit.config import NetworkConfig
 from network_toolkit.device import DeviceSession
 from network_toolkit.exceptions import NetworkToolkitError
+from network_toolkit.inventory.resolve import resolve_named_targets, select_named_target
 from network_toolkit.platforms import UnsupportedOperationError, get_platform_operations
 
 logger = logging.getLogger(__name__)
@@ -48,25 +49,17 @@ def upgrade_routerboard(
     options: RouterboardUpgradeOptions,
 ) -> RouterboardUpgradeResult:
     """Upgrade RouterBOARD firmware on network devices."""
-    devices = options.config.devices or {}
-    groups = options.config.device_groups or {}
-    is_device = options.target in devices
-    is_group = options.target in groups
-
-    if not (is_device or is_group):
+    target_kind = select_named_target(options.config, options.target)
+    if target_kind not in {"device", "group"}:
         msg = f"'{options.target}' not found as device or group in configuration"
         raise NetworkToolkitError(msg)
 
     target_devices: list[str] = []
-    if is_device:
+    if target_kind == "device":
         target_devices = [options.target]
     else:
-        try:
-            target_devices = options.config.get_group_members(options.target)
-        except Exception:
-            grp = groups.get(options.target)
-            if grp and getattr(grp, "members", None):
-                target_devices = grp.members or []
+        resolution = resolve_named_targets(options.config, options.target)
+        target_devices = resolution.resolved_devices
 
     if not target_devices:
         msg = f"No devices found in group '{options.target}'"
