@@ -92,23 +92,19 @@ class TestInfoTraceFlag:
         # Check for path indicators - either file name or temp directory pattern
         assert "devices" in result.output or "/T/" in result.output
 
-    def test_info_without_trace_no_source_column(
+    def test_info_always_has_source_column(
         self,
         test_config_dir: Path,
         env_credentials: None,
     ) -> None:
-        """Test that without --trace, no Source column appears."""
+        """Test that Source column always appears in output."""
         result = runner.invoke(
             app,
             ["info", "test-router", "--config", str(test_config_dir)],
         )
         assert result.exit_code == 0
-        # Without --trace, Source column should not appear in output
-        # (Source appears in a table header position, not as a value)
-        output_lines = result.output.split("\n")
-        header_lines = [line for line in output_lines if "Property" in line]
-        for header in header_lines:
-            assert "Source" not in header
+        # Source column should always appear (always-on introspection)
+        assert "Source" in result.output
 
     def test_info_trace_short_flag(
         self,
@@ -167,6 +163,30 @@ class TestInfoTraceProvenance:
         assert result.exit_code == 0
         # Timeout and Transport rows should show "default" for Pydantic defaults
         assert "default" in result.output
+
+    def test_trace_shows_verbose_paths(
+        self,
+        test_config_dir: Path,
+        env_credentials: None,
+    ) -> None:
+        """Test that --trace shows full paths instead of compact sources."""
+        # Without --trace: shows compact (e.g., "devices.yml")
+        result_compact = runner.invoke(
+            app,
+            ["info", "test-router", "--config", str(test_config_dir)],
+        )
+        assert result_compact.exit_code == 0
+
+        # With --trace: shows full path (includes directory path)
+        result_verbose = runner.invoke(
+            app,
+            ["info", "test-router", "--config", str(test_config_dir), "--trace"],
+        )
+        assert result_verbose.exit_code == 0
+
+        # Verbose output should contain full path indicators (directory separators)
+        # The temp path will contain path separators like / or config_dir pattern
+        assert "/" in result_verbose.output or "\\" in result_verbose.output
 
 
 class TestInfoTraceWithGroups:

@@ -56,8 +56,14 @@ class FieldHistory:
     identifier: str | None = None
     line_number: int | None = None
 
-    def format_source(self) -> str:
+    def format_source(self, *, verbose: bool = False) -> str:
         """Format the source as a human-readable string.
+
+        Parameters
+        ----------
+        verbose : bool
+            If True, show full file paths with line numbers.
+            If False, show compact display (filename only).
 
         Returns
         -------
@@ -69,18 +75,17 @@ class FieldHistory:
         elif self.loader == LoaderType.DOTENV:
             return f"dotenv: {self.identifier}" if self.identifier else "dotenv"
         elif self.loader == LoaderType.CONFIG_FILE:
-            if self.identifier:
-                path = Path(self.identifier)
-                # Show relative path if possible
-                try:
-                    rel_path = path.relative_to(Path.cwd())
-                    loc = str(rel_path)
-                except ValueError:
-                    loc = str(path)
+            if verbose and self.identifier:
+                # Verbose: show full path with line number
+                loc = str(self.identifier)
                 if self.line_number:
                     return f"{loc}:{self.line_number}"
                 return loc
-            return "config"
+            elif self.identifier:
+                # Compact: show just filename
+                path = Path(self.identifier)
+                return path.name
+            return "config file"
         elif self.loader == LoaderType.GROUP:
             return f"group: {self.identifier}" if self.identifier else "group"
         elif self.loader == LoaderType.SSH_CONFIG:

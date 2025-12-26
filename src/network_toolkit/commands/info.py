@@ -70,7 +70,7 @@ def register(app: typer.Typer) -> None:
             typer.Option(
                 "--trace",
                 "-t",
-                help="Show detailed source provenance for all configuration values",
+                help="Show verbose provenance with full file paths and line numbers",
             ),
         ] = False,
         interactive_auth: Annotated[
@@ -245,7 +245,8 @@ def _show_device_info(
         device_name=device,
         interactive_creds=interactive_creds,
         config_path=ctx.config_file,
-        show_provenance=trace,
+        show_provenance=True,
+        verbose_provenance=trace,
     )
     ctx.render_table(provider, verbose)
 

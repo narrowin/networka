@@ -531,7 +531,8 @@ class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
     device_name: str
     interactive_creds: Any | None = None
     config_path: Path | None = None
-    show_provenance: bool = False  # Show inline source indicators
+    show_provenance: bool = True  # Always show source column
+    verbose_provenance: bool = False  # Full paths vs compact display (--trace)
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -565,11 +566,9 @@ class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
 
         # Get field history for provenance display
         def get_source(field_name: str) -> str:
-            if not self.show_provenance:
-                return "-"
             history = device_config.get_field_source(field_name)
             if history:
-                return history.format_source()
+                return history.format_source(verbose=self.verbose_provenance)
             return "-"
 
         # Basic device information with sources
