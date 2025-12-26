@@ -58,7 +58,7 @@ def generate_platform_support_table() -> str:
         )
 
         if info.docs_path:
-            docs = f"[Guide](../{info.docs_path})"
+            docs = f"[Guide]({info.docs_path})"
         else:
             docs = "-"
 
@@ -152,7 +152,7 @@ def generate_vendor_list() -> str:
             if info.description:
                 lines.append(f"  - {info.description}")
             if info.docs_path:
-                lines.append(f"  - [Documentation](../{info.docs_path})")
+                lines.append(f"  - [Documentation]({info.docs_path})")
             lines.append("")
 
     return "\n".join(lines)

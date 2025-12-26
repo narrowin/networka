@@ -10,15 +10,14 @@ from typing import Annotated
 import typer
 from rich.table import Table
 
-from network_toolkit.common.command_helpers import CommandContext
-from network_toolkit.platforms.registry import (
-    PLATFORM_REGISTRY,
-    PlatformInfo,
-    PlatformStatus,
-    get_platforms_by_status,
-    get_platforms_by_vendor,
-    get_platforms_with_capability,
+from network_toolkit.api.platforms import (
+    PlatformFilterError,
+    PlatformListOptions,
+    get_platform_details,
+    list_platforms,
 )
+from network_toolkit.common.command_helpers import CommandContext
+from network_toolkit.platforms.registry import PlatformStatus
 
 
 def register(app: typer.Typer) -> None:
@@ -30,7 +29,7 @@ def register(app: typer.Typer) -> None:
     )
 
     @platforms_app.command("list")
-    def list_platforms(
+    def list_platforms_cmd(
         status: Annotated[
             str | None,
             typer.Option(
@@ -59,45 +58,19 @@ def register(app: typer.Typer) -> None:
         """List all supported network platforms."""
         ctx = CommandContext()
 
-        # Build platform dictionary based on filters
-        platform_dict: dict[str, PlatformInfo]
+        options = PlatformListOptions(
+            status=status,
+            vendor=vendor,
+            capability=capability,
+        )
 
-        if status:
-            try:
-                # Enum values are lowercase, but accept either case from user
-                status_lower = status.lower()
-                status_enum = PlatformStatus(status_lower)
-                platform_dict = get_platforms_by_status(status_enum)
-            except ValueError:
-                ctx.print_error(
-                    f"Invalid status: {status}. Valid values: implemented, planned, sequences_only, experimental"
-                )
-                raise typer.Exit(1) from None
-        elif vendor:
-            platforms = get_platforms_by_vendor(vendor.lower())
-            if not platforms:
-                ctx.print_error(f"No platforms found for vendor: {vendor}")
-                raise typer.Exit(1)
-            platform_dict = {p.device_type: p for p in platforms}
-        elif capability:
-            valid_capabilities = [
-                "config_backup",
-                "firmware_upgrade",
-                "comprehensive_backup",
-            ]
-            if capability not in valid_capabilities:
-                ctx.print_error(
-                    f"Invalid capability: {capability}. Valid values: {', '.join(valid_capabilities)}"
-                )
-                raise typer.Exit(1)
-            platforms = get_platforms_with_capability(capability)
-            platform_dict = {p.device_type: p for p in platforms}
-        else:
-            platform_dict = PLATFORM_REGISTRY
+        try:
+            result = list_platforms(options)
+        except PlatformFilterError as e:
+            ctx.print_error(e.message)
+            raise typer.Exit(1) from None
 
-        platform_list = list(platform_dict.keys())
-
-        if not platform_list:
+        if not result.platforms:
             ctx.print_warning("No platforms match the specified filters")
             raise typer.Exit(0)
 
@@ -110,43 +83,35 @@ def register(app: typer.Typer) -> None:
         table.add_column("Firmware", justify="center")
         table.add_column("Comprehensive", justify="center")
 
-        # Sort platforms by vendor, then by name
-        sorted_platforms = sorted(
-            platform_list,
-            key=lambda p: (platform_dict[p].vendor, p),
-        )
+        # Status indicators with color
+        status_map = {
+            PlatformStatus.IMPLEMENTED: "[green]Implemented[/green]",
+            PlatformStatus.PLANNED: "[yellow]Planned[/yellow]",
+            PlatformStatus.SEQUENCES_ONLY: "[blue]Sequences Only[/blue]",
+            PlatformStatus.EXPERIMENTAL: "[magenta]Experimental[/magenta]",
+        }
 
-        for platform_name in sorted_platforms:
-            info = platform_dict[platform_name]
-
-            # Status indicators with color
-            status_map = {
-                PlatformStatus.IMPLEMENTED: "[green]Implemented[/green]",
-                PlatformStatus.PLANNED: "[yellow]Planned[/yellow]",
-                PlatformStatus.SEQUENCES_ONLY: "[blue]Sequences Only[/blue]",
-                PlatformStatus.EXPERIMENTAL: "[magenta]Experimental[/magenta]",
-            }
-
+        for platform in result.platforms:
             capability_check = (
-                "[green]✓[/green]"
-                if info.capabilities.config_backup
-                else "[dim]—[/dim]"
+                "[green]\u2713[/green]"
+                if platform.config_backup
+                else "[dim]\u2014[/dim]"
             )
             firmware_check = (
-                "[green]✓[/green]"
-                if info.capabilities.firmware_upgrade
-                else "[dim]—[/dim]"
+                "[green]\u2713[/green]"
+                if platform.firmware_upgrade
+                else "[dim]\u2014[/dim]"
             )
             comprehensive_check = (
-                "[green]✓[/green]"
-                if info.capabilities.comprehensive_backup
-                else "[dim]—[/dim]"
+                "[green]\u2713[/green]"
+                if platform.comprehensive_backup
+                else "[dim]\u2014[/dim]"
             )
 
             table.add_row(
-                platform_name,
-                info.vendor,
-                status_map[info.status],
+                platform.device_type,
+                platform.vendor,
+                status_map[platform.status],
                 capability_check,
                 firmware_check,
                 comprehensive_check,
@@ -155,7 +120,7 @@ def register(app: typer.Typer) -> None:
         ctx.console.print(table)
 
     @platforms_app.command("info")
-    def platform_info(
+    def platform_info_cmd(
         platform: Annotated[
             str,
             typer.Argument(
@@ -166,12 +131,11 @@ def register(app: typer.Typer) -> None:
         """Show detailed information about a specific platform."""
         ctx = CommandContext()
 
-        if platform not in PLATFORM_REGISTRY:
+        details = get_platform_details(platform)
+        if details is None:
             ctx.print_error(f"Platform not found: {platform}")
             ctx.print_info("Run 'nw platforms list' to see available platforms")
             raise typer.Exit(1)
-
-        info = PLATFORM_REGISTRY[platform]
 
         # Status with color
         status_map = {
@@ -183,48 +147,45 @@ def register(app: typer.Typer) -> None:
 
         # Display platform information
         ctx.console.print(f"\n[bold cyan]{platform}[/bold cyan]")
-        ctx.console.print(f"Display Name: [bold]{info.display_name}[/bold]")
-        ctx.console.print(f"Vendor: [green]{info.vendor}[/green]")
-        ctx.console.print(f"Description: {info.description}")
-        ctx.console.print(f"Status: {status_map[info.status]}")
+        ctx.console.print(f"Display Name: [bold]{details.display_name}[/bold]")
+        ctx.console.print(f"Vendor: [green]{details.vendor}[/green]")
+        ctx.console.print(f"Description: {details.description}")
+        ctx.console.print(f"Status: {status_map[details.status]}")
 
         # Operations class
-        if info.operations_class:
-            ctx.console.print(f"\nOperations Class: [dim]{info.operations_class}[/dim]")
+        if details.operations_class:
+            ctx.console.print(
+                f"\nOperations Class: [dim]{details.operations_class}[/dim]"
+            )
         else:
             ctx.console.print("\nOperations Class: [dim]Not configured[/dim]")
 
         # File extensions
-        if info.firmware_extensions:
+        if details.firmware_extensions:
             ctx.console.print(
-                f"Firmware Extensions: {', '.join(info.firmware_extensions)}"
+                f"Firmware Extensions: {', '.join(details.firmware_extensions)}"
             )
 
         # Capabilities
         ctx.console.print("\n[bold]Capabilities:[/bold]")
 
         def cap_symbol(x: bool) -> str:
-            return "[green]✓[/green]" if x else "[dim]—[/dim]"
+            return "[green]\u2713[/green]" if x else "[dim]\u2014[/dim]"
 
+        caps = details.capabilities
+        ctx.console.print(f"  Config Backup: {cap_symbol(caps.config_backup)}")
+        ctx.console.print(f"  Firmware Upgrade: {cap_symbol(caps.firmware_upgrade)}")
         ctx.console.print(
-            f"  Config Backup: {cap_symbol(info.capabilities.config_backup)}"
+            f"  Firmware Downgrade: {cap_symbol(caps.firmware_downgrade)}"
         )
+        ctx.console.print(f"  BIOS Upgrade: {cap_symbol(caps.bios_upgrade)}")
         ctx.console.print(
-            f"  Firmware Upgrade: {cap_symbol(info.capabilities.firmware_upgrade)}"
-        )
-        ctx.console.print(
-            f"  Firmware Downgrade: {cap_symbol(info.capabilities.firmware_downgrade)}"
-        )
-        ctx.console.print(
-            f"  BIOS Upgrade: {cap_symbol(info.capabilities.bios_upgrade)}"
-        )
-        ctx.console.print(
-            f"  Comprehensive Backup: {cap_symbol(info.capabilities.comprehensive_backup)}"
+            f"  Comprehensive Backup: {cap_symbol(caps.comprehensive_backup)}"
         )
 
         # Documentation
-        if info.docs_path:
-            ctx.console.print(f"\n[bold]Documentation:[/bold] {info.docs_path}")
+        if details.docs_path:
+            ctx.console.print(f"\n[bold]Documentation:[/bold] {details.docs_path}")
 
         ctx.console.print()  # Empty line at end
 
