@@ -521,7 +521,7 @@
           "type": "boolean"
         },
         "log_level": {
-          "default": "INFO",
+          "default": "WARNING",
           "title": "Log Level",
           "type": "string"
         },

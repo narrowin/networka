@@ -158,20 +158,14 @@ class SequenceManager:
         return Path(__file__).parent / "builtin_sequences"
 
     def _repo_sequences_root(self) -> Path | None:
-        # Try to infer from config file structure:
-        # config/vendor_platforms sequence_path is relative to config dir
-        # We can discover one of the configured paths and take its parent as root.
-        if not self.config or not self.config.vendor_platforms:
-            return None
-        # Heuristic: find any platform with sequence_path set and resolve
-        # against a likely config dir. Assume run is invoked with load_config
-        # pointing to a modular config dir; extract from first path.
-        for platform in self.config.vendor_platforms.values():
-            rel = platform.sequence_path
-            # Find a directory that exists by walking up from CWD
-            candidate = Path.cwd() / "config" / rel
-            if candidate.exists():
-                return candidate.parent
+        # Use the stored config source directory (set by load_modular_config)
+        # No fallback - if config doesn't have _config_source_dir, return None
+        if (
+            hasattr(self.config, "_config_source_dir")
+            and self.config._config_source_dir
+        ):
+            sequences_dir = self.config._config_source_dir / "sequences"
+            return sequences_dir if sequences_dir.exists() else None
         return None
 
     def _user_sequences_root(self) -> Path | None:

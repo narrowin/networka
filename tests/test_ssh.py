@@ -89,7 +89,7 @@ class FakeServer:
         name = query.get("session_name", "")
         return self.sessions.get(name)
 
-    def new_session(self, session_name: str, attach: bool = False) -> FakeSession:  # noqa: FBT002
+    def new_session(self, session_name: str, *, attach: bool = False) -> FakeSession:
         _ = attach
         s = FakeSession(session_name)
         self.sessions[session_name] = s
@@ -163,7 +163,7 @@ def test_ssh_device_opens_session(config_file: Path) -> None:
         result = runner.invoke(
             app,
             [
-                "ssh",
+                "cli",
                 "--config",
                 str(config_file),
                 "test_device1",
@@ -182,7 +182,7 @@ def test_ssh_group_two_panes(config_file: Path) -> None:
         result = runner.invoke(
             app,
             [
-                "ssh",
+                "cli",
                 "--config",
                 str(config_file),
                 "lab_devices",
@@ -207,7 +207,7 @@ def test_ssh_missing_tmux_server(config_file: Path) -> None:
         "network_toolkit.commands.ssh._ensure_libtmux", side_effect=mock_ensure_libtmux
     ):
         result = runner.invoke(
-            app, ["ssh", "--config", str(config_file), "test_device1", "--no-attach"]
+            app, ["cli", "--config", str(config_file), "test_device1", "--no-attach"]
         )
     assert result.exit_code == 1
     assert "Cannot connect to tmux server" in result.output
@@ -236,7 +236,7 @@ def test_auth_key_first_uses_ssh_with_password_fallback(config_file: Path) -> No
         result = runner.invoke(
             app,
             [
-                "ssh",
+                "cli",
                 "--config",
                 str(config_file),
                 "test_device1",
@@ -283,7 +283,7 @@ def test_auth_key_forced_ignores_sshpass(config_file: Path) -> None:
         result = runner.invoke(
             app,
             [
-                "ssh",
+                "cli",
                 "--config",
                 str(config_file),
                 "test_device1",
@@ -323,7 +323,7 @@ def test_auth_password_requires_sshpass_missing_errors(config_file: Path) -> Non
         result = runner.invoke(
             app,
             [
-                "ssh",
+                "cli",
                 "--config",
                 str(config_file),
                 "test_device1",
@@ -355,7 +355,7 @@ def test_user_password_overrides_use_ssh_with_key_first(config_file: Path) -> No
         result = runner.invoke(
             app,
             [
-                "ssh",
+                "cli",
                 "--config",
                 str(config_file),
                 "test_device1",
@@ -401,7 +401,7 @@ def test_auth_interactive_no_sshpass(config_file: Path) -> None:
         result = runner.invoke(
             app,
             [
-                "ssh",
+                "cli",
                 "--config",
                 str(config_file),
                 "test_device1",

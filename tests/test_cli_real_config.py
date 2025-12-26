@@ -104,6 +104,13 @@ class TestCLIWithRealConfig:
 
     def test_original_failing_command(self):
         """Test the exact command that was originally failing."""
+        # Skip if default config doesn't exist (e.g., in CI)
+        from network_toolkit.common.paths import default_modular_config_dir
+
+        default_config = default_modular_config_dir()
+        if not (default_config / "config.yml").exists():
+            pytest.skip("Default config not found (not in user environment)")
+
         runner = CliRunner()
         result = runner.invoke(app, ["list", "sequences"])
 

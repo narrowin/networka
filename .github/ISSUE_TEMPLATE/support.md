@@ -8,7 +8,7 @@ labels: support
 
 **Type of Support Needed:**
 - [ ] Installation help
-- [ ] Configuration assistance  
+- [ ] Configuration assistance
 - [ ] Usage guidance
 - [ ] Troubleshooting
 - [ ] Other (please describe)

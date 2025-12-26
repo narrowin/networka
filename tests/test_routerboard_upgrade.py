@@ -24,10 +24,10 @@ class TestRouterboardUpgrade:
 
     @patch("network_toolkit.commands.routerboard_upgrade.setup_logging")
     @patch("network_toolkit.commands.routerboard_upgrade.load_config")
-    @patch("network_toolkit.commands.routerboard_upgrade.import_module")
+    @patch("network_toolkit.api.routerboard_upgrade.upgrade_routerboard")
     def test_routerboard_upgrade_command_execution(
         self,
-        mock_import: MagicMock,
+        mock_upgrade: MagicMock,
         mock_load_config: MagicMock,
         mock_setup_logging: MagicMock,
     ) -> None:
@@ -38,10 +38,12 @@ class TestRouterboardUpgrade:
         mock_config.device_groups = {}
         mock_load_config.return_value = mock_config
 
-        mock_module = MagicMock()
-        mock_device_session = MagicMock()
-        mock_module.DeviceSession = mock_device_session
-        mock_import.return_value = mock_module
+        # Mock upgrade result
+        mock_result = MagicMock()
+        mock_result.success_count = 1
+        mock_result.failed_count = 0
+        mock_result.results = [MagicMock(success=True, platform="mikrotik_routeros")]
+        mock_upgrade.return_value = mock_result
 
         # Create app and register command
         app = typer.Typer()
@@ -55,13 +57,14 @@ class TestRouterboardUpgrade:
         # The command should at least attempt to load config and setup logging
         mock_setup_logging.assert_called()
         mock_load_config.assert_called()
+        mock_upgrade.assert_called()
 
     @patch("network_toolkit.commands.routerboard_upgrade.setup_logging")
     @patch("network_toolkit.commands.routerboard_upgrade.load_config")
-    @patch("network_toolkit.commands.routerboard_upgrade.import_module")
+    @patch("network_toolkit.api.routerboard_upgrade.upgrade_routerboard")
     def test_routerboard_upgrade_with_options(
         self,
-        mock_import: MagicMock,
+        mock_upgrade: MagicMock,
         mock_load_config: MagicMock,
         mock_setup_logging: MagicMock,
     ) -> None:
@@ -72,10 +75,12 @@ class TestRouterboardUpgrade:
         mock_config.device_groups = {}
         mock_load_config.return_value = mock_config
 
-        mock_module = MagicMock()
-        mock_device_session = MagicMock()
-        mock_module.DeviceSession = mock_device_session
-        mock_import.return_value = mock_module
+        # Mock upgrade result
+        mock_result = MagicMock()
+        mock_result.success_count = 1
+        mock_result.failed_count = 0
+        mock_result.results = []
+        mock_upgrade.return_value = mock_result
 
         # Create app and register command
         app = typer.Typer()
@@ -88,6 +93,7 @@ class TestRouterboardUpgrade:
 
         mock_setup_logging.assert_called()
         mock_load_config.assert_called()
+        mock_upgrade.assert_called()
 
     @patch("network_toolkit.commands.routerboard_upgrade.setup_logging")
     @patch("network_toolkit.commands.routerboard_upgrade.load_config")
@@ -119,10 +125,10 @@ class TestRouterboardUpgrade:
 
     @patch("network_toolkit.commands.routerboard_upgrade.setup_logging")
     @patch("network_toolkit.commands.routerboard_upgrade.load_config")
-    @patch("network_toolkit.commands.routerboard_upgrade.import_module")
+    @patch("network_toolkit.api.routerboard_upgrade.upgrade_routerboard")
     def test_routerboard_upgrade_with_custom_config(
         self,
-        mock_import: MagicMock,
+        mock_upgrade: MagicMock,
         mock_load_config: MagicMock,
         mock_setup_logging: MagicMock,
     ) -> None:
@@ -133,10 +139,12 @@ class TestRouterboardUpgrade:
         mock_config.device_groups = {}
         mock_load_config.return_value = mock_config
 
-        mock_module = MagicMock()
-        mock_device_session = MagicMock()
-        mock_module.DeviceSession = mock_device_session
-        mock_import.return_value = mock_module
+        # Mock upgrade result
+        mock_result = MagicMock()
+        mock_result.success_count = 1
+        mock_result.failed_count = 0
+        mock_result.results = []
+        mock_upgrade.return_value = mock_result
 
         # Create app and register command
         app = typer.Typer()
@@ -152,10 +160,10 @@ class TestRouterboardUpgrade:
 
     @patch("network_toolkit.commands.routerboard_upgrade.setup_logging")
     @patch("network_toolkit.commands.routerboard_upgrade.load_config")
-    @patch("network_toolkit.commands.routerboard_upgrade.import_module")
+    @patch("network_toolkit.api.routerboard_upgrade.upgrade_routerboard")
     def test_routerboard_upgrade_group_processing(
         self,
-        mock_import: MagicMock,
+        mock_upgrade: MagicMock,
         mock_load_config: MagicMock,
         mock_setup_logging: MagicMock,
     ) -> None:
@@ -166,10 +174,12 @@ class TestRouterboardUpgrade:
         mock_config.device_groups = {"test_group": MagicMock()}
         mock_load_config.return_value = mock_config
 
-        mock_module = MagicMock()
-        mock_device_session = MagicMock()
-        mock_module.DeviceSession = mock_device_session
-        mock_import.return_value = mock_module
+        # Mock upgrade result
+        mock_result = MagicMock()
+        mock_result.success_count = 2
+        mock_result.failed_count = 0
+        mock_result.results = []
+        mock_upgrade.return_value = mock_result
 
         # Create app and register command
         app = typer.Typer()
@@ -182,13 +192,14 @@ class TestRouterboardUpgrade:
 
         mock_setup_logging.assert_called()
         mock_load_config.assert_called()
+        mock_upgrade.assert_called()
 
     @patch("network_toolkit.commands.routerboard_upgrade.setup_logging")
     @patch("network_toolkit.commands.routerboard_upgrade.load_config")
-    @patch("network_toolkit.commands.routerboard_upgrade.import_module")
+    @patch("network_toolkit.api.routerboard_upgrade.upgrade_routerboard")
     def test_routerboard_upgrade_device_not_found(
         self,
-        mock_import: MagicMock,
+        mock_upgrade: MagicMock,
         mock_load_config: MagicMock,
         mock_setup_logging: MagicMock,
     ) -> None:
@@ -199,10 +210,10 @@ class TestRouterboardUpgrade:
         mock_config.device_groups = {}
         mock_load_config.return_value = mock_config
 
-        mock_module = MagicMock()
-        mock_device_session = MagicMock()
-        mock_module.DeviceSession = mock_device_session
-        mock_import.return_value = mock_module
+        # Mock upgrade result to raise exception or return failure
+        from network_toolkit.exceptions import NetworkToolkitError
+
+        mock_upgrade.side_effect = NetworkToolkitError("Target not found")
 
         # Create app and register command
         app = typer.Typer()

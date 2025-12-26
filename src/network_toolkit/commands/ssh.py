@@ -46,7 +46,9 @@ from network_toolkit.ip_device import (
 )
 
 app_help = (
-    "Open tmux with SSH panes for a device or group.\n\n"
+    "Open tmux with CLI panes for a device or group.\n\n"
+    "Requires tmux installed and available on PATH; without tmux the command "
+    "falls back to sequential SSH sessions.\n\n"
     "Synchronized typing is ENABLED by default - keystrokes go to all panes.\n"
     "Use --no-sync to disable at startup.\n\n"
     "Quick controls:\n"
@@ -101,10 +103,17 @@ def _ensure_libtmux() -> Any:
 
 
 def _resolve_targets(
-    config: NetworkConfig, targets: str, ctx: CommandContext
+    config: NetworkConfig,
+    targets: str,
+    ctx: CommandContext,
+    platform: str | None = None,
+    port: int | None = None,
+    transport_type: str | None = None,
 ) -> Target:
     """Resolve comma-separated targets to a list of devices."""
-    resolver = DeviceResolver(config)
+    resolver = DeviceResolver(
+        config, platform=platform, port=port, transport_type=transport_type
+    )
     devices, unknowns = resolver.resolve_targets(targets)
 
     if unknowns:
@@ -280,12 +289,12 @@ def _sanitize_session_name(name: str) -> str:
 
 def register(app: typer.Typer) -> None:
     @app.command(
-        "ssh",
+        "cli",
         help=app_help,
         rich_help_panel="Remote Operations",
         context_settings={"help_option_names": ["-h", "--help"]},
     )
-    def ssh(
+    def cli(
         target: Annotated[
             str,
             typer.Argument(help="Comma-separated device/group names or IP addresses"),
@@ -376,18 +385,18 @@ def register(app: typer.Typer) -> None:
         ] = False,
     ) -> None:
         """
-        Open a tmux window with SSH panes for devices in targets.
+        Open a tmux window with CLI panes for devices in targets.
 
         Supports comma-separated device and group names.
 
         Examples:
-        - nw ssh sw-acc1
-        - nw ssh sw-acc1,sw-acc2
-        - nw ssh access_switches
-        - nw ssh sw-acc1,access_switches
+        - nw cli sw-acc1
+        - nw cli sw-acc1,sw-acc2
+        - nw cli access_switches
+        - nw cli sw-acc1,access_switches
         """
 
-        setup_logging("DEBUG" if verbose else "INFO")
+        setup_logging("DEBUG" if verbose else "WARNING")
 
         # Create command context for centralized output management
         ctx = CommandContext(
@@ -434,7 +443,14 @@ def register(app: typer.Typer) -> None:
                 )
 
             # Use the helper function that properly handles unknown targets
-            tgt = _resolve_targets(config, target, ctx)
+            tgt = _resolve_targets(
+                config,
+                target,
+                ctx,
+                platform=device_type,
+                port=port,
+                transport_type=transport_type,
+            )
 
             # Check platform capabilities after we have config and targets
             platform_caps = get_platform_capabilities()

@@ -301,7 +301,8 @@ class ResultsManager:
             with filepath.open("w", encoding="utf-8") as f:
                 f.write("# Network Toolkit Results\n")
                 f.write(f"# Generated: {data['timestamp']}\n")
-                f.write(f"# Device: {data['device_name']}\n")
+                if data.get("device_name"):
+                    f.write(f"# Device: {data['device_name']}\n")
                 if data.get("nw_command"):
                     f.write(f"# NW Command: {data['nw_command']}\n")
                 f.write("\n")

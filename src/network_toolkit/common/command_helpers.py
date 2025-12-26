@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
@@ -13,7 +14,6 @@ from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import (
     OutputMode,
     get_output_manager,
-    get_output_manager_with_config,
     set_output_mode,
 )
 from network_toolkit.common.styles import StyleManager, StyleName
@@ -58,28 +58,39 @@ class CommandContext:
         self.verbose = verbose
         self.config_file = config_file or DEFAULT_CONFIG_PATH
 
-        # Set up logging
-        setup_logging("DEBUG" if verbose else "INFO")
-
-        # Handle output mode configuration
-        if output_mode is not None:
-            set_output_mode(output_mode)
-            self.output_manager = get_output_manager()
-        else:
-            # Try to use config-based output mode if config exists and is loadable
+        config = None
+        if self.config_file and self.config_file.exists():
             try:
-                # Only try to load config if the path seems valid
-                if self.config_file and self.config_file.exists():
-                    config = load_config(self.config_file)
-                    self.output_manager = get_output_manager_with_config(
-                        config.general.output_mode
-                    )
-                else:
-                    # Use default if config doesn't exist or path is invalid
-                    self.output_manager = get_output_manager()
+                config = load_config(self.config_file)
             except Exception:
-                # Fall back to default if config loading fails for any reason
-                self.output_manager = get_output_manager()
+                config = None
+
+        active_output_mode = output_mode
+        if active_output_mode is None and config is not None:
+            active_output_mode = OutputMode(config.general.output_mode)
+
+        if active_output_mode is not None:
+            set_output_mode(active_output_mode)
+
+        if verbose:
+            logging.disable(logging.NOTSET)
+            setup_logging("DEBUG")
+        elif config is not None and not config.general.enable_logging:
+            setup_logging("CRITICAL")
+            logging.disable(logging.CRITICAL)
+        else:
+            logging.disable(logging.NOTSET)
+            effective_level = (
+                config.general.log_level if config is not None else "WARNING"
+            )
+            setup_logging(effective_level)
+
+        self.output_manager = get_output_manager()
+        if active_output_mode is None:
+            active_output_mode = self.output_manager.mode
+
+        self.config = config
+        self.output_mode = active_output_mode
 
         # Create style manager for themed output
         self.style_manager = StyleManager(self.output_manager.mode)

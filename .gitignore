@@ -281,3 +281,9 @@ config/sequences/*
 
 # Keep examples directory
 !config/examples/
+
+# Pre-release check marker
+.pre-release-passed
+
+# LLM working files (plans, notes)
+llm-plans/

@@ -18,7 +18,7 @@ class TestRunCommand:
         """Test successful run on single device."""
         runner = CliRunner()
 
-        with patch("network_toolkit.cli.DeviceSession") as mock_session_cls:
+        with patch("network_toolkit.device.DeviceSession") as mock_session_cls:
             sess = MagicMock()
             sess.__enter__.return_value = sess
             sess.__exit__.return_value = None
@@ -43,14 +43,14 @@ class TestRunCommand:
         """Test successful sequence execution."""
         runner = CliRunner()
 
-        with patch("network_toolkit.commands.run.SequenceManager") as mock_sm:
+        with patch("network_toolkit.api.run.SequenceManager") as mock_sm:
             sm_inst = mock_sm.return_value
             sm_inst.resolve.return_value = [
                 "/system/identity/print",
                 "/system/resource/print",
             ]
 
-            with patch("network_toolkit.cli.DeviceSession") as mock_session_cls:
+            with patch("network_toolkit.device.DeviceSession") as mock_session_cls:
                 sess = MagicMock()
                 sess.__enter__.return_value = sess
                 sess.__exit__.return_value = None
@@ -79,7 +79,7 @@ class TestRunCommand:
         """Test run command with custom timeout."""
         runner = CliRunner()
 
-        with patch("network_toolkit.cli.DeviceSession") as mock_session_cls:
+        with patch("network_toolkit.device.DeviceSession") as mock_session_cls:
             sess = MagicMock()
             sess.__enter__.return_value = sess
             sess.__exit__.return_value = None
@@ -107,7 +107,7 @@ class TestRunCommand:
         runner = CliRunner(env={"NO_COLOR": "1"})
 
         # Test with a valid option like --verbose instead of non-existent --dry-run
-        with patch("network_toolkit.cli.DeviceSession") as mock_session_cls:
+        with patch("network_toolkit.device.DeviceSession") as mock_session_cls:
             sess = MagicMock()
             sess.__enter__.return_value = sess
             sess.__exit__.return_value = None
@@ -136,7 +136,7 @@ class TestRunCommand:
         """Test run command with connection error."""
         runner = CliRunner()
 
-        with patch("network_toolkit.cli.DeviceSession") as mock_session_cls:
+        with patch("network_toolkit.device.DeviceSession") as mock_session_cls:
             mock_session_cls.side_effect = Exception("Connection failed")
 
             result = runner.invoke(
@@ -156,7 +156,7 @@ class TestRunCommand:
         """Test run command on device group."""
         runner = CliRunner()
 
-        with patch("network_toolkit.cli.DeviceSession") as mock_session_cls:
+        with patch("network_toolkit.device.DeviceSession") as mock_session_cls:
             sess = MagicMock()
             sess.__enter__.return_value = sess
             sess.__exit__.return_value = None
@@ -181,7 +181,7 @@ class TestRunCommand:
         """Test run command with verbose logging."""
         runner = CliRunner()
 
-        with patch("network_toolkit.cli.DeviceSession") as mock_session_cls:
+        with patch("network_toolkit.device.DeviceSession") as mock_session_cls:
             sess = MagicMock()
             sess.__enter__.return_value = sess
             sess.__exit__.return_value = None
@@ -223,7 +223,7 @@ class TestRunCommand:
         """Test run command with sequence resolution error."""
         runner = CliRunner()
 
-        with patch("network_toolkit.commands.run.SequenceManager") as mock_sm:
+        with patch("network_toolkit.api.run.SequenceManager") as mock_sm:
             sm_inst = mock_sm.return_value
             sm_inst.resolve.side_effect = Exception("Sequence not found")
 
@@ -245,7 +245,7 @@ class TestRunCommand:
         runner = CliRunner()
         results_dir = tmp_path / "custom_results"
 
-        with patch("network_toolkit.cli.DeviceSession") as mock_session_cls:
+        with patch("network_toolkit.device.DeviceSession") as mock_session_cls:
             sess = MagicMock()
             sess.__enter__.return_value = sess
             sess.__exit__.return_value = None
@@ -271,7 +271,7 @@ class TestRunCommand:
         """Test run command with command execution error."""
         runner = CliRunner()
 
-        with patch("network_toolkit.cli.DeviceSession") as mock_session_cls:
+        with patch("network_toolkit.device.DeviceSession") as mock_session_cls:
             sess = MagicMock()
             sess.__enter__.return_value = sess
             sess.__exit__.return_value = None
@@ -295,7 +295,7 @@ class TestRunCommand:
         """Test run command with parallel execution option."""
         runner = CliRunner()
 
-        with patch("network_toolkit.cli.DeviceSession") as mock_session_cls:
+        with patch("network_toolkit.device.DeviceSession") as mock_session_cls:
             sess = MagicMock()
             sess.__enter__.return_value = sess
             sess.__exit__.return_value = None
@@ -320,7 +320,7 @@ class TestRunCommand:
         """Test run command with confirmation prompt."""
         runner = CliRunner()
 
-        with patch("network_toolkit.cli.DeviceSession") as mock_session_cls:
+        with patch("network_toolkit.device.DeviceSession") as mock_session_cls:
             sess = MagicMock()
             sess.__enter__.return_value = sess
             sess.__exit__.return_value = None
@@ -347,7 +347,7 @@ class TestRunCommand:
         """Test run command with empty command output."""
         runner = CliRunner()
 
-        with patch("network_toolkit.cli.DeviceSession") as mock_session_cls:
+        with patch("network_toolkit.device.DeviceSession") as mock_session_cls:
             sess = MagicMock()
             sess.__enter__.return_value = sess
             sess.__exit__.return_value = None
@@ -376,7 +376,7 @@ class TestRunCommandEdgeCases:
         runner = CliRunner()
         long_output = "line\n" * 1000
 
-        with patch("network_toolkit.cli.DeviceSession") as mock_session_cls:
+        with patch("network_toolkit.device.DeviceSession") as mock_session_cls:
             sess = MagicMock()
             sess.__enter__.return_value = sess
             sess.__exit__.return_value = None
@@ -401,7 +401,7 @@ class TestRunCommandEdgeCases:
         runner = CliRunner()
         special_output = "Special chars: ñáéíóú äöü ßÿ €£¥\n"
 
-        with patch("network_toolkit.cli.DeviceSession") as mock_session_cls:
+        with patch("network_toolkit.device.DeviceSession") as mock_session_cls:
             sess = MagicMock()
             sess.__enter__.return_value = sess
             sess.__exit__.return_value = None
@@ -425,7 +425,7 @@ class TestRunCommandEdgeCases:
         """Test run on multiple devices with mixed success/failure."""
         runner = CliRunner()
 
-        with patch("network_toolkit.cli.DeviceSession") as mock_session_cls:
+        with patch("network_toolkit.device.DeviceSession") as mock_session_cls:
             # First device succeeds, second fails
             sess1 = MagicMock()
             sess1.__enter__.return_value = sess1

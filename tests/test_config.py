@@ -52,7 +52,7 @@ class TestGeneralConfig:
             assert config.verify_checksums is True
             assert config.command_timeout == 60
             assert config.enable_logging is True
-            assert config.log_level == "INFO"
+            assert config.log_level == "WARNING"
             assert config.backup_retention_days == 30
             assert config.max_backups_per_device == 10
             assert config.store_results is False
@@ -279,6 +279,7 @@ class TestNetworkConfig:
             "timeout_socket": 30,
             "timeout_transport": 30,
             "transport": "system",
+            "ssh_config_file": True,
             "platform": "mikrotik_routeros",  # Now correctly uses device_type, not hardware platform
         }
 
@@ -298,6 +299,7 @@ class TestNetworkConfig:
             "timeout_socket": 60,
             "timeout_transport": 60,
             "transport": "system",
+            "ssh_config_file": True,
             "platform": "mikrotik_routeros",
         }
 
@@ -371,7 +373,7 @@ class TestLoadConfig:
         with invalid_file.open("w") as f:
             yaml.dump(invalid_data, f)
 
-        with pytest.raises(Exception, match="Failed to load configuration"):
+        with pytest.raises(Exception, match="Failed to load modular configuration"):
             load_config(invalid_file)
 
     def test_load_config_string_path(self, config_file: Path) -> None:
@@ -963,9 +965,9 @@ class TestModularConfigLoading:
         fragment_data = {"devices": "not_a_dict"}
         fragment_file.write_text(yaml.safe_dump(fragment_data))
 
-        # Should load successfully but skip invalid structure
-        config = load_config(config_dir)
-        assert config.devices is not None
+        # Should raise ValueError for invalid structure
+        with pytest.raises(ValueError, match="Failed to load modular configuration"):
+            load_config(config_dir)
 
     def test_modular_config_vendor_sequence_errors(self, tmp_path: Path) -> None:
         """Test vendor sequence loading with various error conditions."""

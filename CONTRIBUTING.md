@@ -2,6 +2,8 @@
 
 Thank you for your interest in contributing to the Network Toolkit!
 
+For information about project governance, decision-making, and stability commitments, see [GOVERNANCE.md](GOVERNANCE.md).
+
 ## Development Setup
 
 1. Clone the repository:
@@ -54,6 +56,51 @@ ruff check .
 ruff format .
 mypy src/
 ```
+
+## Commit Message Conventions
+
+This project follows [Conventional Commits](https://www.conventionalcommits.org/) format:
+
+```text
+<type>(<scope>): <description>
+
+[optional body]
+
+[optional footer]
+```
+
+### Types
+
+- **feat**: New feature
+- **fix**: Bug fix
+- **docs**: Documentation changes
+- **style**: Code style changes (formatting, no logic change)
+- **refactor**: Code refactoring (no feature or bug fix)
+- **test**: Adding or updating tests
+- **chore**: Maintenance tasks (dependencies, config)
+- **ci**: CI/CD changes
+- **perf**: Performance improvements
+- **build**: Build system changes
+
+### Examples
+
+```text
+feat(cli): add support for Nokia SR Linux
+fix(transport): resolve SSH connection timeout
+docs: update installation instructions
+chore: bump version to v0.1.11
+ci(deps): bump astral-sh/setup-uv from 4 to 7
+```
+
+### Scope
+
+Optional but recommended. Use component names like: `cli`, `transport`, `config`, `backup`, `deps`
+
+## Documentation
+
+- `docs/reference/cli.md` is generated. Do not edit it manually.
+- Regenerate the CLI docs with `task docs:generate` (or `uv run python scripts/generate_cli_docs.py`).
+- Always commit the updated `docs/reference/cli.md` alongside CLI changes so reviewers can see the diff.
 
 ## Pull Request Process
 

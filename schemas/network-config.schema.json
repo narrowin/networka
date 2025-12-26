@@ -505,7 +505,7 @@
           "type": "boolean"
         },
         "log_level": {
-          "default": "INFO",
+          "default": "WARNING",
           "title": "Log Level",
           "type": "string"
         },
@@ -691,7 +691,7 @@
         "verify_checksums": true,
         "command_timeout": 60,
         "enable_logging": true,
-        "log_level": "INFO",
+        "log_level": "WARNING",
         "backup_retention_days": 30,
         "max_backups_per_device": 10,
         "store_results": false,
@@ -793,6 +793,21 @@
       ],
       "default": null,
       "title": "Vendor Sequences"
+    },
+    "global_command_sequences": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/VendorSequence"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Global Command Sequences"
     }
   },
   "title": "NetworkConfig",

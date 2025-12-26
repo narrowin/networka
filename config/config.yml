@@ -24,7 +24,7 @@ general:
 
   # Logging
   enable_logging: true
-  log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  log_level: "WARNING"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
 
   # Backup retention
   backup_retention_days: 30

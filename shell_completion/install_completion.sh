@@ -1,5 +1,5 @@
 #!/bin/bash
-# Installation script for nw completions (bash, zsh, fish)
+# Installation script for nw completions (bash, zsh)
 
 set -euo pipefail
 
@@ -31,7 +31,6 @@ print_error() {
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPLETION_BASH="${SCRIPT_DIR}/bash_completion_nw.sh"
 COMPLETION_ZSH="${SCRIPT_DIR}/zsh_completion_nw.zsh"
-COMPLETION_FISH="${SCRIPT_DIR}/fish_completion_nw.fish"
 
 print_status "Installing nw shell completions..."
 
@@ -44,7 +43,6 @@ fi
 # Flags controlling which shells to install for (default: all)
 DO_BASH=1
 DO_ZSH=1
-DO_FISH=1
 
 # Method 1: Try system-wide installation (requires sudo)
 install_system_wide() {
@@ -75,16 +73,6 @@ install_system_wide() {
         zsh_dir="/usr/local/share/zsh/site-functions"
     fi
 
-    # fish
-    local fish_dir=""
-    if [[ -d "/usr/share/fish/vendor_completions.d" ]]; then
-        fish_dir="/usr/share/fish/vendor_completions.d"
-    elif [[ -d "/opt/homebrew/share/fish/vendor_completions.d" ]]; then
-        fish_dir="/opt/homebrew/share/fish/vendor_completions.d"
-    elif [[ -d "/usr/local/share/fish/vendor_completions.d" ]]; then
-        fish_dir="/usr/local/share/fish/vendor_completions.d"
-    fi
-
     local ok=0
     if [[ $DO_BASH -eq 1 ]] && [[ -n "$bash_dir" ]] && [[ -f "$COMPLETION_BASH" ]]; then
         if sudo cp "$COMPLETION_BASH" "$bash_dir/nw" 2>/dev/null; then
@@ -94,10 +82,6 @@ install_system_wide() {
         # zsh requires leading underscore for function name files
         if sudo cp "$COMPLETION_ZSH" "$zsh_dir/_nw" 2>/dev/null; then
             ok=1; print_success "Zsh: $zsh_dir/_nw"; fi
-    fi
-    if [[ $DO_FISH -eq 1 ]] && [[ -n "$fish_dir" ]] && [[ -f "$COMPLETION_FISH" ]]; then
-        if sudo cp "$COMPLETION_FISH" "$fish_dir/nw.fish" 2>/dev/null; then
-            ok=1; print_success "fish: $fish_dir/nw.fish"; fi
     fi
 
     if [[ $ok -eq 1 ]]; then
@@ -144,14 +128,6 @@ install_user_specific() {
         print_success "Zsh: installed to $zfunc_dir/_nw"
     fi
 
-    # fish
-    if [[ $DO_FISH -eq 1 ]] && [[ -f "$COMPLETION_FISH" ]]; then
-        local fish_dir="$HOME/.config/fish/completions"
-        mkdir -p "$fish_dir"
-        cp "$COMPLETION_FISH" "$fish_dir/nw.fish"
-        print_success "fish: installed to $fish_dir/nw.fish"
-    fi
-
     print_status "User-specific installation complete. Restart your shell."
     return 0
 }
@@ -174,10 +150,6 @@ show_manual_instructions() {
     echo "      echo 'fpath+=\$HOME/.zsh/completions' >> ~/.zshrc"
     echo "      echo 'autoload -Uz compinit && compinit' >> ~/.zshrc"
     echo ""
-    echo "fish:"
-    echo "  - Copy to your fish completions directory:"
-    echo "      mkdir -p ~/.config/fish/completions && cp \"$COMPLETION_FISH\" ~/.config/fish/completions/nw.fish"
-    echo ""
 }
 
 # Main installation logic
@@ -187,10 +159,9 @@ main() {
     # Parse optional per-shell flags
     while [[ $# -gt 0 ]]; do
         case "${1:-}" in
-            --bash) DO_BASH=1; DO_ZSH=0; DO_FISH=0; shift ;;
-            --zsh) DO_BASH=0; DO_ZSH=1; DO_FISH=0; shift ;;
-            --fish) DO_BASH=0; DO_ZSH=0; DO_FISH=1; shift ;;
-            --all) DO_BASH=1; DO_ZSH=1; DO_FISH=1; shift ;;
+            --bash) DO_BASH=1; DO_ZSH=0; shift ;;
+            --zsh) DO_BASH=0; DO_ZSH=1; shift ;;
+            --all) DO_BASH=1; DO_ZSH=1; shift ;;
             *) break ;;
         esac
     done
@@ -220,9 +191,9 @@ main() {
 
     # Default behavior: try system-wide, fall back to user-specific
     if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
-    echo "Usage: $0 [OPTIONS] [--bash|--zsh|--fish|--all]"
+    echo "Usage: $0 [OPTIONS] [--bash|--zsh|--all]"
         echo ""
-    echo "Install shell completions for nw (bash/zsh/fish)"
+    echo "Install shell completions for nw (bash/zsh)"
         echo ""
         echo "Options:"
         echo "  -s, --system     Install system-wide (requires sudo)"
@@ -230,7 +201,6 @@ main() {
         echo "  -m, --manual     Show manual installation instructions"
     echo "      --bash       Only install bash completions"
     echo "      --zsh        Only install zsh completions"
-    echo "      --fish       Only install fish completions"
     echo "      --all        Install all shells (default)"
         echo "  -h, --help       Show this help message"
         echo ""
