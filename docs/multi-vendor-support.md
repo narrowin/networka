@@ -4,15 +4,39 @@
 
 The Network Toolkit now supports multiple network vendors through a flexible, vendor-specific command sequence architecture. This allows you to manage devices from different vendors using their native command syntax while maintaining a unified interface.
 
+## CLI Commands for Platform Information
+
+Query platform support directly from the command line:
+
+```bash
+# List all supported platforms
+nw platforms list
+
+# Filter by status
+nw platforms list --status implemented
+nw platforms list --status planned
+nw platforms list --status sequences_only
+
+# Filter by vendor
+nw platforms list --vendor cisco
+nw platforms list --vendor mikrotik
+
+# Filter by capability
+nw platforms list --capability firmware_upgrade
+nw platforms list --capability config_backup
+
+# Get detailed info about a specific platform
+nw platforms info mikrotik_routeros
+nw platforms info cisco_ios
+```
+
 ## Supported Vendors
 
-### Currently Implemented
+<!-- AUTO-GENERATED: Do not edit this section manually -->
+<!-- Generated from src/network_toolkit/platforms/registry.py -->
+<!-- Run: uv run python scripts/generate_platform_docs.py -->
 
-- **MikroTik RouterOS** (`mikrotik_routeros`) - Primary focus, fully featured
-- **Cisco IOS-XE** (`cisco_iosxe`) - Switches and routers
-- **Cisco NX-OS** (`cisco_nxos`) - Data center switches
-- **Arista EOS** (`arista_eos`) - Data center and campus switches
-- **Juniper JunOS** (`juniper_junos`) - Enterprise switches and routers
+--8<-- "docs/.generated/platform_support_table.md"
 
 ### Extensibility
 

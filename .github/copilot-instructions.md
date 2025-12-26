@@ -87,3 +87,5 @@ If pre-commit fails, fix the issues and run again. Do NOT commit until pre-commi
 4. Confirm tests cover real user scenarios
 
 ```
+
+```

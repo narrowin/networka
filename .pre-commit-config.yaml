@@ -33,6 +33,13 @@ repos:
         require_serial: false
         pass_filenames: true
 
+      - id: generate-platform-docs
+        name: Generate platform documentation
+        entry: uv run python scripts/generate_platform_docs.py
+        language: system
+        files: ^src/network_toolkit/platforms/registry\.py$
+        pass_filenames: false
+
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0
     hooks:

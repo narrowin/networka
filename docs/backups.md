@@ -17,6 +17,7 @@ nw backup config device1 --delete-remote
 ```
 
 Platform behavior:
+
 - MikroTik RouterOS: creates `.rsc` (export) and optionally `.backup` (system)
 - Cisco IOS/IOS-XE: collects configuration and system info outputs
 
@@ -25,3 +26,8 @@ Tips:
 - Use device groups to back up multiple devices concurrently.
 - Control remote file cleanup with `--delete-remote/--keep-remote`.
 - See vendor pages for platform-specific details.
+- Discover which vendors support backup operations in your build:
+
+```bash
+nw backup vendors
+```

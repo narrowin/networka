@@ -40,14 +40,11 @@ class TestUnsupportedOperations:
         )
 
     def test_check_operation_support_cisco_config_backup(self) -> None:
-        """Test that Cisco platforms don't support config backup."""
+        """Test that Cisco platforms support config backup."""
         is_supported, error_msg = check_operation_support("cisco_ios", "create_backup")
 
-        assert not is_supported
-        assert (
-            "Operation 'create_backup' is not supported on platform 'Cisco IOS'"
-            in error_msg
-        )
+        assert is_supported
+        assert error_msg == ""
 
     def test_check_operation_support_mikrotik_supported(self) -> None:
         """Test that MikroTik RouterOS supports all operations."""
@@ -144,12 +141,11 @@ class TestCommandLineUnsupportedOperations:
         # (this would happen only during actual device connection)
 
     def test_all_unsupported_cisco_operations(self) -> None:
-        """Test that all firmware/BIOS operations are unsupported on Cisco."""
+        """Test that BIOS operations are unsupported on Cisco."""
         cisco_platforms = ["cisco_ios", "cisco_iosxe"]
-        # Cisco platforms now support firmware operations, but not other operations
+        # Cisco platforms support firmware and backup operations, but not BIOS
         unsupported_operations = [
             "bios_upgrade",
-            "create_backup",
         ]
 
         for platform in cisco_platforms:

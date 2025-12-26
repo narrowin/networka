@@ -66,6 +66,7 @@ See the User guide for additional configuration options.
 
 ## Next steps
 
+- Explore supported platforms → `nw platforms list`
 - Define more devices and groups → Configuration
 - Learn how to run common operations → Running commands
 - Control formatting and capture outputs → Output modes and Results

@@ -41,6 +41,15 @@ from network_toolkit.api.list import (
     get_group_list,
     get_sequence_list,
 )
+from network_toolkit.api.platforms import (
+    PlatformDetails,
+    PlatformFilterError,
+    PlatformListOptions,
+    PlatformListResult,
+    PlatformSummary,
+    get_platform_details,
+    list_platforms,
+)
 from network_toolkit.api.routerboard_upgrade import (
     DeviceRouterboardUpgradeResult,
     RouterboardUpgradeOptions,
@@ -96,6 +105,12 @@ __all__ = [
     "InfoOptions",
     "InfoResult",
     "InfoTarget",
+    # platforms
+    "PlatformDetails",
+    "PlatformFilterError",
+    "PlatformListOptions",
+    "PlatformListResult",
+    "PlatformSummary",
     "RouterboardUpgradeOptions",
     "RouterboardUpgradeResult",
     "RunOptions",
@@ -114,7 +129,9 @@ __all__ = [
     "get_device_list",
     "get_group_list",
     "get_info",
+    "get_platform_details",
     "get_sequence_list",
+    "list_platforms",
     "run_backup",
     "run_commands",
     "upgrade_firmware",

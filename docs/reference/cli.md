@@ -45,6 +45,7 @@ $ nw [OPTIONS] COMMAND [ARGS]...
 * `firmware`: Firmware management operations
 * `schema`: JSON schema management commands
 * `sync`: Sync inventory from external sources
+* `platforms`: Show platform and vendor support information
 
 ## `nw info`
 
@@ -726,4 +727,58 @@ $ nw sync ssh-config [OPTIONS] [SSH_CONFIG_PATH]
 * `--prune`: Remove hosts no longer in SSH config
 * `--dry-run`: Show changes without writing
 * `-v, --verbose`: Enable verbose output
+* `--help`: Show this message and exit.
+
+## `nw platforms`
+
+Show platform and vendor support information
+
+**Usage**:
+
+```console
+$ nw platforms [OPTIONS] COMMAND [ARGS]...
+```
+
+**Options**:
+
+* `--help`: Show this message and exit.
+
+**Commands**:
+
+* `list`: List all supported network platforms.
+* `info`: Show detailed information about a specific...
+
+### `nw platforms list`
+
+List all supported network platforms.
+
+**Usage**:
+
+```console
+$ nw platforms list [OPTIONS]
+```
+
+**Options**:
+
+* `-s, --status TEXT`: Filter by status: implemented, planned, sequences_only, experimental
+* `-v, --vendor TEXT`: Filter by vendor name (e.g., cisco, mikrotik, arista)
+* `-c, --capability TEXT`: Filter by capability: config_backup, firmware_upgrade, comprehensive_backup
+* `--help`: Show this message and exit.
+
+### `nw platforms info`
+
+Show detailed information about a specific platform.
+
+**Usage**:
+
+```console
+$ nw platforms info [OPTIONS] PLATFORM
+```
+
+**Arguments**:
+
+* `PLATFORM`: Platform device type (e.g., mikrotik_routeros, cisco_ios)  [required]
+
+**Options**:
+
 * `--help`: Show this message and exit.

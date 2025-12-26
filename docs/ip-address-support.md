@@ -58,10 +58,12 @@ Optional parameters:
 
 - mikrotik_routeros — MikroTik RouterOS
 - cisco_iosxe — Cisco IOS-XE
+- cisco_ios — Cisco IOS
 - cisco_iosxr — Cisco IOS-XR
 - cisco_nxos — Cisco NX-OS
 - juniper_junos — Juniper JunOS
 - arista_eos — Arista EOS
+- nokia_srlinux — Nokia SR Linux
 - linux — Linux SSH
 
 ## Authentication
@@ -81,10 +83,12 @@ Error: When using IP addresses, --platform is required
 Supported platforms:
   mikrotik_routeros: MikroTik RouterOS
   cisco_iosxe: Cisco IOS-XE
+  cisco_ios: Cisco IOS
   cisco_iosxr: Cisco IOS-XR
   cisco_nxos: Cisco NX-OS
   juniper_junos: Juniper JunOS
   arista_eos: Arista EOS
+  nokia_srlinux: Nokia SR Linux
   linux: Linux SSH
 ```
 
