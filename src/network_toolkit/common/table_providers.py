@@ -17,7 +17,7 @@ from network_toolkit.common.table_generator import (
     TableDefinition,
 )
 from network_toolkit.config import NetworkConfig, get_supported_device_types
-from network_toolkit.credentials import CredentialResolver, EnvironmentCredentialManager
+from network_toolkit.credentials import CredentialResolver
 from network_toolkit.ip_device import (
     get_supported_device_types as get_device_descriptions,
 )
@@ -659,8 +659,11 @@ class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
         return val.strip().lower() in {"1", "true", "yes", "y", "on"}
 
     def _get_credential_source(self, credential_type: str) -> str:
-        """Get the source of a credential using the same logic as CredentialResolver."""
-        # Check interactive override
+        """Get the source of a credential using CredentialResolver.
+
+        Uses the resolver's with_source methods to avoid duplicating resolution logic.
+        """
+        # Check interactive override first
         if self.interactive_creds:
             if credential_type == "username" and getattr(
                 self.interactive_creds, "username", None
@@ -671,77 +674,16 @@ class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
             ):
                 return "interactive input"
 
-        # Use CredentialResolver to get the actual resolved value
+        # Use CredentialResolver with source tracking
         resolver = CredentialResolver(self.config)
-        dev = self.config.devices.get(self.device_name) if self.config.devices else None
-        if not dev:
-            return "unknown (device not found)"
-
-        # Get what the resolver would actually return
-        resolved_user, resolved_pass = resolver.resolve_credentials(self.device_name)
-        resolved_value = (
-            resolved_user if credential_type == "username" else resolved_pass
-        )
-
-        # Now trace back to find the source of this resolved value
-        # Check device config first
-        if credential_type == "username" and dev.user == resolved_value:
-            return "device config file (devices/devices.yml)"
-        if credential_type == "password" and dev.password == resolved_value:
-            return "device config file (devices/devices.yml)"
-
-        # Check device-specific environment variables
-        env_var_name = (
-            f"NW_{credential_type.upper()}_{self.device_name.upper().replace('-', '_')}"
-        )
-        if os.getenv(env_var_name) == resolved_value:
-            return f"environment ({env_var_name})"
-
-        # Check group-level credentials
-        group_user, group_password = self.config.get_group_credentials(self.device_name)
-        target_credential = (
-            group_user if credential_type == "username" else group_password
-        )
-
-        if target_credential == resolved_value:
-            # Find which group provided the credential
-            device_groups = self.config.get_device_groups(self.device_name)
-            for group_name in device_groups:
-                group = (
-                    self.config.device_groups.get(group_name)
-                    if self.config.device_groups
-                    else None
-                )
-                if group and group.credentials:
-                    if (
-                        credential_type == "username"
-                        and group.credentials.user == resolved_value
-                    ):
-                        return f"group config file groups/groups.yml ({group_name})"
-                    elif (
-                        credential_type == "password"
-                        and group.credentials.password == resolved_value
-                    ):
-                        return f"group config file groups/groups.yml ({group_name})"
-
-                # Check group environment variable
-                if (
-                    EnvironmentCredentialManager.get_group_specific(
-                        group_name, credential_type
-                    )
-                    == resolved_value
-                ):
-                    grp_env = f"NW_{credential_type.upper()}_{group_name.upper().replace('-', '_')}"
-                    return f"environment ({grp_env})"
-
-        # Check default environment variables
-        default_env_var = f"NW_{credential_type.upper()}_DEFAULT"
-        default_env_value = os.getenv(default_env_var)
-        if default_env_value and default_env_value == resolved_value:
-            return f"environment ({default_env_var})"
-
-        # If we reach here, it must be from config general defaults
-        return f"config (general.default_{credential_type})"
+        try:
+            _, (user_source, pass_source) = resolver.resolve_credentials_with_source(
+                self.device_name
+            )
+            source = user_source if credential_type == "username" else pass_source
+            return source.format()
+        except ValueError:
+            return "unknown"
 
     def get_raw_output(self) -> str | None:
         """Get raw data for JSON/CSV output."""

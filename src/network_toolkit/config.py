@@ -29,6 +29,36 @@ from network_toolkit.inventory.nornir_simple import compile_nornir_simple_invent
 from network_toolkit.runtime import get_runtime_settings
 
 
+class ConfigHistoryMixin:
+    """Mixin providing config history tracking methods.
+
+    This mixin provides a consistent interface for recording and querying
+    field history across GeneralConfig, DeviceConfig, and DeviceGroup classes.
+    Classes using this mixin must define a _history: ConfigHistory attribute.
+    """
+
+    _history: ConfigHistory
+
+    def record_field(
+        self,
+        field_name: str,
+        value: Any,
+        loader: LoaderType,
+        identifier: str | None = None,
+        line_number: int | None = None,
+    ) -> None:
+        """Record a field value in history."""
+        self._history.record_field(field_name, value, loader, identifier, line_number)
+
+    def get_field_history(self, field_name: str) -> list[FieldHistory]:
+        """Get the history for a specific field."""
+        return self._history.get_history(field_name)
+
+    def get_field_source(self, field_name: str) -> FieldHistory | None:
+        """Get the current source for a specific field."""
+        return self._history.get_current(field_name)
+
+
 def _resolve_fallback_config_path(original_hint: Path | None = None) -> Path | None:
     """Best-effort fallback discovery for a modular config directory.
 
@@ -114,7 +144,7 @@ def load_dotenv_files(config_path: Path | None = None) -> None:
         os.environ[key] = value
 
 
-class GeneralConfig(BaseModel):
+class GeneralConfig(ConfigHistoryMixin, BaseModel):
     """General configuration settings."""
 
     # Private: configuration history for introspection
@@ -233,25 +263,6 @@ class GeneralConfig(BaseModel):
             raise ValueError(msg)
         return v
 
-    def record_field(
-        self,
-        field_name: str,
-        value: Any,
-        loader: LoaderType,
-        identifier: str | None = None,
-        line_number: int | None = None,
-    ) -> None:
-        """Record a field value in history."""
-        self._history.record_field(field_name, value, loader, identifier, line_number)
-
-    def get_field_history(self, field_name: str) -> list[FieldHistory]:
-        """Get the history for a specific field."""
-        return self._history.get_history(field_name)
-
-    def get_field_source(self, field_name: str) -> FieldHistory | None:
-        """Get the current source for a specific field."""
-        return self._history.get_current(field_name)
-
 
 class DeviceOverrides(BaseModel):
     """Device-specific configuration overrides."""
@@ -270,7 +281,7 @@ class DeviceOverrides(BaseModel):
 SupportedDeviceType = str
 
 
-class DeviceConfig(BaseModel):
+class DeviceConfig(ConfigHistoryMixin, BaseModel):
     """Configuration for a single network device.
 
     Attributes
@@ -318,25 +329,6 @@ class DeviceConfig(BaseModel):
         """Set the inventory source id for this device."""
         self._inventory_source_id = source_id
 
-    def record_field(
-        self,
-        field_name: str,
-        value: Any,
-        loader: LoaderType,
-        identifier: str | None = None,
-        line_number: int | None = None,
-    ) -> None:
-        """Record a field value in history."""
-        self._history.record_field(field_name, value, loader, identifier, line_number)
-
-    def get_field_history(self, field_name: str) -> list[FieldHistory]:
-        """Get the history for a specific field."""
-        return self._history.get_history(field_name)
-
-    def get_field_source(self, field_name: str) -> FieldHistory | None:
-        """Get the current source for a specific field."""
-        return self._history.get_current(field_name)
-
 
 class GroupCredentials(BaseModel):
     """Group-level credential configuration."""
@@ -345,7 +337,7 @@ class GroupCredentials(BaseModel):
     password: str | None = None
 
 
-class DeviceGroup(BaseModel):
+class DeviceGroup(ConfigHistoryMixin, BaseModel):
     """Configuration for a device group."""
 
     # Private: configuration history for introspection
@@ -367,25 +359,6 @@ class DeviceGroup(BaseModel):
     def set_inventory_source_id(self, source_id: str) -> None:
         """Set the inventory source id for this group."""
         self._inventory_source_id = source_id
-
-    def record_field(
-        self,
-        field_name: str,
-        value: Any,
-        loader: LoaderType,
-        identifier: str | None = None,
-        line_number: int | None = None,
-    ) -> None:
-        """Record a field value in history."""
-        self._history.record_field(field_name, value, loader, identifier, line_number)
-
-    def get_field_history(self, field_name: str) -> list[FieldHistory]:
-        """Get the history for a specific field."""
-        return self._history.get_history(field_name)
-
-    def get_field_source(self, field_name: str) -> FieldHistory | None:
-        """Get the current source for a specific field."""
-        return self._history.get_current(field_name)
 
 
 class VendorPlatformConfig(BaseModel):
@@ -1364,14 +1337,15 @@ def _populate_device_field_history(
 
         # Determine the loader type based on where the value came from
         if field_name in device_defaults and value == device_defaults.get(field_name):
-            # Value came from _defaults.yml
+            # Value came from _defaults.yml - construct path properly using Path operations
+            defaults_path = (
+                source_path.parent / "_defaults.yml" if source_path else None
+            )
             device.record_field(
                 field_name,
                 value,
                 LoaderType.CONFIG_FILE,
-                identifier=source_str.replace(source_path.name, "_defaults.yml")
-                if source_str and source_path
-                else "_defaults.yml",
+                identifier=str(defaults_path) if defaults_path else "_defaults.yml",
             )
         elif field_info.default is not None and value == field_info.default:
             # Value is Pydantic's default

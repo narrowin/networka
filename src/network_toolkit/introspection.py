@@ -210,19 +210,28 @@ class ConfigHistory:
             for entry in entries:
                 self.record(entry)
 
-    def to_dict(self) -> dict[str, list[dict[str, Any]]]:
+    def to_dict(
+        self, *, mask_sensitive: bool = True
+    ) -> dict[str, list[dict[str, Any]]]:
         """Convert to a dictionary representation.
+
+        Parameters
+        ----------
+        mask_sensitive : bool
+            If True (default), mask values for sensitive fields like passwords.
 
         Returns
         -------
         dict[str, list[dict[str, Any]]]
             Dictionary mapping field names to lists of history entries
         """
+        sensitive_fields = {"password", "auth_password", "secret", "key", "token"}
         result: dict[str, list[dict[str, Any]]] = {}
         for field_name, entries in self._history.items():
+            should_mask = mask_sensitive and field_name in sensitive_fields
             result[field_name] = [
                 {
-                    "value": entry.value,
+                    "value": "***MASKED***" if should_mask else entry.value,
                     "loader": entry.loader.value,
                     "identifier": entry.identifier,
                     "line_number": entry.line_number,
@@ -232,48 +241,3 @@ class ConfigHistory:
                 for entry in entries
             ]
         return result
-
-
-@dataclass
-class CredentialResolutionTrace:
-    """Traces the resolution of a credential through the precedence chain.
-
-    This captures not just where the final value came from, but which
-    sources were checked and skipped during resolution.
-    """
-
-    credential_type: str  # 'username' or 'password'
-    final_value: str | None
-    final_source: FieldHistory | None
-    checked_sources: list[tuple[str, FieldHistory | None]] = field(default_factory=list)
-
-    def add_checked(self, source_name: str, result: FieldHistory | None) -> None:
-        """Record a source that was checked during resolution.
-
-        Parameters
-        ----------
-        source_name : str
-            Name of the source (e.g., 'cli_override', 'device_config')
-        result : FieldHistory | None
-            The history entry if a value was found, None otherwise
-        """
-        self.checked_sources.append((source_name, result))
-
-    def format_trace(self) -> list[str]:
-        """Format the resolution trace as human-readable lines.
-
-        Returns
-        -------
-        list[str]
-            Lines describing the resolution process
-        """
-        lines = [f"Resolution trace for {self.credential_type}:"]
-        for source_name, result in self.checked_sources:
-            if result is not None:
-                status = f"found: {result.format_source()}"
-                if result == self.final_source:
-                    status += " [SELECTED]"
-            else:
-                status = "not set"
-            lines.append(f"  {source_name}: {status}")
-        return lines

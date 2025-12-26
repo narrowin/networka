@@ -9,7 +9,6 @@ import pytest
 
 from network_toolkit.introspection import (
     ConfigHistory,
-    CredentialResolutionTrace,
     FieldHistory,
     LoaderType,
 )
@@ -269,74 +268,60 @@ class TestConfigHistory:
             identifier="devices.yml",
         )
 
-        result = history.to_dict()
+        result = history.to_dict(mask_sensitive=False)
         assert "host" in result
         assert len(result["host"]) == 1
         assert result["host"][0]["value"] == "192.168.1.1"
         assert result["host"][0]["loader"] == "config_file"
         assert result["host"][0]["identifier"] == "devices.yml"
 
-
-class TestCredentialResolutionTrace:
-    """Tests for CredentialResolutionTrace dataclass."""
-
-    def test_creation(self) -> None:
-        """Test creating a CredentialResolutionTrace."""
-        trace = CredentialResolutionTrace(
-            credential_type="username",
-            final_value="admin",
-            final_source=None,
-        )
-        assert trace.credential_type == "username"
-        assert trace.final_value == "admin"
-        assert trace.checked_sources == []
-
-    def test_add_checked(self) -> None:
-        """Test adding checked sources."""
-        trace = CredentialResolutionTrace(
-            credential_type="password",
-            final_value="secret",
-            final_source=None,
-        )
-
-        trace.add_checked("cli_override", None)
-        trace.add_checked("device_config", None)
-
-        env_entry = FieldHistory(
+    def test_to_dict_masks_sensitive_fields(self) -> None:
+        """Test that to_dict masks sensitive fields by default."""
+        history = ConfigHistory()
+        history.record_field(
             field_name="password",
-            value="secret",
-            loader=LoaderType.ENV_VAR,
-            identifier="NW_PASSWORD_DEFAULT",
+            value="super_secret_password",
+            loader=LoaderType.CONFIG_FILE,
+            identifier="config.yml",
         )
-        trace.add_checked("env_var", env_entry)
-        trace.final_source = env_entry
-
-        assert len(trace.checked_sources) == 3
-        assert trace.checked_sources[0] == ("cli_override", None)
-        assert trace.checked_sources[2][1] == env_entry
-
-    def test_format_trace(self) -> None:
-        """Test formatting the resolution trace."""
-        trace = CredentialResolutionTrace(
-            credential_type="username",
-            final_value="admin",
-            final_source=None,
+        history.record_field(
+            field_name="host",
+            value="192.168.1.1",
+            loader=LoaderType.CONFIG_FILE,
+            identifier="config.yml",
         )
 
-        trace.add_checked("cli_override", None)
+        # Default behavior: mask sensitive fields
+        result = history.to_dict()
+        assert result["password"][0]["value"] == "***MASKED***"
+        assert result["host"][0]["value"] == "192.168.1.1"
 
-        env_entry = FieldHistory(
-            field_name="username",
-            value="admin",
-            loader=LoaderType.ENV_VAR,
-            identifier="NW_USER_DEFAULT",
+    def test_to_dict_mask_sensitive_false(self) -> None:
+        """Test that to_dict shows values when mask_sensitive=False."""
+        history = ConfigHistory()
+        history.record_field(
+            field_name="password",
+            value="super_secret_password",
+            loader=LoaderType.CONFIG_FILE,
+            identifier="config.yml",
         )
-        trace.add_checked("env_var", env_entry)
-        trace.final_source = env_entry
 
-        lines = trace.format_trace()
-        assert "Resolution trace for username:" in lines[0]
-        assert "cli_override" in lines[1]
-        assert "not set" in lines[1]
-        assert "env_var" in lines[2]
-        assert "[SELECTED]" in lines[2]
+        result = history.to_dict(mask_sensitive=False)
+        assert result["password"][0]["value"] == "super_secret_password"
+
+    def test_to_dict_masks_all_sensitive_fields(self) -> None:
+        """Test that all sensitive field names are masked."""
+        history = ConfigHistory()
+        sensitive_fields = ["password", "auth_password", "secret", "key", "token"]
+        for field_name in sensitive_fields:
+            history.record_field(
+                field_name=field_name,
+                value="sensitive_value",
+                loader=LoaderType.CONFIG_FILE,
+            )
+
+        result = history.to_dict()
+        for field_name in sensitive_fields:
+            assert result[field_name][0]["value"] == "***MASKED***", (
+                f"Field {field_name} should be masked"
+            )
