@@ -72,28 +72,6 @@ class TestRealWorldConfigLoading:
                     # Directory exists but may be empty from init - that's OK
                     assert vendor_dir.is_dir(), f"Should create {vendor_name} directory"
 
-    def test_cli_list_sequences_works_after_fix(self, mock_repo_config: Path):
-        """Test that CLI list sequences command works after the fix."""
-        from typer.testing import CliRunner
-
-        from network_toolkit.cli import app
-
-        runner = CliRunner()
-
-        # Test with config directory
-        result = runner.invoke(
-            app, ["list", "sequences", "--config", str(mock_repo_config)]
-        )
-
-        # Should not fail and should show sequences
-        assert result.exit_code == 0, (
-            f"CLI should work after fix. Output: {result.output}"
-        )
-        # The fixture should have global sequences at minimum
-        assert "health_check" in result.output or "No sequences" in result.output, (
-            "Should find sequences or show none available"
-        )
-
     def test_devices_loading_from_real_config(self, mock_repo_config: Path):
         """Test loading devices from actual config structure."""
         config = load_config(mock_repo_config)

@@ -2,10 +2,10 @@ body:
   - type: markdown
     attributes:
       value: |
-        Welcome to networka discussions! 
-        
+        Welcome to networka discussions!
+
         Please choose the appropriate category for your discussion:
-        
+
         - **General** - General questions and discussions about networka
         - **Ideas** - Share ideas for new features or improvements
         - **Q&A** - Ask and answer questions about using networka

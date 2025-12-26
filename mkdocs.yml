@@ -12,6 +12,8 @@ nav:
     - Platform compatibility: platform-compatibility.md
   - User guide:
     - Configuration: configuration.md
+    - SSH config sync: ssh-config-sync.md
+    - Nornir & Containerlab inventory: nornir-inventory.md
     - Environment variables: environment-variables.md
     - Running commands: running-commands.md
     - Results: results.md
@@ -23,9 +25,15 @@ nav:
     - Interactive credentials: interactive-credentials.md
     - Transport: transport.md
     - IP address support: ip-address-support.md
-    - tmux SSH sessions: tmux-ssh.md
+    - tmux CLI sessions: tmux-ssh.md
     - Recipes: examples/recipes.md
     - Examples (user sequences): examples/user_sequences/README.md
+  - Library (Python API):
+      - Overview: library/index.md
+      - Quickstart: library/quickstart.md
+      - Sessions: library/sessions.md
+      - Ad-hoc Targets: library/adhoc-targets.md
+      - Recipes: library/recipes.md
   - Troubleshooting: troubleshooting.md
   - Vendors:
     - Overview: vendors/index.md
@@ -137,11 +145,10 @@ markdown_extensions:
       custom_checkbox: true
   - pymdownx.tilde
   - tables
-  - mkdocs-click
 
 extra:
   announcement: >-
-    Onboarding first: our docs aim to get you to your first successful `nw run` in minutes. If a step slows users down, we fix or remove it. Defaults should work, commands are copy‑pasteable, and every page shows the shortest path to success.
+    From install to first command in seconds. Lightweight CLI automation for network engineers who want results now.
 
 watch:
   - src

@@ -18,8 +18,15 @@ def test_color_system_no_color_mode() -> None:
     # Create a mock config with empty devices
     mock_config = Mock()
     mock_config.devices = {}
+    mock_config.general = Mock()
+    mock_config.general.output_mode = "default"
+    mock_config.general.log_level = "WARNING"
+    mock_config.general.enable_logging = False
 
-    with patch("network_toolkit.config.load_config", return_value=mock_config):
+    with (
+        patch("network_toolkit.common.command.load_config", return_value=mock_config),
+        patch("network_toolkit.commands.list.load_config", return_value=mock_config),
+    ):
         # Test the command works in no-color mode
         result = runner.invoke(app, ["list", "devices", "--output-mode", "no-color"])
 
@@ -31,18 +38,30 @@ def test_color_system_no_color_mode() -> None:
 
 def test_color_system_default_mode() -> None:
     """Test that default color mode works."""
+    from network_toolkit.config import DeviceConfig, GeneralConfig, NetworkConfig
+
     runner = CliRunner()
 
-    # Create a mock config with a device
-    mock_config = Mock()
-    mock_device = Mock()
-    mock_device.host = "192.168.1.1"
-    mock_device.port = 22
-    mock_device.platform = "routeros"
-    mock_device.groups = []
-    mock_config.devices = {"test-device": mock_device}
+    # Create proper Pydantic config objects
+    general = GeneralConfig(
+        output_mode="default", log_level="WARNING", enable_logging=False
+    )
+    device = DeviceConfig(
+        host="192.168.1.1",
+        port=22,
+        device_type="mikrotik_routeros",
+        platform="tile",
+    )
+    mock_config = NetworkConfig(
+        devices={"test-device": device},
+        device_groups={},
+        general=general,
+    )
 
-    with patch("network_toolkit.config.load_config", return_value=mock_config):
+    with (
+        patch("network_toolkit.common.command.load_config", return_value=mock_config),
+        patch("network_toolkit.commands.list.load_config", return_value=mock_config),
+    ):
         # Test the command works in default mode
         result = runner.invoke(app, ["list", "devices"])
 

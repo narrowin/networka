@@ -130,11 +130,8 @@ class TestListCommand:
         """Test list sequences with verbose output."""
         runner = CliRunner()
 
-        with patch("network_toolkit.commands.list.SequenceManager") as mock_sm_class:
-            # Mock the SequenceManager class and its instance methods
-            mock_sm_instance = mock_sm_class.return_value
-            mock_sm_instance.list_all_sequences.return_value = {}
-            mock_sm_instance.list_vendor_sequences.return_value = {}
+        with patch("network_toolkit.api.list.get_sequence_list") as mock_get_sequences:
+            mock_get_sequences.return_value = []
 
             # Also mock the CommandContext to avoid any issues
             with patch(

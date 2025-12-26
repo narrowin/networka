@@ -431,7 +431,7 @@ def install_shell_completions(selected: str) -> tuple[Path | None, Path | None]:
         if selected == "bash":
             cand = sc_dir / "bash_completion_nw.sh"
         else:
-            cand = sc_dir / "zsh_completion_netkit.zsh"
+            cand = sc_dir / "zsh_completion_nw.zsh"
         if cand.exists():
             repo_src = cand
 
@@ -1282,7 +1282,7 @@ def register(app: typer.Typer) -> None:
 
         The 'nw' command will automatically find configurations in these locations.
         """
-        setup_logging("DEBUG" if verbose else "INFO")
+        setup_logging("DEBUG" if verbose else "WARNING")
 
         # Show banner for config init
         from network_toolkit.banner import show_banner
@@ -1345,7 +1345,7 @@ def register(app: typer.Typer) -> None:
         ] = False,
     ) -> None:
         """Validate the configuration file and show any issues."""
-        setup_logging("DEBUG" if verbose else "INFO")
+        setup_logging("DEBUG" if verbose else "WARNING")
 
         try:
             # Use the local implementation
@@ -1380,7 +1380,7 @@ def register(app: typer.Typer) -> None:
         ] = False,
     ) -> None:
         """Show supported device types and platform information."""
-        setup_logging("DEBUG" if verbose else "INFO")
+        setup_logging("DEBUG" if verbose else "WARNING")
 
         ctx = CommandContext()
 
@@ -1451,7 +1451,7 @@ def register(app: typer.Typer) -> None:
         List available backups:
           nw config update --list-backups
         """
-        setup_logging("DEBUG" if verbose else "INFO")
+        setup_logging("DEBUG" if verbose else "WARNING")
 
         try:
             _config_update_impl(

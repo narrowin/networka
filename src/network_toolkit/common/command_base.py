@@ -11,10 +11,7 @@ import typer
 
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.logging import setup_logging
-from network_toolkit.common.output import (
-    get_output_manager,
-    set_output_mode,
-)
+from network_toolkit.common.output import get_output_manager, set_output_mode
 from network_toolkit.common.styles import StyleManager
 from network_toolkit.exceptions import NetworkToolkitError
 
@@ -62,7 +59,7 @@ def standardized_command(
             if verbose:
                 setup_logging("DEBUG")
             else:
-                setup_logging("INFO")
+                setup_logging("WARNING")
 
             # Create style manager for themed output
             style_manager = StyleManager(output_manager.mode)

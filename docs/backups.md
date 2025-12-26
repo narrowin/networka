@@ -12,7 +12,7 @@ nw backup config device1
 nw backup comprehensive device1
 
 # Group operations with options
-nw backup comprehensive office_switches --store-results
+nw backup comprehensive office_switches --delete-remote
 nw backup config device1 --delete-remote
 ```
 
@@ -23,8 +23,8 @@ Platform behavior:
 
 Tips:
 
-- Combine with `--store-results` to archive outputs in the results directory.
 - Use device groups to back up multiple devices concurrently.
+- Control remote file cleanup with `--delete-remote/--keep-remote`.
 - See vendor pages for platform-specific details.
 - Discover which vendors support backup operations in your build:
 

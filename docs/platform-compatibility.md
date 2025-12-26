@@ -44,12 +44,12 @@ CI covers Linux, macOS, and Windows runners across Python 3.11–3.13. For produ
 
 1. Enable WSL and install Ubuntu from the Microsoft Store
 2. Open Ubuntu terminal
-3. Install uv and git, then install Networka from GitHub:
+3. Install uv and git, then install Networka:
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 exec $SHELL
-uv tool install git+https://github.com/narrowin/networka.git
+uv tool install networka
 nw --help
 ```
 
@@ -133,14 +133,14 @@ Performance is comparable across Linux and macOS. On Windows, use WSL2 for best 
 
 ```dockerfile
 FROM python:3.12-slim
-RUN pip install git+https://github.com/narrowin/networka.git
+RUN pip install networka
 ```
 
 ### Podman
 
 ```bash
 podman run -it python:3.12-slim
-pip install git+https://github.com/narrowin/networka.git
+pip install networka
 ```
 
 ## CI/CD Integration

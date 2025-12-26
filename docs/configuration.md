@@ -6,9 +6,9 @@ Note on credentials: See Environment variables (TL;DR at the top) for how creden
 
 ## Directory layout
 
-Place configuration under the `config/` directory:
+Networka expects a modular configuration rooted at the platform-specific application directory created by `nw config init` (Linux: `~/.config/networka`, macOS: `~/Library/Application Support/networka`, Windows: `%APPDATA%\networka`). Within that root, place configuration under the `config/` directory:
 
-```
+```text
 config/
 ├── config.yml                 # Optional global defaults
 ├── devices/                   # Device definitions (YAML or CSV)
@@ -33,6 +33,31 @@ Networka loads all files in these folders. Later files override earlier ones whe
 - Sequences: named sets of commands to run consistently.
 
 Credentials come from environment variables; see Environment variables for details.
+
+## Using Nornir / Containerlab inventory (optional) {#nornir-inventory}
+
+Networka can import inventory from a Nornir **SimpleInventory** file layout, including Containerlab’s generated `nornir-simple-inventory.yml`.
+
+Configure this in `config/config.yml`:
+
+```yaml
+inventory:
+  source: nornir_simple
+  nornir_inventory_dir: /path/to/clab-<lab-dir>   # or a direct file path
+  merge_mode: replace
+```
+
+See [Nornir & Containerlab inventory](nornir-inventory.md) for the full workflow and options.
+
+## Syncing from SSH config {#ssh-config-sync}
+
+Already have hosts in `~/.ssh/config`? Sync them to a YAML inventory:
+
+```bash
+nw sync ssh-config
+```
+
+See [SSH config sync](ssh-config-sync.md) for filtering, updates, and advanced usage.
 
 ## YAML (preferred) {#yaml}
 
@@ -155,12 +180,12 @@ general:
   # Set to true for maximum security (requires manual key management)
 ```
 
-For the `run` and `ssh` commands, you can completely disable all host key verification per-command:
+For the `run` and `cli` commands, you can completely disable all host key verification per-command:
 
 ```bash
 # Completely disable host key verification (INSECURE - lab use only)
 nw run router1 '/system/identity/print' --no-strict-host-key-checking
-nw ssh router1 --no-strict-host-key-checking
+nw cli router1 --no-strict-host-key-checking
 ```
 
 ## Bootstrap configuration (CLI)
@@ -168,6 +193,7 @@ nw ssh router1 --no-strict-host-key-checking
 Use the built-in `config` commands to inspect and manage configuration from the CLI. See the CLI reference for the full command set and options.
 
 - List known devices/groups: `nw list devices` / `nw list groups`
-- Validate config against schema: `nw schema validate`
+- Regenerate editor schemas: `nw schema install`
+- Inspect schema status: `nw schema info`
 
 More: CLI reference → Configuration-related commands

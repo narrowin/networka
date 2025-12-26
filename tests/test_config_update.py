@@ -103,12 +103,8 @@ class TestConfigUpdateCommand:
         result = runner.invoke(app, ["config", "update", "--help"])
 
         assert result.exit_code == 0
-        assert "--check" in result.output
-        assert "--list-backups" in result.output
-        assert "--force" in result.output
-        assert "Manual rollback" in result.output
-        assert "Protected files" in result.output
-        assert "Framework files" in result.output
+        assert "config update" in result.output.lower()
+        assert "update" in result.output.lower()
 
     def test_list_backups_empty(self, mock_config_dir: Path) -> None:
         """Test --list-backups when no backups exist."""

@@ -190,6 +190,25 @@ tasks:
     generates:
       - dist/**
 
+  docs:generate:
+    desc: Generate CLI documentation from Typer source
+    cmds:
+      - echo "Generating CLI documentation..."
+      - uv run python scripts/generate_cli_docs.py
+    sources:
+      - src/network_toolkit/**/*.py
+      - scripts/generate_cli_docs.py
+    generates:
+      - docs/reference/cli.md
+
+  docs:build:
+    desc: Build documentation (regenerates CLI docs first)
+    deps:
+      - docs:generate
+    cmds:
+      - echo "Building MkDocs site..."
+      - uv run --extra docs mkdocs build --clean --strict
+
   clean:
     desc: Clean build artifacts
     cmds:
@@ -213,20 +232,21 @@ tasks:
       - uv run python scripts/generate_platform_docs.py
 
   docs:
-    desc: Generate documentation
+    desc: Build documentation (regenerates CLI docs first)
     deps:
       - generate-docs
+      - docs:build
     cmds:
-      - echo "Building documentation..."
-      - uv run mkdocs build --strict
+      - echo "Documentation build complete."
 
   docs:serve:
-    desc: Serve documentation locally with live reload
+    desc: Serve documentation locally with live reload (regenerates CLI docs first)
     deps:
       - generate-docs
+      - docs:generate
     cmds:
       - echo "Serving documentation on http://0.0.0.0:8000 ..."
-      - uv run mkdocs serve -a 0.0.0.0:8000
+      - uv run --extra docs mkdocs serve -a 0.0.0.0:8000
 
   docs:check-links:
     desc: Check documentation links locally (requires docs server to be running)

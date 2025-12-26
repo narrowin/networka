@@ -22,6 +22,12 @@ class PlatformCapabilities:
     def supports_tmux(self) -> bool:
         """Check if tmux is supported on this platform."""
         if self._tmux_available is None:
+            # First check if tmux binary exists
+            if not shutil.which("tmux"):
+                self._tmux_available = False
+                return self._tmux_available
+
+            # Then check if we can import and use libtmux
             try:
                 import libtmux
 

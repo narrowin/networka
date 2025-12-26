@@ -1,7 +1,7 @@
-"""Hidden completion helper for dynamic shell completions.
+"""Hidden completion command.
 
-This command is intentionally undocumented in user help and prints plain
-newline-separated values for use by completion scripts (bash/zsh/fish).
+This command is used internally by shell completion scripts to dynamically retrieve
+newline-separated values for use by completion scripts (bash/zsh).
 """
 
 from __future__ import annotations
@@ -13,6 +13,12 @@ import typer
 
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.config import NetworkConfig, load_config
+from network_toolkit.inventory.resolve import (
+    list_unique_device_names,
+    list_unique_group_names,
+    resolve_named_targets,
+    select_named_target,
+)
 from network_toolkit.sequence_manager import SequenceManager
 
 
@@ -29,7 +35,7 @@ def _list_commands() -> list[str]:
         "download",
         "backup",
         "firmware",
-        "ssh",
+        "cli",
         "diff",
         "list",
         "config",
@@ -39,11 +45,11 @@ def _list_commands() -> list[str]:
 
 
 def _list_devices(config: NetworkConfig) -> list[str]:
-    return list(config.devices.keys()) if config.devices else []
+    return list_unique_device_names(config)
 
 
 def _list_groups(config: NetworkConfig) -> list[str]:
-    return list(config.device_groups.keys()) if config.device_groups else []
+    return list_unique_group_names(config)
 
 
 def _list_sequence_groups(config: NetworkConfig) -> list[str]:
@@ -77,21 +83,24 @@ def _list_vendors(config: NetworkConfig) -> list[str]:
 
 def _list_sequences(config: NetworkConfig, *, target: str | None) -> list[str]:
     names: set[str] = set()
+    target_kind: str | None = None
+    if target:
+        target_kind = select_named_target(config, target)
+
+    # Global command sequences (vendor-agnostic)
+    if config.global_command_sequences:
+        names.update(config.global_command_sequences.keys())
 
     # Device-specific sequences (either for a specific device/group or across all)
     if config.devices:
-        if target and target in config.devices:
+        if target_kind == "device" and target and target in config.devices:
             dev = config.devices[target]
             if dev.command_sequences:
                 names.update(dev.command_sequences.keys())
-        elif (
-            target
-            and getattr(config, "device_groups", None)
-            and (config.device_groups is not None and target in config.device_groups)
-        ):
-            # Include device-defined sequences from all devices in the group
-            for dev_name in config.get_group_members(target):
-                dev2 = config.devices.get(dev_name)
+        elif target_kind == "group" and target:
+            members = resolve_named_targets(config, target).resolved_devices
+            for dev_name in members:
+                dev2 = (config.devices or {}).get(dev_name)
                 if dev2 and dev2.command_sequences:
                     names.update(dev2.command_sequences.keys())
         else:
@@ -102,18 +111,16 @@ def _list_sequences(config: NetworkConfig, *, target: str | None) -> list[str]:
     # Vendor/user sequences via SequenceManager if we have a target context
     sm = SequenceManager(config)
     if target and config.devices:
-        if target in config.devices:
+        if target_kind == "device" and target in config.devices:
             # Single device: include its vendor sequences
             platform = config.devices[target].device_type
             vendor = sm.list_vendor_sequences(platform)
             names.update(vendor.keys())
-        elif getattr(config, "device_groups", None) and (
-            config.device_groups is not None and target in config.device_groups
-        ):
-            # Group: union sequences across all vendors in the group
+        elif target_kind == "group":
+            members = resolve_named_targets(config, target).resolved_devices
             platforms: set[str] = set()
-            for dev_name in config.get_group_members(target):
-                dev3 = config.devices.get(dev_name)
+            for dev_name in members:
+                dev3 = (config.devices or {}).get(dev_name)
                 if dev3 and dev3.device_type:
                     platforms.add(dev3.device_type)
             for plat in platforms:

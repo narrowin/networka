@@ -5,6 +5,11 @@
 
 <br/>
 
+Network automation CLI. Apache 2.0 licensed. Fully open-source.
+Originally developed at [narrowin](https://narrowin.ch/en/about.html), now community maintained.
+
+<br/>
+
 **Networka: `Eierlegende Wollmilchsau` of network operations — optimized for your daily workflows.**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
@@ -12,12 +17,9 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Type checked with mypy](https://img.shields.io/badge/mypy-checked-blue.svg)](http://mypy-lang.org/)
-[![CI](https://github.com/narrowin/networka/actions/workflows/ci.yml/badge.svg)](https://github.com/narrowin/networka/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/github/actions/workflow/status/narrowin/networka/docs.yml?label=Docs&logo=github)](https://narrowin.github.io/networka/)
 
 Networka is a modern CLI tool for automating network devices across multiple vendors. Designed for network engineers who want fast, scalable automation with full cross-platform support.
-
-Built almost entirely with agentic-AI, this is an experiment that turned into something genuinely useful.
 
 ---
 
@@ -53,6 +55,18 @@ Because a real **Networka** wants the f\*ing lot.”<br><br>
   <p><em>Networka setup and command execution demo</em></p>
 </div>
 
+## Networka vs the alternatives
+
+| | Networka | Ansible | Nornir |
+|---|---|---|---|
+| Primary interface | CLI commands | YAML playbooks | Python scripts |
+| Time to first command | Seconds after install | After writing playbook + inventory | After writing Python script |
+| Learning curve | Familiar CLI patterns | YAML, Jinja2, modules | Python programming |
+| Execution | Concurrent by default | Sequential by default | Depends on implementation |
+| Best for | Daily operations, ad-hoc commands | Infrastructure-as-code, compliance | Custom automation frameworks |
+
+Networka is built for network engineers who want to run commands now. Ansible excels at declarative infrastructure-as-code. Nornir shines when you need full Python programmability. Different tools, each great at what they do.
+
 ## Features
 
 ### **Core Capabilities**
@@ -68,7 +82,7 @@ Because a real **Networka** wants the f\*ing lot.”<br><br>
 - **File management**: Upload/download files to/from network devices with verification and error handling
 - **Device backup**: Automated configuration and comprehensive backups with vendor-specific implementations
 - **Firmware management**: Upgrade, downgrade, and BIOS operations with platform validation
-- **SSH session management**: Direct SSH access with tmux integration for interactive sessions
+- **CLI session management**: Direct CLI access with tmux integration for interactive sessions
 
 ### **Advanced Features**
 
@@ -90,20 +104,20 @@ Because a real **Networka** wants the f\*ing lot.”<br><br>
 ### System Requirements
 
 - **Operating System**: Linux, macOS, or Windows
-- **Python**: 3.11, 3.12, or 3.13
 - **Network Access**: SSH connectivity to target devices
 - **Package Manager**: uv (recommended) or pip
+- **tmux for `nw cli`**: Install tmux to use the multi-pane CLI command (`brew install tmux` on macOS, `apt install tmux` on Debian/Ubuntu). libtmux is installed automatically with Networka.
 
 ### Quick Install (recommended)
 
-Not on PyPI yet — install from GitHub.
+Install from PyPI using an isolated tool installer.
 
 ```bash
 # Recommended (isolated, user-wide)
-uv tool install git+https://github.com/narrowin/networka.git
+uv tool install networka
 
 # Alternative
-pipx install git+https://github.com/narrowin/networka.git
+pipx install networka
 
 # Verify installation
 nw --help
@@ -129,13 +143,13 @@ More → PATH troubleshooting: https://narrowin.github.io/networka/troubleshooti
 ### Upgrade & Remove
 
 ```bash
-# Upgrade to latest version (from GitHub)
-uv tool install --force git+https://github.com/narrowin/networka.git
+# Upgrade to latest version
+uv tool upgrade networka
 # or
-pipx install --force git+https://github.com/narrowin/networka.git
+pipx upgrade networka
 
 # Remove installation
-uv tool uninstall nw
+uv tool uninstall networka
 # or
 pipx uninstall networka
 ```
@@ -152,7 +166,7 @@ WSL2 quickstart (recommended):
 # In Ubuntu on WSL2
 curl -LsSf https://astral.sh/uv/install.sh | sh
 exec $SHELL
-uv tool install git+https://github.com/narrowin/networka.git
+uv tool install networka
 nw --help
 ```
 
@@ -167,6 +181,27 @@ Get up and running with config init command:
 nw config init
 
 ```
+
+### Library API
+
+Use Networka programmatically in your Python applications:
+
+```python
+from network_toolkit import NetworkaClient, DeviceSession
+
+client = NetworkaClient()
+
+with DeviceSession("router1", client.config) as session:
+    output = session.execute_command("show version")
+    print(output)
+```
+
+See the [Library Documentation](https://narrowin.github.io/networka/library/) for:
+
+- Multi-command workflows with persistent sessions
+- Ad-hoc IP targeting without configuration files
+- Credential handling patterns
+- Integration recipes
 
 ### One-liners (no config)
 
@@ -235,7 +270,11 @@ Have a look through existing [Issues](https://github.com/narrowin/networka/issue
 
 ## License
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+Apache License 2.0 - Free for commercial and personal use.
+No paid tiers, no enterprise versions, no licensing restrictions.
+
+Community-driven project with contributions from [narrowin](https://narrowin.ch/en/about.html) and network engineers worldwide.
+See [GOVERNANCE.md](GOVERNANCE.md) for maintenance and decision-making model.
 
 ## Acknowledgments
 

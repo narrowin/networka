@@ -31,7 +31,7 @@ docs/assets/gifs/
 ## Feature Demo
 
 <div align="center">
-  <img src="../assets/gifs/feature-demo.gif" alt="Feature Demo" width="100%" style="max-width: 800px;"/>
+  <img src="assets/gifs/feature-demo.gif" alt="Feature Demo" width="100%" style="max-width: 800px;"/>
   <p><em>Description of what the GIF demonstrates</em></p>
 </div>
 ```
@@ -75,7 +75,7 @@ Add to `docs/running-commands.md`:
 ```markdown
 ## Quick Example
 
-<img src="../assets/gifs/running-commands.gif" alt="Running Commands Demo" width="100%"/>
+<img src="assets/gifs/running-commands.gif" alt="Running Commands Demo" width="100%"/>
 
 The above shows executing a command across multiple devices...
 ```
@@ -86,7 +86,7 @@ Add to `docs/getting-started.md`:
 ```markdown
 ## Installation Demo
 
-<img src="../assets/gifs/installation.gif" alt="Installation Process" width="100%"/>
+<img src="assets/gifs/installation.gif" alt="Installation Process" width="100%"/>
 
 Follow these steps to install Networka...
 ```

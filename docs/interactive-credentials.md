@@ -2,168 +2,67 @@
 
 ## Overview
 
-The Network Toolkit now supports interactive credential input through the `--interactive-auth` (or `-i`) flag, providing a secure way to enter credentials at runtime without storing them in environment variables, .env files, or configuration files.
+Use the `--interactive-auth` flag (or the short `-i`) when you want the CLI to prompt for credentials at runtime instead of reading them from files or environment variables. Interactive prompts are available on the commands that establish device sessions: `nw run` and `nw info`.
 
-## Usage
+## How It Works
 
-Add the `--interactive-auth` or `-i` flag to any command that connects to devices:
+When `--interactive-auth` is provided, the CLI prompts once for a username and password, then applies those values to every targeted device in the invocation. Prompts respect the configured output mode, so messages stay quiet when `--output-mode raw` is active.
 
-````bash
-# Device information with interactive auth
-nw info sw-acc1 --interactive-auth
+### Credential Resolution Order
 
-# Execute commands with interactive auth
-nw run sw-acc1 '/system/identity/print' --interactive-auth
+The project resolves credentials using the following priority chain (highest first):
 
-# Multiple devices with interactive auth (short flag)
-nw run sw-acc1,sw-acc2 '/system/clock/print' -i
+1. Interactive overrides supplied via `--interactive-auth`
+2. Device credentials defined in the modular configuration (`user` / `password` fields or device overrides)
+3. Device-scoped environment variables (`NW_USER_<DEVICE>`, `NW_PASSWORD_<DEVICE>`)
+4. Group-level credentials from the configuration or matching environment variables (`NW_USER_<GROUP>`, `NW_PASSWORD_<GROUP>`)
+5. Default environment variables (`NW_USER_DEFAULT`, `NW_PASSWORD_DEFAULT`)
 
-# Group operations with interactive auth
-nw run access_switches system_info --interactive-auth
-```bash
-# Execute command with interactive auth
-$ nw run sw-acc1 '/system/identity/print' -i
-Interactive authentication mode enabled
-Username [admin]: myuser
-Password: ********
-Will use username: myuser
+>.env files in the config directory are loaded automatically, but exported environment variables always win over values from a file.
 
-Executing on sw-acc1: /system/identity/print
-name="MikroTik"
-Command completed successfully on sw-acc1
-````
+### Environment Variable Naming
 
-1. **`src/network_toolkit/common/credentials.py`** - New module providing:
+Use the `NW_<TYPE>_<TARGET>` pattern with uppercase names and hyphens replaced by underscores. Common examples:
 
-   - `InteractiveCredentials` - Type-safe credential container (NamedTuple)
-   - `prompt_for_credentials()` - Secure credential input using getpass
-   - `confirm_credentials()` - Optional credential verification
+```text
+NW_USER_DEFAULT=admin
+NW_PASSWORD_DEFAULT=changeme
 
-2. **Enhanced Configuration System** - `src/network_toolkit/config.py`:
+# Device-specific overrides
+NW_USER_SW_ACC1=opsuser
+NW_PASSWORD_SW_ACC1=s3cr3t
 
-   - `get_device_connection_params()` now accepts credential overrides
-   - Maintains compatibility with existing credential sources
+# Group-level overrides
+NW_USER_ACCESS_SWITCHES=opsuser
+NW_PASSWORD_ACCESS_SWITCHES=groupsecret
+```
 
-3. **Updated Device Session** - `src/network_toolkit/device.py`:
-
-   - `DeviceSession` constructor accepts username/password overrides
-   - Credential override parameters passed to connection logic
-
-4. **CLI Integration** - Commands updated with `--interactive-auth` flag:
-   - `info` command - Shows device information with interactive auth
-   - `run` command - Executes commands with interactive auth support
-
-### Credential Resolution Priority
-
-1. **Interactive credentials** (highest priority) - When `--interactive-auth` is used
-2. **Environment variables** - `NW_USER_DEFAULT`, `NW_PASSWORD_DEFAULT`, device-specific overrides
-3. **Configuration file** - Defaults in modular `config.yml` (discouraged)
-
-### Error Handling
-
-- **Empty username/password**: Raises `typer.BadParameter` with descriptive message
-- **KeyboardInterrupt**: Properly propagated to allow clean cancellation
-- **Connection failures**: Existing error handling maintained
-
-## Testing
-
-### Test Coverage
-
-- **Unit tests**: `tests/test_credentials.py` - 14 tests covering all credential functionality
-- **Integration tests**: Existing CLI and config tests continue to pass
-- **Validation**: All tests pass, ensuring no regressions
-
-### Test Categories
-
-1. **InteractiveCredentials class**: Immutability, equality, creation
-2. **Credential prompting**: Basic prompting, defaults, error conditions
-3. **Credential confirmation**: Accept/reject flow, keyboard interrupts
-4. **Integration scenarios**: Full workflow, rejection handling
-5. **Error handling**: Exception propagation, validation
+These variables can live in the environment or in a `.env` file alongside the configuration tree.
 
 ## Examples
 
-### Basic Usage
-
-````bash
-# Info command with interactive auth
+```bash
 $ nw info sw-acc1 --interactive-auth
 Interactive authentication mode enabled
-Username [admin]: admin
+Username [admin]: opsuser
 Password: ********
-Will use username: admin
+Will use username: opsuser
 
 Device: sw-acc1
-├─ Connection: Not tested (use --check for live connection)
 ├─ Host: 192.168.1.10
 ├─ Port: 22
-├─ Credentials: Interactive (admin)
+├─ Credentials: Interactive (opsuser)
 └─ Groups: access_switches
-```bash
-# Run on multiple devices
-$ nw run sw-acc1,sw-acc2 '/system/clock/print' --interactive-auth
+
+$ nw run sw-acc1,sw-acc2 '/system/clock/print' -i
 Interactive authentication mode enabled
-Username [admin]: admin
+Username [admin]: opsuser
 Password: ********
-Will use username: admin
-
-Executing on sw-acc1,sw-acc2: '/system/clock/print'
-Command completed successfully on sw-acc1
-Command completed successfully on sw-acc2
-````
-
-Executing on sw-acc1: /system/identity/print
-name="MikroTik"
-✓ Command completed successfully on sw-acc1
-
-````
-
-### Multiple Devices
-
-```bash
-# Run on multiple devices
-$ nw run sw-acc1,sw-acc2 '/system/clock/print' --interactive-auth
-Interactive authentication mode enabled
-Username [admin]: admin
-Password: ********
-Will use username: admin
+Will use username: opsuser
 
 Executing on sw-acc1,sw-acc2: /system/clock/print
 ✓ Command completed successfully on sw-acc1
 ✓ Command completed successfully on sw-acc2
-````
-
-## Implementation Notes
-
-### Type Safety
-
-All functions use proper type annotations with Python 3.11+ typing features:
-
-```python
-def prompt_for_credentials(
-    username_prompt: str = "Username",
-    password_prompt: str = "Password",
-    default_username: str | None = None,
-) -> InteractiveCredentials:
 ```
 
-### Backward Compatibility
-
-- All existing functionality remains unchanged
-- Environment variables and config files still work as before
-- Interactive auth is purely additive - no breaking changes
-- Existing scripts and automation continue to work
-
-## Future Enhancements
-
-Potential improvements for future versions:
-
-1. **Credential caching**: Optional session-based credential caching
-2. **SSH key support**: Interactive SSH key selection and passphrase entry
-3. **Multi-factor auth**: Support for 2FA/MFA prompts
-4. **Credential managers**: Integration with system credential stores
-5. **Role-based auth**: Different credentials for different device roles
-
-## Conclusion
-
-The interactive credentials feature provides a secure, user-friendly way to handle authentication in the Network Toolkit while maintaining full backward compatibility and following security best practices. The implementation is well-tested, type-safe, and follows the project's architectural patterns.
+Interactive prompts respect cancellations. Press `Ctrl+C` at any prompt to abort without making changes.

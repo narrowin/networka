@@ -1,6 +1,6 @@
-# Cross-Platform SSH fanout
+# Cross-Platform CLI fanout
 
-This adds a `nw ssh` command that opens SSH sessions to multiple devices simultaneously. The implementation adapts to your platform capabilities.
+This adds a `nw cli` command that opens CLI sessions to multiple devices simultaneously. The implementation adapts to your platform capabilities.
 
 ## Platform Support
 
@@ -42,11 +42,11 @@ This adds a `nw ssh` command that opens SSH sessions to multiple devices simulta
 
 ## Usage
 
-- Single device: `nw ssh sw-acc1`
-- Group: `nw ssh office_switches`
-- Custom layout: `nw ssh lab_devices --layout even-vertical`
-- Name session/window: `nw ssh core --session-name ops --window-name core-routers`
-- Disable synchronized typing: `nw ssh lab_devices --no-sync`
+- Single device: `nw cli sw-acc1`
+- Group: `nw cli office_switches`
+- Custom layout: `nw cli lab_devices --layout even-vertical`
+- Name session/window: `nw cli core --session-name ops --window-name core-routers`
+- Disable synchronized typing: `nw cli lab_devices --no-sync`
 
 **Synchronized typing is ENABLED by default** - your keystrokes are sent to all panes simultaneously. This is perfect for running the same commands across multiple devices. Use `--no-sync` to disable at startup.
 
@@ -54,8 +54,8 @@ This adds a `nw ssh` command that opens SSH sessions to multiple devices simulta
 
 ### At startup:
 
-- `nw ssh devices` - sync enabled (default)
-- `nw ssh devices --no-sync` - start with sync disabled
+- `nw cli devices` - sync enabled (default)
+- `nw cli devices --no-sync` - start with sync disabled
 
 ### Toggle during session:
 

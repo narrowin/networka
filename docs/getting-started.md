@@ -1,18 +1,22 @@
 # Installation
 
-## Installation (not on PyPI yet)
+## Installation
 
-Install from GitHub using an isolated tool installer.
+Install from PyPI using an isolated tool installer (recommended).
 
 ```bash
-uv tool install git+https://github.com/narrowin/networka.git
+uv tool install networka
 # or
-pipx install git+https://github.com/narrowin/networka.git
+pipx install networka
 ```
 
 Short install video (30s):
 
 [asciinema placeholder – will be embedded here]
+
+### tmux requirement for `nw cli`
+
+The multi-pane CLI command (`nw cli`) requires tmux on your PATH. Install it with `brew install tmux` (macOS), `apt install tmux` (Debian/Ubuntu), or your distro’s package manager. Without tmux the command falls back to sequential SSH sessions.
 
 ## Verify installation
 
@@ -23,7 +27,21 @@ nw --version
 
 ## Minimal configuration
 
-Create a devices file `config/devices/router1.yml`:
+Option 1 (recommended): bootstrap the default config tree and follow the prompts.
+
+```bash
+nw config init
+```
+
+This creates a modular configuration at the platform-specific application path:
+
+- Linux: `~/.config/networka`
+- macOS: `~/Library/Application Support/networka`
+- Windows: `%APPDATA%\networka` (typically `C:\Users\<you>\AppData\Roaming\networka`)
+
+Option 2: copy the repository’s `config/` directory into that application path if you prefer to start from the examples committed in source control. Make sure the destination contains `config.yml`, `devices/`, `groups/`, and `sequences/` exactly as expected by the loader.
+
+With the configuration in place, add a device definition under `devices/` (for example, `devices/router1.yml`):
 
 ```yaml
 host: 192.0.2.10
@@ -38,13 +56,13 @@ nw run router1 "/system/identity/print"
 
 Expected output (trimmed):
 
-```
+```text
 Executing on router1: /system/identity/print
 name="MikroTik"
 Command completed successfully
 ```
 
-See User guide for configuration details.
+See the User guide for additional configuration options.
 
 ## Next steps
 

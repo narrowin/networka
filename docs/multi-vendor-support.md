@@ -52,7 +52,7 @@ The architecture is designed to easily support additional vendors by:
 
 Sequences are organized by vendor platform following Scrapli naming conventions:
 
-```
+```text
 config/sequences/
 ├── mikrotik_routeros/
 │   └── common.yml
@@ -63,16 +63,20 @@ config/sequences/
 ├── arista_eos/
 │   └── common.yml
 └── juniper_junos/
-    └── common.yml
+  └── common.yml
 ```
 
 ### Sequence Resolution Order
 
-When executing a sequence, the toolkit follows this priority order:
+When executing a sequence, the toolkit resolves commands in this priority order:
 
-1. **Global sequences** (highest priority) - Defined in `sequences.yml`
-2. **Vendor-specific sequences** - Based on device's `device_type`
-3. **Device-specific sequences** (lowest priority) - Defined in device configuration
+1. **Custom user sequences** (`sequences/custom/*.yml` in the user config directory)
+2. **User-defined vendor sequences** (`sequences/<vendor>/*.yml` in the user config directory)
+3. **Repository/vendor sequences** shipped with the project (`config/sequences/<vendor>/*.yml`)
+4. **Built-in sequences** packaged with Networka (`src/network_toolkit/builtin_sequences`)
+5. **Device-specific overrides** defined directly on a device entry
+
+If a sequence name is defined at multiple levels, the higher level overrides the lower ones. The legacy `config.vendor_sequences` entries remain a fallback only when no higher-precedence definition exists.
 
 ### Device Configuration
 
@@ -95,15 +99,14 @@ devices:
 
 ### Common Sequences Across Vendors
 
-All vendors support these standardized sequence names with vendor-appropriate commands:
+All vendors ship with a core set of sequence names implemented with vendor-appropriate commands:
 
 - `system_info` - Complete system information gathering
 - `health_check` - Basic health monitoring
-- `quick_status` - Quick device status overview
 - `interface_status` - Detailed interface information
-- `network_overview` - Network configuration overview
+- `routing_info` - Routing-related status
 - `security_audit` - Security configuration review
-- `connectivity_test` - Network connectivity testing
+- `backup_config` / `backup` - Configuration and diagnostic capture
 
 ### Vendor-Specific Command Examples
 
@@ -269,9 +272,9 @@ devices:
 
 Use standardized sequence names across vendors for common operations:
 
-- `system_info`, `health_check`, `quick_status`
-- `interface_status`, `network_overview`
-- `security_audit`, `connectivity_test`
+- `system_info`, `health_check`
+- `interface_status`, `routing_info`
+- `security_audit`, `backup_config`
 
 ### 2. Vendor-Specific Categories
 
@@ -331,7 +334,7 @@ Legacy single-file `sequences.yml` configurations are no longer supported; use m
 
 #### Sequence Not Found
 
-```
+```text
 Error: Sequence 'system_info' not found for device type
 ```
 
@@ -357,7 +360,7 @@ nw info device-name
 nw list sequences --vendor cisco_iosxe
 
 # Test with verbose logging
-nw run --verbose device-name system_info
+nw run device-name system_info --verbose
 ```
 
 ## Future Enhancements

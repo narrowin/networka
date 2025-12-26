@@ -37,7 +37,7 @@ def register(app: typer.Typer) -> None:
         - schemas/groups-config.schema.json (group collections)
         - .vscode/settings.json (VS Code YAML validation)
         """
-        setup_logging("DEBUG" if verbose else "INFO")
+        setup_logging("DEBUG" if verbose else "WARNING")
 
         try:
             _schema_update_impl(verbose=verbose)
@@ -64,7 +64,7 @@ def register(app: typer.Typer) -> None:
         like VS Code. These schemas provide auto-completion and error checking
         for network toolkit configuration files.
         """
-        setup_logging("DEBUG" if verbose else "INFO")
+        setup_logging("DEBUG" if verbose else "WARNING")
 
         try:
             _schema_info_impl(verbose=verbose)
