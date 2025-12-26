@@ -281,6 +281,7 @@ class TestBackupCommandIntegration:
         backup_dir.mkdir()
         return backup_dir
 
+    @pytest.mark.skip(reason="Requires full command flow mocking - see issue #42")
     def test_backup_command_creates_timestamped_directory(
         self, temp_backup_dir: Path
     ) -> None:
@@ -293,14 +294,10 @@ class TestBackupCommandIntegration:
         # Mock pattern: device_YYYYMMDD_HHMMSS
 
         # After running backup, check directory exists
-        list(temp_backup_dir.glob("test-device_*"))
+        backup_dirs = list(temp_backup_dir.glob("test-device_*"))
 
         # This assertion would verify directory was created
-        # assert len(backup_dirs) == 1
-        # assert re.match(expected_pattern, backup_dirs[0].name)
-
-        # Note: Full implementation requires mocking the entire command flow
-        pass
+        assert len(backup_dirs) == 1
 
     def test_backup_saves_text_outputs_to_files(self, temp_backup_dir: Path) -> None:
         """Verify text outputs from BackupResult are saved as files."""
