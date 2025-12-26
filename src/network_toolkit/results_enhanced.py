@@ -5,12 +5,13 @@ from __future__ import annotations
 import datetime as dt
 import json
 import logging
-import re
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import yaml
+
+from network_toolkit.common.filename_utils import normalize_filename
 
 if TYPE_CHECKING:
     from network_toolkit.config import NetworkConfig
@@ -63,19 +64,11 @@ class ResultsManager:
             self.session_dir = self._create_session_directory()
 
     def _sanitize_filename(self, text: str) -> str:
-        """Sanitize text for use in filenames, using underscores instead of spaces."""
-        # Replace common RouterOS path separators and special chars
-        sanitized = re.sub(r'[/\\:*?"<>|]', "_", text)
-        # Replace spaces and multiple underscores with single underscores
-        sanitized = re.sub(r"[\s_]+", "_", sanitized)
-        # Remove leading/trailing underscores and dots
-        sanitized = sanitized.strip("_.")
-        # Limit length to reasonable filename size
-        return (
-            sanitized[:MAX_FILENAME_LEN]
-            if len(sanitized) > MAX_FILENAME_LEN
-            else sanitized
-        )
+        """Sanitize text for use in filenames.
+
+        Uses centralized filename normalization from filename_utils module.
+        """
+        return normalize_filename(text, max_length=MAX_FILENAME_LEN)
 
     def _create_session_directory(self) -> Path:
         """Create a directory for this execution session."""
@@ -308,7 +301,8 @@ class ResultsManager:
             with filepath.open("w", encoding="utf-8") as f:
                 f.write("# Network Toolkit Results\n")
                 f.write(f"# Generated: {data['timestamp']}\n")
-                f.write(f"# Device: {data['device_name']}\n")
+                if data.get("device_name"):
+                    f.write(f"# Device: {data['device_name']}\n")
                 if data.get("nw_command"):
                     f.write(f"# NW Command: {data['nw_command']}\n")
                 f.write("\n")

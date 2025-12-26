@@ -55,7 +55,7 @@ _nw() {
                 if [[ -n "$result" ]]; then
                     echo "$result"
                 else
-                    echo "info run upload download backup firmware ssh diff list config schema complete"
+                    echo "info run upload download backup firmware cli diff list config schema complete"
                 fi
                 return ;;
             devices)
@@ -160,10 +160,11 @@ _nw() {
     local list_devices_opts="$output_opts $common_opts"
     local list_groups_opts="$output_opts $common_opts"
     local list_sequences_opts="--vendor --category $output_opts $common_opts"
-    local ssh_opts="--config -c --auth --user --password --layout --session-name --window-name --reuse --sync --no-sync --use-sshpass --attach --no-attach --platform -p --port $common_opts"
+    local cli_opts="--config -c --auth --user --password --layout --session-name --window-name --reuse --sync --no-sync --use-sshpass --attach --no-attach --platform -p --port $common_opts"
     local info_opts="--interactive-auth -i $output_opts $common_opts"
     local config_validate_opts="$common_opts"
     local config_init_opts="$common_opts --force"
+    local config_supported_types_opts="--verbose -v --help -h"
     local diff_opts="$common_opts"
 
     # Helper: complete from a list or options
@@ -197,14 +198,14 @@ _nw() {
                 _opts "$run_opts"
             fi
             ;;
-        ssh)
+        cli)
             if [[ ${COMP_CWORD} -eq 2 ]]; then
                 local groups devices
                 groups=$(_nw_list groups)
                 devices=$(_nw_list devices)
                 _opts "$groups $devices"
             else
-                if [[ $cur == -* ]]; then _opts "$ssh_opts"; fi
+                if [[ $cur == -* ]]; then _opts "$cli_opts"; fi
             fi
             ;;
         upload)
@@ -272,7 +273,7 @@ _nw() {
             # Handle list subcommands
             if [[ ${#COMP_WORDS[@]} -eq 3 ]]; then
                 # If we're at position 2 (after "nw list"), suggest subcommands
-                COMPREPLY=( $(compgen -W "devices groups sequences supported-types" -- "$cur") )
+                COMPREPLY=( $(compgen -W "devices groups sequences" -- "$cur") )
             elif [[ ${#COMP_WORDS[@]} -gt 3 ]]; then
                 # Handle options for specific subcommands
                 case "${COMP_WORDS[2]}" in
@@ -282,8 +283,6 @@ _nw() {
                         _opts "$list_groups_opts" ;;
                     sequences)
                         _opts "$list_sequences_opts" ;;
-                    supported-types)
-                        _opts "$common_opts" ;;
                     *)
                         _opts "$common_opts" ;;
                 esac
@@ -298,12 +297,16 @@ _nw() {
                         _opts "$config_init_opts" ;;
                     validate)
                         _opts "$config_validate_opts" ;;
+                    supported-types)
+                        _opts "$config_supported_types_opts" ;;
+                    update)
+                        _opts "$common_opts" ;;
                     *)
                         _opts "$common_opts" ;;
                 esac
             else
                 # Complete config subcommands
-                COMPREPLY=( $(compgen -W "init validate" -- "$cur") )
+                COMPREPLY=( $(compgen -W "init validate supported-types update" -- "$cur") )
             fi
             ;;
         complete)

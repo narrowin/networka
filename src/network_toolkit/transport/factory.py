@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
@@ -9,6 +10,8 @@ if TYPE_CHECKING:
 
     from network_toolkit.config import NetworkConfig
     from network_toolkit.transport.interfaces import Transport
+
+logger = logging.getLogger(__name__)
 
 
 class TransportFactory(Protocol):
@@ -45,8 +48,16 @@ class ScrapliTransportFactory:
         params = dict(connection_params)
         params["transport"] = (params.get("transport") or "system").lower()
 
-        # Create Scrapli driver and wrap it in our adapter
-        driver = DeviceScrapli(**params)
+        # For generic/linux connections without a platform, use GenericDriver
+        if "platform" not in params:
+            from scrapli.driver.generic import GenericDriver
+
+            logger.debug("Using GenericDriver (no platform specified)")
+            driver = GenericDriver(**params)
+        else:
+            # Use Scrapli factory for platform-specific drivers
+            logger.debug("Using Scrapli factory with platform=%s", params["platform"])
+            driver = DeviceScrapli(**params)
         adapter = DeviceScrapliSyncTransport(driver)
         # Expose raw driver for callers/tests that inspect underlying open/close
         try:

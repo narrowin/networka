@@ -47,6 +47,13 @@ class TestExactFailingCommands:
 
     def test_nw_list_sequences_default(self):
         """Test: nw list sequences (with no config specified)"""
+        # Skip if default config doesn't exist (e.g., in CI)
+        from network_toolkit.common.paths import default_modular_config_dir
+
+        default_config = default_modular_config_dir()
+        if not (default_config / "config.yml").exists():
+            pytest.skip("Default config not found (not in user environment)")
+
         runner = CliRunner()
         result = runner.invoke(app, ["list", "sequences"])
 

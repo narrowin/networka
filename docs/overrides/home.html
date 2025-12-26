@@ -3,107 +3,311 @@
 <!-- Custom CSS for homepage hero section -->
 {% block extrahead %}
   <style>
-    /* Clean hero section */
-    .hero {
-      background: linear-gradient(135deg, var(--md-primary-fg-color), var(--md-accent-fg-color));
-      color: white;
-      padding: 6rem 1rem;
-      text-align: center;
-      margin: 0;
+    /* Make header dark like other pages */
+    .md-header {
+      background: var(--md-primary-fg-color);
+      backdrop-filter: none;
+      border-bottom: none;
+      transition: all 0.3s ease;
     }
 
-    /* Remove gradient for dark mode */
-    [data-md-color-scheme="slate"] .hero {
+    [data-md-color-scheme="slate"] .md-header {
       background: var(--md-primary-fg-color);
+      border-bottom: none;
+    }
+
+    /* Hero section with parallax background */
+    .hero {
+      position: relative;
+      color: white;
+      padding: 4rem 1rem 2rem;
+      text-align: left;
+      margin: 0;
+      overflow: hidden;
+      /* Full width - extend beyond container */
+      margin-left: calc(-50vw + 50%);
+      margin-right: calc(-50vw + 50%);
+      width: 100vw;
+      margin-top: 0;
+      min-height: 100vh;
+      /* Background image with parallax effect */
+      background:
+        linear-gradient(rgba(30,41,59,0.35), rgba(30,41,59,0.45)),
+        url('/networka/assets/images/networka.jpg') center center / cover no-repeat fixed,
+        var(--md-default-bg-color); /* Use theme background as fallback */
+      background-attachment: fixed;
+    }
+
+    /* Dark mode adjustments */
+    [data-md-color-scheme="slate"] .hero {
+      background:
+        linear-gradient(rgba(15,23,42,0.45), rgba(15,23,42,0.55)),
+        url('/networka/assets/images/networka.jpg') center center / cover no-repeat fixed,
+        #1e293b; /* Use slate background color instead of CSS variable */
+      background-attachment: fixed;
+    }
+
+    /* Hero content styling */
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 35% 65%, rgba(255,255,255,0.15), transparent 60%);
+      mix-blend-mode: overlay;
+      pointer-events: none;
+      z-index: 1;
+      animation: heroGlow 12s ease-in-out infinite alternate;
+    }
+
+    @keyframes heroGlow {
+      0% { opacity: 0.35; }
+      50% { opacity: 0.55; }
+      100% { opacity: 0.4; }
+    }
+
+    /* Dark mode adjustments */
+    [data-md-color-scheme="slate"] .hero::before {
+      background:
+        linear-gradient(rgba(15,23,42,0.45), rgba(15,23,42,0.55)),
+        var(--hero-img) center center / cover no-repeat;
+    }
+
+    /* Hero content styling */
+    /* Hero content positioning - left aligned */
+    .hero-content {
+      position: relative;
+      max-width: 880px;
+      margin: 0 auto;
+      padding-top: 3rem;
+      padding-bottom: 8rem; /* Increased space before features */
+      text-align: left;
+    }
+
+    /* Features content within hero */
+    .hero .features-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      position: relative;
+      padding: 0 1rem;
+    }
+
+    .hero .features-container h2 {
+      text-align: center;
+      font-size: 2.5rem;
+      margin-bottom: 3rem;
+      margin-top: 0;
+      font-weight: 700;
+      color: white;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.5);
     }
 
     .hero h1 {
-      font-size: 3.5rem;
-      margin-bottom: 1.5rem;
-      font-weight: 700;
+      font-size: clamp(2rem, 4vw, 3rem);
+      margin-bottom: 1.2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      color: white; /* Force white color in light mode */
     }
 
-    .hero p {
-      font-size: 1.25rem;
+    .hero .lead {
+      font-size: clamp(1rem, 2vw, 1.125rem);
       margin-bottom: 2.5rem;
-      max-width: 600px;
-      margin-left: auto;
-      margin-right: auto;
-      opacity: 0.9;
+      opacity: 0.95;
+      line-height: 1.5;
+      font-weight: 400;
+    }
+
+    .hero-buttons {
+      display: flex;
+      gap: 1rem;
+      justify-content: flex-start; /* Changed from center to flex-start for left alignment */
+      flex-wrap: wrap;
     }
 
     .hero .md-button {
-      margin: 0 0.5rem;
-      padding: 0.8rem 2rem;
-      font-size: 1rem;
-      font-weight: 500;
+      padding: 0.75rem 1.75rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      border-radius: 2rem;
+      text-decoration: none;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      border: 2px solid transparent;
+      min-width: 140px;
     }
 
     .hero .md-button--primary {
-      background-color: white;
-      color: var(--md-primary-fg-color);
-      border-color: white;
+      background: rgba(255, 255, 255, 0.95);
+      color: #334155;
+      border-color: rgba(255, 255, 255, 0.95);
     }
 
     .hero .md-button--primary:hover {
-      background-color: rgba(255, 255, 255, 0.9);
+      background: white;
       transform: translateY(-2px);
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
     }
 
     .hero .md-button:not(.md-button--primary) {
-      background-color: transparent;
+      background: transparent;
       color: white;
-      border: 2px solid white;
+      border-color: rgba(255, 255, 255, 0.7);
     }
 
     .hero .md-button:not(.md-button--primary):hover {
-      background-color: rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.15);
+      border-color: white;
       transform: translateY(-2px);
     }
 
-    /* Remove default padding from main content */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 2rem;
+      margin-bottom: 4rem;
+    }
+
+    .feature-card {
+      padding: 1.5rem; /* Reduced padding */
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 1rem;
+      transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      display: flex;
+      flex-direction: column;
+      gap: 1rem; /* Space between header and description */
+    }
+
+    .feature-card-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem; /* Space between icon and title */
+    }
+
+    .feature-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+      background: rgba(255, 255, 255, 0.98);
+    }
+
+    [data-md-color-scheme="slate"] .feature-card {
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+    }
+
+    [data-md-color-scheme="slate"] .feature-card:hover {
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+      background: rgba(30, 41, 59, 0.95);
+    }
+
+    .feature-icon {
+      font-size: 2rem; /* Slightly smaller */
+      margin-bottom: 0; /* Remove bottom margin since it's now inline */
+      display: block;
+      color: #1e293b; /* Black/dark color in light mode */
+      width: 2rem;
+      height: 2rem;
+      flex-shrink: 0; /* Prevent icon from shrinking */
+    }
+
+    /* Dark mode icon color */
+    [data-md-color-scheme="slate"] .feature-icon {
+      color: white;
+    }
+
+    .feature-icon svg {
+      width: 100%;
+      height: 100%;
+      fill: currentColor;
+    }
+
+    .feature-card h3 {
+      font-size: 1.125rem; /* Slightly smaller */
+      font-weight: 600;
+      margin: 0; /* Remove margins since it's in flex layout */
+      color: #1e293b;
+      flex: 1; /* Take up remaining space */
+    }
+
+    .feature-card p {
+      color: #475569;
+      line-height: 1.5; /* Tighter line height */
+      margin: 0;
+      font-size: 0.9rem; /* Slightly smaller text */
+    }
+
+    [data-md-color-scheme="slate"] .feature-card h3 {
+      color: #f1f5f9;
+    }
+
+    [data-md-color-scheme="slate"] .feature-card p {
+      color: #cbd5e1;
+    }
+
+    /* Remove default page styling and ensure proper positioning */
     .md-main__inner {
       margin-top: 0;
     }
 
     .md-content__inner {
       padding-top: 0;
+      position: relative;
+      z-index: 1;
+      background: transparent; /* Make sure content background is transparent */
     }
 
-    /* Hide left sidebar completely on home page */
     .md-sidebar--primary {
       display: none;
     }
 
-    /* Hide pagination on home page */
+    .md-content {
+      margin-left: 0;
+      background: transparent; /* Remove any default background */
+    }
+
     .md-content__pagination {
       display: none;
     }
 
-    /* Expand content to full width when sidebar is hidden */
-    .md-content {
-      margin-left: 0;
+    /* Make sure all content areas are transparent to show the background */
+    .md-main,
+    .md-main__inner,
+    .md-grid,
+    .md-typeset {
+      background: transparent !important;
     }
 
-    /* Responsive */
+    /* Ensure hero extends full width */
+    .md-container {
+      max-width: none;
+    }
+
+    /* Responsive adjustments */
     @media (max-width: 768px) {
       .hero {
-        padding: 4rem 1rem;
+        padding: 6rem 1rem 4rem;
+        /* On mobile, disable fixed attachment for better performance */
+        background-attachment: scroll;
       }
 
-      .hero h1 {
-        font-size: 2.5rem;
-      }
-
-      .hero p {
-        font-size: 1.1rem;
+      .hero-buttons {
+        flex-direction: column;
+        align-items: center;
       }
 
       .hero .md-button {
-        display: block;
-        margin: 0.5rem auto;
-        max-width: 200px;
+        width: 200px;
+      }
+
+      .features {
+        padding: 3rem 1rem;
+      }
+
+      .features-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
       }
     }
   </style>
@@ -112,10 +316,81 @@
 <!-- Custom homepage content -->
 {% block content %}
   <div class="hero">
-    <h1>Network automation that simply works</h1>
-    <p>Modern Python cli toolkit for network device automation – concurrent, type-safe, multi-vendor automation in minutes.</p>
-    <a href="#quick-start" class="md-button md-button--primary">Quickstart</a>
-    <a href="getting-started/" class="md-button">Learn more</a>
+    <div class="hero-content">
+      <h1>Network automation that simply works</h1>
+      <p class="lead">Lightweight CLI to execute, collect, and compare results across multi-vendor network devices in seconds. No playbooks, no scripts, no overhead. Open-source and free.</p>
+      <div class="hero-buttons">
+        <a href="#quick-start" class="md-button md-button--primary">Get started</a>
+        <a href="getting-started/" class="md-button">Learn more</a>
+      </div>
+    </div>
+
+    <!-- Features content back inside hero section -->
+    <div class="features-container">
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-card-header">
+            <span class="feature-icon">
+              {% include ".icons/material/flash.svg" %}
+            </span>
+            <h3>Blazing fast execution</h3>
+          </div>
+          <p>Execute sequences of commands across devices and groups of devices. Perform configuration backups and safely issue up/downgrades.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card-header">
+            <span class="feature-icon">
+              {% include ".icons/material/network.svg" %}
+            </span>
+            <h3>Multi-vendor support</h3>
+          </div>
+          <p>Works with MikroTik, Cisco, Arista, Juniper, and more. Vendor-aware sequences and backups with platform-specific optimizations.</p>
+        </div>
+
+
+        <div class="feature-card">
+          <div class="feature-card-header">
+            <span class="feature-icon">
+              {% include ".icons/material/cog.svg" %}
+            </span>
+            <h3>Flexible configuration</h3>
+          </div>
+          <p>YAML/CSV configuration support with tags, groups, and inheritance. Environment variables for credentials and extensive customization options.</p>
+        </div>
+
+         <div class="feature-card">
+          <div class="feature-card-header">
+            <span class="feature-icon">
+              {% include ".icons/material/shield-check.svg" %}
+            </span>
+            <h3>Production ready</h3>
+          </div>
+          <p>Comprehensive error handling, secure credential management, extensive testing, and battle-tested in real network environments.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-header">
+            <span class="feature-icon">
+              {% include ".icons/material/console.svg" %}
+            </span>
+            <h3>Rich CLI output</h3>
+          </div>
+          <p>Beautiful terminal output with selectable modes, progress indicators, colored syntax highlighting, and structured data visualization.</p>
+        </div>
+
+
+        <div class="feature-card">
+          <div class="feature-card-header">
+            <span class="feature-icon">
+              {% include ".icons/material/code-tags-check.svg" %}
+            </span>
+            <h3>Type-safe internals</h3>
+          </div>
+          <p>Built with modern Python, full type safety with mypy, rich and pydantic 2 data models.</p>
+        </div>
+
+      </div>
+    </div>
   </div>
 
   <!-- Render the markdown content after the hero -->

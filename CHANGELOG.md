@@ -10,61 +10,106 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- 
+-
 
 ### Changed
-- 
+-
 
 ### Fixed
-- 
+-
+
+
+## [0.1.13] - 2025-12-04
+
+### Added
+-
+
+### Changed
+-
+
+### Fixed
+-
+
+
+## [0.1.13] - 2025-12-04
+
+### Fixed
+
+- Fixed tmux availability checking to verify binary existence before attempting libtmux import
+- Fixed IP address resolution to properly pass platform/port/transport_type parameters
+- Improved graceful fallback to sequential SSH when tmux is unavailable
+- Resolved issue where IP-based device connections failed despite providing --platform flag
+
+## [0.1.12] - 2025-10-30
+
+### Added
+-
+
+### Changed
+-
+
+### Fixed
+-
+
+
+## [0.1.11] - 2025-10-27
+
+### Added
+-
+
+### Changed
+-
+
+### Fixed
+-
 
 
 ## [0.1.10] - 2025-09-01
 
 ### Added
-- 
+-
 
 ### Changed
-- 
+-
 
 ### Fixed
-- 
+-
 
 
 ## [0.1.9] - 2025-08-29
 
 ### Added
-- 
+-
 
 ### Changed
-- 
+-
 
 ### Fixed
-- 
+-
 
 
 ## [0.1.8] - 2025-08-29
 
 ### Added
-- 
+-
 
 ### Changed
-- 
+-
 
 ### Fixed
-- 
+-
 
 
 ## [0.1.8] - 2025-08-29
 
 ### Added
-- 
+-
 
 ### Changed
-- 
+-
 
 ### Fixed
-- 
+-
 
 
 ## [0.1.7] - 2025-08-28

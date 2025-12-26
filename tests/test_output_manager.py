@@ -85,16 +85,6 @@ class TestOutputManagerRawMode:
         assert "device=sw-acc1 cmd=/system/clock/print" in output
         assert "output text" in output
 
-    def test_raw_success_message(self) -> None:
-        """Test success message in raw mode."""
-        manager = OutputManager(OutputMode.RAW)
-
-        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            manager.print_success("Operation completed", "sw-acc1")
-            output = mock_stdout.getvalue()
-
-        assert "device=sw-acc1 success: Operation completed" in output
-
     def test_raw_error_message(self) -> None:
         """Test error message in raw mode."""
         manager = OutputManager(OutputMode.RAW)

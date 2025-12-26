@@ -1,0 +1,61 @@
+# Built-in Juniper JunOS Command Sequences
+sequences:
+  system_info:
+    description: "Complete system information gathering"
+    category: "information"
+    timeout: 60
+    commands:
+      - "show version"
+      - "show chassis hardware"
+      - "show system uptime"
+      - "show system alarms"
+
+  health_check:
+    description: "Basic health check for device monitoring"
+    category: "monitoring"
+    timeout: 45
+    commands:
+      - "show chassis routing-engine"
+      - "show system alarms"
+      - "show system uptime"
+      - "show interfaces terse"
+      - "show log messages | last 10"
+
+  interface_status:
+    description: "Detailed interface status and statistics"
+    category: "network"
+    timeout: 60
+    commands:
+      - "show interfaces terse"
+      - "show interfaces statistics"
+      - "show interfaces descriptions"
+      - "show chassis hardware"
+
+  routing_info:
+    description: "Routing table and protocol information"
+    category: "network"
+    timeout: 60
+    commands:
+      - "show route"
+      - "show ospf neighbor"
+      - "show bgp summary"
+      - "show route protocol"
+
+  security_audit:
+    description: "Security configuration audit"
+    category: "security"
+    timeout: 120
+    commands:
+      - "show configuration system login"
+      - "show configuration system services"
+      - "show firewall"
+      - "show log messages | match security"
+
+  backup_config:
+    description: "Create comprehensive device backup"
+    category: "maintenance"
+    timeout: 180
+    commands:
+      - "show configuration"
+      - "show version"
+      - "show system uptime"

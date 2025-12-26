@@ -2,24 +2,34 @@
 
 ## Supported Versions
 
-We release patches for security vulnerabilities. Which versions are eligible for receiving such patches depends on the CVSS v3.0 Rating:
+We provide security updates for:
 
-| Version | Supported          |
-| ------- | ------------------ |
-| Latest  | :white_check_mark: |
+- Latest stable release (current minor version)
+- Previous minor version (for 90 days after new release)
 
 ## Reporting a Vulnerability
 
-Please report (suspected) security vulnerabilities to the maintainers via GitHub Issues or directly via email. You will receive a response from us within 48 hours. If the issue is confirmed, we will release a patch as soon as possible depending on complexity but historically within a few days.
+**Do NOT open a public issue for security vulnerabilities.**
 
-### Guidelines
+Email: info@narrowin.ch
 
-- Please do not open GitHub Issues for security vulnerabilities until we have had a chance to review and address them
-- Provide as much detail as possible including:
-  - Description of the vulnerability
-  - Steps to reproduce
-  - Potential impact
-  - Suggested fix (if any)
+Include:
+
+- Description of the vulnerability
+- Steps to reproduce
+- Potential impact
+- Any suggested fixes (optional)
+
+## Response Timeline
+
+- **Initial response**: Within 2 business days
+- **Status update**: Within 7 days
+- **Fix timeline**: Critical issues within 30 days
+
+## Disclosure Policy
+
+- Coordinated disclosure after fix is released
+- Credit given to reporter (unless anonymity requested)
 
 ## Security Best Practices
 

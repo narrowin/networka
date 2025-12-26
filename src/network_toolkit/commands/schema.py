@@ -14,14 +14,15 @@ from network_toolkit.exceptions import NetworkToolkitError
 
 
 def register(app: typer.Typer) -> None:
-    """Register schema commands with the CLI app."""
+    """Register the schema command group with the app."""
     schema_app = typer.Typer(
         name="schema",
         help="JSON schema management commands",
         no_args_is_help=True,
+        context_settings={"help_option_names": ["-h", "--help"]},
     )
 
-    @schema_app.command("update")
+    @schema_app.command("install")
     def update(
         verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
     ) -> None:
@@ -36,7 +37,7 @@ def register(app: typer.Typer) -> None:
         - schemas/groups-config.schema.json (group collections)
         - .vscode/settings.json (VS Code YAML validation)
         """
-        setup_logging("DEBUG" if verbose else "INFO")
+        setup_logging("DEBUG" if verbose else "WARNING")
 
         try:
             _schema_update_impl(verbose=verbose)
@@ -63,7 +64,7 @@ def register(app: typer.Typer) -> None:
         like VS Code. These schemas provide auto-completion and error checking
         for network toolkit configuration files.
         """
-        setup_logging("DEBUG" if verbose else "INFO")
+        setup_logging("DEBUG" if verbose else "WARNING")
 
         try:
             _schema_info_impl(verbose=verbose)

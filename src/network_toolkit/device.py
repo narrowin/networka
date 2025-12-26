@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -100,18 +99,26 @@ class DeviceSession:
 
         # Add SSH host key acceptance settings for first-time connections
         # https://scrapli.dev/user_guide/basic_usage/#ssh-key-verification
-        self._connection_params.update(
-            {
-                "auth_strict_key": False,  # Don't enforce strict host key checking
-                "ssh_config_file": False,  # Don't use SSH config file settings
-                "timeout_socket": 10,  # Socket timeout
-                "timeout_transport": 30,  # Transport timeout
-                "timeout_ops": 30,  # Operations timeout
-                "channel_lock": True,  # Ensure thread-safe channel operations
-            }
-        )
+
+        # Only set defaults if not already provided by config/overrides
+        defaults = {
+            "auth_strict_key": config.general.ssh_strict_host_key_checking,
+            "ssh_config_file": config.general.ssh_config_file,
+            "timeout_socket": 10,  # Socket timeout
+            "timeout_transport": 30,  # Transport timeout
+            "timeout_ops": 30,  # Operations timeout
+            "channel_lock": True,  # Ensure thread-safe channel operations
+        }
+
+        for key, value in defaults.items():
+            if key not in self._connection_params:
+                self._connection_params[key] = value
 
         logger.info(f"Initialized session for device: {device_name}")
+        # Log only non-sensitive connection parameters
+        safe_keys = ("host", "port", "auth_username", "platform", "auth_strict_key")
+        safe_params = {k: self._connection_params.get(k) for k in safe_keys}
+        logger.debug(f"Connection parameters: {safe_params}")
 
     def connect(self) -> None:
         """Establish connection to the device.
@@ -141,7 +148,6 @@ class DeviceSession:
             username = self._connection_params.get("auth_username")
             password = self._connection_params.get("auth_password")
             password_len = len(password) if isinstance(password, str) else 0
-            show_plain_pw = os.getenv("NW_SHOW_PLAINTEXT_PASSWORDS", "0") == "1"
 
             # Create transport via factory and open with retry
             transport_factory = get_transport_factory(transport_type)
@@ -153,13 +159,6 @@ class DeviceSession:
                     logger.info(
                         f"Opening connection to '{host}' on port '{port}' as user '{username}' (attempt {attempt}/{max(1, attempts)}; password_len={password_len})"
                     )
-                    if show_plain_pw:
-                        logger.warning(
-                            "NW_SHOW_PLAINTEXT_PASSWORDS=1 is set; logging plaintext password (unsafe)."
-                        )
-                        logger.warning(
-                            f"Password used for '{self.device_name}' is: {password!r}"
-                        )
                     # If transport exposes underlying driver, prefer opening it to
                     # satisfy tests that patch `network_toolkit.device.Scrapli().open`.
                     raw_drv = getattr(self._transport, "_raw_driver", None)

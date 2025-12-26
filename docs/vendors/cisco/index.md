@@ -45,14 +45,17 @@ Sequence completed successfully
 ### Troubleshooting
 
 - Use `--interactive-auth` for ad-hoc credentials
-- Verify `device_type: cisco_ios` or `cisco_iosxe` for named devices
+- Verify `device_type: cisco_iosxe` for named devices (use `cisco_iosxr` for IOS-XR, `cisco_nxos` for NX-OS)
 - Increase timeouts if devices are slow
 
 ## Platform identifiers
 
-- device_type: `cisco_ios`
-- device_type: `cisco_iosxe`
-- Platform names: Cisco IOS, Cisco IOS-XE
+- device_type: `cisco_iosxe` (for IOS-XE and classic IOS devices)
+- device_type: `cisco_iosxr` (for IOS-XR devices)
+- device_type: `cisco_nxos` (for NX-OS devices)
+- Platform names: Cisco IOS, Cisco IOS-XE, Cisco IOS-XR, Cisco NX-OS
+
+**Important**: Scrapli does not have a `cisco_ios` platform. Use `cisco_iosxe` for both IOS and IOS-XE devices.
 
 ## Supported operations
 

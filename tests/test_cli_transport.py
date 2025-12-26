@@ -16,11 +16,9 @@ class TestCLITransportConfiguration:
 
         # Mock the actual execution to avoid real network operations
         with (
-            patch("network_toolkit.commands.run.load_config") as mock_load_config,
-            patch("network_toolkit.commands.run.SequenceManager"),
-            patch(
-                "network_toolkit.commands.run.create_ip_based_config"
-            ) as mock_create_ip,
+            patch("network_toolkit.common.command.load_config") as mock_load_config,
+            patch("network_toolkit.api.run.SequenceManager"),
+            patch("network_toolkit.api.run._create_ip_based_config") as mock_create_ip,
         ):
             # Setup mocks
             mock_config = MagicMock()
@@ -50,13 +48,13 @@ class TestCLITransportConfiguration:
                 if call_args and "transport_type" in call_args.kwargs:
                     assert call_args.kwargs["transport_type"] == "scrapli"
 
-    def test_ssh_command_with_transport_option(self):
-        """Test that ssh command accepts transport option."""
+    def test_cli_command_with_transport_option(self):
+        """Test that cli command accepts transport option."""
         runner = CliRunner()
 
         # Mock the actual execution to avoid real network operations
         with (
-            patch("network_toolkit.commands.ssh.load_config") as mock_load_config,
+            patch("network_toolkit.common.command.load_config") as mock_load_config,
             patch("network_toolkit.commands.ssh.DeviceResolver"),
             patch(
                 "network_toolkit.commands.ssh.create_ip_based_config"
@@ -71,7 +69,7 @@ class TestCLITransportConfiguration:
             result = runner.invoke(
                 app,
                 [
-                    "ssh",
+                    "cli",
                     "192.168.1.1",
                     "--platform",
                     "mikrotik_routeros",
@@ -84,10 +82,10 @@ class TestCLITransportConfiguration:
             assert "--transport" in str(result.stdout) or result.exit_code != 2
 
     def test_supported_types_shows_transport_info(self):
-        """Test that list supported-types command shows transport information."""
+        """Test that config supported-types command shows transport information."""
         runner = CliRunner()
 
-        result = runner.invoke(app, ["list", "supported-types"])
+        result = runner.invoke(app, ["config", "supported-types"])
 
         # Should succeed and show transport information
         assert result.exit_code == 0

@@ -183,7 +183,13 @@ def create_ip_based_config(
     config_dict = base_config.model_dump()
     config_dict["devices"] = combined_devices
 
-    return NetworkConfig.model_validate(config_dict)
+    new_config = NetworkConfig.model_validate(config_dict)
+
+    # Preserve the config source directory from the base config
+    if hasattr(base_config, "_config_source_dir"):
+        new_config._config_source_dir = base_config._config_source_dir
+
+    return new_config
 
 
 def get_supported_device_types() -> dict[str, str]:
@@ -206,6 +212,7 @@ def get_supported_device_types() -> dict[str, str]:
         "cisco_nxos": "Cisco NX-OS",
         "juniper_junos": "Juniper JunOS",
         "arista_eos": "Arista EOS",
+        "nokia_srlinux": "Nokia SR Linux",
         "linux": "Linux SSH",
         "generic": "Generic SSH",
     }

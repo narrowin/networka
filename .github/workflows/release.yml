@@ -38,7 +38,7 @@ jobs:
         echo "Version consistency verified"
 
     - name: Install uv
-      uses: astral-sh/setup-uv@v4
+      uses: astral-sh/setup-uv@v7
       with:
         version: "latest"
 
@@ -94,7 +94,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
 
     - name: Download build artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v6
       with:
         name: dist
         path: dist/
@@ -129,7 +129,7 @@ jobs:
         fetch-depth: 0
 
     - name: Download build artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v6
       with:
         name: dist
         path: dist/
@@ -156,14 +156,16 @@ jobs:
         echo "" >> release_notes.txt
         echo "## Installation" >> release_notes.txt
         echo "" >> release_notes.txt
-        echo '### Option 1: Install from GitHub' >> release_notes.txt
+        echo '### Option 1: Install from PyPI (Recommended)' >> release_notes.txt
         echo '```bash' >> release_notes.txt
-        echo "pip install git+https://github.com/narrowin/networka.git@v${VERSION}" >> release_notes.txt
+        echo "uv tool install networka" >> release_notes.txt
+        echo "# or" >> release_notes.txt
+        echo "pipx install networka" >> release_notes.txt
         echo '```' >> release_notes.txt
         echo "" >> release_notes.txt
-        echo '### Option 2: Install from PyPI' >> release_notes.txt
+        echo '### Option 2: Install from GitHub' >> release_notes.txt
         echo '```bash' >> release_notes.txt
-        echo "pip install networka==${VERSION}" >> release_notes.txt
+        echo "uv tool install git+https://github.com/narrowin/networka.git@v${VERSION}" >> release_notes.txt
         echo '```' >> release_notes.txt
         echo "" >> release_notes.txt
         echo '### Option 3: Download and install wheel' >> release_notes.txt

@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from network_toolkit.exceptions import DeviceConnectionError, DeviceExecutionError
+from network_toolkit.platforms.base import BackupResult
 from network_toolkit.platforms.mikrotik_routeros.operations import (
     MikroTikRouterOSOperations,
 )
@@ -29,7 +30,10 @@ class TestMikroTikRouterOSBackupOperations:
         # Test config backup
         result = ops.config_backup(backup_sequence=["/export file=test-config"])
 
-        assert result is True
+        assert isinstance(result, BackupResult)
+        assert result.success is True
+        assert len(result.text_outputs) > 0
+        assert len(result.files_to_download) > 0
         mock_session.execute_command.assert_called_with("/export file=test-config")
 
     def test_config_backup_disconnected(self) -> None:
@@ -58,14 +62,16 @@ class TestMikroTikRouterOSBackupOperations:
         # Test config backup with empty sequence (should use default)
         result = ops.config_backup(backup_sequence=[])
 
-        assert result is True
-        mock_session.execute_command.assert_called_with("/export file=nw-config-export")
+        assert isinstance(result, BackupResult)
+        assert result.success is True
+        mock_session.execute_command.assert_called_with("/export file=nw-export")
 
     def test_config_backup_execution_error(self) -> None:
         """Test configuration backup with execution error."""
         # Create mock session
         mock_session = MagicMock()
         mock_session.is_connected = True
+        mock_session.device_name = "test_device"
         mock_session.execute_command.side_effect = DeviceExecutionError(
             "Command failed"
         )
@@ -73,9 +79,11 @@ class TestMikroTikRouterOSBackupOperations:
         # Create operations instance
         ops = MikroTikRouterOSOperations(mock_session)
 
-        # Test config backup should raise error
-        with pytest.raises(DeviceExecutionError):
-            ops.config_backup(backup_sequence=["/export file=test-config"])
+        # Test config backup should return BackupResult with success=False
+        result = ops.config_backup(backup_sequence=["/export file=test-config"])
+        assert isinstance(result, BackupResult)
+        assert result.success is False
+        assert len(result.errors) > 0
 
     def test_backup_success(self) -> None:
         """Test successful comprehensive backup."""
@@ -93,7 +101,9 @@ class TestMikroTikRouterOSBackupOperations:
             backup_sequence=["/export file=test", "/system/backup/save name=test"]
         )
 
-        assert result is True
+        assert isinstance(result, BackupResult)
+        assert result.success is True
+        assert len(result.text_outputs) > 0
         assert mock_session.execute_command.call_count == 2
 
     def test_backup_disconnected(self) -> None:
@@ -122,10 +132,14 @@ class TestMikroTikRouterOSBackupOperations:
         # Test backup with empty sequence (should use default)
         result = ops.backup(backup_sequence=[])
 
-        assert result is True
+        assert isinstance(result, BackupResult)
+        assert result.success is True
         expected_calls: list[tuple[tuple[str, ...], dict[str, Any]]] = [
-            (("/export file=nw-config-export",), {}),
-            (("/system/backup/save name=nw-system-backup",), {}),
+            (("/system/backup/save name=nw-backup",), {}),
+            (("/export file=nw-export",), {}),
+            (("/system resource print",), {}),
+            (("/system identity print",), {}),
+            (("/system package print",), {}),
         ]
         assert mock_session.execute_command.call_args_list == expected_calls
 
@@ -134,6 +148,7 @@ class TestMikroTikRouterOSBackupOperations:
         # Create mock session
         mock_session = MagicMock()
         mock_session.is_connected = True
+        mock_session.device_name = "test_device"
         mock_session.execute_command.side_effect = DeviceExecutionError(
             "Command failed"
         )
@@ -141,9 +156,11 @@ class TestMikroTikRouterOSBackupOperations:
         # Create operations instance
         ops = MikroTikRouterOSOperations(mock_session)
 
-        # Test backup should raise error
-        with pytest.raises(DeviceExecutionError):
-            ops.backup(backup_sequence=["/export", "/system/backup/save"])
+        # Test backup should return BackupResult with errors
+        result = ops.backup(backup_sequence=["/export", "/system/backup/save"])
+        assert isinstance(result, BackupResult)
+        assert result.success is False
+        assert len(result.errors) > 0
 
     def test_create_backup_fixed_connection_check(self) -> None:
         """Test that create_backup uses proper connection check."""

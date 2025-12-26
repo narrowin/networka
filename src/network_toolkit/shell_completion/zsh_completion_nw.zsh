@@ -1,41 +1,6 @@
 #compdef nw networka network-toolkit
-				info)
-					# Offer devices,				run)
-					if (( CU					elif (				ssh)
-					if (( CURRENT == 3 )); then
-						local -a groups devices annotated
-						if [[ -n "$cfg" ]]; then
-							groups=(${(f)"$(nw __complete --for groups --config \"$cfg\" 2>/dev/null)"})
-							devices=(${(f)"$(nw __complete --for devices --config \"$cfg\" 2>/dev/null)"})
-						else
-							groups=(${(f)"$(nw __complete --for groups 2>/dev/null)"})
-							devices=(${(f)"$(nw __complete --for devices 2>/dev/null)"})
-						fiRENT == 4 )); then
-						local target=$words[3]
-						if [[ -n "$cfg" ]]; then
-							values=(${(f)"$(nw __complete --for sequences --device \"$target\" --config \"$cfg\" 2>/dev/null)"})
-						else
-							values=(${(f)"$(nw __complete --for sequences --device \"$target\" 2>/dev/null)"})
-						fiNT == 3 )); then
-						# Groups first, then devices for better UX, annotate entries
-						local -a groups devices annotated
-						if [[ -n "$cfg" ]]; then
-							groups=(${(f)"$(nw __complete --for groups --config \"$cfg\" 2>/dev/null)"})
-							devices=(${(f)"$(nw __complete --for devices --config \"$cfg\" 2>/dev/null)"})
-						else
-							groups=(${(f)"$(nw __complete --for groups 2>/dev/null)"})
-							devices=(${(f)"$(nw __complete --for devices 2>/dev/null)"})
-						fis, and sequences for info command
-					local -a devices groups sequences annotated
-					if [[ -n "$cfg" ]]; then
-						devices=(${(f)"$(nw __complete --for devices --config \"$cfg\" 2>/dev/null)"})
-						groups=(${(f)"$(nw __complete --for groups --config \"$cfg\" 2>/dev/null)"})
-						sequences=(${(f)"$(nw __complete --for sequences --config \"$cfg\" 2>/dev/null)"})
-					else
-						devices=(${(f)"$(nw __complete --for devices 2>/dev/null)"})
-						groups=(${(f)"$(nw __complete --for groups 2>/dev/null)"})
-						sequences=(${(f)"$(nw __complete --for sequences 2>/dev/null)"})
-					fiomplete() {
+
+_nw_complete() {
 	local -a cmds opts values
 	local curcontext="$curcontext" state line
 	typeset -A opt_args
@@ -59,49 +24,46 @@
 	local cfg
 	if [[ -n ${opt_args[--config]} ]]; then
 		cfg=${opt_args[--config]}
-	# Local ./config is no longer probed; rely on explicit --config or user defaults
-	elif false; then
-		cfg="config"
-	else
-		cfg="devices.yml"
+	elif [[ -n ${opt_args[-c]} ]]; then
+		cfg=${opt_args[-c]}
 	fi
-	# If no --config specified, let the Python command use its default
-	# (don't hardcode platform-specific paths here)
 
 	case $state in
 		cmds)
-	values=(${(f)"$(nw __complete --for commands 2>/dev/null)"})
+			values=(${(f)"$(nw __complete --for commands 2>/dev/null)"})
 			_describe -t commands 'nw commands' values && return
 			;;
 		args)
 			case $words[2] in
 				info)
-					# Offer devices, groups, and sequences for info command
 					local -a devices groups sequences annotated
-					devices=(${(f)"$(nw __complete --for devices --config \"$cfg\" 2>/dev/null)"})
-					groups=(${(f)"$(nw __complete --for groups --config \"$cfg\" 2>/dev/null)"})
-					sequences=(${(f)"$(nw __complete --for sequences --config \"$cfg\" 2>/dev/null)"})
+					if [[ -n "$cfg" ]]; then
+						devices=(${(f)"$(nw __complete --for devices --config "$cfg" 2>/dev/null)"})
+						groups=(${(f)"$(nw __complete --for groups --config "$cfg" 2>/dev/null)"})
+						sequences=(${(f)"$(nw __complete --for sequences --config "$cfg" 2>/dev/null)"})
+					else
+						devices=(${(f)"$(nw __complete --for devices 2>/dev/null)"})
+						groups=(${(f)"$(nw __complete --for groups 2>/dev/null)"})
+						sequences=(${(f)"$(nw __complete --for sequences 2>/dev/null)"})
+					fi
 					annotated=()
 					local d g s
-					# Annotate device entries
-					for d in $devices; do
-						annotated+=("$d:device")
-					done
-					# Annotate group entries
-					for g in $groups; do
-						annotated+=("$g:group")
-					done
-					# Annotate sequence entries
-					for s in $sequences; do
-						annotated+=("$s:sequence")
-					done
-					_describe -t targets 'info targets' annotated && return ;;
+					for d in $devices; do annotated+="$d:device"; done
+					for g in $groups; do annotated+="$g:group"; done
+					for s in $sequences; do annotated+="$s:sequence"; done
+					values=($annotated)
+					_describe -t targets 'targets' values && return
+					;;
 				run)
 					if (( CURRENT == 3 )); then
-						# Groups first, then devices for better UX, annotate entries
 						local -a groups devices annotated
-						groups=(${(f)"$(nw __complete --for groups --config \"$cfg\" 2>/dev/null)"})
-						devices=(${(f)"$(nw __complete --for devices --config \"$cfg\" 2>/dev/null)"})
+						if [[ -n "$cfg" ]]; then
+							groups=(${(f)"$(nw __complete --for groups --config "$cfg" 2>/dev/null)"})
+							devices=(${(f)"$(nw __complete --for devices --config "$cfg" 2>/dev/null)"})
+						else
+							groups=(${(f)"$(nw __complete --for groups 2>/dev/null)"})
+							devices=(${(f)"$(nw __complete --for devices 2>/dev/null)"})
+						fi
 						annotated=()
 						local g d
 						for g in $groups; do annotated+="$g:group"; done
@@ -110,14 +72,23 @@
 						_describe -t targets 'targets (groups first)' values && return
 					elif (( CURRENT == 4 )); then
 						local target=$words[3]
-						values=(${(f)"$(nw __complete --for sequences --device \"$target\" --config \"$cfg\" 2>/dev/null)"})
+						if [[ -n "$cfg" ]]; then
+							values=(${(f)"$(nw __complete --for sequences --device "$target" --config "$cfg" 2>/dev/null)"})
+						else
+							values=(${(f)"$(nw __complete --for sequences --device "$target" 2>/dev/null)"})
+						fi
 						_describe -t sequences 'sequences' values && return
 					fi ;;
-				ssh)
+				cli)
 					if (( CURRENT == 3 )); then
 						local -a groups devices annotated
-						groups=(${(f)"$(nw __complete --for groups --config \"$cfg\" 2>/dev/null)"})
-						devices=(${(f)"$(nw __complete --for devices --config \"$cfg\" 2>/dev/null)"})
+						if [[ -n "$cfg" ]]; then
+							groups=(${(f)"$(nw __complete --for groups --config "$cfg" 2>/dev/null)"})
+							devices=(${(f)"$(nw __complete --for devices --config "$cfg" 2>/dev/null)"})
+						else
+							groups=(${(f)"$(nw __complete --for groups 2>/dev/null)"})
+							devices=(${(f)"$(nw __complete --for devices 2>/dev/null)"})
+						fi
 						annotated=()
 						local g d
 						for g in $groups; do annotated+="$g:group"; done
@@ -127,7 +98,7 @@
 					fi ;;
 				config)
 					if (( CURRENT == 3 )); then
-						values=("init:Initialize a network toolkit configuration" "validate:Validate the configuration file")
+						values=("init:Initialize a network toolkit configuration" "validate:Validate the configuration file" "supported-types:Show supported device types" "update:Update configuration files")
 						_describe -t subcommands 'config subcommands' values && return
 					fi ;;
 				schema)
@@ -140,35 +111,64 @@
 						values=("config:Backup device configuration" "comprehensive:Perform comprehensive backup" "vendors:Show vendor support")
 						_describe -t subcommands 'backup subcommands' values && return
 					elif (( CURRENT == 4 && ($words[3] == "config" || $words[3] == "comprehensive") )); then
-						values=(${(f)"$(nw __complete --for devices --config \"$cfg\" 2>/dev/null)"} ${(f)"$(nw __complete --for groups --config \"$cfg\" 2>/dev/null)"})
+						if [[ -n "$cfg" ]]; then
+							values=(${(f)"$(nw __complete --for devices --config "$cfg" 2>/dev/null)"} ${(f)"$(nw __complete --for groups --config "$cfg" 2>/dev/null)"})
+						else
+							values=(${(f)"$(nw __complete --for devices 2>/dev/null)"} ${(f)"$(nw __complete --for groups 2>/dev/null)"})
+						fi
 						_describe -t targets 'targets' values && return
 					fi ;;
 				firmware)
 					if (( CURRENT == 3 )); then
-						values=("upgrade:Upgrade firmware" "downgrade:Downgrade firmware" "bios:Upgrade BIOS" "vendors:Show vendor support")
+						values=("upgrade:Upgrade device firmware" "downgrade:Downgrade device firmware" "bios:BIOS upgrade" "vendors:Show vendor support")
 						_describe -t subcommands 'firmware subcommands' values && return
 					elif (( CURRENT == 4 && ($words[3] == "upgrade" || $words[3] == "downgrade" || $words[3] == "bios") )); then
-						values=(${(f)"$(nw __complete --for devices --config \"$cfg\" 2>/dev/null)"} ${(f)"$(nw __complete --for groups --config \"$cfg\" 2>/dev/null)"})
+						if [[ -n "$cfg" ]]; then
+							values=(${(f)"$(nw __complete --for devices --config "$cfg" 2>/dev/null)"} ${(f)"$(nw __complete --for groups --config "$cfg" 2>/dev/null)"})
+						else
+							values=(${(f)"$(nw __complete --for devices 2>/dev/null)"} ${(f)"$(nw __complete --for groups 2>/dev/null)"})
+						fi
+						_describe -t targets 'targets' values && return
+					fi ;;
+				upload)
+					if (( CURRENT == 3 )); then
+						if [[ -n "$cfg" ]]; then
+							values=(${(f)"$(nw __complete --for devices --config "$cfg" 2>/dev/null)"} ${(f)"$(nw __complete --for groups --config "$cfg" 2>/dev/null)"})
+						else
+							values=(${(f)"$(nw __complete --for devices 2>/dev/null)"} ${(f)"$(nw __complete --for groups 2>/dev/null)"})
+						fi
+						_describe -t targets 'targets' values && return
+					elif (( CURRENT == 4 )); then
+						_files && return
+					fi ;;
+				download)
+					if (( CURRENT == 3 )); then
+						if [[ -n "$cfg" ]]; then
+							values=(${(f)"$(nw __complete --for devices --config "$cfg" 2>/dev/null)"} ${(f)"$(nw __complete --for groups --config "$cfg" 2>/dev/null)"})
+						else
+							values=(${(f)"$(nw __complete --for devices 2>/dev/null)"} ${(f)"$(nw __complete --for groups 2>/dev/null)"})
+						fi
+						_describe -t targets 'targets' values && return
+					elif (( CURRENT == 5 )); then
+						_files -/ && return
+					fi ;;
+				diff)
+					if (( CURRENT == 3 )); then
+						if [[ -n "$cfg" ]]; then
+							values=(${(f)"$(nw __complete --for devices --config "$cfg" 2>/dev/null)"} ${(f)"$(nw __complete --for groups --config "$cfg" 2>/dev/null)"})
+						else
+							values=(${(f)"$(nw __complete --for devices 2>/dev/null)"} ${(f)"$(nw __complete --for groups 2>/dev/null)"})
+						fi
 						_describe -t targets 'targets' values && return
 					fi ;;
 				list)
 					if (( CURRENT == 3 )); then
-						values=("devices:List all configured network devices" "groups:List all configured device groups" "sequences:List available sequences" "supported-types:List supported device types")
+						values=("devices:List all devices" "groups:List all groups" "sequences:List all sequences")
 						_describe -t subcommands 'list subcommands' values && return
-					fi ;;
-				complete)
-					# Handle completion command - mostly internal use
-					;;
-				upload|download|diff)
-					if (( CURRENT == 3 )); then
-						values=(${(f)"$(nw __complete --for devices --config \"$cfg\" 2>/dev/null)"} ${(f)"$(nw __complete --for groups --config \"$cfg\" 2>/dev/null)"})
-						_describe -t targets 'targets' values && return
 					fi ;;
 			esac
 			;;
 	esac
-
-	return 0
 }
 
-compdef _nw_complete nw networka network-toolkit
+_nw_complete "$@"

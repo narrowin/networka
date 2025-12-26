@@ -34,7 +34,7 @@ class TestDownload:
         assert callable(register)
 
     @patch("network_toolkit.commands.download.load_config")
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.api.download.DeviceSession")
     def test_download_device_success(
         self, mock_session_class: MagicMock, mock_load_config: MagicMock
     ) -> None:
@@ -44,6 +44,7 @@ class TestDownload:
         mock_config.devices = {"test-device": MagicMock()}
         mock_config.device_groups = {}
         mock_load_config.return_value = mock_config
+        mock_config.get_transport_type.return_value = "scrapli"
 
         # Mock device session
         mock_session = MagicMock()
@@ -72,7 +73,7 @@ class TestDownload:
         )
 
     @patch("network_toolkit.commands.download.load_config")
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.api.download.DeviceSession")
     def test_download_device_with_options(
         self, mock_session_class: MagicMock, mock_load_config: MagicMock
     ) -> None:
@@ -82,6 +83,7 @@ class TestDownload:
         mock_config.devices = {"test-device": MagicMock()}
         mock_config.device_groups = {}
         mock_load_config.return_value = mock_config
+        mock_config.get_transport_type.return_value = "scrapli"
 
         # Mock device session
         mock_session = MagicMock()
@@ -151,7 +153,7 @@ class TestDownload:
         assert "not found as device or group" in result.output
 
     @patch("network_toolkit.commands.download.load_config")
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.api.download.DeviceSession")
     def test_download_group_success(
         self, mock_session_class: MagicMock, mock_load_config: MagicMock
     ) -> None:
@@ -167,6 +169,7 @@ class TestDownload:
         mock_config.device_groups = {"test-group": mock_group}
         mock_config.get_group_members.return_value = ["device1", "device2"]
         mock_load_config.return_value = mock_config
+        mock_config.get_transport_type.return_value = "scrapli"
 
         # Mock device sessions
         mock_session = MagicMock()
@@ -184,7 +187,7 @@ class TestDownload:
         assert mock_session.download_file.call_count == 2
 
     @patch("network_toolkit.commands.download.load_config")
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.api.download.DeviceSession")
     def test_download_group_partial_failure(
         self, mock_session_class: MagicMock, mock_load_config: MagicMock
     ) -> None:
@@ -200,6 +203,7 @@ class TestDownload:
         mock_config.device_groups = {"test-group": mock_group}
         mock_config.get_group_members.return_value = ["device1", "device2"]
         mock_load_config.return_value = mock_config
+        mock_config.get_transport_type.return_value = "scrapli"
 
         # Mock device sessions - first succeeds, second fails
         mock_session = MagicMock()
@@ -217,7 +221,7 @@ class TestDownload:
         assert "1" in result.output  # Check for the counts
 
     @patch("network_toolkit.commands.download.load_config")
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.api.download.DeviceSession")
     def test_download_group_with_exception(
         self, mock_session_class: MagicMock, mock_load_config: MagicMock
     ) -> None:
@@ -230,6 +234,7 @@ class TestDownload:
         mock_config.device_groups = {"test-group": mock_group}
         mock_config.get_group_members.return_value = ["device1"]
         mock_load_config.return_value = mock_config
+        mock_config.get_transport_type.return_value = "scrapli"
 
         # Mock device session to raise exception
         mock_session_class.return_value.__enter__.side_effect = Exception(
@@ -241,7 +246,7 @@ class TestDownload:
         )
 
         assert result.exit_code == 1
-        assert "error during download" in result.output
+        assert "download failed" in result.output
 
     @patch("network_toolkit.commands.download.load_config")
     def test_download_group_no_members(self, mock_load_config: MagicMock) -> None:
@@ -338,7 +343,7 @@ class TestDownload:
         assert "--verify" in clean_output
 
     @patch("network_toolkit.commands.download.load_config")
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.api.download.DeviceSession")
     def test_download_output_formatting(
         self, mock_session_class: MagicMock, mock_load_config: MagicMock
     ) -> None:
@@ -348,6 +353,7 @@ class TestDownload:
         mock_config.devices = {"test-device": MagicMock()}
         mock_config.device_groups = {}
         mock_load_config.return_value = mock_config
+        mock_config.get_transport_type.return_value = "scrapli"
 
         # Mock device session
         mock_session = MagicMock()
@@ -368,7 +374,7 @@ class TestDownload:
         assert "Verify download:" in result.output
 
     @patch("network_toolkit.commands.download.load_config")
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.api.download.DeviceSession")
     def test_download_group_output_formatting(
         self, mock_session_class: MagicMock, mock_load_config: MagicMock
     ) -> None:
@@ -381,6 +387,7 @@ class TestDownload:
         mock_config.device_groups = {"test-group": mock_group}
         mock_config.get_group_members.return_value = ["device1"]
         mock_load_config.return_value = mock_config
+        mock_config.get_transport_type.return_value = "scrapli"
 
         # Mock device session
         mock_session = MagicMock()
@@ -402,10 +409,8 @@ class TestDownload:
     # Legacy tests for backward compatibility
     @patch("network_toolkit.commands.download.setup_logging")
     @patch("network_toolkit.commands.download.load_config")
-    @patch("network_toolkit.commands.download.import_module")
     def test_download_command_execution(
         self,
-        mock_import: MagicMock,
         mock_load_config: MagicMock,
         mock_setup_logging: MagicMock,
     ) -> None:
@@ -413,9 +418,6 @@ class TestDownload:
         # Setup mocks
         mock_config = MagicMock()
         mock_load_config.return_value = mock_config
-
-        mock_module = MagicMock()
-        mock_import.return_value = mock_module
 
         # Create app and register command
         app = typer.Typer()

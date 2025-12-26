@@ -39,6 +39,18 @@ sequences:
       - "/routing/ospf/neighbor/print"
       - "/routing/bgp/peer/print terse"
 
+  spanning_tree_analysis:
+    description: "Complete Spanning Tree Protocol analysis"
+    category: "network"
+    timeout: 90
+    commands:
+      - "/interface/bridge/print detail"
+      - "/interface/bridge/port/print detail"
+      - "/interface/bridge/port/monitor [find] once"
+      - "/interface/bridge/monitor bridge once"
+      - "/interface/bridge/vlan/print"
+      - "/log/print where topics~\"rstp\""
+
   security_audit:
     description: "Security configuration audit"
     category: "security"
@@ -50,3 +62,12 @@ sequences:
       - "/ip/firewall/filter/print"
       - "/ip/firewall/nat/print"
       - '/log/print where topics~"account|critical|error|warning"'
+
+  backup_config:
+    description: "Create comprehensive device backup"
+    category: "maintenance"
+    timeout: 180
+    commands:
+      - "/system/backup/save name=nw-backup"
+      - "/export compact file=nw-export"
+      - "/system/resource/print"

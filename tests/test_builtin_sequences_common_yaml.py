@@ -49,7 +49,9 @@ def test_mikrotik_builtin_sequences_common(sm_isolated: SequenceManager) -> None
         "health_check",
         "interface_status",
         "routing_info",
+        "spanning_tree_analysis",
         "security_audit",
+        "backup_config",
     }
     assert set(seqs.keys()) == expected_names
 
@@ -80,6 +82,15 @@ def test_mikrotik_builtin_sequences_common(sm_isolated: SequenceManager) -> None
         "/routing/bgp/peer/print terse",
     ]
 
+    assert seqs["spanning_tree_analysis"].commands == [
+        "/interface/bridge/print detail",
+        "/interface/bridge/port/print detail",
+        "/interface/bridge/port/monitor [find] once",
+        "/interface/bridge/monitor bridge once",
+        "/interface/bridge/vlan/print",
+        '/log/print where topics~"rstp"',
+    ]
+
     assert seqs["security_audit"].commands == [
         "/user/print",
         "/user/group/print",
@@ -100,6 +111,7 @@ def test_arista_builtin_sequences_common(sm_isolated: SequenceManager) -> None:
         "interface_status",
         "routing_info",
         "security_audit",
+        "backup_config",
     }
     assert set(seqs.keys()) == expected_names
 

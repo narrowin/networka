@@ -1,0 +1,1 @@
+"""Inventory backends and adapters."""

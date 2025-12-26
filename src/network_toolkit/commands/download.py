@@ -3,21 +3,25 @@
 
 from __future__ import annotations
 
-from importlib import import_module
 from pathlib import Path
-from typing import Annotated, Any, cast
+from typing import Annotated
 
 import typer
 
+from network_toolkit.api.download import DownloadOptions, download_file
 from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.logging import setup_logging
 from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
+from network_toolkit.inventory.resolve import resolve_named_targets, select_named_target
 
 
 def register(app: typer.Typer) -> None:
-    @app.command(rich_help_panel="Remote Operations")
+    @app.command(
+        rich_help_panel="Remote Operations",
+        context_settings={"help_option_names": ["-h", "--help"]},
+    )
     def download(  # pyright: ignore[reportUnusedFunction]
         target_name: Annotated[
             str,
@@ -61,7 +65,7 @@ def register(app: typer.Typer) -> None:
         ] = False,
     ) -> None:
         """Download a file from a device or all devices in a group."""
-        setup_logging("DEBUG" if verbose else "INFO")
+        setup_logging("DEBUG" if verbose else "WARNING")
 
         # ACTION command - use global config theme
         ctx = CommandContext(
@@ -73,22 +77,14 @@ def register(app: typer.Typer) -> None:
         try:
             config = load_config(config_file)
 
-            # Resolve DeviceSession from cli to preserve test patching path
-            module = import_module("network_toolkit.cli")
-            device_session = cast(Any, module).DeviceSession
-
-            devices = config.devices or {}
-            groups = config.device_groups or {}
-            is_device = target_name in devices
-            is_group = target_name in groups
-
-            if not (is_device or is_group):
+            target_kind = select_named_target(config, target_name)
+            if target_kind not in {"device", "group"}:
                 ctx.print_error(
                     f"'{target_name}' not found as device or group in configuration"
                 )
                 raise typer.Exit(1)
 
-            if is_device:
+            if target_kind == "device":
                 # Show summary
                 transport_type = config.get_transport_type(target_name)
                 ctx.print_info("File Download Details:")
@@ -103,85 +99,76 @@ def register(app: typer.Typer) -> None:
                     "Verify download", "Yes" if verify_download else "No"
                 )
                 ctx.print_blank_line()
+            else:
+                # Group summary
+                members = resolve_named_targets(config, target_name).resolved_devices
 
-                with ctx.output_manager.status(
-                    f"Downloading {remote_file} from {target_name}..."
-                ):
-                    with device_session(target_name, config) as session:
-                        success = session.download_file(
-                            remote_filename=remote_file,
-                            local_path=local_path,
-                            delete_remote=delete_remote,
-                            verify_download=verify_download,
-                        )
-
-                if success:
-                    ctx.print_success("Download successful!")
-                    ctx.print_success(
-                        f"File '{remote_file}' downloaded to '{local_path}'"
-                    )
-                else:
-                    ctx.print_error("Download failed!")
+                if not members:
+                    ctx.print_error(f"No devices found in group '{target_name}'")
                     raise typer.Exit(1)
-                return
 
-            # Group path
-            try:
-                members: list[str] = config.get_group_members(target_name)
-            except Exception:
-                group_obj = groups.get(target_name)
-                members = group_obj.members if group_obj and group_obj.members else []
+                ctx.print_info("Group File Download Details:")
+                ctx.print_detail_line("Group", target_name)
+                ctx.print_detail_line("Devices", str(len(members)))
+                ctx.print_detail_line("Remote file", remote_file)
+                ctx.print_detail_line(
+                    "Base path",
+                    f"{local_path} (files saved under <base>/<device>/{remote_file})",
+                )
+                ctx.print_detail_line(
+                    "Delete remote after download", "Yes" if delete_remote else "No"
+                )
+                ctx.print_detail_line(
+                    "Verify download", "Yes" if verify_download else "No"
+                )
+                ctx.print_blank_line()
 
-            if not members:
-                ctx.print_error(f"No devices found in group '{target_name}'")
-                raise typer.Exit(1)
-
-            ctx.print_info("Group File Download Details:")
-            ctx.print_detail_line("Group", target_name)
-            ctx.print_detail_line("Devices", str(len(members)))
-            ctx.print_detail_line("Remote file", remote_file)
-            ctx.print_detail_line(
-                "Base path",
-                f"{local_path} (files saved under <base>/<device>/{remote_file})",
+            options = DownloadOptions(
+                target=target_name,
+                remote_file=remote_file,
+                local_path=local_path,
+                config=config,
+                delete_remote=delete_remote,
+                verify_download=verify_download,
+                verbose=verbose,
             )
-            ctx.print_detail_line(
-                "Delete remote after download", "Yes" if delete_remote else "No"
-            )
-            ctx.print_detail_line("Verify download", "Yes" if verify_download else "No")
-            ctx.print_blank_line()
 
-            successes = 0
-            results: dict[str, bool] = {}
+            with ctx.output_manager.status(
+                f"Downloading {remote_file} from {target_name}..."
+            ):
+                result = download_file(options)
 
-            for dev in members:
-                dest = (local_path / dev / remote_file).resolve()
-                with ctx.output_manager.status(
-                    f"Downloading {remote_file} from {dev}..."
-                ):
-                    try:
-                        with device_session(dev, config) as session:
-                            ok = session.download_file(
-                                remote_filename=remote_file,
-                                local_path=dest,
-                                delete_remote=delete_remote,
-                                verify_download=verify_download,
-                            )
-                            results[dev] = ok
-                            if ok:
-                                successes += 1
-                                ctx.print_success(f"OK {dev}: downloaded to {dest}")
-                            else:
-                                ctx.print_error(f"FAIL {dev}: download failed")
-                    except Exception as e:  # pragma: no cover - unexpected
-                        results[dev] = False
-                        ctx.print_error(f"FAIL {dev}: error during download: {e}")
+            if result.is_group:
+                successes = result.totals.succeeded
+                total = result.totals.total
 
-            total = len(members)
-            ctx.print_info("Group Download Results:")
-            ctx.print_success(f"  Successful: {successes}/{total}")
-            ctx.print_error(f"  Failed: {total - successes}/{total}")
+                for res in result.device_results:
+                    if res.success:
+                        ctx.print_success(
+                            f"OK {res.device}: downloaded to {res.local_path}"
+                        )
+                    else:
+                        ctx.print_error(f"FAIL {res.device}: download failed")
+                        if verbose and res.error:
+                            ctx.print_error(f"  Error: {res.error}")
 
-            if successes < total:
+                ctx.print_info("Group Download Results:")
+                ctx.print_success(f"  Successful: {successes}/{total}")
+                ctx.print_error(f"  Failed: {total - successes}/{total}")
+
+                if successes < total:
+                    raise typer.Exit(1)
+            elif result.totals.succeeded > 0:
+                ctx.print_success("Download successful!")
+                res = result.device_results[0]
+                ctx.print_success(
+                    f"File '{res.remote_file}' downloaded to '{res.local_path}'"
+                )
+            else:
+                ctx.print_error("Download failed!")
+                if result.device_results and result.device_results[0].error:
+                    if verbose:
+                        ctx.print_error(f"Error: {result.device_results[0].error}")
                 raise typer.Exit(1)
 
         except NetworkToolkitError as e:

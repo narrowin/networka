@@ -1,55 +1,5 @@
 {
   "$defs": {
-    "CommandSequence": {
-      "description": "Global command sequence definition.",
-      "properties": {
-        "description": {
-          "title": "Description",
-          "type": "string"
-        },
-        "commands": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Commands",
-          "type": "array"
-        },
-        "tags": {
-          "anyOf": [
-            {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Tags"
-        },
-        "file_operations": {
-          "anyOf": [
-            {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "File Operations"
-        }
-      },
-      "required": [
-        "description",
-        "commands"
-      ],
-      "title": "CommandSequence",
-      "type": "object"
-    },
     "CommandSequenceGroup": {
       "description": "Command sequence group definition.",
       "properties": {
@@ -514,6 +464,16 @@
           "title": "Default Transport Type",
           "type": "string"
         },
+        "ssh_config_file": {
+          "default": true,
+          "title": "Ssh Config File",
+          "type": "boolean"
+        },
+        "ssh_strict_host_key_checking": {
+          "default": false,
+          "title": "Ssh Strict Host Key Checking",
+          "type": "boolean"
+        },
         "connection_retries": {
           "default": 3,
           "title": "Connection Retries",
@@ -545,7 +505,7 @@
           "type": "boolean"
         },
         "log_level": {
-          "default": "INFO",
+          "default": "WARNING",
           "title": "Log Level",
           "type": "string"
         },
@@ -723,13 +683,15 @@
         "port": 22,
         "timeout": 30,
         "default_transport_type": "scrapli",
+        "ssh_config_file": true,
+        "ssh_strict_host_key_checking": false,
         "connection_retries": 3,
         "retry_delay": 5,
         "transfer_timeout": 300,
         "verify_checksums": true,
         "command_timeout": 60,
         "enable_logging": true,
-        "log_level": "INFO",
+        "log_level": "WARNING",
         "backup_retention_days": 30,
         "max_backups_per_device": 10,
         "store_results": false,
@@ -768,21 +730,6 @@
       ],
       "default": null,
       "title": "Device Groups"
-    },
-    "global_command_sequences": {
-      "anyOf": [
-        {
-          "additionalProperties": {
-            "$ref": "#/$defs/CommandSequence"
-          },
-          "type": "object"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Global Command Sequences"
     },
     "command_sequence_groups": {
       "anyOf": [
@@ -846,6 +793,21 @@
       ],
       "default": null,
       "title": "Vendor Sequences"
+    },
+    "global_command_sequences": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/VendorSequence"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Global Command Sequences"
     }
   },
   "title": "NetworkConfig",

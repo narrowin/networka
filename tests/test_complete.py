@@ -45,6 +45,12 @@ def mock_config() -> MagicMock:
         "maintenance": ["backup", "update"],
     }
 
+    # Setup global command sequences (vendor-agnostic)
+    config.global_command_sequences = {
+        "global_health": MagicMock(commands=["global health cmd"]),
+        "global_backup": MagicMock(commands=["global backup cmd"]),
+    }
+
     # Setup get_group_members method
     config.get_group_members.return_value = ["sw-acc1"]
 
@@ -65,7 +71,7 @@ class TestListCommands:
             "download",
             "backup",
             "firmware",
-            "ssh",
+            "cli",
             "diff",
             "list",
             "config",
@@ -89,7 +95,7 @@ class TestListDevices:
         """Test listing devices when devices exist."""
         devices = _list_devices(mock_config)
 
-        assert devices == ["sw-acc1", "rt-edge1"]
+        assert devices == ["rt-edge1", "sw-acc1"]
 
     def test_list_devices_with_empty_config(self) -> None:
         """Test listing devices when no devices exist."""
@@ -115,7 +121,7 @@ class TestListGroups:
         """Test listing groups when groups exist."""
         groups = _list_groups(mock_config)
 
-        assert groups == ["office_switches", "edge_routers"]
+        assert groups == ["edge_routers", "office_switches"]
 
     def test_list_groups_with_empty_config(self) -> None:
         """Test listing groups when no groups exist."""
@@ -237,6 +243,7 @@ class TestListSequences:
         """Test listing sequences when no sequences exist."""
         config = MagicMock(spec=NetworkConfig)
         config.devices = None
+        config.global_command_sequences = None
 
         with patch("network_toolkit.commands.complete.SequenceManager"):
             sequences = _list_sequences(config, target=None)

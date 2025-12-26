@@ -15,13 +15,10 @@ from network_toolkit.common.output import OutputMode
 from network_toolkit.common.table_providers import (
     DeviceListTableProvider,
     GroupListTableProvider,
-    SupportedPlatformsTableProvider,
-    TransportTypesTableProvider,
     VendorSequencesTableProvider,
 )
 from network_toolkit.config import NetworkConfig, load_config
 from network_toolkit.exceptions import NetworkToolkitError
-from network_toolkit.sequence_manager import SequenceManager, SequenceRecord
 
 if TYPE_CHECKING:
     pass
@@ -31,11 +28,14 @@ def _list_devices_impl(
     config: NetworkConfig, ctx: CommandContext, *, verbose: bool
 ) -> None:
     """Implementation logic for listing devices."""
-    if not config.devices:
+    from network_toolkit.api.list import get_device_list
+
+    devices = get_device_list(config)
+    if not devices:
         ctx.print_warning("No devices configured")
         return
 
-    provider = DeviceListTableProvider(config=config)
+    provider = DeviceListTableProvider(devices=devices)
     ctx.render_table(provider, verbose)
 
 
@@ -43,68 +43,15 @@ def _list_groups_impl(
     config: NetworkConfig, ctx: CommandContext, *, verbose: bool
 ) -> None:
     """Implementation logic for listing groups."""
-    if not config.device_groups:
+    from network_toolkit.api.list import get_group_list
+
+    groups = get_group_list(config)
+    if not groups:
         ctx.print_warning("No device groups configured")
         return
 
-    provider = GroupListTableProvider(config=config)
+    provider = GroupListTableProvider(groups=groups)
     ctx.render_table(provider, verbose)
-
-
-def _list_vendor_sequences_impl(
-    vendor: str,
-    sequences: dict[str, SequenceRecord],
-    category_filter: str | None,
-    config: NetworkConfig,
-    ctx: CommandContext,
-    *,
-    verbose: bool = False,
-) -> None:
-    """Implementation logic for listing vendor sequences."""
-    if not sequences:
-        ctx.print_warning(f"No sequences found for vendor '{vendor}'.")
-        return
-
-    filtered_sequences = {
-        name: seq
-        for name, seq in sequences.items()
-        if category_filter is None or seq.category == category_filter
-    }
-
-    if not filtered_sequences:
-        ctx.print_warning(f"No sequences found for category '{category_filter}'.")
-        return
-
-    provider = VendorSequencesTableProvider(
-        config=config, vendor_filter=vendor, verbose=verbose
-    )
-    ctx.render_table(provider, verbose)
-
-
-def _show_all_vendor_sequences(
-    sequences: dict[str, dict[str, SequenceRecord]],
-    category_filter: str | None,
-    config: NetworkConfig,
-    ctx: CommandContext,
-    *,
-    verbose: bool = False,
-) -> None:
-    """Show sequences for all vendors."""
-    provider = VendorSequencesTableProvider(config=config, verbose=verbose)
-    ctx.render_table(provider, verbose)
-
-
-def _show_supported_types_impl(ctx: CommandContext, *, verbose: bool) -> None:
-    """Implementation logic for showing supported device types."""
-    # Show transport types first
-    transport_provider = TransportTypesTableProvider()
-    ctx.render_table(transport_provider, verbose=False)
-
-    ctx.output_manager.print_blank_line()
-
-    # Show supported device types
-    platforms_provider = SupportedPlatformsTableProvider()
-    ctx.render_table(platforms_provider, verbose)
 
 
 def _list_sequences_impl(
@@ -116,22 +63,23 @@ def _list_sequences_impl(
     verbose: bool,
 ) -> None:
     """Implementation logic for listing sequences."""
-    sm = SequenceManager(config)
+    from network_toolkit.api.list import get_sequence_list
 
-    # Vendor sequences (built-in + repo + user + config)
-    if vendor:
-        vendor_seqs = sm.list_vendor_sequences(vendor)
-        _list_vendor_sequences_impl(
-            vendor, vendor_seqs, category, config, ctx, verbose=verbose
-        )
-    else:
-        all_vendor = sm.list_all_sequences()
-        if all_vendor:
-            _show_all_vendor_sequences(
-                all_vendor, category, config, ctx, verbose=verbose
-            )
+    sequences = get_sequence_list(config, vendor=vendor, category=category)
+
+    if not sequences:
+        if vendor:
+            ctx.print_warning(f"No sequences found for vendor '{vendor}'.")
+        elif category:
+            ctx.print_warning(f"No sequences found for category '{category}'.")
         else:
             ctx.print_warning("No vendor-specific sequences found.")
+        return
+
+    provider = VendorSequencesTableProvider(
+        sequences=sequences, vendor_filter=vendor, verbose=verbose
+    )
+    ctx.render_table(provider, verbose)
 
 
 def register(app: typer.Typer) -> None:
@@ -141,6 +89,8 @@ def register(app: typer.Typer) -> None:
     list_app = typer.Typer(
         name="list",
         help="List network devices, groups, sequences, and platform information",
+        no_args_is_help=True,
+        context_settings={"help_option_names": ["-h", "--help"]},
     )
 
     @list_app.command("devices")
@@ -162,7 +112,7 @@ def register(app: typer.Typer) -> None:
         ] = False,
     ) -> None:
         """List all configured network devices."""
-        setup_logging("DEBUG" if verbose else "INFO")
+        setup_logging("DEBUG" if verbose else "WARNING")
 
         ctx = CommandContext(
             config_file=config_file,
@@ -211,7 +161,7 @@ def register(app: typer.Typer) -> None:
         ] = False,
     ) -> None:
         """List all configured device groups and their members."""
-        setup_logging("DEBUG" if verbose else "INFO")
+        setup_logging("DEBUG" if verbose else "WARNING")
 
         ctx = CommandContext(
             config_file=config_file,
@@ -269,7 +219,7 @@ def register(app: typer.Typer) -> None:
     ) -> None:
         """List all available command sequences, optionally filtered by vendor
         or category."""
-        setup_logging("DEBUG" if verbose else "INFO")
+        setup_logging("DEBUG" if verbose else "WARNING")
 
         ctx = CommandContext(
             config_file=config_file,
@@ -282,33 +232,6 @@ def register(app: typer.Typer) -> None:
 
             # Use the local implementation
             _list_sequences_impl(config, ctx, vendor, category, verbose=verbose)
-
-        except NetworkToolkitError as e:
-            ctx.print_error(str(e))
-            if verbose and e.details:
-                ctx.print_error(f"Details: {e.details}")
-            raise typer.Exit(1) from None
-        except typer.Exit:
-            # Allow clean exits (e.g., user cancellation) to pass through
-            raise
-        except Exception as e:  # pragma: no cover - unexpected
-            ctx.print_error(f"Unexpected error: {e}")
-            raise typer.Exit(1) from None
-
-    @list_app.command("supported-types")
-    def supported_types(
-        verbose: Annotated[
-            bool, typer.Option("--verbose", "-v", help="Show detailed information")
-        ] = False,
-    ) -> None:
-        """Show supported device types and platform information."""
-        setup_logging("DEBUG" if verbose else "INFO")
-
-        ctx = CommandContext()
-
-        try:
-            # Use the local implementation
-            _show_supported_types_impl(ctx, verbose=verbose)
 
         except NetworkToolkitError as e:
             ctx.print_error(str(e))

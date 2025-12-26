@@ -16,7 +16,7 @@ import pytest
 from rich.console import Console
 from typer.testing import CliRunner
 
-from src.network_toolkit.output_clean import OutputMode
+from network_toolkit.output_clean import OutputMode
 
 
 @contextmanager

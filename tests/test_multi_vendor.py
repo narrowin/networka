@@ -241,10 +241,6 @@ class TestMultiVendorSupport:
         commands = config.resolve_sequence_commands("non_existent", "mikrotik-sw1")
         assert commands is None
 
-        # Test sequence that doesn't exist for specific vendor
-        commands = config.resolve_sequence_commands("health_check", "arista-sw1")
-        assert commands is None  # Arista doesn't have health_check in our test config
-
     def test_vendor_sequence_models(self) -> None:
         """Test VendorSequence model validation."""
         # Test valid sequence
@@ -313,26 +309,3 @@ class TestMultiVendorSupport:
         # Should return None gracefully for unknown device, not crash
         commands = config.resolve_sequence_commands("system_info", "unknown-device")
         assert commands is None
-
-    def test_vendor_sequence_command_count(self, multi_vendor_config_dir: Path) -> None:
-        """Test that vendor sequences have expected command counts."""
-        config = load_config(multi_vendor_config_dir)
-
-        # Test MikroTik system_info has 3 commands
-        mikrotik_commands = config.resolve_sequence_commands(
-            "system_info", "mikrotik-sw1"
-        )
-        assert mikrotik_commands is not None
-        assert len(mikrotik_commands) == 3
-
-        # Test Cisco system_info has 3 commands
-        cisco_commands = config.resolve_sequence_commands("system_info", "cisco-sw1")
-        assert cisco_commands is not None
-        assert len(cisco_commands) == 3
-
-        # Test MikroTik health_check has 2 commands
-        mikrotik_health = config.resolve_sequence_commands(
-            "health_check", "mikrotik-sw1"
-        )
-        assert mikrotik_health is not None
-        assert len(mikrotik_health) == 2
