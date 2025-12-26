@@ -182,11 +182,9 @@ class CredentialResolver:
         This is the canonical implementation for username resolution.
         The _resolve_username() method delegates to this for single source of truth.
         """
-        # 1. Function parameter override
+        # 1. Function parameter override (CLI flags like --user/--password)
         if override:
-            return override, CredentialSource(
-                loader=LoaderType.INTERACTIVE, identifier="cli"
-            )
+            return override, CredentialSource(loader=LoaderType.CLI, identifier=None)
 
         # 2. Device configuration
         if device.user:
@@ -231,11 +229,9 @@ class CredentialResolver:
         This is the canonical implementation for password resolution.
         The _resolve_password() method delegates to this for single source of truth.
         """
-        # 1. Function parameter override
+        # 1. Function parameter override (CLI flags like --user/--password)
         if override:
-            return override, CredentialSource(
-                loader=LoaderType.INTERACTIVE, identifier="cli"
-            )
+            return override, CredentialSource(loader=LoaderType.CLI, identifier=None)
 
         # 2. Device configuration
         if device.password:

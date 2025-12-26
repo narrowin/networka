@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from network_toolkit.introspection import (
@@ -144,6 +146,15 @@ class TestFieldHistory:
         )
         assert history.format_source() == "interactive"
 
+    def test_format_source_cli(self) -> None:
+        """Test format_source for CLI override."""
+        history = FieldHistory(
+            field_name="user",
+            value="admin",
+            loader=LoaderType.CLI,
+        )
+        assert history.format_source() == "cli"
+
 
 class TestConfigHistory:
     """Tests for ConfigHistory dataclass."""
@@ -246,3 +257,103 @@ class TestConfigHistory:
         history1.merge_from(history2)
         assert "host" in history1.get_all_fields()
         assert "user" in history1.get_all_fields()
+
+
+class TestCredentialSourceTracking:
+    """Tests for credential source tracking with CLI overrides."""
+
+    def test_cli_override_uses_cli_loader_type(self, tmp_path: Path) -> None:
+        """Test that CLI overrides use LoaderType.CLI in credential resolution."""
+        import os
+
+        from network_toolkit.config import DeviceConfig, GeneralConfig, NetworkConfig
+        from network_toolkit.credentials import CredentialResolver
+
+        # Set up required environment variables
+        os.environ["NW_USER_DEFAULT"] = "default_user"
+        os.environ["NW_PASSWORD_DEFAULT"] = "default_pass"
+
+        try:
+            # Create a minimal config with one device
+            config = NetworkConfig(
+                general=GeneralConfig(),
+                devices={
+                    "test-device": DeviceConfig(
+                        host="192.168.1.1",
+                        device_type="mikrotik_routeros",
+                    )
+                },
+            )
+
+            resolver = CredentialResolver(config)
+
+            # Test with CLI override
+            creds, sources = resolver.resolve_credentials_with_source(
+                device_name="test-device",
+                username_override="cli_user",
+                password_override="cli_pass",
+            )
+
+            # Verify credentials are from override
+            assert creds[0] == "cli_user"
+            assert creds[1] == "cli_pass"
+
+            # Verify source is CLI type
+            assert sources[0].loader == LoaderType.CLI
+            assert sources[1].loader == LoaderType.CLI
+            assert sources[0].format() == "cli"
+            assert sources[1].format() == "cli"
+
+        finally:
+            # Clean up environment
+            for var in ["NW_USER_DEFAULT", "NW_PASSWORD_DEFAULT"]:
+                if var in os.environ:
+                    del os.environ[var]
+
+    def test_env_var_uses_env_var_loader_type(self, tmp_path: Path) -> None:
+        """Test that environment variable credentials use LoaderType.ENV_VAR."""
+        import os
+
+        from network_toolkit.config import DeviceConfig, GeneralConfig, NetworkConfig
+        from network_toolkit.credentials import CredentialResolver
+
+        # Set up required environment variables
+        os.environ["NW_USER_DEFAULT"] = "env_default_user"
+        os.environ["NW_PASSWORD_DEFAULT"] = "env_default_pass"
+
+        try:
+            # Create a minimal config with one device (no device-specific creds)
+            config = NetworkConfig(
+                general=GeneralConfig(),
+                devices={
+                    "test-device": DeviceConfig(
+                        host="192.168.1.1",
+                        device_type="mikrotik_routeros",
+                    )
+                },
+            )
+
+            resolver = CredentialResolver(config)
+
+            # Test without override - should use env vars
+            creds, sources = resolver.resolve_credentials_with_source(
+                device_name="test-device",
+                username_override=None,
+                password_override=None,
+            )
+
+            # Verify credentials are from environment
+            assert creds[0] == "env_default_user"
+            assert creds[1] == "env_default_pass"
+
+            # Verify source is ENV_VAR type
+            assert sources[0].loader == LoaderType.ENV_VAR
+            assert sources[1].loader == LoaderType.ENV_VAR
+            assert sources[0].identifier == "NW_USER_DEFAULT"
+            assert sources[1].identifier == "NW_PASSWORD_DEFAULT"
+
+        finally:
+            # Clean up environment
+            for var in ["NW_USER_DEFAULT", "NW_PASSWORD_DEFAULT"]:
+                if var in os.environ:
+                    del os.environ[var]
