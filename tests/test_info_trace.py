@@ -293,3 +293,103 @@ class TestInfoTraceHelp:
         assert (
             "provenance" in result.output.lower() or "source" in result.output.lower()
         )
+
+
+class TestInfoSequence:
+    """Tests for nw info <sequence_name> functionality."""
+
+    @pytest.fixture
+    def config_with_sequences(self, tmp_path: Path) -> Path:
+        """Create config with vendor sequences."""
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+
+        config_yml = config_dir / "config.yml"
+        config_yml.write_text(
+            """
+general:
+  timeout: 30
+"""
+        )
+
+        # Create sequences directory with vendor sequences
+        sequences_dir = config_dir / "sequences"
+        sequences_dir.mkdir()
+
+        cisco_dir = sequences_dir / "cisco_iosxe"
+        cisco_dir.mkdir()
+        cisco_yml = cisco_dir / "common.yml"
+        cisco_yml.write_text(
+            """
+sequences:
+  system_info:
+    description: Get system information
+    category: information
+    commands:
+      - show version
+      - show inventory
+"""
+        )
+
+        mikrotik_dir = sequences_dir / "mikrotik_routeros"
+        mikrotik_dir.mkdir()
+        mikrotik_yml = mikrotik_dir / "common.yml"
+        mikrotik_yml.write_text(
+            """
+sequences:
+  system_info:
+    description: Get system information
+    category: information
+    commands:
+      - /system resource print
+      - /system routerboard print
+"""
+        )
+
+        return config_dir
+
+    def test_info_sequence_shows_info(
+        self,
+        config_with_sequences: Path,
+    ) -> None:
+        """Test that nw info <sequence_name> shows sequence information."""
+        result = runner.invoke(
+            app,
+            ["info", "system_info", "--config", str(config_with_sequences)],
+        )
+        assert result.exit_code == 0
+        assert "system_info" in result.output
+        # Should show it's available for multiple vendors
+        assert "cisco_iosxe" in result.output or "mikrotik_routeros" in result.output
+
+    def test_info_sequence_with_vendor(
+        self,
+        config_with_sequences: Path,
+    ) -> None:
+        """Test that nw info <sequence_name> --vendor shows vendor-specific commands."""
+        result = runner.invoke(
+            app,
+            [
+                "info",
+                "system_info",
+                "--config",
+                str(config_with_sequences),
+                "--vendor",
+                "cisco_iosxe",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "show version" in result.output
+        assert "show inventory" in result.output
+
+    def test_info_sequence_unknown(
+        self,
+        config_with_sequences: Path,
+    ) -> None:
+        """Test that nw info with unknown sequence shows warning."""
+        result = runner.invoke(
+            app,
+            ["info", "nonexistent_sequence", "--config", str(config_with_sequences)],
+        )
+        # Should warn about unknown target
+        assert "Unknown" in result.output or result.exit_code != 0
