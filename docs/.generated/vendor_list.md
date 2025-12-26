@@ -6,7 +6,7 @@
   - Device Type: `arista_eos`
   - Status: sequences_only
   - Data center switches - sequences available, operations coming soon
-  - [Documentation](vendors/arista/index.md)
+  - [Documentation](arista/index.md)
 
 ### Cisco
 
@@ -14,13 +14,13 @@
   - Device Type: `cisco_ios`
   - Status: implemented
   - Legacy Cisco switches and routers
-  - [Documentation](vendors/cisco/index.md)
+  - [Documentation](cisco/index.md)
 
 - **Cisco IOS-XE** [I]
   - Device Type: `cisco_iosxe`
   - Status: implemented
   - Modern Cisco switches and routers
-  - [Documentation](vendors/cisco/index.md)
+  - [Documentation](cisco/index.md)
 
 - **Cisco IOS-XR** [P]
   - Device Type: `cisco_iosxr`
@@ -31,7 +31,7 @@
   - Device Type: `cisco_nxos`
   - Status: sequences_only
   - Data center switches - sequences available, operations coming soon
-  - [Documentation](vendors/cisco/index.md)
+  - [Documentation](cisco/index.md)
 
 ### Generic
 
@@ -46,7 +46,7 @@
   - Device Type: `juniper_junos`
   - Status: sequences_only
   - Enterprise switches and routers - sequences available, operations coming soon
-  - [Documentation](vendors/juniper/index.md)
+  - [Documentation](juniper/index.md)
 
 ### Linux
 
@@ -61,7 +61,7 @@
   - Device Type: `mikrotik_routeros`
   - Status: implemented
   - Primary focus, fully featured
-  - [Documentation](vendors/mikrotik/index.md)
+  - [Documentation](mikrotik/index.md)
 
 ### Nokia
 
@@ -69,4 +69,4 @@
   - Device Type: `nokia_srlinux`
   - Status: planned
   - Modern data center network OS
-  - [Documentation](vendors/nokia/index.md)
+  - [Documentation](nokia/index.md)

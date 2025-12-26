@@ -126,6 +126,9 @@ def generate_capability_matrix() -> str:
 def generate_vendor_list() -> str:
     """Generate list of supported vendors with their platforms.
 
+    This file is included from docs/vendors/index.md, so links need to be
+    relative to that location (strip the 'vendors/' prefix from docs_path).
+
     Returns:
         Markdown list of vendors and their platforms
     """
@@ -152,7 +155,11 @@ def generate_vendor_list() -> str:
             if info.description:
                 lines.append(f"  - {info.description}")
             if info.docs_path:
-                lines.append(f"  - [Documentation]({info.docs_path})")
+                # Strip 'vendors/' prefix since this file is included from vendors/index.md
+                relative_path = info.docs_path
+                if relative_path.startswith("vendors/"):
+                    relative_path = relative_path[len("vendors/") :]
+                lines.append(f"  - [Documentation]({relative_path})")
             lines.append("")
 
     return "\n".join(lines)
