@@ -51,7 +51,6 @@ class TestFieldHistory:
         assert history.loader == LoaderType.CONFIG_FILE
         assert history.identifier == "config/devices/routers.yml"
         assert history.line_number == 5
-        assert history.merged is False
 
     def test_field_history_defaults(self) -> None:
         """Test FieldHistory default values."""
@@ -62,7 +61,6 @@ class TestFieldHistory:
         )
         assert history.identifier is None
         assert history.line_number is None
-        assert history.merged is False
 
     def test_field_history_immutable(self) -> None:
         """Test that FieldHistory is frozen (immutable)."""
@@ -236,15 +234,6 @@ class TestConfigHistory:
         assert "host" in fields
         assert "user" in fields
         assert "timeout" in fields
-
-    def test_clear(self) -> None:
-        """Test clearing all history."""
-        history = ConfigHistory()
-        history.record_field("host", "192.168.1.1", LoaderType.CONFIG_FILE)
-        history.record_field("user", "admin", LoaderType.ENV_VAR)
-
-        history.clear()
-        assert history.get_all_fields() == []
 
     def test_merge_from(self) -> None:
         """Test merging history from another ConfigHistory."""

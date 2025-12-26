@@ -16,16 +16,20 @@ from typing import Any
 
 
 class LoaderType(str, Enum):
-    """Source type for a configuration value."""
+    """Source type for a configuration value.
+
+    Currently implemented: CONFIG_FILE, ENV_VAR, GROUP, SSH_CONFIG, PYDANTIC_DEFAULT
+    Reserved for future use: DOTENV, CLI, INTERACTIVE
+    """
 
     CONFIG_FILE = "config_file"
     ENV_VAR = "env_var"
-    DOTENV = "dotenv"
+    DOTENV = "dotenv"  # Reserved for future use
     GROUP = "group"
     SSH_CONFIG = "ssh_config"
     PYDANTIC_DEFAULT = "default"
-    CLI = "cli"
-    INTERACTIVE = "interactive"
+    CLI = "cli"  # Reserved for future use
+    INTERACTIVE = "interactive"  # Reserved for future use
 
 
 @dataclass(frozen=True)
@@ -43,9 +47,7 @@ class FieldHistory:
     identifier : str | None
         Additional identifier (e.g., env var name, file path, group name)
     line_number : int | None
-        Line number in the source file, if applicable
-    merged : bool
-        Whether this value was merged from multiple sources
+        Line number in the source file, if applicable (reserved for future use)
     """
 
     field_name: str
@@ -53,7 +55,6 @@ class FieldHistory:
     loader: LoaderType
     identifier: str | None = None
     line_number: int | None = None
-    merged: bool = False
 
     def format_source(self) -> str:
         """Format the source as a human-readable string.
@@ -123,8 +124,6 @@ class ConfigHistory:
         loader: LoaderType,
         identifier: str | None = None,
         line_number: int | None = None,
-        *,
-        merged: bool = False,
     ) -> None:
         """Convenience method to record a field value.
 
@@ -139,9 +138,7 @@ class ConfigHistory:
         identifier : str | None
             Additional identifier
         line_number : int | None
-            Line number in source file
-        merged : bool
-            Whether this was merged
+            Line number in source file (reserved for future use)
         """
         entry = FieldHistory(
             field_name=field_name,
@@ -149,7 +146,6 @@ class ConfigHistory:
             loader=loader,
             identifier=identifier,
             line_number=line_number,
-            merged=merged,
         )
         self.record(entry)
 
@@ -193,10 +189,6 @@ class ConfigHistory:
             List of field names
         """
         return list(self._history.keys())
-
-    def clear(self) -> None:
-        """Clear all history."""
-        self._history.clear()
 
     def merge_from(self, other: ConfigHistory) -> None:
         """Merge history from another ConfigHistory instance.

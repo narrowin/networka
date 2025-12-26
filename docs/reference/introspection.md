@@ -29,14 +29,13 @@ The `Source` column shows where each value originated:
 | Source Format | Description |
 |---------------|-------------|
 | `config/path/file.yml` | Value from a YAML config file |
-| `config/path/file.yml:42` | Value from config file at specific line |
+| `config/path/file.yml:42` | Value from config file at specific line (reserved) |
 | `env: NW_VAR_NAME` | Value from environment variable |
-| `dotenv: .env` | Value from .env file |
 | `group: group-name` | Value inherited from device group |
 | `ssh_config: ~/.ssh/config` | Value from SSH config file |
 | `default` | Pydantic model default value |
-| `cli` | Value provided via CLI flag |
-| `interactive` | Value entered interactively |
+
+Note: Line number tracking and some source types (dotenv, cli, interactive) are reserved for future use.
 
 ## Python API
 
@@ -72,14 +71,17 @@ Enum identifying the source type:
 ```python
 from network_toolkit.introspection import LoaderType
 
-LoaderType.CONFIG_FILE    # YAML/CSV config file
-LoaderType.ENV_VAR        # Environment variable
-LoaderType.DOTENV         # .env file
-LoaderType.GROUP          # Device group inheritance
-LoaderType.SSH_CONFIG     # SSH config file
+# Currently implemented
+LoaderType.CONFIG_FILE       # YAML/CSV config file
+LoaderType.ENV_VAR           # Environment variable
+LoaderType.GROUP             # Device group inheritance
+LoaderType.SSH_CONFIG        # SSH config file
 LoaderType.PYDANTIC_DEFAULT  # Model default
-LoaderType.CLI            # CLI argument
-LoaderType.INTERACTIVE    # Interactive prompt
+
+# Reserved for future use
+LoaderType.DOTENV            # .env file (planned)
+LoaderType.CLI               # CLI argument (planned)
+LoaderType.INTERACTIVE       # Interactive prompt (planned)
 ```
 
 #### FieldHistory
