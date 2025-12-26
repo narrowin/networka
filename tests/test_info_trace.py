@@ -88,9 +88,9 @@ class TestInfoTraceFlag:
         assert result.exit_code == 0
         # With trace enabled, we should see Source column header
         assert "Source" in result.output
-        # Device fields should show config file path (may be truncated in terminal)
-        # Check for path indicators - either file name or temp directory pattern
-        assert "devices" in result.output or "/T/" in result.output
+        # With trace, we should see verbose provenance like env: or default
+        # (the full path may be truncated in table output)
+        assert "env:" in result.output or "default" in result.output
 
     def test_info_always_has_source_column(
         self,
@@ -309,10 +309,12 @@ class TestInfoTraceHelp:
     def test_info_help_shows_trace(self) -> None:
         """Test that info --help shows the --trace option."""
         result = runner.invoke(app, ["info", "--help"])
-        assert "--trace" in result.output
-        assert (
-            "provenance" in result.output.lower() or "source" in result.output.lower()
-        )
+        # Strip ANSI codes before checking (Rich may insert codes within text)
+        import re
+
+        clean_output = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+        assert "--trace" in clean_output
+        assert "provenance" in clean_output.lower() or "source" in clean_output.lower()
 
 
 class TestInfoSequence:

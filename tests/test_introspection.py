@@ -107,7 +107,7 @@ class TestFieldHistory:
         assert "devices.yml" in result
 
     def test_format_source_config_file_with_line(self) -> None:
-        """Test format_source includes line number when available."""
+        """Test format_source includes line number when verbose=True."""
         history = FieldHistory(
             field_name="host",
             value="192.168.1.1",
@@ -115,8 +115,12 @@ class TestFieldHistory:
             identifier="devices.yml",
             line_number=42,
         )
-        result = history.format_source()
+        # Verbose mode shows full path with line number
+        result = history.format_source(verbose=True)
         assert ":42" in result
+        # Compact mode (default) shows only filename
+        compact_result = history.format_source()
+        assert compact_result == "devices.yml"
 
     def test_format_source_group(self) -> None:
         """Test format_source for group inheritance."""
