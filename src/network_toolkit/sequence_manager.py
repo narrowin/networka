@@ -97,6 +97,21 @@ class SequenceManager:
             vendors |= set(self.config.vendor_sequences)
         return {v: self.list_vendor_sequences(v) for v in sorted(vendors)}
 
+    def get_sequence_record(
+        self, sequence_name: str, vendor: str
+    ) -> SequenceRecord | None:
+        """Get a specific sequence record for a vendor.
+
+        Args:
+            sequence_name: Name of the sequence (e.g., "system_info")
+            vendor: Vendor platform (e.g., "cisco_iosxe")
+
+        Returns:
+            SequenceRecord if found, None otherwise
+        """
+        sequences = self.list_vendor_sequences(vendor)
+        return sequences.get(sequence_name)
+
     def resolve(
         self, sequence_name: str, device_name: str | None = None
     ) -> list[str] | None:

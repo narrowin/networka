@@ -23,9 +23,40 @@ from network_toolkit.credentials import (
     EnvironmentCredentialManager,
 )
 from network_toolkit.exceptions import ConfigurationError, NetworkToolkitError
+from network_toolkit.introspection import ConfigHistory, FieldHistory, LoaderType
 from network_toolkit.inventory.catalog import InventoryCatalog, set_inventory_catalog
 from network_toolkit.inventory.nornir_simple import compile_nornir_simple_inventory
 from network_toolkit.runtime import get_runtime_settings
+
+
+class ConfigHistoryMixin:
+    """Mixin providing config history tracking methods.
+
+    This mixin provides a consistent interface for recording and querying
+    field history across GeneralConfig, DeviceConfig, and DeviceGroup classes.
+    Classes using this mixin must define a _history: ConfigHistory attribute.
+    """
+
+    _history: ConfigHistory
+
+    def record_field(
+        self,
+        field_name: str,
+        value: Any,
+        loader: LoaderType,
+        identifier: str | None = None,
+        line_number: int | None = None,
+    ) -> None:
+        """Record a field value in history."""
+        self._history.record_field(field_name, value, loader, identifier, line_number)
+
+    def get_field_history(self, field_name: str) -> list[FieldHistory]:
+        """Get the history for a specific field."""
+        return self._history.get_history(field_name)
+
+    def get_field_source(self, field_name: str) -> FieldHistory | None:
+        """Get the current source for a specific field."""
+        return self._history.get_current(field_name)
 
 
 def _resolve_fallback_config_path(original_hint: Path | None = None) -> Path | None:
@@ -113,8 +144,11 @@ def load_dotenv_files(config_path: Path | None = None) -> None:
         os.environ[key] = value
 
 
-class GeneralConfig(BaseModel):
+class GeneralConfig(ConfigHistoryMixin, BaseModel):
     """General configuration settings."""
+
+    # Private: configuration history for introspection
+    _history: ConfigHistory = PrivateAttr(default_factory=ConfigHistory)
 
     # Directory paths
     firmware_dir: str = "/tmp/firmware"
@@ -247,7 +281,7 @@ class DeviceOverrides(BaseModel):
 SupportedDeviceType = str
 
 
-class DeviceConfig(BaseModel):
+class DeviceConfig(ConfigHistoryMixin, BaseModel):
     """Configuration for a single network device.
 
     Attributes
@@ -263,6 +297,9 @@ class DeviceConfig(BaseModel):
         Examples: 'x86', 'x86_64', 'arm', 'tile', 'mipsbe'
         Optional - only required for firmware upgrade operations.
     """
+
+    # Private: configuration history for introspection
+    _history: ConfigHistory = PrivateAttr(default_factory=ConfigHistory)
 
     host: str
     description: str | None = None
@@ -300,8 +337,11 @@ class GroupCredentials(BaseModel):
     password: str | None = None
 
 
-class DeviceGroup(BaseModel):
+class DeviceGroup(ConfigHistoryMixin, BaseModel):
     """Configuration for a device group."""
+
+    # Private: configuration history for introspection
+    _history: ConfigHistory = PrivateAttr(default_factory=ConfigHistory)
 
     description: str
     members: list[str] | None = None
@@ -1309,6 +1349,90 @@ def _discover_local_inventories() -> list[Path]:
     return local_inventory_paths
 
 
+def _populate_device_field_history(
+    device: DeviceConfig,
+    source_path: Path | None,
+    device_defaults: dict[str, Any],
+) -> None:
+    """Populate field history for a DeviceConfig instance.
+
+    Tracks which fields came from the config file, defaults, or defaults file.
+    """
+    source_str = str(source_path) if source_path else None
+
+    # Get Pydantic model fields and their defaults
+    model_fields = DeviceConfig.model_fields
+
+    # Track each field's source
+    for field_name, field_info in model_fields.items():
+        value = getattr(device, field_name, None)
+        if value is None:
+            continue
+
+        # Determine the loader type based on where the value came from
+        if field_name in device_defaults and value == device_defaults.get(field_name):
+            # Value came from _defaults.yml - construct path properly using Path operations
+            defaults_path = (
+                source_path.parent / "_defaults.yml" if source_path else None
+            )
+            device.record_field(
+                field_name,
+                value,
+                LoaderType.CONFIG_FILE,
+                identifier=str(defaults_path) if defaults_path else "_defaults.yml",
+            )
+        elif field_info.default is not None and value == field_info.default:
+            # Value is Pydantic's default
+            device.record_field(
+                field_name, value, LoaderType.PYDANTIC_DEFAULT, identifier=None
+            )
+        elif (
+            hasattr(field_info, "default_factory")
+            and field_info.default_factory is not None
+        ):
+            # Skip fields with default factories (like lists)
+            device.record_field(
+                field_name, value, LoaderType.CONFIG_FILE, identifier=source_str
+            )
+        else:
+            # Value came from the config file
+            device.record_field(
+                field_name, value, LoaderType.CONFIG_FILE, identifier=source_str
+            )
+
+
+def _populate_group_field_history(
+    group: DeviceGroup,
+    source_path: Path | None,
+) -> None:
+    """Populate field history for a DeviceGroup instance.
+
+    Tracks which fields came from the config file or have defaults.
+    """
+    source_str = str(source_path) if source_path else None
+
+    # Get Pydantic model fields and their defaults
+    model_fields = DeviceGroup.model_fields
+
+    # Track each field's source
+    for field_name, field_info in model_fields.items():
+        value = getattr(group, field_name, None)
+        if value is None:
+            continue
+
+        # Determine the loader type based on where the value came from
+        if field_info.default is not None and value == field_info.default:
+            # Value is Pydantic's default
+            group.record_field(
+                field_name, value, LoaderType.PYDANTIC_DEFAULT, identifier=None
+            )
+        else:
+            # Value came from the config file
+            group.record_field(
+                field_name, value, LoaderType.CONFIG_FILE, identifier=source_str
+            )
+
+
 def load_modular_config(
     config_dir: Path, *, main_config_path: Path | None = None
 ) -> NetworkConfig:
@@ -1569,11 +1693,14 @@ def load_modular_config(
 
         if model.devices:
             # Persist source on each device instance (private attr via setter)
+            # and populate field history for introspection
             for _name, _dev in model.devices.items():
                 src = device_sources.get(_name)
                 if src is not None:
                     _dev.set_source_path(src)
                 _dev.set_inventory_source_id(device_inventory_ids.get(_name, "config"))
+                # Populate field history for each field
+                _populate_device_field_history(_dev, src, device_defaults)
 
         if model.device_groups:
             for _name, _grp in model.device_groups.items():
@@ -1581,6 +1708,8 @@ def load_modular_config(
                 if src is not None:
                     _grp.set_source_path(src)
                 _grp.set_inventory_source_id(group_inventory_ids.get(_name, "config"))
+                # Populate field history for each field
+                _populate_group_field_history(_grp, src)
 
         # Attach full inventory catalog for ambiguity detection and source-aware listing.
         catalog = InventoryCatalog()

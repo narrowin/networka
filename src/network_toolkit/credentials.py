@@ -7,7 +7,10 @@ from __future__ import annotations
 
 import logging
 import os
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
+
+from network_toolkit.introspection import LoaderType
 
 if TYPE_CHECKING:
     from network_toolkit.config import DeviceConfig, NetworkConfig
@@ -15,6 +18,35 @@ if TYPE_CHECKING:
 
 # module logger
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class CredentialSource:
+    """Describes where a credential value came from.
+
+    Note: This dataclass intentionally does not store the credential value
+    itself for security reasons. The value is returned separately during
+    resolution, and this class only tracks the source/provenance.
+    """
+
+    loader: LoaderType
+    identifier: str | None = None
+
+    def format(self) -> str:
+        """Format the source as a human-readable string."""
+        if self.loader == LoaderType.ENV_VAR:
+            return f"env: {self.identifier}" if self.identifier else "env"
+        elif self.loader == LoaderType.GROUP:
+            return f"group: {self.identifier}" if self.identifier else "group"
+        elif self.loader == LoaderType.CONFIG_FILE:
+            return f"config: {self.identifier}" if self.identifier else "config"
+        elif self.loader == LoaderType.PYDANTIC_DEFAULT:
+            return "default"
+        elif self.loader == LoaderType.CLI:
+            return "cli"
+        elif self.loader == LoaderType.INTERACTIVE:
+            return "interactive"
+        return str(self.loader.value)
 
 
 class CredentialResolver:
@@ -81,27 +113,12 @@ class CredentialResolver:
         device: DeviceConfig,
         override: str | None = None,
     ) -> str:
-        """Resolve username following precedence chain."""
-        # 1. Function parameter override
-        if override:
-            return override
+        """Resolve username following precedence chain.
 
-        # 2. Device configuration
-        if device.user:
-            return device.user
-
-        # 3. Device-specific environment variable
-        device_env_user = os.getenv(f"NW_USER_{device_name.upper().replace('-', '_')}")
-        if device_env_user:
-            return device_env_user
-
-        # 4. Group-level credentials
-        group_user, _ = self.config.get_group_credentials(device_name)
-        if group_user:
-            return group_user
-
-        # 5. Default environment variable
-        return self.config.general.default_user
+        Delegates to _resolve_username_with_source() for single source of truth.
+        """
+        username, _ = self._resolve_username_with_source(device_name, device, override)
+        return username
 
     def _resolve_password(
         self,
@@ -109,29 +126,186 @@ class CredentialResolver:
         device: DeviceConfig,
         override: str | None = None,
     ) -> str:
-        """Resolve password following precedence chain."""
-        # 1. Function parameter override
+        """Resolve password following precedence chain.
+
+        Delegates to _resolve_password_with_source() for single source of truth.
+        """
+        password, _ = self._resolve_password_with_source(device_name, device, override)
+        return password
+
+    def resolve_credentials_with_source(
+        self,
+        device_name: str,
+        username_override: str | None = None,
+        password_override: str | None = None,
+    ) -> tuple[tuple[str, str], tuple[CredentialSource, CredentialSource]]:
+        """
+        Resolve credentials with source tracking.
+
+        Parameters
+        ----------
+        device_name : str
+            Name of the device
+        username_override : str | None
+            Interactive username override
+        password_override : str | None
+            Interactive password override
+
+        Returns
+        -------
+        tuple[tuple[str, str], tuple[CredentialSource, CredentialSource]]
+            ((username, password), (username_source, password_source))
+        """
+        if not self.config.devices or device_name not in self.config.devices:
+            msg = f"Device '{device_name}' not found in configuration"
+            raise ValueError(msg)
+
+        device = self.config.devices[device_name]
+
+        username, user_source = self._resolve_username_with_source(
+            device_name, device, username_override
+        )
+        password, pass_source = self._resolve_password_with_source(
+            device_name, device, password_override
+        )
+
+        return (username, password), (user_source, pass_source)
+
+    def _resolve_username_with_source(
+        self,
+        device_name: str,
+        device: DeviceConfig,
+        override: str | None = None,
+    ) -> tuple[str, CredentialSource]:
+        """Resolve username with source tracking.
+
+        This is the canonical implementation for username resolution.
+        The _resolve_username() method delegates to this for single source of truth.
+        """
+        # 1. Function parameter override (CLI flags like --user/--password)
         if override:
-            return override
+            return override, CredentialSource(loader=LoaderType.CLI, identifier=None)
+
+        # 2. Device configuration
+        if device.user:
+            source_path = getattr(device, "_source_path", None)
+            identifier = str(source_path) if source_path else "device config"
+            return device.user, CredentialSource(
+                loader=LoaderType.CONFIG_FILE, identifier=identifier
+            )
+
+        # 3. Device-specific environment variable
+        env_var_name = f"NW_USER_{device_name.upper().replace('-', '_')}"
+        device_env_user = os.getenv(env_var_name)
+        if device_env_user:
+            return device_env_user, CredentialSource(
+                loader=LoaderType.ENV_VAR,
+                identifier=env_var_name,
+            )
+
+        # 4. Group-level credentials (with source tracking)
+        group_user, _, group_name = self._get_group_credentials_with_source(
+            device_name, "user"
+        )
+        if group_user and group_name:
+            return group_user, CredentialSource(
+                loader=LoaderType.GROUP, identifier=group_name
+            )
+
+        # 5. Default environment variable
+        default_user = self.config.general.default_user
+        return default_user, CredentialSource(
+            loader=LoaderType.ENV_VAR, identifier="NW_USER_DEFAULT"
+        )
+
+    def _resolve_password_with_source(
+        self,
+        device_name: str,
+        device: DeviceConfig,
+        override: str | None = None,
+    ) -> tuple[str, CredentialSource]:
+        """Resolve password with source tracking.
+
+        This is the canonical implementation for password resolution.
+        The _resolve_password() method delegates to this for single source of truth.
+        """
+        # 1. Function parameter override (CLI flags like --user/--password)
+        if override:
+            return override, CredentialSource(loader=LoaderType.CLI, identifier=None)
 
         # 2. Device configuration
         if device.password:
-            return device.password
+            source_path = getattr(device, "_source_path", None)
+            identifier = str(source_path) if source_path else "device config"
+            return device.password, CredentialSource(
+                loader=LoaderType.CONFIG_FILE,
+                identifier=identifier,
+            )
 
         # 3. Device-specific environment variable
-        device_env_password = os.getenv(
-            f"NW_PASSWORD_{device_name.upper().replace('-', '_')}"
-        )
+        env_var_name = f"NW_PASSWORD_{device_name.upper().replace('-', '_')}"
+        device_env_password = os.getenv(env_var_name)
         if device_env_password:
-            return device_env_password
+            return device_env_password, CredentialSource(
+                loader=LoaderType.ENV_VAR,
+                identifier=env_var_name,
+            )
 
-        # 4. Group-level credentials
-        _, group_password = self.config.get_group_credentials(device_name)
-        if group_password:
-            return group_password
+        # 4. Group-level credentials (with source tracking)
+        _, group_password, group_name = self._get_group_credentials_with_source(
+            device_name, "password"
+        )
+        if group_password and group_name:
+            return group_password, CredentialSource(
+                loader=LoaderType.GROUP, identifier=group_name
+            )
 
         # 5. Default environment variable
-        return self.config.general.default_password
+        default_password = self.config.general.default_password
+        return default_password, CredentialSource(
+            loader=LoaderType.ENV_VAR,
+            identifier="NW_PASSWORD_DEFAULT",
+        )
+
+    def _get_group_credentials_with_source(
+        self, device_name: str, credential_type: str
+    ) -> tuple[str | None, str | None, str | None]:
+        """
+        Get group-level credentials with source tracking.
+
+        Returns
+        -------
+        tuple[str | None, str | None, str | None]
+            (user, password, group_name) - group_name indicates which group provided creds
+        """
+        device_groups = self.config.get_device_groups(device_name)
+
+        for group_name in device_groups:
+            group = (
+                self.config.device_groups.get(group_name)
+                if self.config.device_groups
+                else None
+            )
+            if group and group.credentials:
+                # Check for explicit credentials in group config
+                if credential_type == "user" and group.credentials.user:
+                    return group.credentials.user, None, group_name
+                if credential_type == "password" and group.credentials.password:
+                    return None, group.credentials.password, group_name
+
+                # Check for environment variables for this group
+                group_user = EnvironmentCredentialManager.get_group_specific(
+                    group_name, "user"
+                )
+                group_password = EnvironmentCredentialManager.get_group_specific(
+                    group_name, "password"
+                )
+                if credential_type == "user" and group_user:
+                    return group_user, None, f"{group_name} (env)"
+                if credential_type == "password" and group_password:
+                    return None, group_password, f"{group_name} (env)"
+
+        return None, None, None
 
 
 class EnvironmentCredentialManager:
