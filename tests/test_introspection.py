@@ -1,0 +1,342 @@
+# SPDX-FileCopyrightText: 2025-present Network Team <network@company.com>
+#
+# SPDX-License-Identifier: MIT
+"""Tests for the introspection module."""
+
+from __future__ import annotations
+
+import pytest
+
+from network_toolkit.introspection import (
+    ConfigHistory,
+    CredentialResolutionTrace,
+    FieldHistory,
+    LoaderType,
+)
+
+
+class TestLoaderType:
+    """Tests for LoaderType enum."""
+
+    def test_loader_type_values(self) -> None:
+        """Test that all expected loader types exist."""
+        assert LoaderType.CONFIG_FILE.value == "config_file"
+        assert LoaderType.ENV_VAR.value == "env_var"
+        assert LoaderType.DOTENV.value == "dotenv"
+        assert LoaderType.GROUP.value == "group"
+        assert LoaderType.SSH_CONFIG.value == "ssh_config"
+        assert LoaderType.PYDANTIC_DEFAULT.value == "default"
+        assert LoaderType.CLI.value == "cli"
+        assert LoaderType.INTERACTIVE.value == "interactive"
+
+    def test_loader_type_is_string(self) -> None:
+        """Test that LoaderType is a string enum."""
+        assert isinstance(LoaderType.CONFIG_FILE, str)
+        assert LoaderType.CONFIG_FILE == "config_file"
+
+
+class TestFieldHistory:
+    """Tests for FieldHistory dataclass."""
+
+    def test_field_history_creation(self) -> None:
+        """Test creating a FieldHistory instance."""
+        history = FieldHistory(
+            field_name="host",
+            value="192.168.1.1",
+            loader=LoaderType.CONFIG_FILE,
+            identifier="config/devices/routers.yml",
+            line_number=5,
+        )
+        assert history.field_name == "host"
+        assert history.value == "192.168.1.1"
+        assert history.loader == LoaderType.CONFIG_FILE
+        assert history.identifier == "config/devices/routers.yml"
+        assert history.line_number == 5
+        assert history.merged is False
+
+    def test_field_history_defaults(self) -> None:
+        """Test FieldHistory default values."""
+        history = FieldHistory(
+            field_name="timeout",
+            value=30,
+            loader=LoaderType.PYDANTIC_DEFAULT,
+        )
+        assert history.identifier is None
+        assert history.line_number is None
+        assert history.merged is False
+
+    def test_field_history_immutable(self) -> None:
+        """Test that FieldHistory is frozen (immutable)."""
+        history = FieldHistory(
+            field_name="host",
+            value="192.168.1.1",
+            loader=LoaderType.CONFIG_FILE,
+        )
+        with pytest.raises(AttributeError):
+            history.value = "10.0.0.1"  # type: ignore[misc]
+
+    def test_format_source_env_var(self) -> None:
+        """Test format_source for environment variables."""
+        history = FieldHistory(
+            field_name="user",
+            value="admin",
+            loader=LoaderType.ENV_VAR,
+            identifier="NW_USER_DEFAULT",
+        )
+        assert history.format_source() == "env: NW_USER_DEFAULT"
+
+    def test_format_source_env_var_no_identifier(self) -> None:
+        """Test format_source for environment variables without identifier."""
+        history = FieldHistory(
+            field_name="user",
+            value="admin",
+            loader=LoaderType.ENV_VAR,
+        )
+        assert history.format_source() == "env"
+
+    def test_format_source_config_file(self) -> None:
+        """Test format_source for config file."""
+        history = FieldHistory(
+            field_name="host",
+            value="192.168.1.1",
+            loader=LoaderType.CONFIG_FILE,
+            identifier="/path/to/devices.yml",
+            line_number=10,
+        )
+        # Note: actual output depends on Path.cwd(), but should include path
+        result = history.format_source()
+        assert "devices.yml" in result
+
+    def test_format_source_config_file_with_line(self) -> None:
+        """Test format_source includes line number when available."""
+        history = FieldHistory(
+            field_name="host",
+            value="192.168.1.1",
+            loader=LoaderType.CONFIG_FILE,
+            identifier="devices.yml",
+            line_number=42,
+        )
+        result = history.format_source()
+        assert ":42" in result
+
+    def test_format_source_group(self) -> None:
+        """Test format_source for group inheritance."""
+        history = FieldHistory(
+            field_name="user",
+            value="netadmin",
+            loader=LoaderType.GROUP,
+            identifier="core-routers",
+        )
+        assert history.format_source() == "group: core-routers"
+
+    def test_format_source_pydantic_default(self) -> None:
+        """Test format_source for Pydantic defaults."""
+        history = FieldHistory(
+            field_name="timeout",
+            value=30,
+            loader=LoaderType.PYDANTIC_DEFAULT,
+        )
+        assert history.format_source() == "default"
+
+    def test_format_source_interactive(self) -> None:
+        """Test format_source for interactive input."""
+        history = FieldHistory(
+            field_name="password",
+            value="secret",
+            loader=LoaderType.INTERACTIVE,
+        )
+        assert history.format_source() == "interactive"
+
+
+class TestConfigHistory:
+    """Tests for ConfigHistory dataclass."""
+
+    def test_config_history_creation(self) -> None:
+        """Test creating an empty ConfigHistory."""
+        history = ConfigHistory()
+        assert history.get_all_fields() == []
+
+    def test_record_single_field(self) -> None:
+        """Test recording a single field."""
+        history = ConfigHistory()
+        entry = FieldHistory(
+            field_name="host",
+            value="192.168.1.1",
+            loader=LoaderType.CONFIG_FILE,
+        )
+        history.record(entry)
+
+        assert "host" in history.get_all_fields()
+        assert len(history.get_history("host")) == 1
+        assert history.get_current("host") == entry
+
+    def test_record_multiple_entries_same_field(self) -> None:
+        """Test recording multiple entries for the same field."""
+        history = ConfigHistory()
+
+        # First entry: default
+        entry1 = FieldHistory(
+            field_name="timeout",
+            value=30,
+            loader=LoaderType.PYDANTIC_DEFAULT,
+        )
+        history.record(entry1)
+
+        # Second entry: config file override
+        entry2 = FieldHistory(
+            field_name="timeout",
+            value=60,
+            loader=LoaderType.CONFIG_FILE,
+            identifier="config.yml",
+        )
+        history.record(entry2)
+
+        entries = history.get_history("timeout")
+        assert len(entries) == 2
+        assert entries[0] == entry1
+        assert entries[1] == entry2
+        assert history.get_current("timeout") == entry2
+
+    def test_record_field_convenience_method(self) -> None:
+        """Test the record_field convenience method."""
+        history = ConfigHistory()
+        history.record_field(
+            field_name="host",
+            value="10.0.0.1",
+            loader=LoaderType.CONFIG_FILE,
+            identifier="devices.yml",
+            line_number=5,
+        )
+
+        current = history.get_current("host")
+        assert current is not None
+        assert current.value == "10.0.0.1"
+        assert current.loader == LoaderType.CONFIG_FILE
+        assert current.identifier == "devices.yml"
+        assert current.line_number == 5
+
+    def test_get_history_nonexistent_field(self) -> None:
+        """Test getting history for a field that doesn't exist."""
+        history = ConfigHistory()
+        assert history.get_history("nonexistent") == []
+
+    def test_get_current_nonexistent_field(self) -> None:
+        """Test getting current value for a field that doesn't exist."""
+        history = ConfigHistory()
+        assert history.get_current("nonexistent") is None
+
+    def test_get_all_fields(self) -> None:
+        """Test getting all tracked fields."""
+        history = ConfigHistory()
+        history.record_field("host", "192.168.1.1", LoaderType.CONFIG_FILE)
+        history.record_field("user", "admin", LoaderType.ENV_VAR)
+        history.record_field("timeout", 30, LoaderType.PYDANTIC_DEFAULT)
+
+        fields = history.get_all_fields()
+        assert len(fields) == 3
+        assert "host" in fields
+        assert "user" in fields
+        assert "timeout" in fields
+
+    def test_clear(self) -> None:
+        """Test clearing all history."""
+        history = ConfigHistory()
+        history.record_field("host", "192.168.1.1", LoaderType.CONFIG_FILE)
+        history.record_field("user", "admin", LoaderType.ENV_VAR)
+
+        history.clear()
+        assert history.get_all_fields() == []
+
+    def test_merge_from(self) -> None:
+        """Test merging history from another ConfigHistory."""
+        history1 = ConfigHistory()
+        history1.record_field("host", "192.168.1.1", LoaderType.CONFIG_FILE)
+
+        history2 = ConfigHistory()
+        history2.record_field("user", "admin", LoaderType.ENV_VAR)
+
+        history1.merge_from(history2)
+        assert "host" in history1.get_all_fields()
+        assert "user" in history1.get_all_fields()
+
+    def test_to_dict(self) -> None:
+        """Test converting history to dictionary."""
+        history = ConfigHistory()
+        history.record_field(
+            field_name="host",
+            value="192.168.1.1",
+            loader=LoaderType.CONFIG_FILE,
+            identifier="devices.yml",
+        )
+
+        result = history.to_dict()
+        assert "host" in result
+        assert len(result["host"]) == 1
+        assert result["host"][0]["value"] == "192.168.1.1"
+        assert result["host"][0]["loader"] == "config_file"
+        assert result["host"][0]["identifier"] == "devices.yml"
+
+
+class TestCredentialResolutionTrace:
+    """Tests for CredentialResolutionTrace dataclass."""
+
+    def test_creation(self) -> None:
+        """Test creating a CredentialResolutionTrace."""
+        trace = CredentialResolutionTrace(
+            credential_type="username",
+            final_value="admin",
+            final_source=None,
+        )
+        assert trace.credential_type == "username"
+        assert trace.final_value == "admin"
+        assert trace.checked_sources == []
+
+    def test_add_checked(self) -> None:
+        """Test adding checked sources."""
+        trace = CredentialResolutionTrace(
+            credential_type="password",
+            final_value="secret",
+            final_source=None,
+        )
+
+        trace.add_checked("cli_override", None)
+        trace.add_checked("device_config", None)
+
+        env_entry = FieldHistory(
+            field_name="password",
+            value="secret",
+            loader=LoaderType.ENV_VAR,
+            identifier="NW_PASSWORD_DEFAULT",
+        )
+        trace.add_checked("env_var", env_entry)
+        trace.final_source = env_entry
+
+        assert len(trace.checked_sources) == 3
+        assert trace.checked_sources[0] == ("cli_override", None)
+        assert trace.checked_sources[2][1] == env_entry
+
+    def test_format_trace(self) -> None:
+        """Test formatting the resolution trace."""
+        trace = CredentialResolutionTrace(
+            credential_type="username",
+            final_value="admin",
+            final_source=None,
+        )
+
+        trace.add_checked("cli_override", None)
+
+        env_entry = FieldHistory(
+            field_name="username",
+            value="admin",
+            loader=LoaderType.ENV_VAR,
+            identifier="NW_USER_DEFAULT",
+        )
+        trace.add_checked("env_var", env_entry)
+        trace.final_source = env_entry
+
+        lines = trace.format_trace()
+        assert "Resolution trace for username:" in lines[0]
+        assert "cli_override" in lines[1]
+        assert "not set" in lines[1]
+        assert "env_var" in lines[2]
+        assert "[SELECTED]" in lines[2]

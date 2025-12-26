@@ -65,6 +65,14 @@ def register(app: typer.Typer) -> None:
         verbose: Annotated[
             bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
         ] = False,
+        trace: Annotated[
+            bool,
+            typer.Option(
+                "--trace",
+                "-t",
+                help="Show detailed source provenance for all configuration values",
+            ),
+        ] = False,
         interactive_auth: Annotated[
             bool,
             typer.Option(
@@ -81,6 +89,7 @@ def register(app: typer.Typer) -> None:
 
         Examples:
         - nw info sw-acc1                    # Show device info
+        - nw info sw-acc1 --trace            # Show device info with source provenance
         - nw info sw-acc1,sw-acc2           # Show multiple devices
         - nw info access_switches           # Show group info
         - nw info system_info               # Show sequence info (all vendors)
@@ -140,7 +149,7 @@ def register(app: typer.Typer) -> None:
 
                 if target.type == "device":
                     _show_device_info(
-                        target.name, config, ctx, interactive_creds, verbose
+                        target.name, config, ctx, interactive_creds, verbose, trace
                     )
                     known_count += 1
                 elif target.type == "group":
@@ -224,6 +233,7 @@ def _show_device_info(
     ctx: CommandContext,
     interactive_creds: InteractiveCredentials | None,
     verbose: bool,
+    trace: bool = False,
 ) -> None:
     """Show detailed information for a device."""
     if not config.devices or device not in config.devices:
@@ -235,6 +245,7 @@ def _show_device_info(
         device_name=device,
         interactive_creds=interactive_creds,
         config_path=ctx.config_file,
+        show_provenance=trace,
     )
     ctx.render_table(provider, verbose)
 

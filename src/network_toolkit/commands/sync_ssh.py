@@ -15,6 +15,8 @@ from network_toolkit.inventory.ssh_config import SSHConfigOptions, parse_ssh_con
 
 # Marker to identify hosts that were synced from SSH config
 SSH_CONFIG_SOURCE_MARKER = "_ssh_config_source"
+# Additional provenance marker for field-level tracking
+SSH_CONFIG_PROVENANCE_MARKER = "_ssh_config_provenance"
 
 # Default paths
 DEFAULT_SSH_CONFIG = Path("~/.ssh/config")
@@ -203,6 +205,8 @@ def sync_ssh_config(
     for name, ssh_host in ssh_hosts.items():
         if name not in existing:
             # New host - add with SSH config values
+            # Track which fields came from SSH config for introspection
+            provenance_fields = ["host"]
             new_entry: dict[str, Any] = {
                 "host": ssh_host.hostname,
                 "device_type": default_device_type,
@@ -210,8 +214,16 @@ def sync_ssh_config(
             }
             if ssh_host.user:
                 new_entry["user"] = ssh_host.user
+                provenance_fields.append("user")
             if ssh_host.port:
                 new_entry["port"] = ssh_host.port
+                provenance_fields.append("port")
+            # Store field-level provenance
+            new_entry[SSH_CONFIG_PROVENANCE_MARKER] = {
+                "source_file": str(resolved_ssh_config),
+                "ssh_host_alias": name,
+                "fields": provenance_fields,
+            }
             existing[name] = new_entry
             added.append(name)
         else:
@@ -253,7 +265,25 @@ def sync_ssh_config(
 
             # Preserve: device_type, tags, description, platform, etc.
 
+            # Update provenance tracking for changed fields
             if changes:
+                provenance = current.get(SSH_CONFIG_PROVENANCE_MARKER, {})
+                if not provenance:
+                    provenance = {
+                        "source_file": str(resolved_ssh_config),
+                        "ssh_host_alias": name,
+                        "fields": [],
+                    }
+                # Update tracked fields
+                tracked_fields = set(provenance.get("fields", []))
+                for change in changes:
+                    field_name = change.split()[0]  # Handle "user (removed)"
+                    if "(removed)" in change:
+                        tracked_fields.discard(field_name)
+                    else:
+                        tracked_fields.add(field_name)
+                provenance["fields"] = list(tracked_fields)
+                current[SSH_CONFIG_PROVENANCE_MARKER] = provenance
                 updated.append((name, changes))
             else:
                 unchanged.append(name)

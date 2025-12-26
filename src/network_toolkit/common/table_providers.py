@@ -531,41 +531,69 @@ class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
     device_name: str
     interactive_creds: Any | None = None
     config_path: Path | None = None
+    show_provenance: bool = False  # Show inline source indicators
 
     model_config = {"arbitrary_types_allowed": True}
 
     def get_table_definition(self) -> TableDefinition:
+        columns = [
+            TableColumn(header="Property", style=StyleName.DEVICE),
+            TableColumn(header="Value", style=StyleName.OUTPUT),
+        ]
+        if self.show_provenance:
+            columns.append(TableColumn(header="Source", style=StyleName.WARNING))
         return TableDefinition(
             title=f"Device: {self.device_name}",
-            columns=[
-                TableColumn(header="Property", style=StyleName.DEVICE),
-                TableColumn(header="Value", style=StyleName.OUTPUT),
-            ],
+            columns=columns,
         )
 
     def get_table_rows(self) -> list[list[str]]:
         """Get device information data."""
         devices = self.config.devices or {}
         if self.device_name not in devices:
-            return [["Error", f"Device '{self.device_name}' not found"]]
+            row = ["Error", f"Device '{self.device_name}' not found"]
+            return [[*row, "-"] if self.show_provenance else row]
 
         device_config = devices[self.device_name]
-        rows = []
+        rows: list[list[str]] = []
 
-        # Basic device information
-        rows.append(["Host", device_config.host])
-        rows.append(["Description", device_config.description or "N/A"])
-        rows.append(["Device Type", device_config.device_type])
-        rows.append(["Model", device_config.model or "N/A"])
-        rows.append(["Platform", device_config.platform or device_config.device_type])
-        rows.append(["Location", device_config.location or "N/A"])
-        rows.append(
-            ["Tags", ", ".join(device_config.tags) if device_config.tags else "None"]
+        def add_row(prop: str, value: str, source: str = "-") -> None:
+            if self.show_provenance:
+                rows.append([prop, value, source])
+            else:
+                rows.append([prop, value])
+
+        # Get field history for provenance display
+        def get_source(field_name: str) -> str:
+            if not self.show_provenance:
+                return "-"
+            history = device_config.get_field_source(field_name)
+            if history:
+                return history.format_source()
+            return "-"
+
+        # Basic device information with sources
+        add_row("Host", device_config.host, get_source("host"))
+        add_row(
+            "Description", device_config.description or "N/A", get_source("description")
         )
-        rows.append(["Source", self._get_device_source()])
-        rows.append(["Inventory Source", self._get_device_inventory_source()])
+        add_row("Device Type", device_config.device_type, get_source("device_type"))
+        add_row("Model", device_config.model or "N/A", get_source("model"))
+        add_row(
+            "Platform",
+            device_config.platform or device_config.device_type,
+            get_source("platform"),
+        )
+        add_row("Location", device_config.location or "N/A", get_source("location"))
+        add_row(
+            "Tags",
+            ", ".join(device_config.tags) if device_config.tags else "None",
+            get_source("tags"),
+        )
+        add_row("Source File", self._get_device_source(), "-")
+        add_row("Inventory Source", self._get_device_inventory_source(), "-")
 
-        # Connection parameters
+        # Connection parameters with credential sources
         username_override = (
             getattr(self.interactive_creds, "username", None)
             if self.interactive_creds
@@ -581,32 +609,37 @@ class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
             self.device_name, username_override, password_override
         )
 
-        rows.append(["SSH Port", str(conn_params["port"])])
-        rows.append(["Username", conn_params["auth_username"]])
-        rows.append(["Username Source", self._get_credential_source("username")])
+        # Get credential sources using the enhanced resolver
+        user_source_str = self._get_credential_source("username")
+        pass_source_str = self._get_credential_source("password")
+
+        add_row("SSH Port", str(conn_params["port"]), get_source("port"))
+        add_row("Username", conn_params["auth_username"], user_source_str)
 
         # Password handling with environment variable support
         show_passwords = self._env_truthy("NW_SHOW_PLAINTEXT_PASSWORDS")
         if show_passwords:
             password_value = conn_params["auth_password"] or ""
             if password_value:
-                rows.append(["Password", password_value])
+                add_row("Password", password_value, pass_source_str)
             else:
-                rows.append(
-                    [
-                        "Password",
-                        "(empty - set NW_SHOW_PLAINTEXT_PASSWORDS=1 to display)",
-                    ]
+                add_row(
+                    "Password",
+                    "(empty - set NW_SHOW_PLAINTEXT_PASSWORDS=1 to display)",
+                    pass_source_str,
                 )
         else:
-            rows.append(["Password", "set NW_SHOW_PLAINTEXT_PASSWORDS=1 to display"])
-        rows.append(["Password Source", self._get_credential_source("password")])
+            add_row(
+                "Password",
+                "set NW_SHOW_PLAINTEXT_PASSWORDS=1 to display",
+                pass_source_str,
+            )
 
-        rows.append(["Timeout", f"{conn_params['timeout_socket']}s"])
+        add_row("Timeout", f"{conn_params['timeout_socket']}s", "default")
 
         # Transport type
         transport_type = self.config.get_transport_type(self.device_name)
-        rows.append(["Transport Type", transport_type])
+        add_row("Transport Type", transport_type, "default")
 
         # Group memberships
         group_memberships = []
@@ -616,7 +649,7 @@ class DeviceInfoTableProvider(BaseModel, BaseTableProvider):
                     group_memberships.append(group_name)
 
         if group_memberships:
-            rows.append(["Groups", ", ".join(group_memberships)])
+            add_row("Groups", ", ".join(group_memberships), "computed")
 
         return rows
 
