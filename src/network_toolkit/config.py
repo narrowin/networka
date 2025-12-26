@@ -409,6 +409,17 @@ class NetworkConfig(BaseModel):
             return None
         return getattr(grp, "_inventory_source_id", None)
 
+    # Helper: global sequence source path accessor (non-schema, uses PrivateAttr on CommandSequence)
+    def get_global_sequence_source_path(self, sequence_name: str) -> Path | None:
+        seq = (
+            self.global_command_sequences.get(sequence_name)
+            if self.global_command_sequences
+            else None
+        )
+        if seq is None:
+            return None
+        return getattr(seq, "_source_path", None)
+
     def get_device_connection_params(
         self,
         device_name: str,
@@ -907,9 +918,13 @@ def load_config(config_path: str | Path) -> NetworkConfig:
                 _auto_export_schemas_if_project()
                 return config
 
-        # For DEFAULT_CONFIG_PATH, only use the explicit default path
-        # Do NOT search for local config/ directories
-        # This ensures consistent behavior across different working directories
+        # Prefer a repo-local ./config when running in a project/tests
+        discovered = _resolve_fallback_config_path(config_path)
+        if discovered is not None:
+            load_dotenv_files(discovered)
+            config = load_modular_config(discovered)
+            _auto_export_schemas_if_project()
+            return config
 
     # Load .env files to make environment variables available for credential resolution
     # using the original hint path. This happens after the NW_CONFIG_DIR fast path above.
@@ -923,8 +938,14 @@ def load_config(config_path: str | Path) -> NetworkConfig:
             raise FileNotFoundError(msg)
         # Default path missing — surface clearly but without probing CWD
         if config_path == DEFAULT_CONFIG_PATH:
-            # For DEFAULT_CONFIG_PATH, do not attempt fallback discovery
-            # This ensures consistent behavior regardless of working directory
+            # Attempt best-effort fallback discovery for local development/tests
+            fallback = _resolve_fallback_config_path(config_path)
+            if fallback is not None:
+                # Reload .env with the discovered config directory to ensure correct precedence
+                load_dotenv_files(fallback)
+                config = load_modular_config(fallback)
+                _auto_export_schemas_if_project()
+                return config
             msg = f"Configuration directory not found: {config_path}"
             raise FileNotFoundError(msg)
         msg = f"Configuration path not found: {config_path}"
@@ -1137,21 +1158,29 @@ def _load_sequences(
     config_dir: Path,
     main_config: dict[str, Any],
 ) -> tuple[
-    dict[str, Any], dict[str, VendorSequence], dict[str, dict[str, VendorSequence]]
+    dict[str, Any],
+    dict[str, VendorSequence],
+    dict[str, dict[str, VendorSequence]],
+    dict[str, Path],
 ]:
     """Load vendor-specific and global command sequences.
 
     Returns:
-        Tuple of (sequences_config, global_command_sequences, vendor_sequences)
+        Tuple of (sequences_config, global_command_sequences, vendor_sequences, global_sequence_sources)
     """
     sequence_files = _discover_config_files(config_dir, "sequences")
     sequences_config: dict[str, Any] = {}
+    global_sequence_sources: dict[str, Path] = {}
 
     for seq_file in sequence_files:
         if seq_file.suffix.lower() != ".csv":
             try:
                 with seq_file.open("r", encoding="utf-8") as sf:
                     seq_yaml_config: dict[str, Any] = yaml.safe_load(sf) or {}
+                    # Track source paths for sequences
+                    file_sequences = seq_yaml_config.get("sequences", {})
+                    for seq_name in file_sequences.keys():
+                        global_sequence_sources[seq_name] = seq_file
                     if not sequences_config:
                         sequences_config = seq_yaml_config
                     else:
@@ -1178,7 +1207,12 @@ def _load_sequences(
                     commands=seq_data,
                 )
 
-    return sequences_config, global_command_sequences, vendor_sequences
+    return (
+        sequences_config,
+        global_command_sequences,
+        vendor_sequences,
+        global_sequence_sources,
+    )
 
 
 def _is_containerlab_inventory_path(path: Path) -> bool:
@@ -1314,9 +1348,12 @@ def load_modular_config(
         group_files = _discover_config_files(config_dir, "groups")
         all_groups, group_sources = _load_groups(config_dir, group_files)
 
-        sequences_config, global_command_sequences, vendor_sequences = _load_sequences(
-            config_dir, main_config
-        )
+        (
+            sequences_config,
+            global_command_sequences,
+            vendor_sequences,
+            global_sequence_sources,
+        ) = _load_sequences(config_dir, main_config)
 
         # Merge inline devices/groups from main config with discovered files
         # Inline definitions from main config file
@@ -1599,6 +1636,12 @@ def load_modular_config(
             )
 
         set_inventory_catalog(model, catalog)
+
+        if model.global_command_sequences:
+            for _name, _seq in model.global_command_sequences.items():
+                src = global_sequence_sources.get(_name)
+                if src is not None:
+                    _seq.set_source_path(src)
 
         return model
 

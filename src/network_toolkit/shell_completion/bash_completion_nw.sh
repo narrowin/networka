@@ -31,8 +31,14 @@ _nw() {
 	local cfg
 	cfg=$(_after_opt --config)
 	[[ -z "$cfg" ]] && cfg=$(_after_opt -c)
-	# If no --config specified, let the Python command use its default
-	# (don't hardcode platform-specific paths here)
+	if [[ -z "$cfg" ]]; then
+		# Local ./config is no longer probed; rely on explicit --config or user defaults
+		if false; then
+			cfg="config"
+		else
+			cfg="devices.yml"
+		fi
+	fi
 
 	# Try to find nw command - check if available, otherwise try python module
 	local nw_cmd=""

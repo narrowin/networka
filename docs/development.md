@@ -109,7 +109,7 @@ uv run pytest -v
 
 ```bash
 # Build package locally
-uv build
+task build
 
 # Verify build
 uv run twine check dist/*
@@ -118,6 +118,22 @@ uv run twine check dist/*
 pip install dist/*.whl
 nw --help
 ```
+
+### Publishing to PyPI
+
+#### Manual publishing (local)
+
+```bash
+# Test on TestPyPI first
+task publish:test
+
+# Publish to production PyPI
+task publish:pypi
+```
+
+#### Automated publishing (recommended)
+
+Publishing is automated via GitHub Actions when you create a release tag.
 
 ### Release process
 
@@ -177,6 +193,7 @@ nw --help
    - Tests installation on multiple platforms (Linux, Windows, macOS) with Python 3.11, 3.12, 3.13
    - Creates GitHub release with build artifacts
    - Generates release notes from CHANGELOG.md
+   - Publishes to PyPI automatically (stable releases) or TestPyPI (pre-releases)
    - Attaches wheel and source distribution files
 
    **Note**: Quality checks were already validated by the pre-release script, so the release workflow focuses on building and distributing.

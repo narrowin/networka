@@ -316,6 +316,85 @@ class SupportedPlatformsTableProvider(BaseModel, BaseTableProvider):
         return ["Platforms supported by the network toolkit transport layer"]
 
 
+class GlobalSequenceInfoTableProvider(BaseModel, BaseTableProvider):
+    """Provider for global sequence info table."""
+
+    # Config is optional for tests that instantiate the provider directly
+    config: NetworkConfig | None = None
+    sequence_name: str
+    sequence: Any  # CommandSequence object
+    verbose: bool = False
+
+    def get_table_definition(self) -> TableDefinition:
+        return TableDefinition(
+            title=f"Global Sequence: {self.sequence_name}",
+            columns=[
+                TableColumn(header="Property", style=StyleName.DEVICE),
+                TableColumn(header="Value", style=StyleName.OUTPUT),
+            ],
+        )
+
+    def get_table_rows(self) -> list[list[str]]:
+        """Get global sequence info data."""
+        rows: list[list[str]] = [
+            ["Description", getattr(self.sequence, "description", "No description")],
+            ["Source", self._get_sequence_source()],
+            ["Command Count", str(len(getattr(self.sequence, "commands", [])))],
+        ]
+
+        # Add individual commands with truncation for long lists
+        commands = getattr(self.sequence, "commands", [])
+        max_preview = 3
+        for i, cmd in enumerate(commands[:max_preview], 1):
+            rows.append([f"Command {i}", str(cmd)])
+
+        remaining = max(0, len(commands) - max_preview)
+        if remaining > 0:
+            rows.append(["Note", f"({remaining} more commands)"])
+
+        # Add tags if available
+        tags = getattr(self.sequence, "tags", [])
+        if tags:
+            rows.append(["Tags", ", ".join(tags)])
+
+        return rows
+
+    def _get_sequence_source(self) -> str:
+        """
+        Determine the source of this global sequence.
+
+        Prefer the exact config file path recorded by the loader. When running
+        with mocked configs (tests that don't provide loader metadata), fall back
+        to a stable label.
+        """
+        # Try to use loader metadata if available
+        try:
+            if self.config is not None and hasattr(
+                self.config, "get_global_sequence_source_path"
+            ):
+                src = self.config.get_global_sequence_source_path(self.sequence_name)
+                if isinstance(src, Path):
+                    try:
+                        return str(src.resolve())
+                    except Exception:
+                        return str(src)
+        except Exception:
+            # Ignore and fall back to stable label
+            pass
+
+        # Fallback for mocked/global sequences without tracked source
+        return "Global (config)"
+
+    def get_raw_output(self) -> str | None:
+        """Get raw data for JSON/CSV output."""
+        commands = getattr(self.sequence, "commands", [])
+        return f"sequence={self.sequence_name} type=global commands={len(commands)}"
+
+    def get_verbose_info(self) -> list[str] | None:
+        """Get additional verbose information."""
+        return [f"Global sequence '{self.sequence_name}' details"]
+
+
 class VendorSequenceInfoTableProvider(BaseModel, BaseTableProvider):
     """Provider for vendor sequence info table."""
 
@@ -324,7 +403,6 @@ class VendorSequenceInfoTableProvider(BaseModel, BaseTableProvider):
     vendor_names: list[str]
     verbose: bool = False
     config: NetworkConfig | None = None
-    vendor_specific: bool = False
 
     def get_table_definition(self) -> TableDefinition:
         title_suffix = ""
@@ -356,22 +434,10 @@ class VendorSequenceInfoTableProvider(BaseModel, BaseTableProvider):
             ["Command Count", str(len(getattr(self.sequence_record, "commands", [])))],
         ]
 
-        # Show commands based on vendor_specific flag
+        # Add all individual commands - no truncation
         commands = getattr(self.sequence_record, "commands", [])
-
-        if self.vendor_specific:
-            # Show all commands for vendor-specific display
-            for i, cmd in enumerate(commands, 1):
-                rows.append([f"Command {i}", str(cmd)])
-        elif len(self.vendor_names) > 1:
-            # For multi-vendor display, don't show individual commands
-            # since they differ between vendors
-            rows.append(
-                [
-                    "Commands",
-                    "Use --vendor <vendor_name> to see vendor-specific commands",
-                ]
-            )
+        for i, cmd in enumerate(commands, 1):
+            rows.append([f"Command {i}", str(cmd)])
 
         return rows
 
