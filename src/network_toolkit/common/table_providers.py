@@ -403,6 +403,7 @@ class VendorSequenceInfoTableProvider(BaseModel, BaseTableProvider):
     vendor_names: list[str]
     verbose: bool = False
     config: NetworkConfig | None = None
+    vendor_specific: bool = False
 
     def get_table_definition(self) -> TableDefinition:
         title_suffix = ""
