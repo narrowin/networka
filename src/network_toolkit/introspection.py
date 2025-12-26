@@ -18,8 +18,8 @@ from typing import Any
 class LoaderType(str, Enum):
     """Source type for a configuration value.
 
-    Currently implemented: CONFIG_FILE, ENV_VAR, GROUP, SSH_CONFIG, PYDANTIC_DEFAULT
-    Reserved for future use: DOTENV, CLI, INTERACTIVE
+    Currently implemented: CONFIG_FILE, ENV_VAR, GROUP, SSH_CONFIG, PYDANTIC_DEFAULT, CLI
+    Reserved for future use: DOTENV, INTERACTIVE
     """
 
     CONFIG_FILE = "config_file"
@@ -28,7 +28,7 @@ class LoaderType(str, Enum):
     GROUP = "group"
     SSH_CONFIG = "ssh_config"
     PYDANTIC_DEFAULT = "default"
-    CLI = "cli"  # Reserved for future use
+    CLI = "cli"
     INTERACTIVE = "interactive"  # Reserved for future use
 
 

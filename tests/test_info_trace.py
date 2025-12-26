@@ -85,10 +85,12 @@ class TestInfoTraceFlag:
             app,
             ["info", "test-router", "--config", str(test_config_dir), "--trace"],
         )
-        # The output should include source information
-        # Check for source-related text in output
         assert result.exit_code == 0
-        # With trace enabled, we should see source indicators
+        # With trace enabled, we should see Source column header
+        assert "Source" in result.output
+        # Device fields should show config file path (may be truncated in terminal)
+        # Check for path indicators - either file name or temp directory pattern
+        assert "devices" in result.output or "/T/" in result.output
 
     def test_info_without_trace_no_source_column(
         self,
@@ -101,8 +103,12 @@ class TestInfoTraceFlag:
             ["info", "test-router", "--config", str(test_config_dir)],
         )
         assert result.exit_code == 0
-        # The standard output should not have extra source column
-        # Just verify the command runs successfully
+        # Without --trace, Source column should not appear in output
+        # (Source appears in a table header position, not as a value)
+        output_lines = result.output.split("\n")
+        header_lines = [line for line in output_lines if "Property" in line]
+        for header in header_lines:
+            assert "Source" not in header
 
     def test_info_trace_short_flag(
         self,
@@ -146,7 +152,7 @@ class TestInfoTraceProvenance:
         )
         assert result.exit_code == 0
         # Should show environment variable source for credentials
-        # The actual source indicator depends on implementation
+        assert "env:" in result.output or "NW_" in result.output
 
     def test_default_value_provenance(
         self,
@@ -159,7 +165,8 @@ class TestInfoTraceProvenance:
             ["info", "test-router", "--config", str(test_config_dir), "--trace"],
         )
         assert result.exit_code == 0
-        # Default values like timeout should show "default" source
+        # Timeout and Transport rows should show "default" for Pydantic defaults
+        assert "default" in result.output
 
 
 class TestInfoTraceWithGroups:
