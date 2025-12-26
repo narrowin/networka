@@ -45,6 +45,7 @@ nav:
   - Reference:
     - CLI: reference/cli.md
     - API: reference/api.md
+    - Config Introspection: reference/introspection.md
     - Project development: development.md
     - Adding platform support: adding-platforms.md
     - Documentation guidelines: documentation-guidelines.md

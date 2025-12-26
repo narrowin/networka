@@ -209,35 +209,3 @@ class ConfigHistory:
         for _field_name, entries in other._history.items():
             for entry in entries:
                 self.record(entry)
-
-    def to_dict(
-        self, *, mask_sensitive: bool = True
-    ) -> dict[str, list[dict[str, Any]]]:
-        """Convert to a dictionary representation.
-
-        Parameters
-        ----------
-        mask_sensitive : bool
-            If True (default), mask values for sensitive fields like passwords.
-
-        Returns
-        -------
-        dict[str, list[dict[str, Any]]]
-            Dictionary mapping field names to lists of history entries
-        """
-        sensitive_fields = {"password", "auth_password", "secret", "key", "token"}
-        result: dict[str, list[dict[str, Any]]] = {}
-        for field_name, entries in self._history.items():
-            should_mask = mask_sensitive and field_name in sensitive_fields
-            result[field_name] = [
-                {
-                    "value": "***MASKED***" if should_mask else entry.value,
-                    "loader": entry.loader.value,
-                    "identifier": entry.identifier,
-                    "line_number": entry.line_number,
-                    "merged": entry.merged,
-                    "source": entry.format_source(),
-                }
-                for entry in entries
-            ]
-        return result
