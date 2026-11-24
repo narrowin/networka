@@ -1,5 +1,7 @@
 # Networka upgrade report
 
+The [implementation plan and qualification results](networka-upgrade-plan.md) record the three local builds and the remaining release gates.
+
 24 November 2026 · Networka CLI (`nw`) and Python library · Reviewed commit [`0f37fed`](https://github.com/narrowin/networka/commit/0f37feda6b3405c21aed82d3c3d329c08dbcaf75)
 
 **Classification.** No action/change to the product. The proposed development work is reversible. Publishing a release, changing advertised platform support, and exercising device-changing operations require operator confirmation.

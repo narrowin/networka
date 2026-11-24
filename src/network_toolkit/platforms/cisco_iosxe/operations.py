@@ -8,7 +8,11 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from network_toolkit.exceptions import DeviceConnectionError, DeviceExecutionError
+from network_toolkit.exceptions import (
+    DeviceConnectionError,
+    DeviceExecutionError,
+    OperationUnconfirmedError,
+)
 from network_toolkit.platforms.base import (
     BackupResult,
     PlatformOperations,
@@ -372,6 +376,8 @@ class CiscoIOSXEOperations(PlatformOperations):
                         )
                         return True
 
+                    except OperationUnconfirmedError:
+                        raise
                     except Exception as e:
                         error_str = str(e).lower()
                         if any(
@@ -396,6 +402,8 @@ class CiscoIOSXEOperations(PlatformOperations):
                             logger.warning(f"Install rollback failed: {e}")
                             logger.info("Falling back to standard upgrade workflow")
 
+        except OperationUnconfirmedError:
+            raise
         except DeviceExecutionError:
             logger.info(
                 "Install commands not available, using standard upgrade workflow"

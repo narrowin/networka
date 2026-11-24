@@ -13,7 +13,7 @@ Originally developed at [narrowin](https://narrowin.ch/en/about.html), now commu
 **Networka: `Eierlegende Wollmilchsau` of network operations — optimized for your daily workflows.**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
-[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](https://github.com/narrowin/networka)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20arm64-lightgrey.svg)](https://github.com/narrowin/networka)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Type checked with mypy](https://img.shields.io/badge/mypy-checked-blue.svg)](http://mypy-lang.org/)
@@ -73,7 +73,7 @@ Networka is built for network engineers who want to run commands now. Ansible ex
 
 - **Multi-vendor network automation**: Native support for MikroTik RouterOS, Cisco IOS/IOS-XE/NX-OS, Arista EOS, Juniper JunOS, and more
 - **Scalable device management**: Execute commands across individual devices or groups
-- **Cross-platform compatibility**: Full support for Linux, macOS, and Windows environments
+- **Cross-platform compatibility**: Scrapli 2 wheels for Linux and Apple Silicon
 - **Flexible configuration**: YAML and CSV configuration options with powerful device tagging and grouping
 
 ### **Operational Features**
@@ -103,74 +103,22 @@ Networka is built for network engineers who want to run commands now. Ansible ex
 
 ### System Requirements
 
-- **Operating System**: Linux, macOS, or Windows
+- **Operating System**: Linux x86-64/arm64 or macOS arm64
 - **Network Access**: SSH connectivity to target devices
 - **Package Manager**: uv (recommended) or pip
 - **tmux for `nw cli`**: Install tmux to use the multi-pane CLI command (`brew install tmux` on macOS, `apt install tmux` on Debian/Ubuntu). libtmux is installed automatically with Networka.
 
-### Quick Install (recommended)
+### Install the development candidate
 
-Install from PyPI using an isolated tool installer.
-
-```bash
-# Recommended (isolated, user-wide)
-uv tool install networka
-
-# Alternative
-pipx install networka
-
-# Verify installation
-nw --help
-```
-
-#### If `nw` is not found
-
-- Check: `command -v nw` (Linux/macOS) or `where nw` (Windows)
-- If using pipx: ensure PATH is set, then reload shell
-  ```bash
-  pipx ensurepath
-  exec $SHELL
-  ```
-- Linux/macOS: add user bin to PATH if needed
-  ```bash
-  echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc  # or ~/.zshrc
-  exec $SHELL
-  ```
-- Windows (native, best-effort): prefer WSL2; if native, run `pipx ensurepath` and restart the terminal
-
-More → PATH troubleshooting: https://narrowin.github.io/networka/troubleshooting/#path-nw-not-found
-
-### Upgrade & Remove
+With uv 0.13.9 in this checkout, use a project environment to keep the native driver isolated.
 
 ```bash
-# Upgrade to latest version
-uv tool upgrade networka
-# or
-pipx upgrade networka
-
-# Remove installation
-uv tool uninstall networka
-# or
-pipx uninstall networka
+uv sync --locked
+uv run nw --version
+uv run nw --help
 ```
 
-### Platform-Specific Notes
-
-**Linux/macOS**: No additional dependencies required
-
-**Windows**: Scrapli (the default transport) does not officially support native Windows. While it may work with Paramiko or ssh2-python drivers, the recommended approach is to run Networka on WSL2 (Ubuntu) for a fully supported POSIX environment. Native Windows usage is best-effort.
-
-WSL2 quickstart (recommended):
-
-```bash
-# In Ubuntu on WSL2
-curl -LsSf https://astral.sh/uv/install.sh | sh
-exec $SHELL
-uv tool install networka
-nw --help
-```
-
-Details → https://narrowin.github.io/networka/platform-compatibility/#wsl2-quickstart-recommended
+The candidate uses `scrapli2==2.0.4`. Keep legacy Scrapli in its own environment. Native Windows and Intel macOS installations need the compatibility line. WSL2 and real-device behavior still need qualification. [Transport selection](docs/transport.md) · [Platform compatibility](docs/platform-compatibility.md)
 
 ## Quick Start
 

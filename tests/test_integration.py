@@ -234,7 +234,7 @@ class TestModuleStructure:
 class TestEndToEndWorkflow:
     """End-to-end workflow tests."""
 
-    @patch("network_toolkit.device.Scrapli")
+    @patch("network_toolkit.transport.scrapli_sync.Cli")
     def test_device_session_workflow(
         self, mock_scrapli: MagicMock, sample_config
     ) -> None:

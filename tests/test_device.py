@@ -59,7 +59,7 @@ class TestDeviceBasics:
 class TestConnectionHandling:
     """Test connection-related functionality."""
 
-    @patch("network_toolkit.device.Scrapli")
+    @patch("network_toolkit.transport.scrapli_sync.Cli")
     def test_connect_success(self, mock_scrapli, sample_config: NetworkConfig) -> None:
         """Test successful connection."""
         mock_driver = MagicMock()
@@ -78,7 +78,7 @@ class TestConnectionHandling:
         session = DeviceSession("test_device1", sample_config)
 
         # Mock the driver to raise ScrapliException on open
-        with patch("network_toolkit.device.Scrapli") as factory:
+        with patch("network_toolkit.transport.scrapli_sync.Cli") as factory:
             factory.return_value.open.side_effect = ScrapliException(
                 "Connection failed"
             )
@@ -120,7 +120,7 @@ class TestConnectionHandling:
 class TestContextManager:
     """Test context manager functionality."""
 
-    @patch("network_toolkit.device.Scrapli")
+    @patch("network_toolkit.transport.scrapli_sync.Cli")
     def test_context_manager_success(
         self, mock_scrapli, sample_config: NetworkConfig
     ) -> None:
@@ -140,7 +140,7 @@ class TestContextManager:
         """Test context manager with connection failure."""
         from scrapli.exceptions import ScrapliException
 
-        with patch("network_toolkit.device.Scrapli") as mock_scrapli:
+        with patch("network_toolkit.transport.scrapli_sync.Cli") as mock_scrapli:
             mock_scrapli.return_value.open.side_effect = ScrapliException(
                 "Connection failed"
             )
@@ -149,7 +149,7 @@ class TestContextManager:
                 with DeviceSession("test_device1", sample_config):
                     pass
 
-    @patch("network_toolkit.device.Scrapli")
+    @patch("network_toolkit.transport.scrapli_sync.Cli")
     def test_context_manager_exception_in_block(
         self, mock_scrapli, sample_config: NetworkConfig
     ) -> None:
@@ -291,7 +291,7 @@ class TestErrorConditions:
 
         assert "not found" in str(exc_info.value).lower()
 
-    @patch("network_toolkit.device.Scrapli")
+    @patch("network_toolkit.transport.scrapli_sync.Cli")
     def test_connect_already_connected(
         self, mock_scrapli, sample_config: NetworkConfig
     ) -> None:

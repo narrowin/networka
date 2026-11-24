@@ -10,12 +10,17 @@ cd "$PROJECT_ROOT"
 # Parse command line arguments
 VERSION=""
 DRY_RUN=false
+RELEASE_BRANCH=main
 FORCE=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         -v|--version)
             VERSION="$2"
+            shift 2
+            ;;
+        --branch)
+            RELEASE_BRANCH="${2:?Specify the checked-out release branch}"
             shift 2
             ;;
         --dry-run)
@@ -27,10 +32,11 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -h|--help)
-            echo "Usage: $0 -v VERSION [--dry-run] [--force]"
+            echo "Usage: $0 -v VERSION [--branch BRANCH] [--dry-run] [--force]"
             echo ""
             echo "Options:"
             echo "  -v, --version    Version to release (e.g., 1.0.0)"
+            echo "  --branch         Expected release branch (default main)"
             echo "  --dry-run        Show what would be done without making changes"
             echo "  -f, --force      Skip branch and pre-release marker checks"
             echo "  -h, --help       Show this help message"
@@ -76,9 +82,9 @@ if [[ -z "$CURRENT_BRANCH" ]]; then
     echo "Check out the branch to release first"
     exit 1
 fi
-if [[ "$CURRENT_BRANCH" != "main" ]] && [[ "$FORCE" != true ]]; then
-    echo "ERROR: Not on main branch. Current branch: $CURRENT_BRANCH"
-    echo "   Use --force to release from current branch"
+if [[ "$CURRENT_BRANCH" != "$RELEASE_BRANCH" ]] && [[ "$FORCE" != true ]]; then
+    echo "Expected branch $RELEASE_BRANCH. Current branch: $CURRENT_BRANCH"
+    echo "Use --branch to select an intentional maintenance release branch."
     exit 1
 fi
 
@@ -131,7 +137,7 @@ if [[ "$FORCE" != true ]]; then
 else
     echo ""
     echo "WARNING: Skipping pre-release check verification (--force used)"
-    echo "   GitHub Actions will still run quality checks before releasing"
+    echo "   GitHub Actions will still install and check both release archives"
     echo ""
 fi
 

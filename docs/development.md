@@ -20,7 +20,7 @@ git clone https://github.com/narrowin/networka.git
 cd networka
 
 # Install dependencies with development tools
-uv sync
+uv sync --locked --all-extras
 
 # Install pre-commit hooks
 uv run pytest --version

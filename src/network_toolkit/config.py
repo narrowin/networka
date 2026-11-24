@@ -162,9 +162,7 @@ class GeneralConfig(ConfigHistoryMixin, BaseModel):
     timeout: int = 30
     default_transport_type: str = "scrapli"
     ssh_config_file: bool = True
-    ssh_strict_host_key_checking: bool = (
-        False  # accept-new: auto-accept new keys, verify existing
-    )
+    ssh_strict_host_key_checking: bool = False  # Enable to require trusted SSH keys
 
     # Connection retry settings
     connection_retries: int = 3

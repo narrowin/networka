@@ -28,7 +28,7 @@ class TestDeviceSessionAdditional:
 
     def test_device_session_context_manager(self, sample_config: NetworkConfig) -> None:
         """Test device session context manager."""
-        with patch("network_toolkit.device.Scrapli") as mock_scrapli:
+        with patch("network_toolkit.transport.scrapli_sync.Cli") as mock_scrapli:
             mock_driver = MagicMock()
             mock_scrapli.return_value = mock_driver
 
@@ -40,7 +40,7 @@ class TestDeviceSessionAdditional:
 
     def test_execute_command_success(self, sample_config: NetworkConfig) -> None:
         """Test successful command execution."""
-        with patch("network_toolkit.device.Scrapli") as mock_scrapli:
+        with patch("network_toolkit.transport.scrapli_sync.Cli") as mock_scrapli:
             mock_driver = MagicMock()
             mock_transport = MagicMock(spec=ScrapliSyncTransport)
 
@@ -60,7 +60,7 @@ class TestDeviceSessionAdditional:
 
     def test_execute_command_failure(self, sample_config: NetworkConfig) -> None:
         """Test command execution failure."""
-        with patch("network_toolkit.device.Scrapli") as mock_scrapli:
+        with patch("network_toolkit.transport.scrapli_sync.Cli") as mock_scrapli:
             mock_driver = MagicMock()
             mock_transport = MagicMock(spec=ScrapliSyncTransport)
 
@@ -93,7 +93,7 @@ class TestDeviceSessionAdditional:
             "/system/resource/print",
         ]
 
-        with patch("network_toolkit.device.Scrapli") as mock_scrapli:
+        with patch("network_toolkit.transport.scrapli_sync.Cli") as mock_scrapli:
             mock_driver = MagicMock()
             mock_transport = MagicMock(spec=ScrapliSyncTransport)
 
@@ -218,7 +218,7 @@ class TestDeviceSessionAdditional:
 
     def test_disconnect(self, sample_config: NetworkConfig) -> None:
         """Test disconnect method."""
-        with patch("network_toolkit.device.Scrapli") as mock_scrapli:
+        with patch("network_toolkit.transport.scrapli_sync.Cli") as mock_scrapli:
             mock_driver = MagicMock()
             mock_scrapli.return_value = mock_driver
 
@@ -292,7 +292,7 @@ class TestDeviceSessionAdditional:
 
     def test_connection_error_handling(self, sample_config: NetworkConfig) -> None:
         """Test connection error handling."""
-        with patch("network_toolkit.device.Scrapli") as mock_scrapli:
+        with patch("network_toolkit.transport.scrapli_sync.Cli") as mock_scrapli:
             # Test configuration error
             mock_scrapli.side_effect = TypeError("Invalid config")
 
@@ -305,7 +305,7 @@ class TestDeviceSessionAdditional:
         """Test connection retry logic."""
         from scrapli.exceptions import ScrapliException
 
-        with patch("network_toolkit.device.Scrapli") as mock_scrapli:
+        with patch("network_toolkit.transport.scrapli_sync.Cli") as mock_scrapli:
             mock_driver = MagicMock()
             mock_driver.open.side_effect = [
                 ScrapliException("First attempt fails"),
@@ -315,21 +315,15 @@ class TestDeviceSessionAdditional:
 
             session = DeviceSession("test_device1", sample_config)
 
-            with patch(
-                "network_toolkit.transport.ScrapliSyncTransport"
-            ) as mock_transport:
-                mock_transport.return_value = MagicMock()
-                session.connect()
-
-                # Should have retried
-                assert mock_driver.open.call_count == 2
-                assert session.is_connected is True
+            session.connect()
+            assert mock_driver.open.call_count == 2
+            assert session.is_connected is True
 
     def test_connection_retry_exhausted(self, sample_config: NetworkConfig) -> None:
         """Test connection when all retries are exhausted."""
         from scrapli.exceptions import ScrapliException
 
-        with patch("network_toolkit.device.Scrapli") as mock_scrapli:
+        with patch("network_toolkit.transport.scrapli_sync.Cli") as mock_scrapli:
             mock_driver = MagicMock()
             mock_driver.open.side_effect = ScrapliException("Connection failed")
             mock_scrapli.return_value = mock_driver
@@ -345,7 +339,7 @@ class TestDeviceSessionAdditional:
         """Test command execution with Scrapli error."""
         from scrapli.exceptions import ScrapliException
 
-        with patch("network_toolkit.device.Scrapli") as mock_scrapli:
+        with patch("network_toolkit.transport.scrapli_sync.Cli") as mock_scrapli:
             mock_driver = MagicMock()
             mock_transport = MagicMock(spec=ScrapliSyncTransport)
             mock_transport.send_command.side_effect = ScrapliException(

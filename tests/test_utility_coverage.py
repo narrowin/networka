@@ -36,7 +36,7 @@ class TestUtilityCoverage:
         self, sample_config: NetworkConfig
     ) -> None:
         """Test DeviceSession context manager with connection error."""
-        with patch("network_toolkit.device.Scrapli") as mock_scrapli:
+        with patch("network_toolkit.transport.scrapli_sync.Cli") as mock_scrapli:
             mock_scrapli.return_value.open.side_effect = Exception("Connection failed")
 
             with pytest.raises((DeviceConnectionError, Exception)):

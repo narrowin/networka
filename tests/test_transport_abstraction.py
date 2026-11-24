@@ -52,7 +52,7 @@ class TestTransportAbstraction:
             connection_params = config.get_device_connection_params("test_device")
 
             # Mock Scrapli to avoid actual connection
-            with patch("scrapli.Scrapli") as mock_scrapli:
+            with patch("network_toolkit.transport.scrapli_sync.Cli") as mock_scrapli:
                 mock_driver = MagicMock()
                 mock_scrapli.return_value = mock_driver
 

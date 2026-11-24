@@ -102,6 +102,8 @@ class InteractiveConfirmationHandler:
             logger.debug(f"Device response: {response!r}")
             return response
 
+        except DeviceExecutionError:
+            raise
         except Exception as e:
             # For reboot operations, disconnection is expected
             if pattern.is_reboot_operation and self._is_expected_disconnect(e):

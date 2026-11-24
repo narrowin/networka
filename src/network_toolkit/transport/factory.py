@@ -37,34 +37,9 @@ class ScrapliTransportFactory:
         connection_params: dict[str, Any],
     ) -> Transport:
         """Create a Scrapli transport instance."""
-        # Import Scrapli symbol from device module so unit tests that patch
-        # `network_toolkit.device.Scrapli` continue to intercept driver creation.
-        # Also import the adapter symbol from transport module.
-        from network_toolkit.device import Scrapli as DeviceScrapli
-        from network_toolkit.transport import (
-            ScrapliSyncTransport as DeviceScrapliSyncTransport,
-        )
+        from network_toolkit.transport.scrapli_sync import ScrapliSyncTransport
 
-        params = dict(connection_params)
-        params["transport"] = (params.get("transport") or "system").lower()
-
-        # For generic/linux connections without a platform, use GenericDriver
-        if "platform" not in params:
-            from scrapli.driver.generic import GenericDriver
-
-            logger.debug("Using GenericDriver (no platform specified)")
-            driver = GenericDriver(**params)
-        else:
-            # Use Scrapli factory for platform-specific drivers
-            logger.debug("Using Scrapli factory with platform=%s", params["platform"])
-            driver = DeviceScrapli(**params)
-        adapter = DeviceScrapliSyncTransport(driver)
-        # Expose raw driver for callers/tests that inspect underlying open/close
-        try:
-            adapter._raw_driver = driver  # type: ignore[attr-defined]
-        except Exception:
-            pass
-        return adapter
+        return ScrapliSyncTransport.from_connection_params(connection_params)
 
 
 class NornirNetmikoTransportFactory:

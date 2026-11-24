@@ -1,38 +1,18 @@
-# Transport Selection
+# Transport selection
 
-Networka supports pluggable connection transports. Today, Scrapli is the default and stable choice. A Netmiko-based transport via Nornir is planned.
+Networka 0.3.0.dev0 uses the `scrapli2==2.0.4` distribution. It shares the `scrapli` import name with the legacy distribution. Use a separate uv environment for each version.
 
-## Current status
+The driver family remains `scrapli`. The CLI `--transport` option takes precedence over the device's `transport_type` and then `general.default_transport_type`. Set the underlying connection backend with `general.transport` or `overrides.transport` for a device.
 
-- Default transport: `scrapli` (stable)
-- Config default override: `general.default_transport_type` in `config/config.yml`
-- Per-device override: `transport_type` in a device entry
-- CLI override: `--transport` on commands like `nw run` and `nw cli`
-- nornir-netmiko: not yet supported but coming soon
+| Backend | Configuration and behavior |
+| --- | --- |
+| `system` (default) | Uses the system OpenSSH executable. `ssh_config_file: true` reads its normal configuration. Set the flag to false to bypass it. |
+| `ssh2` | Uses bundled libssh2. Set `ssh_config_file: false` and supply a directly reachable host. Strict mode checks the user's `~/.ssh/known_hosts`. |
+| `telnet` | Uses native Telnet. Set the inventory port explicitly, normally 23. |
+| Legacy `paramiko`, `asyncssh`, `asynctelnet` | Choose a supported backend for this candidate or use the compatibility line. Paramiko still handles SFTP. |
 
-## How precedence works
+For CLI SSH sessions with a populated known-hosts file, enable `general.ssh_strict_host_key_checking`. The default value of false disables verification. SFTP uses an independent Paramiko connection. The SSH setting described here applies to the Scrapli CLI session.
 
-1. CLI `--transport` if provided
-2. Device `transport_type` if set
-3. Global `general.default_transport_type` (defaults to `scrapli`)
+`general.timeout` sets the session opening deadline. `general.command_timeout` sets the command deadline. Prompted operations can set their own deadline. An interrupted operation can already have reached the device. Check device state before repeating it.
 
-## Examples
-
-```bash
-# Use default transport (scrapli)
-nw run sw-acc1 "/system/identity/print"
-
-# Force transport per run
-nw run sw-acc1 "/system/identity/print" --transport scrapli
-
-# Set default transport in config/config.yml
-general:
-  default_transport_type: scrapli
-```
-
-## Notes
-
-- Transport selection affects how connections and commands are executed.
-- Some features may be transport-specific. The Scrapli transport is the reference implementation.
-- nornir-netmiko is under active development and will be documented here when available.
-- Windows: Scrapli is not officially supported on native Windows. Prefer WSL2/Cygwin for a POSIX environment; native use is best-effort.
+The local qualification used a shell over a pseudo-terminal. RouterOS login options, command echoes, Cisco privilege transitions, and SFTP still need comparison on representative devices. [Upgrade report](development/networka-upgrade-report-2026-11-24.md)

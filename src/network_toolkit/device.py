@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import paramiko
-from scrapli import Scrapli
 from scrapli.exceptions import ScrapliException
 
 from network_toolkit.common.interactive_confirmation import create_confirmation_handler
@@ -34,6 +33,8 @@ from network_toolkit.transport.factory import get_transport_factory
 if TYPE_CHECKING:
     from types import TracebackType
 
+    from scrapli import Cli
+
     from network_toolkit.config import NetworkConfig
     from network_toolkit.transport.interfaces import Transport
 
@@ -44,8 +45,7 @@ class DeviceSession:
     """
     Session manager for network device connections using Scrapli.
 
-    Handles SSH connections to MikroTik RouterOS devices with automatic
-    host key acceptance for first-time connections.
+    Applies the configured SSH host key policy to device CLI sessions.
 
     Parameters
     ----------
@@ -88,7 +88,7 @@ class DeviceSession:
         self.device_name = device_name
         self.config = config
         self.transport_override = transport_override
-        self._driver: Scrapli | None = None
+        self._driver: Cli | None = None
         self._transport: Transport | None = None
         self._connected = False
 
@@ -97,17 +97,13 @@ class DeviceSession:
             device_name, username_override, password_override
         )
 
-        # Add SSH host key acceptance settings for first-time connections
-        # https://scrapli.dev/user_guide/basic_usage/#ssh-key-verification
-
         # Only set defaults if not already provided by config/overrides
         defaults = {
             "auth_strict_key": config.general.ssh_strict_host_key_checking,
             "ssh_config_file": config.general.ssh_config_file,
             "timeout_socket": 10,  # Socket timeout
             "timeout_transport": 30,  # Transport timeout
-            "timeout_ops": 30,  # Operations timeout
-            "channel_lock": True,  # Ensure thread-safe channel operations
+            "timeout_ops": config.general.command_timeout,
         }
 
         for key, value in defaults.items():
@@ -141,65 +137,29 @@ class DeviceSession:
         )
 
         try:
-            attempts = self.config.general.connection_retries
-            delay = float(self.config.general.retry_delay)
-            host = self._connection_params.get("host")
-            port = self._connection_params.get("port")
-            username = self._connection_params.get("auth_username")
-            password = self._connection_params.get("auth_password")
-            password_len = len(password) if isinstance(password, str) else 0
-
-            # Create transport via factory and open with retry
+            attempts = max(1, self.config.general.connection_retries)
             transport_factory = get_transport_factory(transport_type)
-            self._transport = transport_factory.create_transport(
-                self.device_name, self.config, self._connection_params
-            )
-            for attempt in range(1, max(1, attempts) + 1):
+            for attempt in range(1, attempts + 1):
+                transport = transport_factory.create_transport(
+                    self.device_name, self.config, self._connection_params
+                )
                 try:
-                    logger.info(
-                        f"Opening connection to '{host}' on port '{port}' as user '{username}' (attempt {attempt}/{max(1, attempts)}; password_len={password_len})"
-                    )
-                    # If transport exposes underlying driver, prefer opening it to
-                    # satisfy tests that patch `network_toolkit.device.Scrapli().open`.
-                    raw_drv = getattr(self._transport, "_raw_driver", None)
-                    if raw_drv is not None and hasattr(raw_drv, "open"):
-                        raw_drv.open()
-                    else:
-                        self._transport.open()
-                    self._connected = True
-                    logger.info(
-                        f"Successfully connected to {self.device_name} using {transport_type}"
-                    )
-                    break
-                except Exception as e:
+                    transport.open()
+                except Exception as exc:
                     logger.warning(
-                        f"Connect attempt {attempt} failed for {self.device_name}: {e}"
+                        "Connection attempt %d/%d failed for %s: %s",
+                        attempt,
+                        attempts,
+                        self.device_name,
+                        exc,
                     )
-                    if attempt < max(1, attempts):
-                        # Best-effort cleanup of current transport/driver before retry
-                        try:
-                            raw_drv = getattr(self._transport, "_raw_driver", None)
-                            if raw_drv is not None and hasattr(raw_drv, "close"):
-                                raw_drv.close()
-                        except Exception:
-                            pass
-                        try:
-                            if self._transport is not None:
-                                self._transport.close()
-                        except Exception:
-                            pass
-
-                        # Recreate transport/driver for the next attempt to ensure clean state
-                        try:
-                            self._transport = transport_factory.create_transport(
-                                self.device_name, self.config, self._connection_params
-                            )
-                        except Exception:
-                            # If recreation fails, we'll still respect retry delay
-                            pass
-                        time.sleep(delay)
-                        continue
-                    raise
+                    if attempt == attempts:
+                        raise
+                    time.sleep(self.config.general.retry_delay)
+                else:
+                    self._transport = transport
+                    self._connected = True
+                    return
 
         except NotImplementedError as e:
             # Surface a friendly message for transports that are not ready yet
@@ -211,7 +171,7 @@ class DeviceSession:
             ) from e
         except (TypeError, ValueError, KeyError) as e:
             logger.error(f"Invalid configuration for {self.device_name}: {e}")
-            msg = f"Invalid configuration for {self.device_name}"
+            msg = f"Invalid configuration for {self.device_name}: {e}"
             raise DeviceConnectionError(
                 msg,
                 details={"original_error": str(e)},
@@ -228,30 +188,14 @@ class DeviceSession:
 
     def disconnect(self) -> None:
         """Close connection to the device."""
-        if not self._connected:
+        if self._transport is None and self._driver is None:
             return
 
         try:
-            closed = False
             if self._transport is not None:
-                # Preferred path with transport abstraction
-                # If underlying driver is exposed and patched in tests, close it
-                raw_drv = getattr(self._transport, "_raw_driver", None)
-                if raw_drv is not None and hasattr(raw_drv, "close"):
-                    raw_drv.close()
-                    closed = True
-                else:
-                    self._transport.close()
-                    closed = True
-
-            # Legacy/back-compat path: if a raw driver was set directly, close it
-            if (
-                not closed
-                and self._driver is not None
-                and hasattr(self._driver, "close")
-            ):
+                self._transport.close()
+            elif self._driver is not None:
                 self._driver.close()
-                closed = True
 
             transport_type = self.config.get_transport_type(self.device_name)
             logger.info(
@@ -301,6 +245,8 @@ class DeviceSession:
             logger.debug(f"Command completed on {self.device_name}")
             return response.result
 
+        except DeviceExecutionError:
+            raise
         except ScrapliException as e:
             logger.error(f"Command execution failed on {self.device_name}: {e}")
             msg = f"Command execution failed on {self.device_name}"

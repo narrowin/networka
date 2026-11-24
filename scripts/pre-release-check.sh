@@ -17,7 +17,7 @@ echo ""
 CURRENT_BRANCH=$(git branch --show-current)
 if [[ "$CURRENT_BRANCH" != "main" ]]; then
     echo "WARNING: Not on main branch. Current branch: $CURRENT_BRANCH"
-    echo "   Quality checks can run on any branch, but releases must be from main"
+    echo "   To release this branch after checks, select it with release.sh --branch"
     echo ""
 fi
 

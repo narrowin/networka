@@ -49,6 +49,10 @@ class DeviceExecutionError(NetworkToolkitError):
         self.exit_code = exit_code
 
 
+class OperationUnconfirmedError(DeviceExecutionError):
+    """An operation may have reached the device and must not be automatically repeated."""
+
+
 class FileTransferError(NetworkToolkitError):
     """Raised when file transfer operations fail."""
 
