@@ -1,5 +1,6 @@
 [tool.uv]
 required-version = "==0.13.9"
+cache-keys = [{ file = "pyproject.toml" }, { file = "src/network_toolkit/__about__.py" }]
 
 [build-system]
 requires = ["hatchling"]

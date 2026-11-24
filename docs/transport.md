@@ -1,6 +1,6 @@
 # Transport selection
 
-Networka 0.2.0rc1 uses the Scrapli 2.0.4 implementation via the `scrapli==2026.11.12` distribution. This lets the resolver replace the legacy `scrapli` distribution in the same environment. Use a fresh environment if an early preview installed the separate `scrapli2` distribution.
+Networka 0.2.0 uses the Scrapli 2.0.4 implementation via the `scrapli==2026.11.12` distribution. This lets the resolver replace the legacy `scrapli` distribution in the same environment. Use a fresh environment if an early preview installed the separate `scrapli2` distribution.
 
 The driver family remains `scrapli`. The CLI `--transport` option takes precedence over the device's `transport_type` and then `general.default_transport_type`. Set the underlying connection backend with `general.transport` or `overrides.transport` for a device.
 

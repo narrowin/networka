@@ -2,7 +2,7 @@
 
 24 November 2026
 
-The release target is Networka 0.2.0rc1 with Scrapli 2. The table keeps the original build names for the checks performed on those builds.
+The release target is Networka 0.2.0 with Scrapli 2. The table keeps the original build names for the checks performed on those builds.
 
 ## Packaging and infrastructure
 

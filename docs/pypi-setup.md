@@ -6,15 +6,14 @@ This document describes how to configure PyPI publishing for the networka projec
 
 ### 1. Set up PyPI Trusted Publishing
 
-1. Go to [PyPI](https://pypi.org) and create an account if needed
-2. Create a new project called `networka`
-3. Go to "Publishing" → "Add a new pending publisher"
-4. Fill in:
-   - **PyPI Project Name**: `networka`
-   - **Owner**: `narrowin`
-   - **Repository name**: `networka`
-   - **Workflow name**: `release.yml`
-   - **Environment name**: `pypi`
+In the existing [Networka project on PyPI](https://pypi.org/manage/project/networka/settings/publishing/), add or verify a GitHub Trusted Publisher with these values:
+
+| Setting | Value |
+| --- | --- |
+| Owner | `narrowin` |
+| Repository | `networka` |
+| Workflow file | `release.yml` |
+| Environment | `pypi` |
 
 ### 2. Set up TestPyPI Trusted Publishing
 
@@ -81,8 +80,8 @@ password = <your-testpypi-token>
 2. GitHub Actions will automatically:
    - Build the package
    - Test installation on multiple platforms
-   - Create GitHub release
-   - Publish to PyPI (stable) or TestPyPI (pre-release)
+   - Publish to PyPI (stable) or TestPyPI (prerelease)
+   - Create the GitHub release after publication
 
 ### Manual (Local)
 
@@ -97,7 +96,7 @@ task publish:pypi
 ## Release Types
 
 - **Stable releases** (e.g., `1.0.0`): Published to PyPI
-- **Pre-releases** (e.g., `1.0.0-rc1`, `1.0.0a1`): Published to TestPyPI
+- **Pre-releases** (e.g., `1.0.0rc1`, `1.0.0a1`): Published to TestPyPI
 
 ## Troubleshooting
 
