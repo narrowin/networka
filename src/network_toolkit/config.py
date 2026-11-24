@@ -1995,6 +1995,7 @@ def export_schemas_to_workspace() -> None:
     full_schema_path = schema_dir / "network-config.schema.json"
     with full_schema_path.open("w", encoding="utf-8") as f:
         json.dump(full_schema, f, indent=2)
+        f.write("\n")
 
     # Extract DeviceConfig schema for standalone device files
     # Device files contain a "devices" object with multiple DeviceConfig entries
@@ -2017,6 +2018,7 @@ def export_schemas_to_workspace() -> None:
     device_schema_path = schema_dir / "device-config.schema.json"
     with device_schema_path.open("w", encoding="utf-8") as f:
         json.dump(device_collection_schema, f, indent=2)
+        f.write("\n")
 
     # Create groups collection schema for standalone group files
     # Group files contain a "groups" object with multiple DeviceGroup entries
@@ -2039,6 +2041,7 @@ def export_schemas_to_workspace() -> None:
     groups_schema_path = schema_dir / "groups-config.schema.json"
     with groups_schema_path.open("w", encoding="utf-8") as f:
         json.dump(groups_collection_schema, f, indent=2)
+        f.write("\n")
 
     # Create/update VS Code settings for YAML validation
     vscode_dir = Path(".vscode")

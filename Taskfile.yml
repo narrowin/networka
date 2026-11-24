@@ -19,7 +19,7 @@ tasks:
     desc: Install development dependencies
     cmds:
       - echo "Installing development dependencies..."
-      - uv sync --all-extras --group dev
+      - uv sync --locked --all-extras --group dev
     sources:
       - pyproject.toml
       - uv.lock
@@ -346,7 +346,7 @@ tasks:
     desc: Open a shell in the virtual environment
     cmds:
       - echo "Opening shell in virtual environment..."
-      - uv shell
+      - uv run --locked "$SHELL"
 
   run:
     desc: Run the CLI tool (nw --help)
@@ -364,7 +364,7 @@ tasks:
     desc: Show CLI version
     cmds:
       - echo "Showing version..."
-      - uv run nw version
+      - uv run nw --version
 
   install:task:
     desc: Install go-task if not present

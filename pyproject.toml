@@ -1,3 +1,6 @@
+[tool.uv]
+required-version = "==0.13.9"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -39,23 +42,23 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "scrapli[paramiko]>=2023.7.30",
-    "scrapli[community]>=2023.7.30",
+    "scrapli[paramiko,community]==2026.2.20",
+    "paramiko>=3.5.1,<4",
     "pydantic>=2.5.0",
     "pyyaml>=6.0",
     "typer>=0.12.0",
     "rich>=13.0.0",
     "asyncssh>=2.21.0",
     "scrapli-community>=2025.1.30",
-    "libtmux>=0.46.2",
+    "libtmux>=0.67.1,<0.68",
     "python-dotenv>=1.0.0",
     "textual>=0.58.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "ruff>=0.1.0",
-    "mypy>=1.7.0",
+    "ruff==0.17.6",
+    "mypy==2.4.1",
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.1.0",
@@ -206,7 +209,9 @@ select = [
 ]
 ignore = [
     # Complexity rules - these are judgment calls
-    "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915",
+    "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR0917",
+    # Keep str(EnumMember) stable for existing callers.
+    "UP042",
     # Formatter conflicts
     "ISC001",   # Implicit string concatenation (conflicts with formatter)
     # Specific cases where we need flexibility
@@ -276,6 +281,7 @@ warn_unreachable = false
 strict_equality = true
 ignore_missing_imports = true
 explicit_package_bases = true
+mypy_path = "$MYPY_CONFIG_FILE_DIR/src"
 exclude = [
     "tests/"
 ]
@@ -291,8 +297,8 @@ dev = [
     # Helper tooling for developing the Textual TUI (live reload, inspector)
     "textual-dev>=1.0.0",
     # Type checking - pinned exactly for consistency (FastAPI approach)
-    "mypy==1.17.1",
-    "ruff==0.14.2",
+    "mypy==2.4.1",
+    "ruff==0.17.6",
     # Type stubs for mypy
     "types-PyYAML>=6.0.0",
     "types-paramiko>=3.0.0",

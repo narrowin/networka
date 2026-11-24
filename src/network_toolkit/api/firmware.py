@@ -40,7 +40,7 @@ class DeviceUpgradeResult:
     message: str
     platform: str = "unknown"
     transport: str = "unknown"
-    error_details: str | None = None
+    error_details: dict[str, object] | str | None = None
 
 
 @dataclass

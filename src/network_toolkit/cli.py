@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-import datetime
+import datetime as dt
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -212,7 +212,7 @@ def _handle_file_downloads(
     results: dict[str, str] = {}
 
     def replace_placeholders(text: str) -> str:
-        now = datetime.datetime.now(datetime.UTC)
+        now = dt.datetime.now(dt.UTC)
         return (
             text.replace("{date}", now.strftime("%Y%m%d"))
             .replace("{time}", now.strftime("%H%M%S"))

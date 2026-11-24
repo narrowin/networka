@@ -146,7 +146,7 @@ class TestHandleFileDownloads(unittest.TestCase):
             "%Y%m%d_%H%M%S": "20250805_143000",
         }[fmt]
 
-        with patch("network_toolkit.cli.datetime") as mock_datetime:
+        with patch("network_toolkit.cli.dt") as mock_datetime:
             mock_datetime.datetime.now.return_value = mock_datetime_obj
 
             download_files: list[dict[str, str | bool]] = [
@@ -217,7 +217,7 @@ class TestHandleFileDownloads(unittest.TestCase):
 
         mock_datetime_obj.strftime.side_effect = mock_strftime
 
-        with patch("network_toolkit.cli.datetime") as mock_datetime:
+        with patch("network_toolkit.cli.dt") as mock_datetime:
             mock_datetime.datetime.now.return_value = mock_datetime_obj
 
             download_files: list[dict[str, str | bool]] = [
@@ -547,7 +547,7 @@ class TestHandleFileDownloadsIntegration(unittest.TestCase):
 
         mock_datetime_obj.strftime.side_effect = mock_strftime
 
-        with patch("network_toolkit.cli.datetime") as mock_datetime:
+        with patch("network_toolkit.cli.dt") as mock_datetime:
             mock_datetime.datetime.now.return_value = mock_datetime_obj
 
             download_files: list[dict[str, str | bool]] = [

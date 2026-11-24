@@ -24,11 +24,11 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13", "3.14", "3.15"]
 
     steps:
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ matrix.python-version }}
 
@@ -41,7 +41,7 @@ jobs:
       run: |
         nw --help
         python -c "import network_toolkit; print('[OK] Import successful')"
-        nw --version || echo "Version command not available"
+        nw --version
 
     - name: Uninstall for next test
       run: python -m pip uninstall -y networka
@@ -52,37 +52,25 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
 
     - name: Install uv
-      uses: astral-sh/setup-uv@v7
-
-    - name: Set up Python
-      run: uv python install 3.12
+      uses: astral-sh/setup-uv@v10
+      with:
+        version-file: pyproject.toml
+        python-version: "3.12"
 
     - name: Build package
-      run: uv build
+      run: uv build --no-sources
 
-    - name: Test wheel installation
+    - name: Install each artifact in a clean environment
+      shell: bash
       run: |
-        python -m pip install --upgrade pip
-        # Find and install the wheel file
-        wheel_file=$(find dist/ -name "*.whl" | head -1)
-        python -m pip install "$wheel_file"
-
-    - name: Test installed package
-      run: |
-        nw --help
-        python -c "import network_toolkit; print('[OK] Wheel installation successful')"
-
-    - name: Test source distribution installation
-      run: |
-        python -m pip uninstall -y networka
-        # Find and install the source distribution
-        tar_file=$(find dist/ -name "*.tar.gz" | head -1)
-        python -m pip install "$tar_file"
-
-    - name: Test source installation
-      run: |
-        nw --help
-        python -c "import network_toolkit; print('[OK] Source distribution installation successful')"
+        for artifact in dist/*.whl dist/*.tar.gz; do
+          envdir="$(mktemp -d)"
+          uv venv --python 3.12 "$envdir"
+          uv pip install --python "$envdir/bin/python" "$artifact"
+          "$envdir/bin/nw" --help
+          "$envdir/bin/nw" --version
+          "$envdir/bin/python" -c 'from network_toolkit import NetworkaClient'
+        done

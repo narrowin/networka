@@ -225,7 +225,7 @@ class TestPlatformFileExtensions:
         def validate_firmware_file(device_type: str, filename: str) -> tuple[bool, str]:
             """Simulate the validation logic used in commands."""
             supported_exts = get_platform_file_extensions(device_type)
-            file_ext = "." + filename.split(".")[-1]
+            file_ext = "." + filename.rsplit(".", 1)[-1]
 
             if file_ext.lower() not in supported_exts:
                 platform_names = {

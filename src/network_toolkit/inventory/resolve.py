@@ -229,8 +229,8 @@ def _group_members_in_source(
 
     resolved: list[tuple[str, DeviceEntry]] = []
     for member in members:
-        entry = catalog.resolve_device(member, source_id=source_id)
-        if entry is None:
+        member_entry = catalog.resolve_device(member, source_id=source_id)
+        if member_entry is None:
             msg = f"Group '{group_entry.name}' references unknown device '{member}'"
             raise NetworkToolkitError(
                 msg,
@@ -240,7 +240,7 @@ def _group_members_in_source(
                     "source_id": source_id,
                 },
             )
-        resolved.append((member, entry))
+        resolved.append((member, member_entry))
     return resolved
 
 

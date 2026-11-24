@@ -244,7 +244,7 @@ class VendorSequencesTableProvider(BaseModel, BaseTableProvider):
                 seq.name,
                 seq.description or "N/A",
                 seq.vendor or "N/A",
-                seq.category,
+                seq.category or "N/A",
                 (commands_str[:50] + "..." if len(commands_str) > 50 else commands_str),
             ]
 

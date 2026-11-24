@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from scrapli import Scrapli
+from scrapli.driver.generic import GenericDriver
 
 from network_toolkit.transport.interfaces import CommandResult
 
@@ -10,7 +10,7 @@ from network_toolkit.transport.interfaces import CommandResult
 class ScrapliSyncTransport:
     """Thin adapter over Scrapli to satisfy our Transport Protocol."""
 
-    def __init__(self, driver: Scrapli) -> None:
+    def __init__(self, driver: GenericDriver) -> None:
         self._driver = driver
 
     def open(self) -> None:  # pragma: no cover - passthrough

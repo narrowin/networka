@@ -37,10 +37,10 @@ class FakeWindow:
     def active_pane(self) -> FakePane:
         return self._panes[0]
 
-    def split_window(
-        self, *, attach: bool = False, vertical: bool | None = None
+    def split(
+        self, *, attach: bool = False, direction: object | None = None
     ) -> FakePane:
-        _ = (attach, vertical)
+        _ = (attach, direction)
         p = FakePane()
         self._panes.append(p)
         return p
@@ -74,7 +74,7 @@ class FakeSession:
         self._window = FakeWindow()
         return self._window
 
-    def attach_session(self) -> None:
+    def attach(self) -> None:
         """Mock session attach - does nothing in tests."""
         pass
 

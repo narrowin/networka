@@ -190,7 +190,7 @@ Publishing is automated via GitHub Actions when you create a release tag.
 
    - Validates version consistency between tag and code
    - Builds wheel and source distribution
-   - Tests installation on multiple platforms (Linux, Windows, macOS) with Python 3.11, 3.12, 3.13
+   - Tests installation on multiple platforms (Linux, Windows, macOS) with Python 3.11–3.15
    - Creates GitHub release with build artifacts
    - Generates release notes from CHANGELOG.md
    - Publishes to PyPI automatically (stable releases) or TestPyPI (pre-releases)
@@ -299,7 +299,7 @@ uv run python -m cProfile -o profile.stats -m network_toolkit.cli run device com
 
 The project uses GitHub Actions for CI/CD:
 
-- **Tests**: Run on Python 3.11-3.13 across Ubuntu, Windows, macOS
+- **Tests**: Run on Python 3.11–3.15 across Ubuntu, Windows, macOS
 - **Quality**: Linting, type checking, security scans
 - **Build**: Package building and validation
 - **Release**: Automated releases on git tags

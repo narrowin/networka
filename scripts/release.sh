@@ -32,7 +32,7 @@ while [[ $# -gt 0 ]]; do
             echo "Options:"
             echo "  -v, --version    Version to release (e.g., 1.0.0)"
             echo "  --dry-run        Show what would be done without making changes"
-            echo "  -f, --force      Force release even if version exists"
+            echo "  -f, --force      Skip branch and pre-release marker checks"
             echo "  -h, --help       Show this help message"
             echo ""
             echo "Example - Full release workflow:"
@@ -58,9 +58,9 @@ if [[ -z "$VERSION" ]]; then
     exit 1
 fi
 
-# Validate version format (basic semver check)
-if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
-    echo "ERROR: Invalid version format. Use semantic versioning (e.g., 1.0.0, 1.0.0-beta1)"
+# Use the same canonical spelling that appears in the wheel filename.
+if [[ ! "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)((a|b|rc)(0|[1-9][0-9]*))?$ ]]; then
+    echo "Expected a version such as 1.2.3 or 1.2.3rc1"
     exit 1
 fi
 
@@ -72,6 +72,10 @@ fi
 
 # Check if we're on the right branch
 CURRENT_BRANCH=$(git branch --show-current)
+if [[ -z "$CURRENT_BRANCH" ]]; then
+    echo "Check out the branch to release first"
+    exit 1
+fi
 if [[ "$CURRENT_BRANCH" != "main" ]] && [[ "$FORCE" != true ]]; then
     echo "ERROR: Not on main branch. Current branch: $CURRENT_BRANCH"
     echo "   Use --force to release from current branch"
@@ -132,8 +136,8 @@ else
 fi
 
 # Check if tag already exists
-if git tag | grep -q "^v$VERSION$" && [[ "$FORCE" != true ]]; then
-    echo "ERROR: Tag v$VERSION already exists. Use --force to overwrite"
+if git show-ref --verify --quiet "refs/tags/v$VERSION"; then
+    echo "ERROR: Tag v$VERSION already exists."
     exit 1
 fi
 
@@ -141,11 +145,6 @@ fi
 CURRENT_VERSION=$(grep -o '__version__ = "[^"]*"' src/network_toolkit/__about__.py | cut -d'"' -f2)
 echo "Current version in __about__.py: $CURRENT_VERSION"
 echo "Target version: $VERSION"
-
-if [[ "$CURRENT_VERSION" == "$VERSION" ]] && [[ "$FORCE" != true ]]; then
-    echo "ERROR: Version $VERSION is already set in __about__.py. Use --force to proceed anyway"
-    exit 1
-fi
 
 # Update version in __about__.py
 VERSION_FILE="src/network_toolkit/__about__.py"
@@ -171,27 +170,23 @@ TODAY=$(date +%Y-%m-%d)
 
 if [[ "$DRY_RUN" != true ]]; then
     echo "Updating CHANGELOG.md..."
-    # Replace [Unreleased] with [VERSION] - DATE and add new [Unreleased] section
-    sed -i.bak "s/## \[Unreleased\]/## [$VERSION] - $TODAY/" "$CHANGELOG_FILE"
+    python3 - "$CHANGELOG_FILE" "$VERSION" "$TODAY" <<'PYTHON'
+from pathlib import Path
+import sys
 
-    # Add new unreleased section at the top
-    TEMP_FILE=$(mktemp)
-    head -n 8 "$CHANGELOG_FILE" > "$TEMP_FILE"
-    echo "" >> "$TEMP_FILE"
-    echo "## [Unreleased]" >> "$TEMP_FILE"
-    echo "" >> "$TEMP_FILE"
-    echo "### Added" >> "$TEMP_FILE"
-    echo "- " >> "$TEMP_FILE"
-    echo "" >> "$TEMP_FILE"
-    echo "### Changed" >> "$TEMP_FILE"
-    echo "- " >> "$TEMP_FILE"
-    echo "" >> "$TEMP_FILE"
-    echo "### Fixed" >> "$TEMP_FILE"
-    echo "- " >> "$TEMP_FILE"
-    echo "" >> "$TEMP_FILE"
-    tail -n +9 "$CHANGELOG_FILE" >> "$TEMP_FILE"
-    mv "$TEMP_FILE" "$CHANGELOG_FILE"
-    rm -f "$CHANGELOG_FILE.bak"
+path = Path(sys.argv[1])
+version, today = sys.argv[2:]
+text = path.read_text()
+header = f"## [{version}]"
+if header in text.splitlines():
+    text = text.replace(header + "\n", f"{header} - {today}\n", 1)
+elif not any(line.startswith(header + " - ") for line in text.splitlines()):
+    if "## [Unreleased]" not in text.splitlines():
+        raise SystemExit("Missing Unreleased section in CHANGELOG.md")
+    text = text.replace("## [Unreleased]\n", f"## [Unreleased]\n\n{header} - {today}\n", 1)
+path.write_text(text)
+PYTHON
+
 else
     echo "Would update CHANGELOG.md with version $VERSION and date $TODAY"
 fi
@@ -232,7 +227,7 @@ fi
 # Update uv.lock with new version
 if [[ "$DRY_RUN" != true ]]; then
     echo "Updating uv.lock..."
-    uv sync
+    uv lock
 else
     echo "Would update uv.lock"
 fi
@@ -246,25 +241,18 @@ fi
 if [[ "$DRY_RUN" != true ]]; then
     echo "Committing release changes..."
     git add "${COMMIT_FILES[@]}"
-    git commit --no-verify -m "chore: bump version to v$VERSION"
+    if ! git diff --cached --quiet; then
+        git commit -m "chore: prepare v$VERSION for release"
+    fi
 else
     echo "Would commit release changes: ${COMMIT_FILES[*]}"
 fi
 
-# Push commit first, then create and push tag
 if [[ "$DRY_RUN" != true ]]; then
-    echo "Pushing version bump commit..."
-    git push origin main
-
-    echo "Creating tag v$VERSION..."
     git tag -a "v$VERSION" -m "Release v$VERSION"
-
-    echo "Pushing tag..."
-    git push origin "v$VERSION"
+    git push --atomic origin "HEAD:refs/heads/$CURRENT_BRANCH" "refs/tags/v$VERSION"
 else
-    echo "Would push version bump commit to main"
-    echo "Would create tag v$VERSION"
-    echo "Would push tag"
+    echo "Would push $CURRENT_BRANCH and new tag v$VERSION atomically"
 fi
 
 echo ""

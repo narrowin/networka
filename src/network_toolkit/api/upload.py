@@ -188,7 +188,7 @@ def upload_file(options: UploadOptions) -> UploadResult:
         raise NetworkToolkitError(msg)
 
     is_group = len(resolution.resolved) > 1 or (
-        options.config.device_groups and options.target in options.config.device_groups
+        options.target in (options.config.device_groups or {})
     )
 
     results: list[DeviceUploadResult] = []

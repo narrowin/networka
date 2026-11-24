@@ -7,7 +7,11 @@ from typing import Any
 
 from network_toolkit.config import NetworkConfig
 from network_toolkit.inventory.catalog import get_inventory_catalog
-from network_toolkit.sequence_manager import SequenceManager, SequenceRecord
+from network_toolkit.sequence_manager import (
+    SequenceManager,
+    SequenceRecord,
+    SequenceSource,
+)
 
 
 @dataclass
@@ -40,9 +44,9 @@ class SequenceInfo:
     """Information about a sequence."""
 
     name: str
-    category: str
-    description: str
-    source: str
+    category: str | None
+    description: str | None
+    source: SequenceSource | None
     vendor: str | None = None
     commands: list[str] | None = None
     timeout: float | None = None

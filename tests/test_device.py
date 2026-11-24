@@ -78,8 +78,10 @@ class TestConnectionHandling:
         session = DeviceSession("test_device1", sample_config)
 
         # Mock the driver to raise ScrapliException on open
-        with patch.object(session, "_driver") as mock_driver:
-            mock_driver.open.side_effect = ScrapliException("Connection failed")
+        with patch("network_toolkit.device.Scrapli") as factory:
+            factory.return_value.open.side_effect = ScrapliException(
+                "Connection failed"
+            )
 
             with pytest.raises(DeviceConnectionError):
                 session.connect()

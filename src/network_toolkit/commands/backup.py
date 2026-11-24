@@ -60,7 +60,7 @@ def _print_results(ctx: CommandContext, result: BackupResult) -> None:
                 ctx.print_error(f"  {dev_result.error}")
 
     # Print summary
-    ctx.output_manager.print_header("Backup Summary")
+    ctx.print_info("Backup Summary")
     ctx.output_manager.print_info(f"Total: {result.totals.total}")
     ctx.output_manager.print_success(f"Succeeded: {result.totals.succeeded}")
     if result.totals.failed > 0:

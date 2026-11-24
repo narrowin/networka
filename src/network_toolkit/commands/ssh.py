@@ -14,7 +14,7 @@ Design goals:
 from __future__ import annotations
 
 # Standard library imports
-import datetime
+import datetime as dt
 import os
 import shlex
 import shutil
@@ -169,7 +169,7 @@ def _prepare_sshpass_fifo(password: str) -> str:
     Returns the FIFO path.
     """
     dirpath = _secure_tmpdir()
-    ts_ms = int(datetime.datetime.now(tz=datetime.UTC).timestamp() * 1000)
+    ts_ms = int(dt.datetime.now(tz=dt.UTC).timestamp() * 1000)
     fifo_path = dirpath / f"pw_{os.getpid()}_{ts_ms}.fifo"
     try:
         os.mkfifo(fifo_path, 0o600)
@@ -277,7 +277,7 @@ def _build_ssh_cmd(
 
 
 def _session_name(default_base: str) -> str:
-    ts = datetime.datetime.now(tz=datetime.UTC).strftime("%Y%m%d_%H%M%S")
+    ts = dt.datetime.now(tz=dt.UTC).strftime("%Y%m%d_%H%M%S")
     base = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in default_base)
     return f"nw_{base}_{ts}"
 
@@ -527,9 +527,6 @@ def register(app: typer.Typer) -> None:
         server = libtmux.Server()
         sname = session_name or _session_name(tgt.name)
         sname = _sanitize_session_name(sname)
-
-        # Always create a new unique session name to avoid conflicts
-        sname = _sanitize_session_name(_session_name(tgt.name))
         session = server.new_session(session_name=sname, attach=False)
 
         wname = window_name or tgt.name
@@ -544,14 +541,16 @@ def register(app: typer.Typer) -> None:
         # Create panes for each device
         panes: list[Any] = []
         if not window.panes:
-            pane0 = window.split_window(attach=False)
+            pane0 = window.split(attach=False)
             panes.append(pane0)
         else:
             panes.append(window.active_pane)
 
+        from libtmux.constants import PaneDirection
+
         for idx in range(1, len(device_cmds)):
-            vertical = idx % 2 == 1
-            panes.append(window.split_window(attach=False, vertical=vertical))
+            direction = PaneDirection.Below if idx % 2 else PaneDirection.Right
+            panes.append(window.split(attach=False, direction=direction))
 
         # Apply layout
         if layout in LAYOUT_CHOICES:
@@ -583,7 +582,7 @@ def register(app: typer.Typer) -> None:
             # Use libtmux to attach directly instead of subprocess
             try:
                 # Attach using libtmux server
-                session.attach_session()
+                session.attach()
             except Exception:
                 ctx.print_warning(
                     f"Failed to attach automatically. Run: tmux attach -t {sname}"

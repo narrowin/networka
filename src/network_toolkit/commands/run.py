@@ -442,7 +442,7 @@ def register(app: typer.Typer) -> None:
 
         # Single command execution
         if not run_result.is_group:
-            device_result = run_result.command_results[0]
+            command_result = run_result.command_results[0]
             if output_mode != OutputMode.RAW:
                 ctx.print_info(
                     f"Executing command on device {run_result.resolution.resolved[0]}"
@@ -450,22 +450,22 @@ def register(app: typer.Typer) -> None:
                 ctx.print_info(f"Command: {command_or_sequence}")
                 output_mgr.print_blank_line()
 
-            if device_result.error:
+            if command_result.error:
                 raise typer.Exit(1)
 
-            _print_command_result(device_result)
+            _print_command_result(command_result)
 
             if (
                 store_results
-                and device_result.stored_path
+                and command_result.stored_path
                 and output_mode != OutputMode.RAW
             ):
                 output_mgr.print_blank_line()
-                output_mgr.print_info(f"Results stored: {device_result.stored_path}")
+                output_mgr.print_info(f"Results stored: {command_result.stored_path}")
                 _print_results_dir_once(printing_results_mgr)
 
             _print_run_summary(
-                target_label=device_result.device,
+                target_label=command_result.device,
                 op_type="Command",
                 name=command_or_sequence,
                 duration=run_result.duration,
@@ -477,11 +477,11 @@ def register(app: typer.Typer) -> None:
                 output_mgr.print_json(
                     {
                         "event": "summary",
-                        "target": device_result.device,
+                        "target": command_result.device,
                         "type": "Command",
                         "name": command_or_sequence,
                         "duration": run_result.duration,
-                        "succeeded": not device_result.error,
+                        "succeeded": not command_result.error,
                     }
                 )
             return
@@ -496,8 +496,8 @@ def register(app: typer.Typer) -> None:
             ctx.print_info(f"Members: {', '.join(members)}")
             output_mgr.print_blank_line()
 
-        for device_result in run_result.command_results:
-            _print_command_result(device_result)
+        for command_result in run_result.command_results:
+            _print_command_result(command_result)
 
         if store_results and output_mode != OutputMode.RAW:
             _print_results_dir_once(printing_results_mgr)

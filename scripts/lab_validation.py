@@ -26,6 +26,7 @@ from network_toolkit.api.run import RunResult
 def main() -> None:
     """Main entry point for the lab validation script."""
     parser = argparse.ArgumentParser(description="Lab Validation Script")
+    parser.add_argument("--config", help="Inventory configuration file or directory")
     parser.add_argument("--target", help="Target a specific device by name")
     parser.add_argument("--tag", help="Target devices with a specific tag")
     parser.add_argument("--list", action="store_true", help="List available devices")
@@ -34,7 +35,7 @@ def main() -> None:
     # Initialize the client
     # The client automatically loads configuration from standard locations
     try:
-        client = NetworkaClient()
+        client = NetworkaClient(config_path=args.config)
     except Exception as e:
         print(f"Error initializing Networka client: {e}")
         sys.exit(1)
@@ -43,7 +44,7 @@ def main() -> None:
     if args.list:
         print("Available Devices:")
         for name, device in client.devices.items():
-            print(f"  - {name} ({device.platform})")
+            print(f"  - {name} ({device.device_type})")
         return
 
     # Determine targets
@@ -67,7 +68,7 @@ def main() -> None:
 
     if not targets:
         print("No targets selected.")
-        return
+        sys.exit(1)
 
     print(f"Starting validation for {len(targets)} devices...")
     print("-" * 60)
@@ -78,7 +79,7 @@ def main() -> None:
 
     for target_name in targets:
         device_config = client.devices[target_name]
-        platform = device_config.platform
+        platform = device_config.device_type
 
         print(f"Checking {target_name} ({platform})...")
 
@@ -91,7 +92,8 @@ def main() -> None:
         elif "cisco" in platform.lower() or "ios" in platform.lower():
             commands = ["show version", "show ip int brief"]
         else:
-            print(f"  [WARN] Unknown platform '{platform}', skipping specific checks.")
+            print(f"  [FAIL] No validation commands for {platform}")
+            failure_count += 1
             continue
 
         # Run commands
@@ -128,7 +130,8 @@ def main() -> None:
                         first_line = output.split("\n")[0]
                         print(f"         > {first_line[:50]}...")
                     else:
-                        print(f"  [WARN] Command '{cmd}' returned empty output")
+                        print(f"  [FAIL] Command '{cmd}' returned empty output")
+                        device_failed = True
 
             except Exception as e:
                 print(f"  [ERR] Exception running '{cmd}': {e}")

@@ -5,6 +5,8 @@ on:
     branches: [ main ]
     paths:
       - 'mkdocs.yml'
+      - 'pyproject.toml'
+      - 'uv.lock'
       - 'docs/**'
       - 'src/**'
       - '.github/workflows/docs.yml'
@@ -26,19 +28,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v10
         with:
-          version: "0.8.8"
+          version-file: pyproject.toml
+          python-version: "3.12"
           enable-cache: true
 
-      - name: Setup Python
-        run: uv python install 3.12
-
       - name: Install dependencies
-        run: uv sync --extra docs --frozen
+        run: uv sync --extra docs --locked
 
       - name: Validate documentation structure
         run: |
@@ -51,13 +51,13 @@ jobs:
           echo "Asset link validation passed"
 
       - name: Generate CLI documentation
-        run: uv run python scripts/generate_cli_docs.py
+        run: uv run --no-sync python scripts/generate_cli_docs.py
 
       - name: Generate platform documentation
-        run: uv run python scripts/generate_platform_docs.py
+        run: uv run --no-sync python scripts/generate_platform_docs.py
 
       - name: Build documentation
-        run: uv run mkdocs build --strict --verbose
+        run: uv run --no-sync mkdocs build --strict --verbose
 
       - name: Check build output
         run: |

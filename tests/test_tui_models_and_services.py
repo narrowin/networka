@@ -74,9 +74,9 @@ async def test_execution_service_build_and_run_plan_smoke(monkeypatch: Any) -> N
     result = await svc.run_plan(
         plan,
         RunCallbacks(
-            on_output=lambda m: outputs.append(m),
-            on_error=lambda m: errors.append(m),
-            on_meta=lambda m: metas.append(m),
+            on_output=outputs.append,
+            on_error=errors.append,
+            on_meta=metas.append,
         ),
     )
 

@@ -134,9 +134,12 @@ class TestShellCompletions:
     """Test shell completion installation and activation."""
 
     @patch("network_toolkit.commands.config._detect_repo_root")
-    def test_install_shell_completions_no_repo(self, mock_repo: Mock) -> None:
+    def test_install_shell_completions_no_repo(
+        self, mock_repo: Mock, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test shell completion installation when repo not found but packaged resources available."""
         mock_repo.return_value = None
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
         result = install_shell_completions("bash")
         # Should succeed using packaged resources even when repo root not detected
@@ -445,11 +448,12 @@ class TestConfigInitImpl:
 
     @patch("network_toolkit.commands.config._detect_repo_root")
     def test_install_shell_completions_no_repo_but_packaged_resources_available(
-        self, mock_repo_detect: Mock
+        self, mock_repo_detect: Mock, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Test that shell completion works when repo root not detected but packaged resources exist."""
         # Simulate no repo root detected (e.g., installed package, not dev environment)
         mock_repo_detect.return_value = None
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
         # This should NOT return (None, None) because packaged resources should be used
         result = install_shell_completions("bash")

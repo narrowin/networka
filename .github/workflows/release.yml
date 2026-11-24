@@ -6,7 +6,7 @@ on:
       - "v*"
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   FORCE_COLOR: "1"
@@ -15,10 +15,12 @@ env:
 jobs:
   build:
     name: Build distribution
+    outputs:
+      prerelease: ${{ steps.channel.outputs.prerelease }}
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         # Ensure we get the full history and the latest commit
         fetch-depth: 0
@@ -38,18 +40,28 @@ jobs:
         echo "Version consistency verified"
 
     - name: Install uv
-      uses: astral-sh/setup-uv@v7
+      uses: astral-sh/setup-uv@v10
       with:
-        version: "latest"
+        version-file: pyproject.toml
+        python-version: "3.13"
 
-    - name: Set up Python
-      run: uv python install 3.12
-
-    - name: Install dependencies
-      run: uv sync
+    - name: Check lock and classify the release
+      id: channel
+      run: |
+        uv lock --check
+        uv run --locked python - <<'PYTHON'
+        import os
+        from packaging.version import Version
+        raw = os.environ["GITHUB_REF_NAME"].removeprefix("v")
+        version = Version(raw)
+        if str(version) != raw or version.local is not None:
+            raise SystemExit(f"Expected a canonical public version, got {raw!r}")
+        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+            print(f"prerelease={str(version.is_prerelease).lower()}", file=output)
+        PYTHON
 
     - name: Build package
-      run: uv build
+      run: uv build --no-sources
 
     - name: Verify built package version
       run: |
@@ -71,7 +83,7 @@ jobs:
         file dist/*
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: dist
         path: dist/
@@ -85,187 +97,94 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13", "3.14", "3.15"]
 
     steps:
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ matrix.python-version }}
 
     - name: Download build artifacts
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v8
       with:
         name: dist
         path: dist/
 
-    - name: Install built package
-      shell: bash
+    - name: Install and run each distribution independently
+      shell: python
       run: |
-        python -m pip install --upgrade pip
-        # Find and install the wheel file
-        wheel_file=$(find dist/ -name "*.whl" | head -1)
-        if [ -n "$wheel_file" ]; then
-          python -m pip install "$wheel_file"
-        else
-          echo "No wheel file found!"
-          ls -la dist/
-          exit 1
-        fi
+        import os
+        import subprocess
+        import sys
+        import tempfile
+        from pathlib import Path
 
-    - name: Test package installation
-      run: |
-        nw --help
-        python -c "import network_toolkit; print('Import successful')"
+        for suffix in ("*.whl", "*.tar.gz"):
+            artifact, = Path("dist").glob(suffix)
+            with tempfile.TemporaryDirectory() as directory:
+                subprocess.run([sys.executable, "-m", "venv", directory], check=True)
+                bin_dir = Path(directory, "Scripts" if os.name == "nt" else "bin")
+                python = bin_dir / ("python.exe" if os.name == "nt" else "python")
+                nw = bin_dir / ("nw.exe" if os.name == "nt" else "nw")
+                subprocess.run([python, "-m", "pip", "install", artifact.resolve()], check=True)
+                subprocess.run([nw, "--version"], cwd=directory, check=True)
+                subprocess.run([nw, "--help"], cwd=directory, check=True)
 
   create-release:
     name: Create GitHub Release
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     needs: [build, test-built-package]
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         fetch-depth: 0
 
     - name: Download build artifacts
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v8
       with:
         name: dist
         path: dist/
 
-    - name: Get version from tag
-      id: version
-      run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-    - name: Generate release notes
-      id: release_notes
+    - name: Extract changelog for this tag
+      shell: python
       run: |
-        # Extract changelog section for this version
-        VERSION="${{ steps.version.outputs.version }}"
-        if [ -f CHANGELOG.md ]; then
-          # Extract section between version headers
-          awk "/^## \[?v?${VERSION}\]?/,/^## \[?v?[0-9]/" CHANGELOG.md | head -n -1 | tail -n +2 > release_notes.txt
-        else
-          echo "Release v${VERSION}" > release_notes.txt
-          echo "" >> release_notes.txt
-          echo "See [CHANGELOG.md](CHANGELOG.md) for details." >> release_notes.txt
-        fi
-
-        # Add installation instructions
-        echo "" >> release_notes.txt
-        echo "## Installation" >> release_notes.txt
-        echo "" >> release_notes.txt
-        echo '### Option 1: Install from PyPI (Recommended)' >> release_notes.txt
-        echo '```bash' >> release_notes.txt
-        echo "uv tool install networka" >> release_notes.txt
-        echo "# or" >> release_notes.txt
-        echo "pipx install networka" >> release_notes.txt
-        echo '```' >> release_notes.txt
-        echo "" >> release_notes.txt
-        echo '### Option 2: Install from GitHub' >> release_notes.txt
-        echo '```bash' >> release_notes.txt
-        echo "uv tool install git+https://github.com/narrowin/networka.git@v${VERSION}" >> release_notes.txt
-        echo '```' >> release_notes.txt
-        echo "" >> release_notes.txt
-        echo '### Option 3: Download and install wheel' >> release_notes.txt
-        echo '```bash' >> release_notes.txt
-        echo "# Download the .whl file from this release, then:" >> release_notes.txt
-        echo "pip install networka-${VERSION}-py3-none-any.whl" >> release_notes.txt
-        echo '```' >> release_notes.txt
-        echo "" >> release_notes.txt
-        echo '### Option 3: Clone and install' >> release_notes.txt
-        echo '```bash' >> release_notes.txt
-        echo "git clone https://github.com/narrowin/networka.git" >> release_notes.txt
-        echo "cd networka" >> release_notes.txt
-        echo "git checkout v${VERSION}" >> release_notes.txt
-        echo "uv sync  # or pip install -e ." >> release_notes.txt
-        echo '```' >> release_notes.txt
+        import os
+        import re
+        from pathlib import Path
+        version = os.environ["GITHUB_REF_NAME"].removeprefix("v")
+        sections = re.split(r"^## ", Path("CHANGELOG.md").read_text(), flags=re.MULTILINE)
+        notes = next((s.partition("\n")[2] for s in sections if s.startswith(f"[{version}]")), "")
+        Path("release_notes.txt").write_text(notes.strip() + "\n")
 
     - name: Create GitHub Release
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         files: dist/*
         body_path: release_notes.txt
         draft: false
-        prerelease: ${{ contains(steps.version.outputs.version, 'a') || contains(steps.version.outputs.version, 'b') || contains(steps.version.outputs.version, 'rc') }}
+        prerelease: ${{ needs.build.outputs.prerelease == 'true' }}
         generate_release_notes: true
 
-  publish-pypi:
-    name: Publish to PyPI
-    runs-on: ubuntu-latest
+  publish:
+    name: Publish verified package
     needs: [build, test-built-package]
-    if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, 'a') && !contains(github.ref, 'b') && !contains(github.ref, 'rc')
-    environment:
-      name: pypi
-      url: https://pypi.org/p/networka
-    permissions:
-      id-token: write  # Required for trusted publishing
-      contents: read   # Required to download artifacts
-    steps:
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: dist
-        path: dist/
-
-    - name: Verify package integrity
-      run: |
-        echo "Verifying package integrity..."
-        ls -la dist/
-        # Check that we have both wheel and sdist
-        if [ ! -f dist/*.whl ]; then
-          echo "ERROR: No wheel file found!"
-          exit 1
-        fi
-        if [ ! -f dist/*.tar.gz ]; then
-          echo "ERROR: No source distribution found!"
-          exit 1
-        fi
-        echo "Package integrity verified"
-
-    - name: Publish to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        print-hash: true
-        verify-metadata: true
-
-  publish-test-pypi:
-    name: Publish to TestPyPI (Pre-releases)
     runs-on: ubuntu-latest
-    needs: [build, test-built-package]
-    if: startsWith(github.ref, 'refs/tags/v') && (contains(github.ref, 'a') || contains(github.ref, 'b') || contains(github.ref, 'rc'))
     environment:
-      name: testpypi
-      url: https://test.pypi.org/p/networka
+      name: ${{ needs.build.outputs.prerelease == 'true' && 'testpypi' || 'pypi' }}
     permissions:
-      id-token: write  # Required for trusted publishing
-      contents: read   # Required to download artifacts
+      id-token: write
+      contents: read
     steps:
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: dist
-        path: dist/
-
-    - name: Verify package integrity
-      run: |
-        echo "Verifying package integrity..."
-        ls -la dist/
-        # Check that we have both wheel and sdist
-        if [ ! -f dist/*.whl ]; then
-          echo "ERROR: No wheel file found!"
-          exit 1
-        fi
-        if [ ! -f dist/*.tar.gz ]; then
-          echo "ERROR: No source distribution found!"
-          exit 1
-        fi
-        echo "Package integrity verified"
-
-    - name: Publish to TestPyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        repository-url: https://test.pypi.org/legacy/
-        print-hash: true
-        verify-metadata: true
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: ${{ needs.build.outputs.prerelease == 'true' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
+          print-hash: true
+          verify-metadata: true

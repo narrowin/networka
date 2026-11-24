@@ -119,7 +119,7 @@ class Prompt:
             app.push_screen(screen)
             if timeout:
                 try:
-                    app.set_timer(timeout, lambda: app.pop_screen())
+                    app.set_timer(timeout, app.pop_screen)
                 except Exception:
                     pass
             return True
