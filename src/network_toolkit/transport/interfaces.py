@@ -42,5 +42,9 @@ class Transport(Protocol):
     def send_command(self, command: str) -> CommandResult: ...
 
     def send_interactive(
-        self, interact_events: list[tuple[str, str, bool]], timeout_ops: float
+        self,
+        interact_events: list[tuple[str, str, bool]],
+        timeout_ops: float,
+        *,
+        expect_disconnect: bool = False,
     ) -> str: ...

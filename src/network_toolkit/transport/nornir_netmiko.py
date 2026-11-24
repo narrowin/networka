@@ -212,6 +212,8 @@ class NornirNetmikoTransport:
         self,
         _interact_events: list[tuple[str, str, bool]],
         _timeout_ops: float,
+        *,
+        expect_disconnect: bool = False,
     ) -> str:
         """Send interactive command with prompts and responses."""
         # This is more complex with Netmiko, would need custom implementation

@@ -278,6 +278,7 @@ class CiscoIOSXEOperations(PlatformOperations):
                             ),
                         ],
                         timeout_ops=confirmation_timeout,
+                        expect_disconnect=True,
                     )
 
                     logger.info(f"Reload command executed: {response}")

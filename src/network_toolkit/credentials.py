@@ -423,6 +423,12 @@ class ConnectionParameterBuilder:
 
         # Apply device overrides
         self._apply_device_overrides(params, device)
+        if params.get("platform") == "cisco_iosxe":
+            enable_password = EnvironmentCredentialManager.get_credential(
+                device_name, "enable_password"
+            )
+            if enable_password:
+                params["auth_enable_password"] = enable_password
 
         return params
 

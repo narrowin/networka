@@ -93,24 +93,19 @@ class TestInteractiveConfirmationHandler:
 
         # Check timeout
         assert call_args[1]["timeout_ops"] == 10.0
+        assert call_args[1]["expect_disconnect"] is True
 
-    def test_execute_with_confirmation_reboot_disconnect(self) -> None:
-        """Test that expected disconnection during reboot is handled correctly."""
-        # Mock expected disconnection error
+    def test_execute_with_confirmation_reboot_timeout(self) -> None:
+        """Test that a timeout without a sent reply remains a failure."""
+        # Mock a transport timeout
         self.mock_transport.send_interactive.side_effect = Exception(
             "timed out sending interactive input to device"
         )
 
-        # Execute reboot command
-        response = self.handler.execute_with_confirmation(
-            command="/system/reboot",
-            pattern=MIKROTIK_REBOOT,
-            timeout_ops=10.0,
-            description="test reboot",
-        )
-
-        # Should return expected message for reboot operations
-        assert response == "Device rebooted (connection lost as expected)"
+        with pytest.raises(DeviceExecutionError, match="timed out"):
+            self.handler.execute_with_confirmation(
+                command="/system/reboot", pattern=MIKROTIK_REBOOT
+            )
 
     def test_execute_with_confirmation_non_reboot_error(self) -> None:
         """Test that unexpected errors for non-reboot operations raise exceptions."""
@@ -168,8 +163,8 @@ class TestInteractiveConfirmationHandler:
         for pattern in non_reboot_patterns:
             assert not pattern.is_reboot_operation
 
-    def test_expected_disconnect_during_reboot(self) -> None:
-        """Test that expected disconnection during reboot is handled properly."""
+    def test_unconfirmed_disconnect_during_reboot(self) -> None:
+        """Test that a generic disconnect does not establish that a reply was sent."""
         # Mock expected disconnection errors
         expected_disconnect_errors = [
             Exception("connection lost"),
@@ -184,14 +179,10 @@ class TestInteractiveConfirmationHandler:
         for error in expected_disconnect_errors:
             self.mock_transport.send_interactive.side_effect = error
 
-            # For reboot operations, should return expected message
-            response = self.handler.execute_with_confirmation(
-                command="/system/reboot",
-                pattern=MIKROTIK_REBOOT,
-                timeout_ops=10.0,
-                description="test reboot",
-            )
-            assert response == "Device rebooted (connection lost as expected)"
+            with pytest.raises(DeviceExecutionError):
+                self.handler.execute_with_confirmation(
+                    command="/system/reboot", pattern=MIKROTIK_REBOOT
+                )
 
         # For non-reboot operations, should raise exception even with "expected" errors
         for error in expected_disconnect_errors[:3]:  # Test a few

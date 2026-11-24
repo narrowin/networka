@@ -15,11 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support OpenSSH, native SSH2, and Telnet for device CLI sessions. Keep Paramiko for SFTP.
 - Update uv, CI, and tmux. Target Linux and Apple Silicon macOS.
 
+### Added
+
+- Read the optional Cisco IOS and IOS-XE enable secret from `NW_ENABLE_PASSWORD_<DEVICE>` or `NW_ENABLE_PASSWORD_DEFAULT`.
+
 ### Fixed
 
 - Keep RouterOS replies aligned with their commands and collect monitoring output for every configured bridge.
 - Verify SFTP host keys in strict mode, verify uploads to remote directories, and remove requested files through SFTP.
 - Limit pooled retries to connection setup and restore output from backup summaries.
+- Track restart replies before accepting a session disconnect.
 
 ## [0.1.13] - 2025-12-04
 

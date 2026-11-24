@@ -96,6 +96,7 @@ class InteractiveConfirmationHandler:
                     (pattern.response, "", False),
                 ],
                 timeout_ops=timeout_ops,
+                expect_disconnect=pattern.is_reboot_operation,
             )
 
             logger.info(f"Interactive {operation_desc} completed successfully")
@@ -105,29 +106,9 @@ class InteractiveConfirmationHandler:
         except DeviceExecutionError:
             raise
         except Exception as e:
-            # For reboot operations, disconnection is expected
-            if pattern.is_reboot_operation and self._is_expected_disconnect(e):
-                logger.info(
-                    f"Device disconnected during {operation_desc} (expected for reboot)"
-                )
-                return "Device rebooted (connection lost as expected)"
-
             logger.error(f"Interactive {operation_desc} failed: {e}")
             msg = f"Interactive {operation_desc} failed: {e}"
             raise DeviceExecutionError(msg) from e
-
-    def _is_expected_disconnect(self, exception: Exception) -> bool:
-        """Check if the exception indicates an expected disconnection during reboot."""
-        error_str = str(exception).lower()
-        expected_patterns = [
-            "connection",
-            "disconnect",
-            "timeout",
-            "closed",
-            "eof",
-            "timed out sending interactive input",
-        ]
-        return any(pattern in error_str for pattern in expected_patterns)
 
 
 def create_confirmation_handler(transport: Transport) -> InteractiveConfirmationHandler:

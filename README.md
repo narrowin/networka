@@ -118,7 +118,7 @@ uv run nw --version
 uv run nw --help
 ```
 
-The candidate uses Scrapli 2 via the `scrapli==2026.11.12` distribution. An in-place upgrade replaces legacy Scrapli through pip or uv. Early candidate installations that included `scrapli2==2.0.4` should use a fresh environment. The release candidate targets Linux and Apple Silicon macOS. WSL2, device restart confirmations, and Cisco enable-password escalation remain open. [Transport selection](docs/transport.md) · [Platform compatibility](docs/platform-compatibility.md)
+The candidate uses Scrapli 2 via the `scrapli==2026.11.12` distribution. An in-place upgrade replaces legacy Scrapli through pip or uv. Early candidate installations that included `scrapli2==2.0.4` should use a fresh environment. The release candidate targets Linux and Apple Silicon macOS. RouterOS restart confirmation and Cisco enable-password escalation passed in disposable labs. WSL2 remains unverified. [Transport selection](docs/transport.md) · [Platform compatibility](docs/platform-compatibility.md)
 
 ## Quick Start
 

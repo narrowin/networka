@@ -6,18 +6,26 @@ import logging
 import os
 import re
 from pathlib import Path
-from threading import Lock
+from threading import Lock, Timer
 from typing import Any
 
 from scrapli import (
     AuthOptions,
     Cli,
+    LookupKeyValue,
+    ReadCallback,
     SessionOptions,
     TransportBinOptions,
     TransportSsh2Options,
     TransportTelnetOptions,
 )
-from scrapli.exceptions import ScrapliException
+from scrapli.exceptions import (
+    EOFException,
+    OperationException,
+    ScrapliException,
+    TransportException,
+)
+from scrapli.ffi_types import Cancel
 from scrapli.transport import Options
 
 from network_toolkit.exceptions import DeviceExecutionError, OperationUnconfirmedError
@@ -62,6 +70,7 @@ class ScrapliSyncTransport:
         self._driver = driver
         self._command_timeout_ns = command_timeout_ns
         self._routeros = routeros
+        self._force_close = False
         self._lock = Lock()
 
     @classmethod
@@ -77,13 +86,18 @@ class ScrapliSyncTransport:
         open_seconds = min(
             params.get("timeout_socket", 30), params.get("timeout_transport", 30)
         )
+        enable_password = params.get("auth_enable_password")
         # Scrapli needs the initial timeout before allocating its native pointer.
         driver = Cli(
             params["host"],
             port=params.get("port"),
             definition_file_or_name=platform,
             auth_options=AuthOptions(
-                username=username, password=params["auth_password"]
+                username=username,
+                password=params["auth_password"],
+                lookups=[LookupKeyValue("enable", enable_password)]
+                if enable_password
+                else None,
             ),
             transport_options=_transport_options(params),
             session_options=SessionOptions(
@@ -91,6 +105,9 @@ class ScrapliSyncTransport:
                 operation_timeout_ns=int(open_seconds * _NS_PER_SECOND),
             ),
         )
+        if enable_password:
+            # libscrapli 0.0.8 logs the resolved enable reply at DEBUG.
+            driver.logger.setLevel(logging.WARNING)
         return cls(
             driver,
             int(params.get("timeout_ops", 30) * _NS_PER_SECOND),
@@ -101,6 +118,7 @@ class ScrapliSyncTransport:
         with self._lock:
             try:
                 self._driver.open()
+                self._force_close = False
             except Exception:
                 if self._driver.ptr is not None:
                     try:
@@ -115,7 +133,7 @@ class ScrapliSyncTransport:
     def close(self) -> None:
         with self._lock:
             if self._driver.ptr is not None:
-                self._driver.close()
+                self._driver.close(force=self._force_close)
 
     def send_command(self, command: str) -> CommandResult:
         with self._lock:
@@ -137,7 +155,11 @@ class ScrapliSyncTransport:
         return CommandResult(result=output, failed=result.failed)
 
     def send_interactive(
-        self, interact_events: list[tuple[str, str, bool]], timeout_ops: float
+        self,
+        interact_events: list[tuple[str, str, bool]],
+        timeout_ops: float,
+        *,
+        expect_disconnect: bool = False,
     ) -> str:
         if (
             len(interact_events) != 2
@@ -149,6 +171,11 @@ class ScrapliSyncTransport:
         command, prompt, _ = interact_events[0]
         reply, _, hidden = interact_events[1]
         with self._lock:
+            if expect_disconnect:
+                if hidden:
+                    msg = "A restart confirmation must use a non-secret reply"
+                    raise DeviceExecutionError(msg)
+                return self._confirm_disconnect(command, prompt, reply, timeout_ops)
             try:
                 result = self._driver.send_prompted_input(
                     command,
@@ -167,3 +194,58 @@ class ScrapliSyncTransport:
                 msg, command=command, details={"error": result.result}
             )
         return result.result
+
+    def _confirm_disconnect(
+        self, command: str, prompt: str, reply: str, timeout_ops: float
+    ) -> str:
+        """Send the reply once and distinguish a subsequent EOF from a lost prompt."""
+        cancel = Cancel()
+        reply_sent = False
+
+        def confirm(driver: Cli, _recent: str, _output: str) -> None:
+            nonlocal reply_sent
+            if cancel.cancelled:
+                msg = "Restart confirmation deadline exceeded"
+                raise OperationException(msg)
+            driver.write_and_return(reply)
+            reply_sent = True
+
+        timeout = Timer(timeout_ops, cancel.cancel)
+        timeout.daemon = True
+        timeout.start()
+        try:
+            self._driver.read_with_callbacks(
+                [
+                    ReadCallback(
+                        name="restart confirmation",
+                        contains=prompt,
+                        search_depth=len(prompt) * 2,
+                        once=True,
+                        callback=confirm,
+                    )
+                ],
+                initial_input=command,
+                cancel=cancel,
+                operation_timeout_ns=int(timeout_ops * _NS_PER_SECOND),
+            )
+        except (ScrapliException, OSError) as exc:
+            # The native result API wraps EOF and SSH2 socket loss in OperationException.
+            reason = (
+                str(exc).partition(":")[0]
+                if isinstance(exc, OperationException)
+                else ""
+            )
+            end_of_stream = isinstance(exc, EOFException) or reason == "EOF"
+            ssh2_connection_lost = isinstance(
+                self._driver.transport_options, TransportSsh2Options
+            ) and (isinstance(exc, TransportException) or reason == "Transport")
+            if reply_sent and (end_of_stream or ssh2_connection_lost):
+                self._force_close = True
+                return "Restart confirmation sent and the session ended"
+            msg = "Device did not acknowledge the restart confirmation"
+            raise OperationUnconfirmedError(msg, command=command) from exc
+        finally:
+            timeout.cancel()
+
+        msg = "Device did not acknowledge the restart confirmation"
+        raise OperationUnconfirmedError(msg, command=command)
