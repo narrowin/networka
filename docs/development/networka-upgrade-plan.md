@@ -1,5 +1,7 @@
 # Networka upgrade plan
 
+The [final release qualification](networka-release-qualification.md) records the follow-up fixes and OrbStack checks.
+
 The [upgrade report](networka-upgrade-report-2026-11-24.md) records the dependency trials, alternatives, and compatibility risks. Each stage below has a separate acceptance check.
 
 1. **Repair the published line.** Prepare 0.1.14 from the 0.1.13 tag. Constrain the legacy driver and tmux API, correct stable and prerelease routing, and install the resulting wheel and sdist in fresh environments.

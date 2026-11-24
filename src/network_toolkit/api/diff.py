@@ -117,7 +117,6 @@ def _get_session(
 
         try:
             session.connect()
-            yield session
         except Exception as first_error:
             # Session might be stale - remove it and retry with fresh session
             logger.debug(
@@ -135,7 +134,7 @@ def _get_session(
             session = DeviceSession(device_name, config)
             session.connect()
             session_pool[device_name] = session
-            yield session
+        yield session
     else:
         with DeviceSession(device_name, config) as session:
             yield session

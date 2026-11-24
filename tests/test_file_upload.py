@@ -23,6 +23,7 @@ class TestFileUpload(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         self.mock_config = MagicMock()
+        self.mock_config.general.ssh_strict_host_key_checking = False
         self.mock_config.get_device_connection_params.return_value = {
             "host": "192.168.1.1",
             "port": 22,
@@ -244,6 +245,7 @@ class TestFileUploadIntegration(unittest.TestCase):
     def test_upload_with_custom_filename(self, mock_sftp_class, mock_transport_class):
         """Test upload with custom remote filename."""
         mock_config = MagicMock()
+        mock_config.general.ssh_strict_host_key_checking = False
         mock_config.get_device_connection_params.return_value = {
             "host": "192.168.1.1",
             "port": 22,

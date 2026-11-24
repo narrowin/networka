@@ -92,7 +92,6 @@ def _get_session(
 
         try:
             session.connect()
-            yield session
         except Exception as first_error:
             # Session might be stale - remove it and retry with fresh session
             logger.debug(
@@ -110,7 +109,7 @@ def _get_session(
             session = DeviceSession(device_name, config)
             session.connect()
             session_pool[device_name] = session
-            yield session
+        yield session
     else:
         with DeviceSession(device_name, config) as session:
             yield session
@@ -123,8 +122,6 @@ def _upload_single_device(
     """Execute upload for a single device."""
     try:
         with _get_session(device_name, options.config, options.session_pool) as session:
-            session.connect()
-
             success = session.upload_file(
                 local_path=options.local_file,
                 remote_filename=options.remote_filename,

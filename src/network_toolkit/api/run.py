@@ -233,10 +233,7 @@ def _with_session_retry(
     execute_fn: Callable[[device_module.DeviceSession], T],
 ) -> T:
     """
-    Execute an operation using a pooled session with stale session retry.
-
-    If the session fails (e.g., connection died), removes it from the pool,
-    creates a fresh session, and retries once.
+    Retry a failed pooled connection once, then execute the operation once.
 
     Args:
         execute_fn: Callable that takes a connected session and returns result
@@ -258,7 +255,6 @@ def _with_session_retry(
 
     try:
         session.connect()
-        return execute_fn(session)
     except Exception as first_error:
         logger.debug(
             "Session for %s failed, attempting fresh connection: %s",
@@ -273,9 +269,8 @@ def _with_session_retry(
 
         session = create_session()
         session.connect()
-        result = execute_fn(session)
         session_pool[device_name] = session
-        return result
+    return execute_fn(session)
 
 
 def _execute_with_session_pool(

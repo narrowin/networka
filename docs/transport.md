@@ -11,7 +11,7 @@ The driver family remains `scrapli`. The CLI `--transport` option takes preceden
 | `telnet` | Uses native Telnet. Set the inventory port explicitly, normally 23. |
 | Legacy `paramiko`, `asyncssh`, `asynctelnet` | Choose a supported backend for this candidate or use the compatibility line. Paramiko still handles SFTP. |
 
-For CLI SSH sessions with a populated known-hosts file, enable `general.ssh_strict_host_key_checking`. The default value of false disables verification. SFTP uses an independent Paramiko connection. The SSH setting described here applies to the Scrapli CLI session.
+For CLI SSH sessions with a populated known-hosts file, enable `general.ssh_strict_host_key_checking`. The default value of false disables verification. SFTP uses an independent Paramiko connection and applies the same flag. In strict mode it checks the inventory host and port against `~/.ssh/known_hosts` before sending the password.
 
 `general.timeout` sets the session opening deadline. `general.command_timeout` sets the command deadline. Prompted operations can set their own deadline. An interrupted operation can already have reached the device. Check device state before repeating it.
 

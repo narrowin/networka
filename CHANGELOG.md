@@ -16,7 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -
 
 ### Fixed
--
+- Fix checksum verification for uploads to remote directories, apply strict SSH key checking to SFTP, and use the SFTP session for requested removal after download.
+- Limit pooled operation retries to connection setup.
 
 
 ## [0.1.13] - 2025-12-04

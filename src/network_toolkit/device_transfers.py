@@ -68,7 +68,7 @@ def verify_file_upload(
 
             # Create temporary file for download verification
             with tempfile.NamedTemporaryFile(
-                delete=False, suffix=f"_verify_{remote_filename}"
+                delete=False, prefix="networka-verify-"
             ) as tmp:
                 temp_file = Path(tmp.name)
 

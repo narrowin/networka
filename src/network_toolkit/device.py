@@ -290,6 +290,29 @@ class DeviceSession:
 
         return results
 
+    def _authenticate_file_transfer(self, transport: paramiko.Transport) -> None:
+        """Apply the inventory's SSH trust policy before sending SFTP credentials."""
+        params = self._connection_params
+        if not params["auth_strict_key"]:
+            transport.connect(
+                username=params["auth_username"], password=params["auth_password"]
+            )
+            return
+
+        host, port = params["host"], params["port"]
+        host_id = host if port == 22 else f"[{host}]:{port}"
+        known_hosts = Path.home() / ".ssh" / "known_hosts"
+        keys = paramiko.HostKeys()
+        if known_hosts.is_file():
+            keys.load(str(known_hosts))
+        transport.start_client(timeout=params["timeout_socket"])
+        if not keys.check(host_id, transport.get_remote_server_key()):
+            msg = (
+                f"SSH host key for {host_id} is missing or does not match {known_hosts}"
+            )
+            raise paramiko.SSHException(msg)
+        transport.auth_password(params["auth_username"], params["auth_password"])
+
     def upload_file(
         self,
         local_path: str | Path,
@@ -297,7 +320,7 @@ class DeviceSession:
         verify_upload: bool = True,
         verify_checksum: bool | None = None,
     ) -> bool:
-        """Upload a file to the MikroTik device using SCP.
+        """Upload a file to the device using SFTP.
 
         Parameters
         ----------
@@ -355,11 +378,9 @@ class DeviceSession:
             local_checksum = calculate_file_checksum(local_path)
             logger.debug(f"Local file SHA256: {local_checksum}")
 
-        # Get connection parameters for SCP
+        # Get connection parameters for SFTP
         host = self._connection_params["host"]
         port = self._connection_params["port"]
-        username = self._connection_params["auth_username"]
-        password = self._connection_params["auth_password"]
 
         transport: paramiko.Transport | None = None
         sftp: paramiko.SFTPClient | None = None
@@ -367,7 +388,7 @@ class DeviceSession:
         try:
             # Create transport and connect
             transport = paramiko.Transport((host, port))
-            transport.connect(username=username, password=password)
+            self._authenticate_file_transfer(transport)
 
             # Create SFTP client
             sftp = paramiko.SFTPClient.from_transport(transport)
@@ -433,7 +454,7 @@ class DeviceSession:
 
         except paramiko.SSHException as e:
             logger.error(f"SSH error during file upload to {self.device_name}: {e}")
-            msg = f"SSH error during file upload to {self.device_name}"
+            msg = f"SSH error during file upload to {self.device_name}: {e}"
             raise DeviceExecutionError(
                 msg,
                 details={"original_error": str(e)},
@@ -1446,8 +1467,6 @@ class DeviceSession:
         # Get connection parameters for SFTP
         host = self._connection_params["host"]
         port = self._connection_params["port"]
-        username = self._connection_params["auth_username"]
-        password = self._connection_params["auth_password"]
 
         transport: paramiko.Transport | None = None
         sftp: paramiko.SFTPClient | None = None
@@ -1455,7 +1474,7 @@ class DeviceSession:
         try:
             # Create transport and connect
             transport = paramiko.Transport((host, port))
-            transport.connect(username=username, password=password)
+            self._authenticate_file_transfer(transport)
 
             # Create SFTP client
             sftp = paramiko.SFTPClient.from_transport(transport)
@@ -1493,18 +1512,9 @@ class DeviceSession:
                     )
                     return False
 
-            # Delete remote file if requested
             if delete_remote:
-                try:
-                    # Use the device command to remove the file
-                    self.execute_command(
-                        f'/file/remove numbers=[find name="{remote_filename}"]'
-                    )
-                    logger.info(f"Remote file '{remote_filename}' deleted")
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to delete remote file '{remote_filename}': {e}"
-                    )
+                sftp.remove(remote_path)
+                logger.info("Remote file '%s' deleted", remote_filename)
 
             return True
 
@@ -1520,7 +1530,7 @@ class DeviceSession:
 
         except paramiko.SSHException as e:
             logger.error(f"SSH error during file download from {self.device_name}: {e}")
-            msg = f"SSH error during file download from {self.device_name}"
+            msg = f"SSH error during file download from {self.device_name}: {e}"
             raise DeviceExecutionError(
                 msg,
                 details={"original_error": str(e)},

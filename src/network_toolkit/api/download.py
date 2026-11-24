@@ -92,7 +92,6 @@ def _get_session(
 
         try:
             session.connect()
-            yield session
         except Exception as first_error:
             # Session might be stale - remove it and retry with fresh session
             logger.debug(
@@ -110,7 +109,7 @@ def _get_session(
             session = DeviceSession(device_name, config)
             session.connect()
             session_pool[device_name] = session
-            yield session
+        yield session
     else:
         with DeviceSession(device_name, config) as session:
             yield session
@@ -142,8 +141,6 @@ def _download_single_device(
             dest_path.parent.mkdir(parents=True, exist_ok=True)
 
         with _get_session(device_name, options.config, options.session_pool) as session:
-            session.connect()
-
             # Perform download
             success = session.download_file(
                 remote_filename=options.remote_file,
@@ -155,11 +152,6 @@ def _download_single_device(
             if not success:
                 msg = "Download failed"
                 raise NetworkToolkitError(msg)
-
-            # Delete remote if requested - handled by download_file now if supported
-            # or we can rely on the session method to handle it.
-            # The session.download_file signature in base class might not have delete_remote
-            # but the command was passing it. Let's assume the session method handles it.
 
         file_size = dest_path.stat().st_size if dest_path.exists() else 0
 
