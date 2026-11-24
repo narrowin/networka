@@ -5,21 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-### Changed
-
 ## [Unreleased]
 
-### Added
--
+## [0.2.0rc1]
 
 ### Changed
--
+
+- Use Scrapli 2.0.4 for device CLI sessions. The `scrapli` distribution replaces the legacy driver in place during dependency resolution.
+- Support OpenSSH, native SSH2, and Telnet for device CLI sessions. Keep Paramiko for SFTP.
+- Update uv, CI, and tmux. Target Linux and Apple Silicon macOS.
 
 ### Fixed
-- Collect spanning-tree and bridge status for all configured RouterOS bridges, including current per-bridge MLAG fields.
-- Fix checksum verification for uploads to remote directories, apply strict SSH key checking to SFTP, and use the SFTP session for requested removal after download.
-- Limit pooled operation retries to connection setup.
 
+- Keep RouterOS replies aligned with their commands and collect monitoring output for every configured bridge.
+- Verify SFTP host keys in strict mode, verify uploads to remote directories, and remove requested files through SFTP.
+- Limit pooled retries to connection setup and restore output from backup summaries.
 
 ## [0.1.13] - 2025-12-04
 

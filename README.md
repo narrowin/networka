@@ -108,7 +108,7 @@ Networka is built for network engineers who want to run commands now. Ansible ex
 - **Package Manager**: uv (recommended) or pip
 - **tmux for `nw cli`**: Install tmux to use the multi-pane CLI command (`brew install tmux` on macOS, `apt install tmux` on Debian/Ubuntu). libtmux is installed automatically with Networka.
 
-### Install the development candidate
+### Install the release candidate
 
 With uv 0.13.9 in this checkout, use a project environment to keep the native driver isolated.
 
@@ -118,7 +118,7 @@ uv run nw --version
 uv run nw --help
 ```
 
-The candidate uses Scrapli 2 via the `scrapli==2026.11.12` distribution. An in-place upgrade replaces legacy Scrapli through pip or uv. Early candidate installations that included `scrapli2==2.0.4` should use a fresh environment. Native Windows and Intel macOS installations need the compatibility line. WSL2 and real-device behavior still need qualification. [Transport selection](docs/transport.md) · [Platform compatibility](docs/platform-compatibility.md)
+The candidate uses Scrapli 2 via the `scrapli==2026.11.12` distribution. An in-place upgrade replaces legacy Scrapli through pip or uv. Early candidate installations that included `scrapli2==2.0.4` should use a fresh environment. The release candidate targets Linux and Apple Silicon macOS. WSL2, device restart confirmations, and Cisco enable-password escalation remain open. [Transport selection](docs/transport.md) · [Platform compatibility](docs/platform-compatibility.md)
 
 ## Quick Start
 

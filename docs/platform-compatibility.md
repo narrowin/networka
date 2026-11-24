@@ -1,6 +1,6 @@
 # Platform compatibility
 
-This table applies to Networka 0.3.0.dev0 with Scrapli 2.0.4.
+This table applies to Networka 0.2.0rc1 with Scrapli 2.0.4.
 
 | Host | Candidate status |
 | --- | --- |

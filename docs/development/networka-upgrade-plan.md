@@ -1,5 +1,7 @@
 # Networka upgrade plan
 
+Networka 0.2.0rc1 combines the infrastructure refresh with Scrapli 2 as the sole CLI driver. The branch names and release order below record the earlier staging plan.
+
 The [final release qualification](networka-release-qualification.md) records the follow-up fixes and OrbStack checks.
 
 The [upgrade report](networka-upgrade-report-2026-11-24.md) records the dependency trials, alternatives, and compatibility risks. Each stage below has a separate acceptance check.
