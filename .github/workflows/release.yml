@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to build and publish
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -11,6 +17,7 @@ permissions:
 env:
   FORCE_COLOR: "1"
   PYTHONUNBUFFERED: "1"
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   build:
@@ -22,12 +29,12 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v7
       with:
-        # Ensure we get the full history and the latest commit
+        ref: refs/tags/${{ env.RELEASE_TAG }}
         fetch-depth: 0
 
     - name: Verify version consistency
       run: |
-        TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+        TAG_VERSION="${RELEASE_TAG#v}"
         FILE_VERSION=$(grep -o '__version__ = "[^"]*"' src/network_toolkit/__about__.py | cut -d'"' -f2)
         echo "Tag version: $TAG_VERSION"
         echo "File version: $FILE_VERSION"
@@ -40,7 +47,7 @@ jobs:
         echo "Version consistency verified"
 
     - name: Install uv
-      uses: astral-sh/setup-uv@v10
+      uses: astral-sh/setup-uv@v10.4.0
       with:
         version-file: pyproject.toml
         python-version: "3.13"
@@ -52,7 +59,7 @@ jobs:
         uv run --locked python - <<'PYTHON'
         import os
         from packaging.version import Version
-        raw = os.environ["GITHUB_REF_NAME"].removeprefix("v")
+        raw = os.environ["RELEASE_TAG"].removeprefix("v")
         version = Version(raw)
         if str(version) != raw or version.local is not None:
             raise SystemExit(f"Expected a canonical public version, got {raw!r}")
@@ -65,7 +72,7 @@ jobs:
 
     - name: Verify built package version
       run: |
-        TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+        TAG_VERSION="${RELEASE_TAG#v}"
         # Extract version from built wheel filename
         WHEEL_FILE=$(ls dist/*.whl | head -1)
         WHEEL_VERSION=$(basename "$WHEEL_FILE" | cut -d'-' -f2)
@@ -141,6 +148,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v7
       with:
+        ref: refs/tags/${{ env.RELEASE_TAG }}
         fetch-depth: 0
 
     - name: Download build artifacts
@@ -155,7 +163,7 @@ jobs:
         import os
         import re
         from pathlib import Path
-        version = os.environ["GITHUB_REF_NAME"].removeprefix("v")
+        version = os.environ["RELEASE_TAG"].removeprefix("v")
         sections = re.split(r"^## ", Path("CHANGELOG.md").read_text(), flags=re.MULTILINE)
         notes = next((s.partition("\n")[2] for s in sections if s.startswith(f"[{version}]")), "")
         Path("release_notes.txt").write_text(notes.strip() + "\n")
@@ -163,6 +171,7 @@ jobs:
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v3
       with:
+        tag_name: ${{ env.RELEASE_TAG }}
         files: dist/*
         body_path: release_notes.txt
         draft: false
