@@ -42,7 +42,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "scrapli2==2.0.4",
+    "scrapli==2026.11.12",
     "paramiko>=5.1.0,<6",
     "pydantic>=2.5.0",
     "pyyaml>=6.0",

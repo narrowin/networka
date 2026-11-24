@@ -86,7 +86,7 @@ def test_mikrotik_builtin_sequences_common(sm_isolated: SequenceManager) -> None
         "/interface/bridge/print detail",
         "/interface/bridge/port/print detail",
         "/interface/bridge/port/monitor [find] once",
-        "/interface/bridge/monitor bridge once",
+        "/interface/bridge/monitor [find] once",
         "/interface/bridge/vlan/print",
         '/log/print where topics~"rstp"',
     ]

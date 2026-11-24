@@ -1,6 +1,6 @@
 # Transport selection
 
-Networka 0.3.0.dev0 uses the `scrapli2==2.0.4` distribution. It shares the `scrapli` import name with the legacy distribution. Use a separate uv environment for each version.
+Networka 0.3.0.dev0 uses the Scrapli 2.0.4 implementation via the `scrapli==2026.11.12` distribution. This lets the resolver replace the legacy `scrapli` distribution in the same environment. Use a fresh environment if an early preview installed the separate `scrapli2` distribution.
 
 The driver family remains `scrapli`. The CLI `--transport` option takes precedence over the device's `transport_type` and then `general.default_transport_type`. Set the underlying connection backend with `general.transport` or `overrides.transport` for a device.
 
@@ -15,4 +15,4 @@ For CLI SSH sessions with a populated known-hosts file, enable `general.ssh_stri
 
 `general.timeout` sets the session opening deadline. `general.command_timeout` sets the command deadline. Prompted operations can set their own deadline. An interrupted operation can already have reached the device. Check device state before repeating it.
 
-The local qualification used a shell over a pseudo-terminal. RouterOS login options, command echoes, Cisco privilege transitions, and SFTP still need comparison on representative devices. [Upgrade report](development/networka-upgrade-report-2026-11-24.md)
+The candidate uses RouterOS plain-console login and a single carriage return to keep command replies aligned. RouterOS 7.20.6 and 7.25.2 and Cisco IOL 17.18.02 were qualified in disposable labs. Separate Cisco enable-password escalation and device restart confirmation remain unverified. [Release qualification](development/networka-release-qualification.md)

@@ -118,7 +118,7 @@ uv run nw --version
 uv run nw --help
 ```
 
-The candidate uses `scrapli2==2.0.4`. Keep legacy Scrapli in its own environment. Native Windows and Intel macOS installations need the compatibility line. WSL2 and real-device behavior still need qualification. [Transport selection](docs/transport.md) · [Platform compatibility](docs/platform-compatibility.md)
+The candidate uses Scrapli 2 via the `scrapli==2026.11.12` distribution. An in-place upgrade replaces legacy Scrapli through pip or uv. Early candidate installations that included `scrapli2==2.0.4` should use a fresh environment. Native Windows and Intel macOS installations need the compatibility line. WSL2 and real-device behavior still need qualification. [Transport selection](docs/transport.md) · [Platform compatibility](docs/platform-compatibility.md)
 
 ## Quick Start
 

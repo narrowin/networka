@@ -24,7 +24,8 @@ from network_toolkit.exceptions import DeviceExecutionError, OperationUnconfirme
 from network_toolkit.transport.interfaces import CommandResult
 
 logger = logging.getLogger(__name__)
-_ROUTEROS_SUFFIX = "+cet511w4098h"
+_ROUTEROS_SUFFIX = "+ct511w4098h"
+_LEGACY_ROUTEROS_SUFFIX = "+cet511w4098h"
 _NS_PER_SECOND = 1_000_000_000
 
 
@@ -68,8 +69,11 @@ class ScrapliSyncTransport:
         platform = params.get("platform")
         routeros = platform == "mikrotik_routeros"
         username = params["auth_username"]
-        if routeros and not username.endswith(_ROUTEROS_SUFFIX):
-            username += _ROUTEROS_SUFFIX
+        if routeros:
+            # RouterOS can redraw an intermediate prompt with the legacy console mode.
+            username = username.removesuffix(_LEGACY_ROUTEROS_SUFFIX)
+            if not username.endswith(_ROUTEROS_SUFFIX):
+                username += _ROUTEROS_SUFFIX
         open_seconds = min(
             params.get("timeout_socket", 30), params.get("timeout_transport", 30)
         )
@@ -83,7 +87,7 @@ class ScrapliSyncTransport:
             ),
             transport_options=_transport_options(params),
             session_options=SessionOptions(
-                return_char="\r\n" if routeros else None,
+                return_char="\r" if routeros else None,
                 operation_timeout_ns=int(open_seconds * _NS_PER_SECOND),
             ),
         )

@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -
 
 ### Fixed
+- Collect spanning-tree and bridge status for all configured RouterOS bridges, including current per-bridge MLAG fields.
 - Fix checksum verification for uploads to remote directories, apply strict SSH key checking to SFTP, and use the SFTP session for requested removal after download.
 - Limit pooled operation retries to connection setup.
 
