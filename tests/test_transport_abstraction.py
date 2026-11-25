@@ -8,6 +8,7 @@ import pytest
 from network_toolkit.config import DeviceConfig, GeneralConfig, NetworkConfig
 from network_toolkit.transport.factory import get_transport_factory
 from network_toolkit.transport.interfaces import Transport
+from network_toolkit.transport.scrapli_sync import ScrapliSyncTransport
 
 
 class TestTransportAbstraction:
@@ -124,3 +125,41 @@ class TestTransportAbstraction:
             for key in ["NW_USER_DEFAULT", "NW_PASSWORD_DEFAULT"]:
                 if key in os.environ:
                     del os.environ[key]
+
+
+class TestScrapliSyncTransport:
+    """Reply handling and SSH options of the native Scrapli session."""
+
+    @staticmethod
+    def _transport(reply: str, *, routeros: bool = True) -> ScrapliSyncTransport:
+        driver = MagicMock()
+        driver.send_input.return_value = MagicMock(result=reply, failed=False)
+        return ScrapliSyncTransport(driver, 1, routeros=routeros)
+
+    @pytest.mark.parametrize(
+        "reply",
+        [
+            "/foo\nbad command name foo (line 1 column 2)",
+            "/ip/address/print x\nsyntax error (line 1 column 19)",
+            "/interface/set ether9 disabled=yes\nno such item",
+            "/x\r\n  failure: already have such address",
+        ],
+    )
+    def test_routeros_error_reply_is_failed(self, reply: str) -> None:
+        command = reply.partition("\n")[0].strip()
+        result = self._transport(reply).send_command(command)
+        assert result.failed is True
+
+    def test_routeros_normal_reply_is_not_failed(self) -> None:
+        reply = "/ip/address/print\n 0 10.0.0.1/24  10.0.0.0  ether1"
+        result = self._transport(reply).send_command("/ip/address/print")
+        assert result.failed is False
+        assert result.result == " 0 10.0.0.1/24  10.0.0.0  ether1"
+
+    def test_routeros_error_text_later_in_reply_is_not_failed(self) -> None:
+        reply = "/log/print\n12:00:00 system,error no such item"
+        assert self._transport(reply).send_command("/log/print").failed is False
+
+    def test_error_prefix_ignored_for_other_platforms(self) -> None:
+        result = self._transport("syntax error", routeros=False).send_command("x")
+        assert result.failed is False
