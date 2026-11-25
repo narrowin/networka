@@ -82,6 +82,36 @@ class TestDeviceSessionAdditional:
                 with pytest.raises(DeviceExecutionError):
                     session.execute_command("/invalid/command")
 
+    @pytest.mark.parametrize(
+        ("reply", "expected"),
+        [
+            (
+                "bad command name bogus (line 1 column 12)\n",
+                (
+                    "Command failed on test_device1: /bogus: "
+                    "bad command name bogus (line 1 column 12)"
+                ),
+            ),
+            ("  \n", "Command failed on test_device1: /bogus"),
+        ],
+    )
+    def test_execute_command_failure_includes_device_reply(
+        self, sample_config: NetworkConfig, reply: str, expected: str
+    ) -> None:
+        """A rejected command reports the device's reply when there is one."""
+        mock_transport = MagicMock(spec=ScrapliSyncTransport)
+        mock_transport.send_command.return_value = MagicMock(result=reply, failed=True)
+
+        session = DeviceSession("test_device1", sample_config)
+
+        with patch.object(session, "_transport", mock_transport):
+            session._connected = True
+            with pytest.raises(DeviceExecutionError) as exc_info:
+                session.execute_command("/bogus")
+
+        assert exc_info.value.message == expected
+        assert exc_info.value.details["error"] == reply
+
     def test_execute_command_not_connected(self, sample_config: NetworkConfig) -> None:
         """Test command execution when not connected."""
         session = DeviceSession("test_device1", sample_config)

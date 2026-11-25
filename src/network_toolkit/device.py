@@ -256,6 +256,9 @@ class DeviceSession:
 
             if response.failed:
                 msg = f"Command failed on {self.device_name}: {command}"
+                reply = response.result.strip()
+                if reply:
+                    msg = f"{msg}: {reply}"
                 raise DeviceExecutionError(
                     msg,
                     details={"error": response.result},
