@@ -285,6 +285,12 @@ config/sequences/*
 # Keep examples directory
 !config/examples/
 
+# Generated Containerlab inventory and local connection settings
+/clabs/clab-s3n/ansible-inventory.yml
+/clabs/clab-s3n/nornir-simple-inventory.yml
+/clabs/clab-s3n/topology-data.json
+/clabs/networka-s3n-config/config.yml
+
 # Pre-release check marker
 .pre-release-passed
 

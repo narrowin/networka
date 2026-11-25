@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Inspect the commands and source selected for a sequence with `nw info <sequence> --device <device>`. Packaged sequences are also discoverable without a local config.
+- List active Scrapli definitions and their packaged or override source with `nw platforms list`. Use `nw platforms info` to inspect a definition, registered operations, and the selected sequence sources.
+- Add an experimental offline example that compares intended interface and MLAG state against archived lab evidence.
+
+### Changed
+
+- Require Python 3.15 or later. Use one locked uv workflow for development and CI, and update libtmux to the 0.68 series.
+- Align the installation, CLI, platform, results, and SDK guides with the current workflows.
+
+### Fixed
+
+- Resolve applicable sequences consistently across execution, diff, inspection, and completion. Keep an inline sequence on its owning device and reject inapplicable sequence names before connecting.
+- Accept exact active Scrapli definition names for ad hoc targets and preserve explicit platform names in CSV inventory.
+- Restore inherited CLI help, validate SSH CLI ports, and validate upload parallelism in the CLI and SDK.
+- Return exit status `1` when any resolved device fails during `nw run` on a group or device list. Keep the per-device results and summary.
+
+### Removed
+
+- Remove unused legacy transport code and the internal Textual interface. The `nw` CLI, Rich output, and Python SDK remain available.
+
 ## [0.2.0] - 2026-11-24
 
 ### Changed

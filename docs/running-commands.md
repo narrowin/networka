@@ -96,8 +96,9 @@ Notes:
 - The results directory defaults to the value in `general.results_dir`; override per run with `--results-dir`.
 - Choose the serialization format via `general.results_format` in `config.yml` (txt/json/yaml).
 
-A group run can exit successfully while some targets report failures. Check
-the per-device outcomes and summary when using a group run for verification.
+When running a command or sequence on a group or device list, `nw run` exits
+with status `1` if any resolved device fails. Use the per-device outcomes and
+summary to identify which devices failed.
 
 ## Next steps
 
