@@ -306,7 +306,7 @@ def _run_sequence_on_device(
     try:
         commands = sequence_manager.resolve(sequence_name, device_name)
         if not commands:
-            msg = f"Sequence '{sequence_name}' not found for device type"
+            msg = f"Sequence '{sequence_name}' not found for device '{device_name}'"
             return DeviceSequenceResult(
                 device=device_name,
                 sequence=sequence_name,

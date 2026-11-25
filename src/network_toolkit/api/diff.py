@@ -301,7 +301,7 @@ def _perform_device_diff(
                 msg = "For sequence diff, baseline must be a directory."
                 raise NetworkToolkitError(msg)
 
-            seq_cmds = sequence_manager.resolve(device, subj)
+            seq_cmds = sequence_manager.resolve(sequence_name=subj, device_name=device)
             if not seq_cmds:
                 return [
                     DiffItemResult(

@@ -148,6 +148,9 @@ class TestDiffCLI:
         # One missing baseline file -> exit 1
         assert result.exit_code == 1
         assert "Baseline file missing" in result.output
+        sm_inst.resolve.assert_called_once_with(
+            sequence_name="system_info", device_name="test_device1"
+        )
 
 
 class TestDiffAdvancedScenarios:

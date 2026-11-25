@@ -88,22 +88,16 @@ def test_run_commands_single_device_command(
 def test_run_commands_group_sequence(
     sample_config: NetworkConfig,
     patch_device_session: Callable[[DummyDeviceSession], None],
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     patch_device_session(DummyDeviceSession)
-
-    # Force sequence resolution regardless of actual config contents
-    monkeypatch.setattr(
-        "network_toolkit.api.run.SequenceManager.exists", lambda _self, _name: True
-    )
-    monkeypatch.setattr(
-        "network_toolkit.api.run.SequenceManager.resolve",
-        lambda _self, _name, _device: ["cmd_a", "cmd_b"],
-    )
+    assert sample_config.devices is not None
+    sample_config.devices["test_device1"].command_sequences = {
+        "device_local_report": ["cmd_a", "cmd_b"]
+    }
 
     options = RunOptions(
         target="lab_devices",
-        command_or_sequence="health_check",
+        command_or_sequence="device_local_report",
         config=sample_config,
         store_results=False,
     )
@@ -113,16 +107,23 @@ def test_run_commands_group_sequence(
     assert result.is_sequence is True
     assert result.is_group is True
     assert result.totals.total == 2
-    assert result.totals.failed == 0
+    assert result.totals.succeeded == 1
+    assert result.totals.failed == 1
+    assert not result.command_results
     assert all(
         isinstance(device_result, DeviceSequenceResult)
         for device_result in result.sequence_results
     )
     # Ensure deterministic ordering follows group resolution
     assert [r.device for r in result.sequence_results] == result.resolution.resolved
-    assert all(
-        r.outputs == {"cmd_a": f"{r.device}:cmd_a", "cmd_b": f"{r.device}:cmd_b"}
-        for r in result.sequence_results
+    owning_device, other_device = result.sequence_results
+    assert owning_device.outputs == {
+        "cmd_a": "test_device1:cmd_a",
+        "cmd_b": "test_device1:cmd_b",
+    }
+    assert other_device.outputs is None
+    assert other_device.error == (
+        "Sequence 'device_local_report' not found for device 'test_device2'"
     )
 
 

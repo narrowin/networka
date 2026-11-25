@@ -53,7 +53,7 @@ class SequenceManager:
 
     Contract:
     - list_vendor_sequences(vendor) -> dict[str, SequenceRecord]
-    - resolve(device_name, sequence_name) -> list[str] | None
+    - resolve(sequence_name, device_name) -> list[str] | None
     """
 
     def __init__(self, config: NetworkConfig) -> None:
@@ -115,30 +115,22 @@ class SequenceManager:
     def resolve(
         self, sequence_name: str, device_name: str | None = None
     ) -> list[str] | None:
-        """Resolve a sequence to a list of commands with precedence.
+        """Resolve the platform sequence or the requested device's inline commands."""
+        if not device_name or not self.config.devices:
+            return None
+        device = self.config.devices.get(device_name)
+        if device is None:
+            return None
 
-        Order:
-        1. Vendor sequences based on device_type via user > repo > builtin > config.vendor_sequences
-        2. Device-specific sequences (legacy) via NetworkConfig
-        """
-        # 1. Vendor-based
-        vendor = None
-        if device_name and self.config.devices and device_name in self.config.devices:
-            vendor = self.config.devices[device_name].device_type
-        if vendor:
-            merged = self.list_vendor_sequences(vendor)
-            if sequence_name in merged:
-                return list(merged[sequence_name].commands)
+        record = self.get_sequence_record(sequence_name, device.device_type)
+        if record is not None:
+            return list(record.commands)
 
-        # 2. Device-defined
-        if self.config.devices:
-            for dev in self.config.devices.values():
-                if dev.command_sequences and sequence_name in dev.command_sequences:
-                    return list(dev.command_sequences[sequence_name])
-        return None
+        inline_commands = (device.command_sequences or {}).get(sequence_name)
+        return list(inline_commands) if inline_commands is not None else None
 
     def exists(self, sequence_name: str) -> bool:
-        """Return True if a sequence is known anywhere (vendor or device)."""
+        """Recognize sequence names even when they do not apply to a target."""
         # Any vendor layer
         all_vendor = self.list_all_sequences()
         for vendor_map in all_vendor.values():
