@@ -4,7 +4,6 @@ on:
   workflow_call:
 
 env:
-  FORCE_COLOR: "1"
   PYTHONUNBUFFERED: "1"
   UV_LOCKED: "true"
   UV_PYTHON: "3.15"
