@@ -19,7 +19,6 @@ general:
 inventory:
   source: nornir_simple
   nornir_inventory_dir: /path/to/clab-<lab-dir>
-  merge_mode: replace
 
   # Recommended when Containerlab inventory provides username/password
   credentials_mode: inventory
@@ -75,7 +74,6 @@ With Scrapli’s default `system` transport, Networka will use your local OpenSS
 
 - `inventory.source`: `nornir_simple`
 - `inventory.nornir_inventory_dir`: directory containing `hosts.(yml|yaml)` (and optional `groups/defaults`), **or** a Containerlab lab directory, **or** a direct path to a `*.yml`/`*.yaml` hosts inventory file.
-- `inventory.merge_mode`: `replace` (v1)
 - `inventory.credentials_mode`: `env` (default) or `inventory` (opt-in)
 - `inventory.group_membership`: `extended` (default) or `direct` (nested group inheritance only applies when `groups.(yml|yaml)` exists)
 - `inventory.platform_mapping`: `none` (default) or `netmiko_to_networka`
