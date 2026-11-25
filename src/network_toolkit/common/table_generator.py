@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from typing import Protocol
 
 from pydantic import BaseModel
+from rich.console import OverflowMethod
 from rich.table import Table
 from rich.text import Text
 
@@ -20,6 +21,7 @@ class TableColumn(BaseModel):
     header: str
     style: StyleName | None = None
     no_wrap: bool = False
+    overflow: OverflowMethod = "ellipsis"
 
 
 class TableDefinition(BaseModel):
@@ -63,8 +65,13 @@ class TableGenerator:
         table = self.style_manager.create_table(title=Text(definition.title))
 
         for column in definition.columns:
-            self.style_manager.add_column(
-                table, column.header, column.style if column.style else None
+            table.add_column(
+                column.header,
+                style=self.style_manager.get_style(column.style)
+                if column.style
+                else None,
+                no_wrap=column.no_wrap,
+                overflow=column.overflow,
             )
 
         return table
@@ -116,7 +123,13 @@ class TableGenerator:
         # Single-item info tables have titles like "Device: name", "Group: name", etc.
         is_single_item_info = any(
             definition.title.startswith(prefix)
-            for prefix in ["Device:", "Group:", "Vendor Sequence:", "Global Sequence:"]
+            for prefix in [
+                "Device:",
+                "Group:",
+                "Vendor Sequence:",
+                "Global Sequence:",
+                "Device Sequence:",
+            ]
         )
 
         if not is_single_item_info:

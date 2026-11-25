@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Iterable
+from dataclasses import dataclass, field
 
 from network_toolkit.config import NetworkConfig
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.inventory.resolve import select_named_target
-from network_toolkit.sequence_manager import SequenceManager
+from network_toolkit.sequence_manager import SequenceManager, SequenceRecord
 
 
 @dataclass
@@ -18,6 +19,7 @@ class InfoOptions:
     config: NetworkConfig
     vendor: str | None = None
     verbose: bool = False
+    device: str | None = None
 
 
 @dataclass
@@ -26,6 +28,7 @@ class InfoTarget:
 
     name: str
     type: str  # "device", "group", "sequence"
+    sequence_records: list[SequenceRecord] = field(default_factory=list)
 
 
 @dataclass
@@ -48,30 +51,40 @@ def get_info(options: InfoOptions) -> InfoResult:
     unknown_targets: list[str] = []
     device_count = 0
 
-    sm = SequenceManager(options.config)
-    all_sequences = sm.list_all_sequences()
+    manager = SequenceManager(options.config)
+    known_sequences = manager.known_names()
+    if options.device and options.vendor:
+        msg = "Choose either --device or --vendor when inspecting a sequence."
+        raise NetworkToolkitError(msg)
 
-    def _determine_target_type(target: str) -> str:
-        resolved = select_named_target(options.config, target)
-        if resolved is not None:
-            return resolved
+    records: Iterable[SequenceRecord]
+    if options.device:
+        if select_named_target(options.config, options.device) != "device":
+            msg = f"Device '{options.device}' not found in configuration."
+            raise NetworkToolkitError(msg)
+        records = manager.list_device_sequences(options.device).values()
+    elif options.vendor:
+        records = manager.list_platform_sequences(options.vendor).values()
+    else:
+        records = manager.catalog_records()
 
-        # Check if it's a vendor sequence
-        for vendor_sequences in all_sequences.values():
-            if target in vendor_sequences:
-                return "sequence"
-
-        return "unknown"
+    sequences: dict[str, list[SequenceRecord]] = {}
+    for record in records:
+        sequences.setdefault(record.name, []).append(record)
 
     for target in target_list:
-        target_type = _determine_target_type(target)
-
-        if target_type == "unknown":
-            unknown_targets.append(target)
+        target_type = (
+            None
+            if target in known_sequences and (options.device or options.vendor)
+            else select_named_target(options.config, target)
+        )
+        if target_type:
+            targets.append(InfoTarget(target, target_type))
+            device_count += target_type == "device"
+        elif target in known_sequences:
+            targets.append(InfoTarget(target, "sequence", sequences.get(target, [])))
         else:
-            targets.append(InfoTarget(name=target, type=target_type))
-            if target_type == "device":
-                device_count += 1
+            unknown_targets.append(target)
 
     return InfoResult(
         targets=targets,

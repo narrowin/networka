@@ -14,49 +14,56 @@ from network_toolkit.commands.complete import (
     _list_sequences,
     _list_tags,
 )
-from network_toolkit.config import DeviceConfig, NetworkConfig
+from network_toolkit.config import (
+    CommandSequenceGroup,
+    DeviceConfig,
+    DeviceGroup,
+    NetworkConfig,
+    VendorSequence,
+)
 
 
 @pytest.fixture
-def mock_config() -> MagicMock:
-    """Create a mock NetworkConfig for testing."""
-    config = MagicMock(spec=NetworkConfig)
-
-    # Setup devices
-    device1 = MagicMock(spec=DeviceConfig)
-    device1.tags = ["switch", "office"]
-    device1.device_type = "mikrotik_routeros"
-    device1.command_sequences = {"test_seq": ["cmd1", "cmd2"]}
-
-    device2 = MagicMock(spec=DeviceConfig)
-    device2.tags = ["router", "edge"]
-    device2.device_type = "cisco_iosxe"
-    device2.command_sequences = {"cisco_seq": ["show version"]}
-
-    config.devices = {"sw-acc1": device1, "rt-edge1": device2}
-
-    # Setup groups
-    config.device_groups = {
-        "office_switches": ["sw-acc1"],
-        "edge_routers": ["rt-edge1"],
-    }
-
-    # Setup sequence groups
-    config.command_sequence_groups = {
-        "monitoring": ["health_check", "status"],
-        "maintenance": ["backup", "update"],
-    }
-
-    # Setup global command sequences (vendor-agnostic)
-    config.global_command_sequences = {
-        "global_health": MagicMock(commands=["global health cmd"]),
-        "global_backup": MagicMock(commands=["global backup cmd"]),
-    }
-
-    # Setup get_group_members method
-    config.get_group_members.return_value = ["sw-acc1"]
-
-    return config
+def completion_config() -> NetworkConfig:
+    """Give completion a configured device in each platform and a restricted global."""
+    return NetworkConfig(
+        devices={
+            "sw-acc1": DeviceConfig(
+                host="192.0.2.1",
+                tags=["switch", "office"],
+                device_type="mikrotik_routeros",
+                command_sequences={"test_seq": ["cmd1", "cmd2"]},
+            ),
+            "rt-edge1": DeviceConfig(
+                host="192.0.2.2",
+                tags=["router", "edge"],
+                device_type="cisco_iosxe",
+                command_sequences={"cisco_seq": ["show version"]},
+            ),
+        },
+        device_groups={
+            "office_switches": DeviceGroup(description="Office", match_tags=["office"]),
+            "edge_routers": DeviceGroup(description="Edge", members=["rt-edge1"]),
+        },
+        command_sequence_groups={
+            "monitoring": CommandSequenceGroup(
+                description="Monitoring", match_tags=["health"]
+            ),
+            "maintenance": CommandSequenceGroup(
+                description="Maintenance", match_tags=["update"]
+            ),
+        },
+        global_command_sequences={
+            "global_health": VendorSequence(
+                description="Health", commands=["global health cmd"]
+            ),
+            "global_backup": VendorSequence(
+                description="Backup",
+                commands=["global backup cmd"],
+                device_types=["cisco_iosxe"],
+            ),
+        },
+    )
 
 
 class TestListCommands:
@@ -94,9 +101,9 @@ class TestListCommands:
 class TestListDevices:
     """Test _list_devices function."""
 
-    def test_list_devices_with_devices(self, mock_config: MagicMock) -> None:
+    def test_list_devices_with_devices(self, completion_config: NetworkConfig) -> None:
         """Test listing devices when devices exist."""
-        devices = _list_devices(mock_config)
+        devices = _list_devices(completion_config)
 
         assert devices == ["rt-edge1", "sw-acc1"]
 
@@ -120,9 +127,9 @@ class TestListDevices:
 class TestListGroups:
     """Test _list_groups function."""
 
-    def test_list_groups_with_groups(self, mock_config: MagicMock) -> None:
+    def test_list_groups_with_groups(self, completion_config: NetworkConfig) -> None:
         """Test listing groups when groups exist."""
-        groups = _list_groups(mock_config)
+        groups = _list_groups(completion_config)
 
         assert groups == ["edge_routers", "office_switches"]
 
@@ -146,9 +153,11 @@ class TestListGroups:
 class TestListSequenceGroups:
     """Test _list_sequence_groups function."""
 
-    def test_list_sequence_groups_with_groups(self, mock_config: MagicMock) -> None:
+    def test_list_sequence_groups_with_groups(
+        self, completion_config: NetworkConfig
+    ) -> None:
         """Test listing sequence groups when they exist."""
-        seq_groups = _list_sequence_groups(mock_config)
+        seq_groups = _list_sequence_groups(completion_config)
 
         assert seq_groups == ["monitoring", "maintenance"]
 
@@ -164,9 +173,9 @@ class TestListSequenceGroups:
 class TestListTags:
     """Test _list_tags function."""
 
-    def test_list_tags_with_devices(self, mock_config: MagicMock) -> None:
+    def test_list_tags_with_devices(self, completion_config: NetworkConfig) -> None:
         """Test listing tags when devices have tags."""
-        tags = _list_tags(mock_config)
+        tags = _list_tags(completion_config)
 
         # Should be sorted
         assert tags == ["edge", "office", "router", "switch"]
@@ -191,101 +200,53 @@ class TestListTags:
 
 
 class TestListSequences:
-    """Test _list_sequences function."""
+    """Complete only sequences eligible for the selected scope."""
 
-    def test_list_sequences_global_only(self, mock_config: MagicMock) -> None:
-        """Test listing sequences when only global sequences exist."""
-        mock_config.devices = None
+    def test_list_sequences_global_only(self, completion_config: NetworkConfig) -> None:
+        completion_config.devices = None
+        sequences = _list_sequences(completion_config, target=None)
+        assert {"global_health", "global_backup"}.issubset(sequences)
 
-        with patch("network_toolkit.commands.complete.SequenceManager"):
-            sequences = _list_sequences(mock_config, target=None)
+    def test_list_sequences_with_device_target(
+        self, completion_config: NetworkConfig
+    ) -> None:
+        sequences = _list_sequences(completion_config, target="sw-acc1")
+        assert {"global_health", "test_seq", "system_info"}.issubset(sequences)
+        assert "global_backup" not in sequences
+        assert "cisco_seq" not in sequences
 
-            assert "global_health" in sequences
-            assert "global_backup" in sequences
+    def test_list_sequences_with_group_target(
+        self, completion_config: NetworkConfig
+    ) -> None:
+        sequences = _list_sequences(completion_config, target="office_switches")
+        assert {"global_health", "test_seq"}.issubset(sequences)
+        assert "global_backup" not in sequences
+        assert "cisco_seq" not in sequences
 
-    def test_list_sequences_with_device_target(self, mock_config: MagicMock) -> None:
-        """Test listing sequences for specific device."""
-        with patch("network_toolkit.commands.complete.SequenceManager") as mock_sm:
-            mock_sm_instance = MagicMock()
-            mock_sm.return_value = mock_sm_instance
-            mock_sm_instance.list_vendor_sequences.return_value = {
-                "vendor_seq": ["vendor_cmd"]
-            }
-
-            sequences = _list_sequences(mock_config, target="sw-acc1")
-
-            # Should include global, device-specific, and vendor sequences
-            assert "global_health" in sequences
-            assert "test_seq" in sequences
-            assert "vendor_seq" in sequences
-
-    def test_list_sequences_with_group_target(self, mock_config: MagicMock) -> None:
-        """Test listing sequences for device group."""
-        with patch("network_toolkit.commands.complete.SequenceManager") as mock_sm:
-            mock_sm_instance = MagicMock()
-            mock_sm.return_value = mock_sm_instance
-            mock_sm_instance.list_vendor_sequences.return_value = {}
-
-            sequences = _list_sequences(mock_config, target="office_switches")
-
-            # Should include global and device sequences from group members
-            assert "global_health" in sequences
-            assert "test_seq" in sequences
-
-    def test_list_sequences_all_devices(self, mock_config: MagicMock) -> None:
-        """Test listing sequences across all devices."""
-        with patch("network_toolkit.commands.complete.SequenceManager"):
-            sequences = _list_sequences(mock_config, target=None)
-
-            # Should include global and all device sequences
-            assert "global_health" in sequences
-            assert "test_seq" in sequences
-            assert "cisco_seq" in sequences
+    def test_list_sequences_all_devices(self, completion_config: NetworkConfig) -> None:
+        sequences = _list_sequences(completion_config, target=None)
+        assert {"global_health", "test_seq", "cisco_seq"}.issubset(sequences)
 
     def test_list_sequences_no_sequences(self) -> None:
-        """Test listing sequences when no sequences exist."""
-        config = MagicMock(spec=NetworkConfig)
-        config.devices = None
-        config.global_command_sequences = None
+        with patch("network_toolkit.commands.complete.SequenceManager") as manager:
+            manager.return_value.catalog_records.return_value = []
+            assert _list_sequences(NetworkConfig(), target=None) == []
 
-        with patch("network_toolkit.commands.complete.SequenceManager"):
-            sequences = _list_sequences(config, target=None)
-
-            assert len(sequences) == 0
-
-    def test_list_sequences_complex_group_logic(self, mock_config: MagicMock) -> None:
-        """Test complex group member logic in _list_sequences."""
-        # Test when getattr returns None for device_groups
-        mock_config.device_groups = None
-
-        with patch("network_toolkit.commands.complete.SequenceManager"):
-            sequences = _list_sequences(mock_config, target="nonexistent_group")
-
-            # Should still include global and all device sequences
-            assert "global_health" in sequences
-            assert "test_seq" in sequences
+    def test_list_sequences_unknown_group(
+        self, completion_config: NetworkConfig
+    ) -> None:
+        assert _list_sequences(completion_config, target="nonexistent_group") == []
 
     def test_list_sequences_vendor_sequences_multiple_platforms(
-        self, mock_config: MagicMock
+        self, completion_config: NetworkConfig
     ) -> None:
-        """Test vendor sequences with multiple device platforms."""
-        with patch("network_toolkit.commands.complete.SequenceManager") as mock_sm:
-            mock_sm_instance = MagicMock()
-            mock_sm.return_value = mock_sm_instance
-
-            # Mock list_vendor_sequences for different platforms
-            def mock_list_vendor(platform: str) -> dict[str, list[str]]:
-                if platform == "mikrotik_routeros":
-                    return {"mikrotik_health": ["system clock print"]}
-                elif platform == "cisco_iosxe":
-                    return {"cisco_health": ["show version"]}
-                return {}
-
-            mock_sm_instance.list_vendor_sequences.side_effect = mock_list_vendor
-
-            # Test without specific target - should collect from all platforms
-            sequences = _list_sequences(mock_config, target=None)
-
-            assert "global_health" in sequences
-            assert "test_seq" in sequences
-            assert "cisco_seq" in sequences
+        sequences = _list_sequences(
+            completion_config, target="office_switches,edge_routers"
+        )
+        assert {
+            "global_health",
+            "global_backup",
+            "test_seq",
+            "cisco_seq",
+            "system_info",
+        }.issubset(sequences)

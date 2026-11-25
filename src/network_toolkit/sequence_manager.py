@@ -11,23 +11,27 @@ Resolution order (highest wins):
 2. User-defined vendor sequences (sequences/<vendor>/*.yml)
 3. Repo-provided vendor sequences from config/
 4. Built-in sequences shipped with the package
+5. Inline commands on the selected device
+6. Global configuration sequences
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, cast
-
-import yaml
 
 from network_toolkit.common.paths import user_sequences_dir
-from network_toolkit.config import NetworkConfig, VendorSequence
+from network_toolkit.config import (
+    NetworkConfig,
+    VendorSequence,
+    load_vendor_sequence_file,
+)
+from network_toolkit.inventory.catalog import get_inventory_catalog
 
 
 @dataclass(frozen=True)
 class SequenceSource:
-    origin: str  # "builtin" | "repo" | "user" | "custom"
+    origin: str
     path: Path | None
 
 
@@ -40,116 +44,149 @@ class SequenceRecord:
     timeout: int | None = None
     device_types: list[str] | None = None
     source: SequenceSource | None = None
+    vendor: str | None = None
+    device: str | None = None
 
 
 class SequenceManager:
-    """Loads and resolves sequences from multiple layers.
-
-    Resolution order (highest to lowest precedence):
-    1. Custom user sequences (sequences/custom/*.yml)
-    2. User vendor sequences (sequences/<vendor>/*.yml)
-    3. Repo vendor sequences (config/sequences/<vendor>/*.yml)
-    4. Built-in sequences (package builtin_sequences/)
-
-    Contract:
-    - list_vendor_sequences(vendor) -> dict[str, SequenceRecord]
-    - resolve(sequence_name, device_name) -> list[str] | None
-    """
+    """Select applicable sequence definitions with their winning source."""
 
     def __init__(self, config: NetworkConfig) -> None:
         self.config = config
         # Layered stores: builtin < repo < user < custom
         self._builtin: dict[str, dict[str, SequenceRecord]] = {}
-        self._repo: dict[str, dict[str, SequenceRecord]] = {}
         self._user: dict[str, dict[str, SequenceRecord]] = {}
         self._custom: dict[str, dict[str, SequenceRecord]] = {}
         # Preload from known places
         self._load_all()
 
-    # ---------- Public API ----------
+    def _vendors(self) -> set[str]:
+        return (set(self._builtin) | set(self._user) | set(self._custom)) | set(
+            self.config.vendor_sequences or {}
+        )
+
+    def _vendor_records(self, vendor: str) -> dict[str, SequenceRecord]:
+        configured = {
+            name: self._record_from_vendor_sequence(name, seq, origin="repo")
+            for name, seq in (self.config.vendor_sequences or {})
+            .get(vendor, {})
+            .items()
+        }
+        return {
+            **self._builtin.get(vendor, {}),
+            **configured,
+            **self._user.get(vendor, {}),
+            **self._custom.get(vendor, {}),
+        }
+
+    @staticmethod
+    def _applies(record: SequenceRecord, vendor: str | None) -> bool:
+        if not record.commands:
+            return False
+        types = record.device_types
+        return types is None or (bool(types) and (vendor is None or vendor in types))
+
     def list_vendor_sequences(self, vendor: str) -> dict[str, SequenceRecord]:
-        """Get merged sequences for a vendor (custom > user > repo > builtin)."""
-        merged: dict[str, SequenceRecord] = {}
-        for layer in (
-            self._builtin.get(vendor, {}),
-            self._repo.get(vendor, {}),
-            self._user.get(vendor, {}),
-            self._custom.get(vendor, {}),  # Custom has highest precedence
-        ):
-            for name, rec in layer.items():
-                merged[name] = rec
-        # Also include config.vendor_sequences from NetworkConfig as repo-level
-        if self.config.vendor_sequences and vendor in self.config.vendor_sequences:
-            for name, vseq in self.config.vendor_sequences[vendor].items():
-                # Only add if not already in merged (respect precedence)
-                if name not in merged:
-                    merged[name] = self._record_from_vendor_sequence(
-                        name, vseq, origin="repo", path=None
-                    )
-        return merged
+        """Return applicable vendor definitions after whole-record precedence."""
+        return {
+            name: replace(record, vendor=vendor)
+            for name, record in self._vendor_records(vendor).items()
+            if self._applies(record, vendor)
+        }
 
     def list_all_sequences(self) -> dict[str, dict[str, SequenceRecord]]:
-        """Return all vendors and their sequences (merged)."""
-        vendors: set[str] = (
-            set(self._builtin) | set(self._repo) | set(self._user) | set(self._custom)
+        """Return applicable definitions under each configured or packaged vendor."""
+        return {
+            vendor: self.list_vendor_sequences(vendor)
+            for vendor in sorted(self._vendors())
+        }
+
+    def list_global_sequences(
+        self, vendor: str | None = None
+    ) -> dict[str, SequenceRecord]:
+        """Return global definitions, filtered when a vendor is selected."""
+        records = {
+            name: self._record_from_vendor_sequence(name, seq, origin="global")
+            for name, seq in (self.config.global_command_sequences or {}).items()
+        }
+        return {
+            name: record
+            for name, record in records.items()
+            if self._applies(record, vendor)
+        }
+
+    def list_platform_sequences(self, vendor: str) -> dict[str, SequenceRecord]:
+        """Return winners for a platform without device-local context."""
+        return {
+            **self.list_global_sequences(vendor),
+            **self.list_vendor_sequences(vendor),
+        }
+
+    def list_device_sequences(self, device_name: str) -> dict[str, SequenceRecord]:
+        """Return the exact applicable winners for a selected inventory device."""
+        device = (self.config.devices or {}).get(device_name)
+        if device is None:
+            return {}
+        source = SequenceSource(
+            "device", self.config.get_device_sequence_source_path(device_name)
         )
-        if self.config.vendor_sequences:
-            vendors |= set(self.config.vendor_sequences)
-        return {v: self.list_vendor_sequences(v) for v in sorted(vendors)}
+        inline = {
+            name: SequenceRecord(
+                name=name, commands=commands, source=source, device=device_name
+            )
+            for name, commands in (device.command_sequences or {}).items()
+            if commands
+        }
+        return {
+            **self.list_global_sequences(device.device_type),
+            **inline,
+            **self.list_vendor_sequences(device.device_type),
+        }
 
-    def get_sequence_record(
-        self, sequence_name: str, vendor: str
-    ) -> SequenceRecord | None:
-        """Get a specific sequence record for a vendor.
+    def catalog_records(self) -> list[SequenceRecord]:
+        """List global fallbacks, vendor winners, and effective device-local records."""
+        records = list(self.list_global_sequences().values())
+        for sequences in self.list_all_sequences().values():
+            records.extend(sequences.values())
+        for device_name in sorted(self.config.devices or {}):
+            records.extend(
+                record
+                for record in self.list_device_sequences(device_name).values()
+                if record.device is not None
+            )
+        return records
 
-        Args:
-            sequence_name: Name of the sequence (e.g., "system_info")
-            vendor: Vendor platform (e.g., "cisco_iosxe")
-
-        Returns:
-            SequenceRecord if found, None otherwise
-        """
-        sequences = self.list_vendor_sequences(vendor)
-        return sequences.get(sequence_name)
+    def known_names(self) -> set[str]:
+        """Recognize configured names independently of execution eligibility."""
+        names = set(self.config.global_command_sequences or {})
+        for vendor in self._vendors():
+            names.update(self._vendor_records(vendor))
+        for device in (self.config.devices or {}).values():
+            names.update(device.command_sequences or {})
+        if catalog := get_inventory_catalog(self.config):
+            for entries in catalog.devices_by_name.values():
+                for entry in entries:
+                    names.update(entry.device.command_sequences or {})
+        return names
 
     def resolve(
         self, sequence_name: str, device_name: str | None = None
     ) -> list[str] | None:
-        """Resolve the platform sequence or the requested device's inline commands."""
-        if not device_name or not self.config.devices:
-            return None
-        device = self.config.devices.get(device_name)
-        if device is None:
-            return None
-
-        record = self.get_sequence_record(sequence_name, device.device_type)
-        if record is not None:
-            return list(record.commands)
-
-        inline_commands = (device.command_sequences or {}).get(sequence_name)
-        return list(inline_commands) if inline_commands is not None else None
+        """Return commands from the winning record for the requested device."""
+        record = (
+            self.list_device_sequences(device_name).get(sequence_name)
+            if device_name
+            else None
+        )
+        return list(record.commands) if record is not None else None
 
     def exists(self, sequence_name: str) -> bool:
         """Recognize sequence names even when they do not apply to a target."""
-        # Any vendor layer
-        all_vendor = self.list_all_sequences()
-        for vendor_map in all_vendor.values():
-            if sequence_name in vendor_map:
-                return True
-        # Any device-defined
-        if self.config.devices:
-            for dev in self.config.devices.values():
-                if dev.command_sequences and sequence_name in dev.command_sequences:
-                    return True
-        return False
+        return sequence_name in self.known_names()
 
     # ---------- Internal loading ----------
     def _load_all(self) -> None:
         self._builtin = self._load_from_root(self._builtin_root(), origin="builtin")
-        # Repo paths from modular config
-        repo_root = self._repo_sequences_root()
-        if repo_root:
-            self._repo = self._load_from_root(repo_root, origin="repo")
         # User paths
         user_root = self._user_sequences_root()
         if user_root:
@@ -163,17 +200,6 @@ class SequenceManager:
         # This file lives at src/network_toolkit/sequence_manager.py
         # builtin lives at src/network_toolkit/builtin_sequences
         return Path(__file__).parent / "builtin_sequences"
-
-    def _repo_sequences_root(self) -> Path | None:
-        # Use the stored config source directory (set by load_modular_config)
-        # No fallback - if config doesn't have _config_source_dir, return None
-        if (
-            hasattr(self.config, "_config_source_dir")
-            and self.config._config_source_dir
-        ):
-            sequences_dir = self.config._config_source_dir / "sequences"
-            return sequences_dir if sequences_dir.exists() else None
-        return None
 
     def _user_sequences_root(self) -> Path | None:
         # Use OS-appropriate user config directory
@@ -194,55 +220,43 @@ class SequenceManager:
     def _load_custom_sequences(
         self, custom_root: Path
     ) -> dict[str, dict[str, SequenceRecord]]:
-        """Load custom sequences from sequences/custom/ directory.
-
-        Custom sequences are organized by vendor name in the filename
-        or loaded as vendor-agnostic and available to all vendors.
-        """
+        """Load filename-scoped custom files and definitions for known platforms."""
         data: dict[str, dict[str, SequenceRecord]] = {}
-
-        if not custom_root.exists():
-            return data
-
-        # Load all YAML files in custom/ directory
-        for yml in sorted(custom_root.glob("*.yml")):
-            sequences = self._load_yaml_sequences(yml, origin="custom")
-
-            # Try to extract vendor from filename (e.g., mikrotik_custom.yml)
-            # Otherwise make available to all known vendors
-            filename_stem = yml.stem
-            vendor_name = None
-
-            # Check if filename starts with a known vendor platform
-            for platform in [
-                "mikrotik_routeros",
-                "cisco_iosxe",
-                "cisco_nxos",
-                "arista_eos",
-                "juniper_junos",
-            ]:
-                if filename_stem.startswith(platform):
-                    vendor_name = platform
-                    break
-
-            if vendor_name:
-                # Add to specific vendor
-                if vendor_name not in data:
-                    data[vendor_name] = {}
-                data[vendor_name].update(sequences)
-            else:
-                # Make available to all vendors
-                for vendor in [
-                    "mikrotik_routeros",
-                    "cisco_iosxe",
-                    "cisco_nxos",
-                    "arista_eos",
-                    "juniper_junos",
-                ]:
-                    if vendor not in data:
-                        data[vendor] = {}
-                    data[vendor].update(sequences)
-
+        platforms = (
+            self._vendors()
+            | {device.device_type for device in (self.config.devices or {}).values()}
+            | set(self.config.vendor_platforms or {})
+        )
+        if catalog := get_inventory_catalog(self.config):
+            platforms.update(
+                entry.device.device_type
+                for entries in catalog.devices_by_name.values()
+                for entry in entries
+            )
+        for path in sorted([*custom_root.glob("*.yml"), *custom_root.glob("*.yaml")]):
+            sequences = self._load_yaml_sequences(path, origin="custom")
+            declared = {
+                platform
+                for record in sequences.values()
+                for platform in record.device_types or []
+            }
+            known_platforms = platforms | declared
+            filename_platform = next(
+                (
+                    platform
+                    for platform in sorted(known_platforms, key=len, reverse=True)
+                    if path.stem.startswith(platform)
+                ),
+                None,
+            )
+            for name, record in sequences.items():
+                targets = (
+                    [filename_platform]
+                    if filename_platform
+                    else record.device_types or platforms
+                )
+                for platform in targets:
+                    data.setdefault(platform, {})[name] = record
         return data
 
     def _load_from_root(
@@ -252,13 +266,16 @@ class SequenceManager:
         if not root.exists():
             return data
         for vendor_dir in root.iterdir():
-            if not vendor_dir.is_dir():
+            if (
+                not vendor_dir.is_dir()
+                or vendor_dir.name.startswith(".")
+                or vendor_dir.name == "custom"
+            ):
                 continue
             vendor_name = vendor_dir.name
             vendor_map: dict[str, SequenceRecord] = {}
-            for yml in sorted(vendor_dir.glob("*.yml")):
-                for name, rec in self._load_yaml_sequences(yml, origin=origin).items():
-                    vendor_map[name] = rec
+            for yml in sorted([*vendor_dir.glob("*.yml"), *vendor_dir.glob("*.yaml")]):
+                vendor_map.update(self._load_yaml_sequences(yml, origin=origin))
             if vendor_map:
                 data[vendor_name] = vendor_map
         return data
@@ -266,42 +283,20 @@ class SequenceManager:
     def _load_yaml_sequences(
         self, path: Path, *, origin: str
     ) -> dict[str, SequenceRecord]:
-        try:
-            with path.open("r", encoding="utf-8") as f:
-                loaded: Any = yaml.safe_load(f)
-                raw = cast(dict[str, Any], loaded or {})
-        except Exception:
-            return {}
-
-        out: dict[str, SequenceRecord] = {}
-        seqs_any: Any = raw.get("sequences", {}) or {}
-        seqs = cast(dict[str, Any], seqs_any)
-        for name_any, body_any in seqs.items():
-            name = name_any
-            body = cast(dict[str, Any], body_any or {})
-            commands = list(cast(list[str], body.get("commands", []) or []))
-            if not commands:
-                continue
-            out[name] = SequenceRecord(
-                name=name,
-                commands=commands,
-                description=cast(str | None, body.get("description")),
-                category=cast(str | None, body.get("category")),
-                timeout=cast(int | None, body.get("timeout")),
-                device_types=cast(list[str] | None, body.get("device_types")),
-                source=SequenceSource(origin=origin, path=path),
-            )
-        return out
+        return {
+            name: self._record_from_vendor_sequence(name, sequence, origin=origin)
+            for name, sequence in load_vendor_sequence_file(path).items()
+        }
 
     def _record_from_vendor_sequence(
-        self, name: str, vseq: VendorSequence, *, origin: str, path: Path | None
+        self, name: str, vseq: VendorSequence, *, origin: str
     ) -> SequenceRecord:
         return SequenceRecord(
             name=name,
             commands=list(vseq.commands),
-            description=getattr(vseq, "description", None),
-            category=getattr(vseq, "category", None),
-            timeout=getattr(vseq, "timeout", None),
-            device_types=getattr(vseq, "device_types", None),
-            source=SequenceSource(origin=origin, path=path),
+            description=vseq.description or None,
+            category=vseq.category,
+            timeout=vseq.timeout,
+            device_types=vseq.device_types,
+            source=SequenceSource(origin=origin, path=vseq._source_path),
         )

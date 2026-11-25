@@ -91,12 +91,17 @@ match_tags: [edge]
 
 ```yaml
 # config/sequences/common.yml
-health_check:
-  description: Basic health check
-  commands:
-    - /system/resource/print
-    - /interface/print stats
+sequences:
+  router_summary:
+    description: Basic RouterOS summary
+    device_types: [mikrotik_routeros]
+    commands:
+      - /system/resource/print
+      - /interface/print stats
 ```
+
+Global definitions are a fallback after platform and device-local sequences.
+See the [resolution order](multi-vendor-support.md#sequence-resolution-order).
 
 ## CSV {#csv}
 
@@ -126,19 +131,9 @@ core_switches,Core network switches,sw-01;sw-02,switch;core
 edge_devices,Edge routers and firewalls,,edge;firewall
 ```
 
-### Sequences CSV
-
-Required: `name`, `description`, `commands` (semicolon-separated)
-
-Optional: `tags` (semicolon-separated)
-
-```csv
-name,description,commands,tags
-health_check,Basic health check,/system/resource/print;/interface/print stats,monitoring;health
-```
-
 ## YAML vs CSV: differences at a glance
 
+- Scope: Use YAML for sequences. Device and group inventories also support CSV.
 - Expressiveness: YAML supports comments, nesting, and complex structures; CSV is flat.
 - Multi-valued fields: In YAML, use lists; in CSV, use semicolon-separated values.
 - Merging/overrides: Both support file-level overrides by name; YAML is clearer for intent.
@@ -148,7 +143,7 @@ Recommendation: Use YAML for long-term, reviewable configuration. Use CSV for qu
 
 ## Mixing formats
 
-Mixing is supported. If both YAML and CSV define the same device/group/sequence name, the later-loaded file wins according to filesystem order. Keep ownership clear to avoid surprises.
+Device and group inventories can mix YAML and CSV. Keep each name in one file to make its source clear.
 
 ## Next steps
 

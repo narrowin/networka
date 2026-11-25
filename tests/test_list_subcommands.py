@@ -202,7 +202,7 @@ class TestListCommand:
         )
 
         assert result.exit_code == 1
-        assert "Unexpected error" in result.output
+        assert "Configuration file not found: /nonexistent/config.yml" in result.output
 
     def test_list_devices_no_devices_configured(self, empty_config_file: Path) -> None:
         """Test list devices when no devices are configured."""

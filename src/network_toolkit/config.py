@@ -13,7 +13,7 @@ from typing import Any, cast
 
 import yaml
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field, PrivateAttr, field_validator
+from pydantic import BaseModel, Field, PrivateAttr, ValidationError, field_validator
 
 from network_toolkit.common.defaults import (
     DEFAULT_CONFIG_PATH,
@@ -432,6 +432,16 @@ class NetworkConfig(BaseModel):
             return None
         return getattr(dev, "_source_path", None)
 
+    def get_device_sequence_source_path(self, device_name: str) -> Path | None:
+        """Return the source of the device's command_sequences field."""
+        device = (self.devices or {}).get(device_name)
+        if device is None:
+            return None
+        source = device.get_field_source("command_sequences")
+        if source and source.identifier:
+            return Path(source.identifier)
+        return device._source_path
+
     def get_device_inventory_source_id(self, device_name: str) -> str | None:
         dev = self.devices.get(device_name) if self.devices else None
         if dev is None:
@@ -583,33 +593,6 @@ class NetworkConfig(BaseModel):
 
         sm = SequenceManager(self)
         return sm.resolve(sequence_name, device_name)
-
-    def _resolve_vendor_sequence(
-        self, sequence_name: str, device_type: str
-    ) -> list[str] | None:
-        """Resolve vendor-specific sequence commands.
-
-        Parameters
-        ----------
-        sequence_name : str
-            Name of the sequence to resolve
-        device_type : str
-            Device type (e.g., 'mikrotik_routeros', 'cisco_iosxe')
-
-        Returns
-        -------
-        list[str] | None
-            List of commands for the vendor-specific sequence, or None if not found
-        """
-        if (
-            not self.vendor_sequences
-            or device_type not in self.vendor_sequences
-            or sequence_name not in self.vendor_sequences[device_type]
-        ):
-            return None
-
-        vendor_sequence = self.vendor_sequences[device_type][sequence_name]
-        return list(vendor_sequence.commands)
 
     def get_device_groups(self, device_name: str) -> list[str]:
         """
@@ -872,7 +855,8 @@ def _discover_config_files(config_dir: Path, config_type: str) -> list[Path]:
 
         # All yaml/csv files in subdirectory
         for pattern in ["*.yml", "*.yaml", "*.csv"]:
-            files.extend(subdir.glob(pattern))
+            matches = subdir.glob(pattern)
+            files.extend(sorted(matches) if config_type == "sequences" else matches)
 
     # Remove duplicates while preserving order
     seen: set[Path] = set()
@@ -906,7 +890,9 @@ def _merge_configs(
     return merged
 
 
-def load_config(config_path: str | Path) -> NetworkConfig:
+def load_config(
+    config_path: str | Path, *, discover_default: bool = True
+) -> NetworkConfig:
     """
     Load and validate configuration.
 
@@ -933,7 +919,7 @@ def load_config(config_path: str | Path) -> NetworkConfig:
     # If caller passed the default sentinel path, honor NW_CONFIG_DIR explicitly
     # so tests and callers can force a specific config/ directory regardless of
     # whether a user-level DEFAULT_CONFIG_PATH exists.
-    if config_path == DEFAULT_CONFIG_PATH:
+    if discover_default and config_path == DEFAULT_CONFIG_PATH:
         env_dir = os.environ.get("NW_CONFIG_DIR")
         if env_dir:
             env_path = Path(env_dir)
@@ -963,7 +949,7 @@ def load_config(config_path: str | Path) -> NetworkConfig:
             msg = f"Configuration file not found: {config_path}"
             raise FileNotFoundError(msg)
         # Default path missing — surface clearly but without probing CWD
-        if config_path == DEFAULT_CONFIG_PATH:
+        if discover_default and config_path == DEFAULT_CONFIG_PATH:
             # Attempt best-effort fallback discovery for local development/tests
             fallback = _resolve_fallback_config_path(config_path)
             if fallback is not None:
@@ -996,6 +982,24 @@ def load_config(config_path: str | Path) -> NetworkConfig:
     config = load_modular_config(config_path)
     _auto_export_schemas_if_project()
     return config
+
+
+def load_inspection_config(config_file: Path | None) -> NetworkConfig:
+    """Load a selected config, or allow packaged inspection without a default."""
+    if config_file is not None:
+        return load_config(config_file, discover_default=False)
+    if env_dir := os.environ.get("NW_CONFIG_DIR"):
+        env_path = Path(env_dir)
+        if not env_path.is_dir():
+            msg = f"NW_CONFIG_DIR must name a configuration directory: {env_path}"
+            raise FileNotFoundError(msg)
+        return load_config(env_path, discover_default=False)
+    discovered = _resolve_fallback_config_path(DEFAULT_CONFIG_PATH)
+    if selected := discovered or (
+        DEFAULT_CONFIG_PATH if DEFAULT_CONFIG_PATH.exists() else None
+    ):
+        return load_config(selected, discover_default=False)
+    return NetworkConfig()
 
 
 def create_minimal_config() -> NetworkConfig:
@@ -1101,14 +1105,14 @@ def _load_devices(
     config_dir: Path,
     device_files: list[Path],
     device_defaults: dict[str, Any],
-) -> tuple[dict[str, Any], dict[str, Path]]:
+) -> tuple[dict[str, Any], dict[str, Path], set[str]]:
     """Load devices from YAML and CSV files.
 
-    Returns:
-        Tuple of (devices dict, device_sources mapping)
+    Track devices whose command sequences were inherited from shared defaults.
     """
     all_devices: dict[str, Any] = {}
     device_sources: dict[str, Path] = {}
+    sequence_defaults: set[str] = set()
 
     for device_file in device_files:
         if device_file.name == "_defaults.yml":
@@ -1120,6 +1124,8 @@ def _load_devices(
                 for key, default_value in device_defaults.items():
                     if getattr(device_config, key, None) is None:
                         setattr(device_config, key, default_value)
+                        if key == "command_sequences":
+                            sequence_defaults.add(_device_name)
                 device_sources[_device_name] = device_file
             all_devices.update(file_devices)
         else:
@@ -1132,9 +1138,12 @@ def _load_devices(
                     )
                     typed_file_devices: dict[str, dict[str, Any]] = {}
                     for _device_name, device_dict in file_devices_node.items():
+                        sequence_defaults.discard(_device_name)
                         for key, default_value in device_defaults.items():
                             if key not in device_dict:
                                 device_dict[key] = default_value
+                                if key == "command_sequences":
+                                    sequence_defaults.add(_device_name)
                         device_dict.setdefault("device_type", "linux")
                         device_sources[_device_name] = device_file
                         typed_file_devices[_device_name] = device_dict
@@ -1142,7 +1151,7 @@ def _load_devices(
             except yaml.YAMLError as e:
                 logging.warning(f"Invalid YAML in {device_file}: {e}")
 
-    return all_devices, device_sources
+    return all_devices, device_sources, sequence_defaults
 
 
 def _load_groups(
@@ -1183,6 +1192,7 @@ def _load_groups(
 def _load_sequences(
     config_dir: Path,
     main_config: dict[str, Any],
+    config_file: Path,
 ) -> tuple[
     dict[str, Any],
     dict[str, VendorSequence],
@@ -1195,8 +1205,11 @@ def _load_sequences(
         Tuple of (sequences_config, global_command_sequences, vendor_sequences, global_sequence_sources)
     """
     sequence_files = _discover_config_files(config_dir, "sequences")
-    sequences_config: dict[str, Any] = {}
-    global_sequence_sources: dict[str, Path] = {}
+    sequences_config: dict[str, Any] = {
+        "vendor_platforms": main_config.get("vendor_platforms") or {},
+    }
+    global_sequences_raw = dict(main_config.get("global_command_sequences") or {})
+    global_sequence_sources = dict.fromkeys(global_sequences_raw, config_file)
 
     for seq_file in sequence_files:
         if seq_file.suffix.lower() != ".csv":
@@ -1204,23 +1217,19 @@ def _load_sequences(
                 with seq_file.open("r", encoding="utf-8") as sf:
                     seq_yaml_config: dict[str, Any] = yaml.safe_load(sf) or {}
                     # Track source paths for sequences
-                    file_sequences = seq_yaml_config.get("sequences", {})
-                    for seq_name in file_sequences.keys():
+                    file_sequences = seq_yaml_config.pop("sequences", None) or {}
+                    if not isinstance(file_sequences, dict):
+                        msg = f"Expected a sequences mapping in {seq_file}"
+                        raise ValueError(msg)
+                    global_sequences_raw.update(file_sequences)
+                    for seq_name in file_sequences:
                         global_sequence_sources[seq_name] = seq_file
-                    if not sequences_config:
-                        sequences_config = seq_yaml_config
-                    else:
-                        sequences_config = _merge_configs(
-                            sequences_config, seq_yaml_config
-                        )
-            except yaml.YAMLError as e:
-                logging.warning(f"Invalid YAML in {seq_file}: {e}")
+                    sequences_config = _merge_configs(sequences_config, seq_yaml_config)
+            except yaml.YAMLError as error:
+                msg = f"Invalid sequence YAML in {seq_file}"
+                raise ValueError(msg) from error
 
     vendor_sequences = _load_vendor_sequences(config_dir, sequences_config)
-
-    global_sequences_raw = sequences_config.get("sequences", {})
-    if not global_sequences_raw and "global_command_sequences" in main_config:
-        global_sequences_raw = main_config.get("global_command_sequences", {})
 
     global_command_sequences: dict[str, VendorSequence] = {}
     if global_sequences_raw:
@@ -1339,6 +1348,7 @@ def _populate_device_field_history(
     device: DeviceConfig,
     source_path: Path | None,
     device_defaults: dict[str, Any],
+    sequence_source: Path | None,
 ) -> None:
     """Populate field history for a DeviceConfig instance.
 
@@ -1356,7 +1366,14 @@ def _populate_device_field_history(
             continue
 
         # Determine the loader type based on where the value came from
-        if field_name in device_defaults and value == device_defaults.get(field_name):
+        if field_name == "command_sequences":
+            device.record_field(
+                field_name,
+                value,
+                LoaderType.CONFIG_FILE,
+                identifier=str(sequence_source) if sequence_source else source_str,
+            )
+        elif field_name in device_defaults and value == device_defaults.get(field_name):
             # Value came from _defaults.yml - construct path properly using Path operations
             defaults_path = (
                 source_path.parent / "_defaults.yml" if source_path else None
@@ -1451,7 +1468,7 @@ def load_modular_config(
         # Load devices, groups, and sequences using helper functions
         device_defaults = _load_device_defaults(config_dir)
         device_files = _discover_config_files(config_dir, "devices")
-        all_devices, device_sources = _load_devices(
+        all_devices, device_sources, sequence_defaults = _load_devices(
             config_dir, device_files, device_defaults
         )
 
@@ -1463,7 +1480,7 @@ def load_modular_config(
             global_command_sequences,
             vendor_sequences,
             global_sequence_sources,
-        ) = _load_sequences(config_dir, main_config)
+        ) = _load_sequences(config_dir, main_config, config_file)
 
         # Merge inline devices/groups from main config with discovered files
         # Inline definitions from main config file
@@ -1686,7 +1703,14 @@ def load_modular_config(
                     _dev.set_source_path(src)
                 _dev.set_inventory_source_id(device_inventory_ids.get(_name, "config"))
                 # Populate field history for each field
-                _populate_device_field_history(_dev, src, device_defaults)
+                sequence_source = (
+                    config_dir / "devices" / "_defaults.yml"
+                    if _name in sequence_defaults
+                    else src
+                )
+                _populate_device_field_history(
+                    _dev, src, device_defaults, sequence_source
+                )
 
         if model.device_groups:
             for _name, _grp in model.device_groups.items():
@@ -1777,40 +1801,36 @@ def load_modular_config(
 def _load_vendor_sequences(
     config_dir: Path, sequences_config: dict[str, Any]
 ) -> dict[str, dict[str, VendorSequence]]:
-    """
-    Load vendor-specific sequences from sequences directory.
-
-    Uses explicit vendor_platforms configuration if available, otherwise
-    auto-discovers vendor directories for backward compatibility and
-    future-proof operation.
-    """
+    """Load project files, then apply explicit per-platform file selections."""
     vendor_sequences: dict[str, dict[str, VendorSequence]] = {}
+    sequences_dir = config_dir / "sequences"
 
-    # Get vendor platform configurations
-    vendor_platforms = sequences_config.get("vendor_platforms", {})
+    if sequences_dir.is_dir():
+        for vendor_dir in sorted(sequences_dir.iterdir()):
+            if (
+                not vendor_dir.is_dir()
+                or vendor_dir.name.startswith(".")
+                or vendor_dir.name == "custom"
+            ):
+                continue
+            records: dict[str, VendorSequence] = {}
+            for path in sorted([*vendor_dir.glob("*.yml"), *vendor_dir.glob("*.yaml")]):
+                records.update(load_vendor_sequence_file(path))
+            if records:
+                vendor_sequences[vendor_dir.name] = records
 
-    if vendor_platforms:
-        # Use explicit vendor platform configuration (preferred)
-        for platform_name, platform_config in vendor_platforms.items():
-            platform_sequences = _load_vendor_platform_sequences(
-                config_dir, platform_name, platform_config
-            )
-            if platform_sequences:
-                vendor_sequences[platform_name] = platform_sequences
-    else:
-        # Auto-discovery fallback for backward compatibility
-        vendor_sequences = _auto_discover_vendor_sequences(config_dir)
-        if vendor_sequences:
-            logging.debug(
-                f"Auto-discovered {len(vendor_sequences)} vendor platforms "
-                f"in {config_dir / 'sequences'}"
-            )
+    for platform_name, platform_config in sequences_config.get(
+        "vendor_platforms", {}
+    ).items():
+        selected = _load_vendor_platform_sequences(config_dir, platform_config)
+        if selected:
+            vendor_sequences.setdefault(platform_name, {}).update(selected)
 
     return vendor_sequences
 
 
 def _load_vendor_platform_sequences(
-    config_dir: Path, platform_name: str, platform_config: dict[str, Any]
+    config_dir: Path, platform_config: dict[str, Any]
 ) -> dict[str, VendorSequence]:
     """Load sequences for a specific vendor platform using explicit configuration."""
     platform_sequences: dict[str, VendorSequence] = {}
@@ -1819,7 +1839,7 @@ def _load_vendor_platform_sequences(
     sequence_path = config_dir / platform_config.get("sequence_path", "")
 
     if not sequence_path.exists():
-        logging.debug(f"Vendor sequence path not found: {sequence_path}")
+        logging.warning(f"Vendor sequence path not found: {sequence_path}")
         return platform_sequences
 
     # Load default sequence files for this vendor
@@ -1829,108 +1849,43 @@ def _load_vendor_platform_sequences(
         vendor_file_path = sequence_path / sequence_file
 
         if not vendor_file_path.exists():
-            logging.debug(f"Vendor sequence file not found: {vendor_file_path}")
+            logging.warning(f"Vendor sequence file not found: {vendor_file_path}")
             continue
 
-        sequences = _load_sequence_file(vendor_file_path, platform_name)
-        platform_sequences.update(sequences)
+        platform_sequences.update(load_vendor_sequence_file(vendor_file_path))
 
     return platform_sequences
 
 
-def _auto_discover_vendor_sequences(
-    config_dir: Path,
-) -> dict[str, dict[str, VendorSequence]]:
-    """
-    Auto-discover vendor sequences by scanning the sequences directory.
-
-    This provides backward compatibility when vendor_platforms is not configured
-    and future-proofs against missing configuration.
-    """
-    vendor_sequences: dict[str, dict[str, VendorSequence]] = {}
-    sequences_dir = config_dir / "sequences"
-
-    if not sequences_dir.exists():
-        logging.debug(f"Sequences directory not found: {sequences_dir}")
-        return vendor_sequences
-
-    # Scan for vendor subdirectories
-    for vendor_dir in sequences_dir.iterdir():
-        if not vendor_dir.is_dir() or vendor_dir.name.startswith("."):
-            continue
-
-        vendor_name = vendor_dir.name
-        platform_sequences: dict[str, VendorSequence] = {}
-
-        # Look for common sequence files
-        sequence_files = [
-            "common.yml",
-            "common.yaml",
-            f"{vendor_name}.yml",
-            f"{vendor_name}.yaml",
-        ]
-
-        for sequence_file in sequence_files:
-            vendor_file_path = vendor_dir / sequence_file
-            if vendor_file_path.exists():
-                sequences = _load_sequence_file(vendor_file_path, vendor_name)
-                platform_sequences.update(sequences)
-                break  # Use first found file
-
-        # Also scan for any other YAML files in the vendor directory
-        for yaml_file in vendor_dir.glob("*.yml"):
-            if yaml_file.name not in sequence_files:
-                sequences = _load_sequence_file(yaml_file, vendor_name)
-                platform_sequences.update(sequences)
-
-        for yaml_file in vendor_dir.glob("*.yaml"):
-            if yaml_file.name not in sequence_files:
-                sequences = _load_sequence_file(yaml_file, vendor_name)
-                platform_sequences.update(sequences)
-
-        if platform_sequences:
-            vendor_sequences[vendor_name] = platform_sequences
-            logging.debug(
-                f"Auto-discovered {len(platform_sequences)} sequences for {vendor_name}"
-            )
-
-    return vendor_sequences
-
-
-def _load_sequence_file(file_path: Path, vendor_name: str) -> dict[str, VendorSequence]:
-    """Load sequences from a single vendor sequence file."""
-    sequences: dict[str, VendorSequence] = {}
-
+def load_vendor_sequence_file(path: Path) -> dict[str, VendorSequence]:
+    """Read one vendor YAML file and retain the actual source on each definition."""
     try:
-        with file_path.open("r", encoding="utf-8") as f:
-            vendor_config: dict[str, Any] = yaml.safe_load(f) or {}
-        # Load sequences from the vendor file
-        sequence_data = cast(
-            dict[str, dict[str, Any]], vendor_config.get("sequences", {}) or {}
-        )
-        for seq_name, seq_data in sequence_data.items():
-            try:
-                seq_obj = VendorSequence(**seq_data)
-                # Store source path on the sequence object (private via setter)
-                seq_obj.set_source_path(file_path)
-                sequences[seq_name] = seq_obj
-            except Exception as e:
-                logging.warning(f"Invalid sequence '{seq_name}' in {file_path}: {e}")
-                continue
+        with path.open("r", encoding="utf-8") as stream:
+            loaded = yaml.safe_load(stream) or {}
+    except (OSError, yaml.YAMLError) as error:
+        logging.warning("Cannot load sequences from %s: %s", path, error)
+        return {}
 
-        logging.debug(
-            f"Loaded {len(sequence_data)} sequences for {vendor_name} from {file_path}"
-        )
+    definitions = loaded.get("sequences", {}) if isinstance(loaded, dict) else None
+    if not isinstance(definitions, dict):
+        logging.warning("Expected a sequences mapping in %s", path)
+        return {}
 
-    except yaml.YAMLError as e:
-        logging.warning(f"Invalid YAML in vendor sequence file {file_path}: {e}")
-    except Exception as e:  # pragma: no cover - robustness
-        logging.warning(f"Failed to load vendor sequence file {file_path}: {e}")
-
+    sequences: dict[str, VendorSequence] = {}
+    for name, body in definitions.items():
+        if not isinstance(name, str):
+            logging.warning("Expected a sequence name in %s: %r", path, name)
+            continue
+        try:
+            payload = {"description": "", **body} if isinstance(body, dict) else body
+            sequence = VendorSequence.model_validate(payload)
+        except ValidationError as error:
+            logging.warning("Invalid sequence %s in %s: %s", name, path, error)
+            # Keep the known name out of the raw command path.
+            sequence = VendorSequence(description="", commands=[])
+        sequence.set_source_path(path)
+        sequences[name] = sequence
     return sequences
-
-
-# Legacy single-file YAML mode removed: no legacy loader remains
 
 
 def generate_json_schema() -> dict[str, Any]:

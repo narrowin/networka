@@ -3,18 +3,17 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from network_toolkit.api.diff import DiffOptions, diff_targets
-from network_toolkit.config import NetworkConfig
+from network_toolkit.config import DeviceConfig, NetworkConfig
 
 
 @pytest.fixture
 def mock_config():
-    config = MagicMock(spec=NetworkConfig)
-    config.devices = {"dev1": MagicMock(), "dev2": MagicMock()}
-    config.device_groups = {}
-    config.get_group_members.return_value = []
-    config.general = MagicMock()
-    config.general.results_dir = "results"
-    return config
+    return NetworkConfig(
+        devices={
+            "dev1": DeviceConfig(host="192.0.2.1"),
+            "dev2": DeviceConfig(host="192.0.2.2"),
+        }
+    )
 
 
 @patch("network_toolkit.api.diff.DeviceSession")

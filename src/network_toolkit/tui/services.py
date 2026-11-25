@@ -14,7 +14,7 @@ from collections.abc import Iterable
 
 from pydantic import BaseModel, ConfigDict
 
-from network_toolkit.common.resolver import DeviceResolver
+from network_toolkit.inventory.resolve import resolve_named_targets
 from network_toolkit.tui.data import TuiData
 from network_toolkit.tui.models import (
     CancellationToken,
@@ -95,35 +95,28 @@ class ExecutionService:
         self, devices: Iterable[str], groups: Iterable[str]
     ) -> list[str]:
         """Resolve devices and expand groups using the project's resolver."""
-        resolver = DeviceResolver(self._data.config)
-        selected: set[str] = set(devices)
-        for g in groups:
-            try:
-                for m in self._data.config.get_group_members(g):
-                    selected.add(m)
-            except Exception:
-                # Best-effort, groups may be invalid during development
-                logging.debug("Failed to expand group %s", g)
-        return [d for d in sorted(selected) if resolver.is_device(d)]
+        targets = ",".join(sorted(set(devices) | set(groups)))
+        return sorted(
+            resolve_named_targets(self._data.config, targets).resolved_devices
+        )
 
     def build_plan(
         self, devices: Iterable[str], sequences: Iterable[str], command_text: str
     ) -> ExecutionPlan:
         plan: ExecutionPlan = {}
-        seqs = list(sequences)
-        if seqs:
-            for device in devices:
-                cmds: list[str] = []
-                for seq in sorted(seqs):
-                    resolved = self._data.sequence_manager.resolve(seq, device) or []
-                    cmds.extend(resolved)
-                if cmds:
-                    plan[device] = cmds
-        else:
-            commands = list(iter_commands(command_text))
+        manager = self._data.sequence_manager
+        selected = sorted(sequences)
+        actions = selected or list(iter_commands(command_text))
+        known_names = set(selected) if selected else manager.known_names()
+        for device in devices:
+            commands: list[str] = []
+            for action in actions:
+                if action in known_names:
+                    commands.extend(manager.resolve(action, device) or [])
+                else:
+                    commands.append(action)
             if commands:
-                for device in devices:
-                    plan[device] = commands
+                plan[device] = commands
         return plan
 
     async def run_plan(

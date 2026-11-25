@@ -7,7 +7,6 @@ Textual UI remains a thin layer on top.
 from __future__ import annotations
 
 import os
-from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, cast
 
@@ -125,20 +124,11 @@ class TuiData:
         return Targets(devices=devices, groups=groups)
 
     def actions(self) -> Actions:
-        sequences = sorted(self._discover_all_sequences())
-        return Actions(sequences=sequences)
-
-    def _discover_all_sequences(self) -> Iterable[str]:
-        names: set[str] = set()
-        # Vendor via SequenceManager
-        for vendor_map in self.sequence_manager.list_all_sequences().values():
-            names |= set(vendor_map.keys())
-        # Device-defined sequences
-        if self.config.devices:
-            for dev in self.config.devices.values():
-                if dev.command_sequences:
-                    names |= set(dev.command_sequences.keys())
-        return names
+        return Actions(
+            sequences=sorted(
+                {record.name for record in self.sequence_manager.catalog_records()}
+            )
+        )
 
     def sequence_commands(
         self, name: str, device_name: str | None = None

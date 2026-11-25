@@ -24,6 +24,7 @@ from network_toolkit.ip_device import (
 from network_toolkit.platforms.factory import (
     get_supported_platforms as get_platform_ops,
 )
+from network_toolkit.sequence_manager import SequenceRecord
 
 if TYPE_CHECKING:
     pass
@@ -203,7 +204,7 @@ class TransportTypesTableProvider(BaseModel, BaseTableProvider):
 
 
 class VendorSequencesTableProvider(BaseModel, BaseTableProvider):
-    """Provider for vendor sequences table."""
+    """Provider for sequence catalog tables."""
 
     sequences: list[SequenceInfo]
     vendor_filter: str | None = None
@@ -215,7 +216,8 @@ class VendorSequencesTableProvider(BaseModel, BaseTableProvider):
         columns = [
             TableColumn(header="Sequence Name", style=StyleName.DEVICE),
             TableColumn(header="Description", style=StyleName.SUCCESS),
-            TableColumn(header="Vendor", style=StyleName.WARNING),
+            TableColumn(header="Scope", style=StyleName.WARNING),
+            TableColumn(header="Origin", style=StyleName.INFO),
             TableColumn(header="Category", style=StyleName.WARNING),
             TableColumn(header="Commands", style=StyleName.OUTPUT),
         ]
@@ -223,15 +225,16 @@ class VendorSequencesTableProvider(BaseModel, BaseTableProvider):
         if self.verbose:
             columns.extend(
                 [
+                    TableColumn(header="Source", style=StyleName.INFO, overflow="fold"),
                     TableColumn(header="Timeout", style=StyleName.INFO),
                     TableColumn(header="Device Types", style=StyleName.ERROR),
                 ]
             )
 
-        vendor_name = self.vendor_filter or "All Vendors"
-        return TableDefinition(
-            title=f"Vendor Sequences - {vendor_name}", columns=columns
+        title = (
+            f"Sequences - {self.vendor_filter}" if self.vendor_filter else "Sequences"
         )
+        return TableDefinition(title=title, columns=columns)
 
     def get_table_rows(self) -> list[list[str]]:
         """Get vendor sequences data."""
@@ -239,11 +242,13 @@ class VendorSequencesTableProvider(BaseModel, BaseTableProvider):
 
         for seq in self.sequences:
             commands_str = ", ".join(seq.commands) if seq.commands else "N/A"
+            source = seq.source
 
             row = [
                 seq.name,
                 seq.description or "N/A",
-                seq.vendor or "N/A",
+                seq.device or seq.vendor or "Global",
+                source.origin if source else "unknown",
                 seq.category or "N/A",
                 (commands_str[:50] + "..." if len(commands_str) > 50 else commands_str),
             ]
@@ -253,7 +258,8 @@ class VendorSequencesTableProvider(BaseModel, BaseTableProvider):
                 device_types = (
                     ", ".join(seq.device_types) if seq.device_types else "All"
                 )
-                row.extend([timeout, device_types])
+                path = str(source.path.resolve()) if source and source.path else "—"
+                row.extend([path, timeout, device_types])
 
             rows.append(row)
 
@@ -263,7 +269,8 @@ class VendorSequencesTableProvider(BaseModel, BaseTableProvider):
         """Get raw data for JSON/CSV output."""
         lines = []
         for seq in self.sequences:
-            lines.append(f"vendor={seq.vendor} sequence={seq.name}")
+            scope = f"device={seq.device}" if seq.device else f"vendor={seq.vendor}"
+            lines.append(f"{scope} sequence={seq.name}")
         return "\n".join(lines)
 
     def get_verbose_info(self) -> list[str] | None:
@@ -316,199 +323,62 @@ class SupportedPlatformsTableProvider(BaseModel, BaseTableProvider):
         return ["Platforms supported by the network toolkit transport layer"]
 
 
-class GlobalSequenceInfoTableProvider(BaseModel, BaseTableProvider):
-    """Provider for global sequence info table."""
+class SequenceInfoTableProvider(BaseModel, BaseTableProvider):
+    """Render a resolved sequence and its actual source."""
 
-    # Config is optional for tests that instantiate the provider directly
-    config: NetworkConfig | None = None
-    sequence_name: str
-    sequence: Any  # CommandSequence object
-    verbose: bool = False
+    record: SequenceRecord
+    device: str | None = None
+    vendor: str | None = None
 
     def get_table_definition(self) -> TableDefinition:
+        source = self.record.source
+        kind = "Vendor"
+        if source and source.origin in {"global", "device"}:
+            kind = source.origin.title()
+        scope = self.device or self.record.device or self.vendor or self.record.vendor
+        suffix = f" ({scope})" if scope else ""
         return TableDefinition(
-            title=f"Global Sequence: {self.sequence_name}",
+            title=f"{kind} Sequence: {self.record.name}{suffix}",
             columns=[
                 TableColumn(header="Property", style=StyleName.DEVICE),
-                TableColumn(header="Value", style=StyleName.OUTPUT),
+                TableColumn(header="Value", style=StyleName.OUTPUT, overflow="fold"),
             ],
         )
 
     def get_table_rows(self) -> list[list[str]]:
-        """Get global sequence info data."""
-        rows: list[list[str]] = [
-            ["Description", getattr(self.sequence, "description", "No description")],
-            ["Source", self._get_sequence_source()],
-            ["Command Count", str(len(getattr(self.sequence, "commands", [])))],
-        ]
-
-        # Add individual commands with truncation for long lists
-        commands = getattr(self.sequence, "commands", [])
-        max_preview = 3
-        for i, cmd in enumerate(commands[:max_preview], 1):
-            rows.append([f"Command {i}", str(cmd)])
-
-        remaining = max(0, len(commands) - max_preview)
-        if remaining > 0:
-            rows.append(["Note", f"({remaining} more commands)"])
-
-        # Add tags if available
-        tags = getattr(self.sequence, "tags", [])
-        if tags:
-            rows.append(["Tags", ", ".join(tags)])
-
-        return rows
-
-    def _get_sequence_source(self) -> str:
-        """
-        Determine the source of this global sequence.
-
-        Prefer the exact config file path recorded by the loader. When running
-        with mocked configs (tests that don't provide loader metadata), fall back
-        to a stable label.
-        """
-        # Try to use loader metadata if available
-        try:
-            if self.config is not None and hasattr(
-                self.config, "get_global_sequence_source_path"
-            ):
-                src = self.config.get_global_sequence_source_path(self.sequence_name)
-                if isinstance(src, Path):
-                    try:
-                        return str(src.resolve())
-                    except Exception:
-                        return str(src)
-        except Exception:
-            # Ignore and fall back to stable label
-            pass
-
-        # Fallback for mocked/global sequences without tracked source
-        return "Global (config)"
-
-    def get_raw_output(self) -> str | None:
-        """Get raw data for JSON/CSV output."""
-        commands = getattr(self.sequence, "commands", [])
-        return f"sequence={self.sequence_name} type=global commands={len(commands)}"
-
-    def get_verbose_info(self) -> list[str] | None:
-        """Get additional verbose information."""
-        return [f"Global sequence '{self.sequence_name}' details"]
-
-
-class VendorSequenceInfoTableProvider(BaseModel, BaseTableProvider):
-    """Provider for vendor sequence info table."""
-
-    sequence_name: str
-    sequence_record: Any  # SequenceRecord object
-    vendor_names: list[str]
-    verbose: bool = False
-    config: NetworkConfig | None = None
-    vendor_specific: bool = False
-
-    def get_table_definition(self) -> TableDefinition:
-        title_suffix = ""
-        if self.vendor_specific and len(self.vendor_names) == 1:
-            title_suffix = f" ({self.vendor_names[0]})"
-
-        return TableDefinition(
-            title=f"Vendor Sequence: {self.sequence_name}{title_suffix}",
-            columns=[
-                TableColumn(header="Property", style=StyleName.DEVICE),
-                TableColumn(header="Value", style=StyleName.OUTPUT),
-            ],
-        )
-
-    def get_table_rows(self) -> list[list[str]]:
-        """Get vendor sequence info data."""
+        record = self.record
+        source = record.source
         rows = [
+            ["Description", record.description or "No description"],
+            ["Category", record.category or "general"],
+            ["Origin", source.origin if source else "unknown"],
             [
-                "Description",
-                getattr(self.sequence_record, "description", "No description")
-                or "No description",
+                "Source",
+                str(source.path.resolve())
+                if source and source.path
+                else "In-memory configuration",
             ],
             [
-                "Category",
-                getattr(self.sequence_record, "category", "general") or "general",
+                "Device Types",
+                ", ".join(record.device_types) if record.device_types else "All",
             ],
-            ["Vendors", ", ".join(self.vendor_names)],
-            ["Source", self._get_sequence_source()],
-            ["Command Count", str(len(getattr(self.sequence_record, "commands", [])))],
+            ["Command Count", str(len(record.commands))],
         ]
-
-        # Add all individual commands - no truncation
-        commands = getattr(self.sequence_record, "commands", [])
-        for i, cmd in enumerate(commands, 1):
-            rows.append([f"Command {i}", str(cmd)])
-
+        if device := self.device or record.device:
+            rows.append(["Device", device])
+        if vendor := self.vendor or record.vendor:
+            rows.append(["Vendor", vendor])
+        rows.extend(
+            [f"Command {i}", command] for i, command in enumerate(record.commands, 1)
+        )
         return rows
 
-    def _get_sequence_source(self) -> str:
-        """Determine the source of this vendor sequence using the actual sequence record source."""
-        # Use the source information from the SequenceRecord if available
-        if hasattr(self.sequence_record, "source") and self.sequence_record.source:
-            source = self.sequence_record.source
-            origin = getattr(source, "origin", None)
-            path = getattr(source, "path", None)
-
-            if origin == "builtin":
-                if path:
-                    return f"Built-in vendor sequences ({path.name})"
-                return "Built-in vendor sequences"
-            elif origin in {"repo", "user"}:
-                # Prefer explicit path if provided
-                if path:
-                    return f"config file ({path.resolve()})"
-                # Try loader metadata to get exact filename
-                try:
-                    if self.config and getattr(self.config, "vendor_sequences", None):
-                        for _vendor_key, seqs in (
-                            self.config.vendor_sequences or {}
-                        ).items():
-                            seq_obj = seqs.get(self.sequence_name)
-                            if seq_obj is not None:
-                                src = getattr(seq_obj, "_source_path", None)
-                                if src:
-                                    return f"config file ({Path(src).resolve()})"
-                except Exception:
-                    pass
-                # Fall back to generic label by origin
-                return (
-                    "repository config sequences"
-                    if origin == "repo"
-                    else "user config sequences"
-                )
-            elif origin == "global":
-                return "global config sequences"
-
-        # Fallback: try loader metadata if config is provided
-        try:
-            if self.config and getattr(self, "vendor_names", None):
-                vendor_sequences = getattr(self.config, "vendor_sequences", {}) or {}
-                for vendor in self.vendor_names:
-                    seqs = vendor_sequences.get(vendor.replace(" ", "_"), {})
-                    seq_obj = seqs.get(self.sequence_name)
-                    if seq_obj is not None:
-                        src = getattr(seq_obj, "_source_path", None)
-                        if src:
-                            return f"config file ({Path(src).resolve()})"
-        except Exception:
-            # Ignore and continue to final fallback
-            pass
-
-        # Final fallback
-        return "Built-in vendor sequences"
-
-    def get_raw_output(self) -> str | None:
-        """Get raw data for JSON/CSV output."""
-        commands = getattr(self.sequence_record, "commands", [])
-        vendors = ",".join(self.vendor_names)
-        return f"sequence={self.sequence_name} type=vendor vendors={vendors} commands={len(commands)}"
+    def get_raw_output(self) -> str:
+        metadata = "\n".join(f"{key}: {value}" for key, value in self.get_table_rows())
+        return f"{self.get_table_definition().title}\n{metadata}"
 
     def get_verbose_info(self) -> list[str] | None:
-        """Get additional verbose information."""
-        return [
-            f"Vendor sequence '{self.sequence_name}' available in {len(self.vendor_names)} vendor(s)"
-        ]
+        return None
 
 
 class TransportInfoTableProvider(BaseModel, BaseTableProvider):
