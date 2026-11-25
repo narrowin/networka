@@ -6,9 +6,11 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
 from typer.testing import CliRunner
 
 from network_toolkit.cli import app
+from network_toolkit.exceptions import DeviceExecutionError
 
 
 class TestRunCommand:
@@ -452,6 +454,57 @@ class TestRunCommandEdgeCases:
 
         # Mixed results should still return appropriate exit code
         assert result.exit_code in [0, 1]
+
+    @staticmethod
+    def _invoke_group(
+        config_file: Path, failing_device: str | None, *, sequence: bool
+    ) -> int:
+        """Run on two devices, where ``failing_device`` rejects every command."""
+
+        def make_session(device_name: str, *_args: object) -> MagicMock:
+            session = MagicMock()
+            session.__enter__.return_value = session
+            session.__exit__.return_value = None
+            if device_name == failing_device:
+                session.execute_command.side_effect = DeviceExecutionError("Failed")
+            else:
+                session.execute_command.return_value = "ok\n"
+            return session
+
+        with (
+            patch("network_toolkit.device.DeviceSession", side_effect=make_session),
+            patch(
+                "network_toolkit.api.run.SequenceManager.exists",
+                return_value=sequence,
+            ),
+            patch(
+                "network_toolkit.api.run.SequenceManager.resolve",
+                return_value=["/system/identity/print"],
+            ),
+        ):
+            result = CliRunner().invoke(
+                app,
+                [
+                    "run",
+                    "test_device1,test_device2",
+                    "health_check" if sequence else "/system/identity/print",
+                    "--config",
+                    str(config_file),
+                ],
+            )
+        return result.exit_code
+
+    @pytest.mark.parametrize("sequence", [False, True])
+    def test_run_group_all_succeed_exits_zero(
+        self, config_file: Path, sequence: bool
+    ) -> None:
+        assert self._invoke_group(config_file, None, sequence=sequence) == 0
+
+    @pytest.mark.parametrize("sequence", [False, True])
+    def test_run_group_with_failed_device_exits_one(
+        self, config_file: Path, sequence: bool
+    ) -> None:
+        assert self._invoke_group(config_file, "test_device2", sequence=sequence) == 1
 
     def test_run_with_config_validation_error(self, tmp_path: Path) -> None:
         """Test run command with invalid configuration."""
