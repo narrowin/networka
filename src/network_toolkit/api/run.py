@@ -90,6 +90,7 @@ class RunOptions:
     results_dir: str | None = None
     no_strict_host_key_checking: bool = False
     session_pool: SessionPoolProtocol | None = None
+    sequence_manager: SequenceManager | None = None
 
 
 @dataclass(slots=True)
@@ -459,7 +460,9 @@ def run_commands(options: RunOptions) -> RunResult:
             f"Using IP addresses with device type '{options.device_type}': {', '.join(ips)}"
         )
 
-    sequence_manager = SequenceManager(config)
+    sequence_manager = options.sequence_manager
+    if sequence_manager is None or sequence_manager.config is not config:
+        sequence_manager = SequenceManager(config)
     command_context = f"run_{options.target}_{options.command_or_sequence}"
     results_mgr = _build_results_manager(
         config=config,

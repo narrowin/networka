@@ -18,6 +18,7 @@ from network_toolkit.api.run import (
 )
 from network_toolkit.config import NetworkConfig
 from network_toolkit.exceptions import DeviceExecutionError, OperationUnconfirmedError
+from network_toolkit.sequence_manager import SequenceManager
 from network_toolkit.session_pool import SessionPool
 
 
@@ -270,3 +271,58 @@ def test_rejected_command_keeps_pooled_session(
 
     assert result.command_results[0].error is not None
     assert pool.get("test_device1") is not None
+
+
+def test_run_uses_supplied_sequence_manager(
+    sample_config: NetworkConfig,
+    patch_device_session: Callable[[DummyDeviceSession], None],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    patch_device_session(DummyDeviceSession)
+    manager = SequenceManager(sample_config)
+
+    def fail_init(_self: SequenceManager, _config: NetworkConfig) -> None:
+        msg = "run_commands built a new sequence manager"
+        raise AssertionError(msg)
+
+    monkeypatch.setattr(SequenceManager, "__init__", fail_init)
+
+    result = run_commands(
+        RunOptions(
+            target="test_device1",
+            command_or_sequence="/system/clock/print",
+            config=sample_config,
+            sequence_manager=manager,
+        )
+    )
+
+    assert result.command_results[0].output == "test_device1:/system/clock/print"
+
+
+def test_run_builds_sequence_manager_for_other_config(
+    sample_config: NetworkConfig,
+    patch_device_session: Callable[[DummyDeviceSession], None],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    patch_device_session(DummyDeviceSession)
+    stale = SequenceManager(sample_config.model_copy())
+    built: list[NetworkConfig] = []
+    original_init = SequenceManager.__init__
+
+    def record_init(self: SequenceManager, config: NetworkConfig) -> None:
+        built.append(config)
+        original_init(self, config)
+
+    monkeypatch.setattr(SequenceManager, "__init__", record_init)
+
+    run_commands(
+        RunOptions(
+            target="test_device1",
+            command_or_sequence="/system/clock/print",
+            config=sample_config,
+            sequence_manager=stale,
+        )
+    )
+
+    assert len(built) == 1
+    assert built[0] is sample_config
