@@ -48,15 +48,14 @@ Edit `src/network_toolkit/platforms/registry.py` and add your platform to the `P
 ```python
 PLATFORM_REGISTRY: dict[str, PlatformInfo] = {
     # ... existing platforms ...
-
     "your_platform": PlatformInfo(
-        device_type="your_platform",              # Unique identifier (lowercase, underscore)
-        display_name="Your Platform Name",        # Human-readable name
-        vendor="VendorName",                      # Vendor name for grouping
-        status=PlatformStatus.PLANNED,            # Start with PLANNED
+        device_type="your_platform",  # Unique identifier (lowercase, underscore)
+        display_name="Your Platform Name",  # Human-readable name
+        vendor="VendorName",  # Vendor name for grouping
+        status=PlatformStatus.PLANNED,  # Start with PLANNED
         description="Brief platform description",
-        has_operations_class=False,               # Set True when adding operations
-        has_builtin_sequences=False,              # Set True when adding sequences
+        has_operations_class=False,  # Set True when adding operations
+        has_builtin_sequences=False,  # Set True when adding sequences
     ),
 }
 ```
@@ -511,6 +510,7 @@ def operations():
     """Provide operations instance."""
     return YourPlatformOperations()
 
+
 @pytest.fixture
 def mock_session(mocker):
     """Provide mocked device session."""
@@ -528,21 +528,21 @@ Start with sequences before full implementation:
 1. **PLANNED** - Add registry entry
 
    ```python
-   status=PlatformStatus.PLANNED
+   status = PlatformStatus.PLANNED
    ```
 
 2. **SEQUENCES_ONLY** - Add command sequences
 
    ```python
-   status=PlatformStatus.SEQUENCES_ONLY
-   has_builtin_sequences=True
+   status = PlatformStatus.SEQUENCES_ONLY
+   has_builtin_sequences = True
    ```
 
 3. **IMPLEMENTED** - Add operations class
    ```python
-   status=PlatformStatus.IMPLEMENTED
-   has_operations_class=True
-   capabilities=PlatformCapabilities(...)
+   status = PlatformStatus.IMPLEMENTED
+   has_operations_class = True
+   capabilities = PlatformCapabilities(...)
    ```
 
 ### Path 2: Full Implementation
@@ -561,14 +561,16 @@ Skip directly to full implementation if you have:
 
 ```python
 # Fix: Add operations_class field
-operations_class="network_toolkit.platforms.your_platform.operations.YourPlatformOperations"
+operations_class = (
+    "network_toolkit.platforms.your_platform.operations.YourPlatformOperations"
+)
 ```
 
 **Error: "Has firmware capabilities but no firmware_extensions specified"**
 
 ```python
 # Fix: Add firmware extensions
-firmware_extensions=[".bin", ".pkg"]
+firmware_extensions = [".bin", ".pkg"]
 ```
 
 ### Platform Not Appearing in CLI
@@ -604,7 +606,7 @@ cat config/sequences/your_platform/common.yml
 **Check registry flags:**
 
 ```python
-has_builtin_sequences=True  # Must be True
+has_builtin_sequences = True  # Must be True
 ```
 
 ### Operations Class Import Errors
@@ -622,6 +624,7 @@ src/network_toolkit/platforms/your_platform/
 ```python
 # In __init__.py
 from network_toolkit.platforms.your_platform.operations import YourPlatformOperations
+
 __all__ = ["YourPlatformOperations"]
 ```
 

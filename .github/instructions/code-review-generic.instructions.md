@@ -98,6 +98,7 @@ def process_user(user_id):
     except:
         pass
 
+
 # ✅ GOOD: Explicit error handling
 def process_user(user_id):
     if not user_id or user_id <= 0:

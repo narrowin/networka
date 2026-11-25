@@ -129,9 +129,9 @@ def get_supported_device_types() -> set[str]:
         "cisco_iosxe",
         "cisco_ios",
         "cisco_iosxr",  # ← Already accepted!
-        "cisco_nxos",   # ← Already accepted!
-        "juniper_junos",# ← Already accepted!
-        "arista_eos",   # ← Already accepted!
+        "cisco_nxos",  # ← Already accepted!
+        "juniper_junos",  # ← Already accepted!
+        "arista_eos",  # ← Already accepted!
         "linux",
         "generic",
     }
@@ -356,7 +356,6 @@ def _map_to_scrapli_platform(self, device_type: str) -> str:
     platform_mapping = {
         # Core mappings
         "cisco_ios": "cisco_iosxe",
-
         # Community mappings
         "paloalto_panos": "paloalto_panos",  # Direct match
         "nokia_sros": "nokia_sros",

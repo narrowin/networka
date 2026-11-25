@@ -28,7 +28,7 @@ with DeviceSession("router1", config) as session:
     success = session.upload_file(
         local_path="config_backup.rsc",
         remote_filename="uploaded_config.rsc",  # Optional: custom remote name
-        verify_upload=True  # Optional: verify the upload
+        verify_upload=True,  # Optional: verify the upload
     )
 
     if success:
@@ -49,7 +49,7 @@ results = DeviceSession.upload_file_to_devices(
     local_path="firmware.npk",
     remote_filename="new_firmware.npk",
     verify_upload=True,
-    max_concurrent=3  # Upload to max 3 devices at once
+    max_concurrent=3,  # Upload to max 3 devices at once
 )
 
 # Check results

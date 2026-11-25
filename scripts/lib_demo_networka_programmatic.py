@@ -48,8 +48,9 @@ CHECKS = [
     ComplianceCheck(
         name="Kernel Version Check",
         command="uname -r",
-        validator=lambda out: "6." in out
-        or "5." in out,  # Example: Require kernel 5.x or 6.x
+        validator=lambda out: (
+            "6." in out or "5." in out
+        ),  # Example: Require kernel 5.x or 6.x
     ),
     ComplianceCheck(
         name="Root Filesystem",

@@ -34,6 +34,7 @@ Run the same command on multiple devices simultaneously. Note that `NetworkaClie
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from network_toolkit import NetworkaClient
 
+
 def get_device_info(device_name):
     """Execute command on a single device."""
     # Create a new client for each thread
@@ -45,12 +46,12 @@ def get_device_info(device_name):
     except Exception as e:
         return {"device": device_name, "output": None, "error": str(e)}
 
+
 devices = ["router1", "router2", "router3", "router4"]
 
 results = []
 with ThreadPoolExecutor(max_workers=4) as executor:
-    futures = {executor.submit(get_device_info, dev): dev
-               for dev in devices}
+    futures = {executor.submit(get_device_info, dev): dev for dev in devices}
 
     for future in as_completed(futures):
         result = future.result()
@@ -72,6 +73,7 @@ Parse command output and validate against requirements:
 ```python
 from network_toolkit import NetworkaClient
 
+
 def check_compliance(device_name):
     """Run compliance checks on a device."""
     checks = {
@@ -89,10 +91,11 @@ def check_compliance(device_name):
             output = result.command_results[0].output if result.command_results else ""
             results[check_name] = {
                 "passed": len(output) > 0 if output else False,
-                "output": output
+                "output": output,
             }
 
     return results
+
 
 compliance = check_compliance("router1")
 
@@ -130,10 +133,7 @@ with DeviceSession("router1", client.config) as session:
 
     # Download it
     local_path = Path("./backups/router1-backup.backup")
-    session.download_file(
-        remote_file="mybackup.backup",
-        local_path=local_path
-    )
+    session.download_file(remote_file="mybackup.backup", local_path=local_path)
 
     # Delete remote backup
     session.execute_command("/file/remove mybackup.backup")
@@ -163,10 +163,7 @@ script_file.write_text(script_content)
 try:
     with DeviceSession("router1", client.config) as session:
         # Upload script
-        session.upload_file(
-            local_file=script_file,
-            remote_path="temp_script.rsc"
-        )
+        session.upload_file(local_file=script_file, remote_path="temp_script.rsc")
 
         # Execute it
         output = session.execute_command("/import temp_script.rsc")
@@ -211,10 +208,11 @@ from network_toolkit import NetworkaClient, DeviceSession
 from network_toolkit.exceptions import (
     DeviceConnectionError,
     DeviceExecutionError,
-    NetworkToolkitError
+    NetworkToolkitError,
 )
 
 client = NetworkaClient()
+
 
 def safe_execute(device_name, command, config):
     """Execute command with comprehensive error handling."""
@@ -227,29 +225,30 @@ def safe_execute(device_name, command, config):
         return {
             "success": False,
             "output": None,
-            "error": f"Connection failed: {e.message}"
+            "error": f"Connection failed: {e.message}",
         }
 
     except DeviceExecutionError as e:
         return {
             "success": False,
             "output": None,
-            "error": f"Command failed: {e.message}"
+            "error": f"Command failed: {e.message}",
         }
 
     except NetworkToolkitError as e:
         return {
             "success": False,
             "output": None,
-            "error": f"Networka error: {e.message}"
+            "error": f"Networka error: {e.message}",
         }
 
     except Exception as e:
         return {
             "success": False,
             "output": None,
-            "error": f"Unexpected error: {str(e)}"
+            "error": f"Unexpected error: {str(e)}",
         }
+
 
 result = safe_execute("router1", "/system/identity/print", client.config)
 if result["success"]:
@@ -266,6 +265,7 @@ Load credentials from environment or vault:
 import os
 from network_toolkit import NetworkaClient, DeviceSession, InteractiveCredentials
 
+
 def get_credentials():
     """Load credentials from environment."""
     return InteractiveCredentials(
@@ -273,12 +273,16 @@ def get_credentials():
         password=os.getenv("DEVICE_PASSWORD", ""),
     )
 
+
 client = NetworkaClient()
 creds = get_credentials()
 
-with DeviceSession("router1", client.config,
-                   username_override=creds.username,
-                   password_override=creds.password) as session:
+with DeviceSession(
+    "router1",
+    client.config,
+    username_override=creds.username,
+    password_override=creds.password,
+) as session:
     output = session.execute_command("/system/identity/print")
     print(output)
 ```

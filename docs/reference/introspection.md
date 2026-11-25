@@ -72,16 +72,16 @@ Enum identifying the source type:
 from network_toolkit.introspection import LoaderType
 
 # Currently implemented
-LoaderType.CONFIG_FILE       # YAML/CSV config file
-LoaderType.ENV_VAR           # Environment variable
-LoaderType.GROUP             # Device group inheritance
-LoaderType.SSH_CONFIG        # SSH config file
+LoaderType.CONFIG_FILE  # YAML/CSV config file
+LoaderType.ENV_VAR  # Environment variable
+LoaderType.GROUP  # Device group inheritance
+LoaderType.SSH_CONFIG  # SSH config file
 LoaderType.PYDANTIC_DEFAULT  # Model default
 
 # Reserved for future use
-LoaderType.DOTENV            # .env file (planned)
-LoaderType.CLI               # CLI argument (planned)
-LoaderType.INTERACTIVE       # Interactive prompt (planned)
+LoaderType.DOTENV  # .env file (planned)
+LoaderType.CLI  # CLI argument (planned)
+LoaderType.INTERACTIVE  # Interactive prompt (planned)
 ```
 
 #### FieldHistory
@@ -114,8 +114,9 @@ history = ConfigHistory()
 
 # Record field values
 history.record_field("host", "10.0.0.1", LoaderType.PYDANTIC_DEFAULT)
-history.record_field("host", "192.168.1.1", LoaderType.CONFIG_FILE,
-                     identifier="devices.yml")
+history.record_field(
+    "host", "192.168.1.1", LoaderType.CONFIG_FILE, identifier="devices.yml"
+)
 
 # Query
 current = history.get_current("host")  # Most recent value

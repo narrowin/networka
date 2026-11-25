@@ -117,26 +117,34 @@ This leads to:
 from enum import Enum
 from pydantic import BaseModel, Field
 
+
 class PlatformStatus(str, Enum):
-    IMPLEMENTED = "implemented"      # Full operations + sequences + docs
+    IMPLEMENTED = "implemented"  # Full operations + sequences + docs
     SEQUENCES_ONLY = "sequences_only"  # Only builtin sequences, no operations
-    PLANNED = "planned"              # On roadmap, no implementation
-    EXPERIMENTAL = "experimental"    # Partial implementation, unstable
+    PLANNED = "planned"  # On roadmap, no implementation
+    EXPERIMENTAL = "experimental"  # Partial implementation, unstable
+
 
 class PlatformCapabilities(BaseModel):
     """What operations this platform supports."""
+
     firmware_upgrade: bool = False
     firmware_downgrade: bool = False
     bios_upgrade: bool = False
     config_backup: bool = False
     comprehensive_backup: bool = False
 
+
 class PlatformInfo(BaseModel):
     """Complete information about a network platform."""
 
     # Identity
-    device_type: str = Field(description="Unique identifier (e.g., 'mikrotik_routeros')")
-    display_name: str = Field(description="Human-readable name (e.g., 'MikroTik RouterOS')")
+    device_type: str = Field(
+        description="Unique identifier (e.g., 'mikrotik_routeros')"
+    )
+    display_name: str = Field(
+        description="Human-readable name (e.g., 'MikroTik RouterOS')"
+    )
     vendor: str = Field(description="Vendor name (e.g., 'MikroTik')")
 
     # Status
@@ -145,13 +153,22 @@ class PlatformInfo(BaseModel):
 
     # Technical details
     capabilities: PlatformCapabilities = Field(default_factory=PlatformCapabilities)
-    firmware_extensions: list[str] = Field(default_factory=list, description="Supported firmware file extensions")
+    firmware_extensions: list[str] = Field(
+        default_factory=list, description="Supported firmware file extensions"
+    )
 
     # References
-    has_operations_class: bool = Field(description="Has platform operations implementation")
+    has_operations_class: bool = Field(
+        description="Has platform operations implementation"
+    )
     has_builtin_sequences: bool = Field(description="Has builtin command sequences")
-    docs_path: str | None = Field(default=None, description="Relative path to vendor docs")
-    operations_class: str | None = Field(default=None, description="Fully qualified class name")
+    docs_path: str | None = Field(
+        default=None, description="Relative path to vendor docs"
+    )
+    operations_class: str | None = Field(
+        default=None, description="Fully qualified class name"
+    )
+
 
 # The single source of truth
 PLATFORM_REGISTRY: dict[str, PlatformInfo] = {
@@ -282,39 +299,45 @@ PLATFORM_REGISTRY: dict[str, PlatformInfo] = {
     ),
 }
 
+
 # Helper functions
 def get_platform_info(device_type: str) -> PlatformInfo | None:
     """Get platform info by device type."""
     return PLATFORM_REGISTRY.get(device_type)
 
+
 def get_implemented_platforms() -> dict[str, PlatformInfo]:
     """Get only fully implemented platforms."""
     return {
-        k: v for k, v in PLATFORM_REGISTRY.items()
+        k: v
+        for k, v in PLATFORM_REGISTRY.items()
         if v.status == PlatformStatus.IMPLEMENTED
     }
 
+
 def get_platforms_by_status(status: PlatformStatus) -> dict[str, PlatformInfo]:
     """Get platforms by status."""
-    return {
-        k: v for k, v in PLATFORM_REGISTRY.items()
-        if v.status == status
-    }
+    return {k: v for k, v in PLATFORM_REGISTRY.items() if v.status == status}
+
 
 def get_platforms_by_vendor(vendor: str) -> list[PlatformInfo]:
     """Get all platforms for a vendor."""
     return [v for v in PLATFORM_REGISTRY.values() if v.vendor.lower() == vendor.lower()]
 
+
 def get_platforms_with_capability(capability: str) -> list[PlatformInfo]:
     """Get platforms supporting a specific capability."""
     return [
-        v for v in PLATFORM_REGISTRY.values()
+        v
+        for v in PLATFORM_REGISTRY.values()
         if getattr(v.capabilities, capability, False)
     ]
+
 
 def get_supported_device_types() -> set[str]:
     """Get all device types (for validation)."""
     return set(PLATFORM_REGISTRY.keys())
+
 
 def validate_registry() -> list[str]:
     """Validate registry consistency. Returns list of errors."""

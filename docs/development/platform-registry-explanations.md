@@ -272,7 +272,9 @@ This is the "Facade Pattern" - common in Python projects:
 from requests import get, post  # Not: from requests.api import get
 
 # Django
-from django.conf import settings  # Not: from django.conf.global_settings import settings
+from django.conf import (
+    settings,
+)  # Not: from django.conf.global_settings import settings
 
 # Your project will do same
 from network_toolkit.platforms import PLATFORM_REGISTRY
@@ -311,6 +313,7 @@ Or if you need more control:
 # File: src/network_toolkit/config.py
 from network_toolkit.platforms import PLATFORM_REGISTRY
 
+
 def get_supported_device_types() -> set[str]:
     """Get supported device types from registry."""
     return set(PLATFORM_REGISTRY.keys())
@@ -324,7 +327,8 @@ def get_supported_device_types() -> set[str]:
 
 ```python
 # File: src/network_toolkit/platforms/registry.py
-PLATFORM_REGISTRY = { ... }
+PLATFORM_REGISTRY = {...}
+
 
 def get_platform_info(device_type: str) -> PlatformInfo | None:
     return PLATFORM_REGISTRY.get(device_type)
