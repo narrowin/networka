@@ -6,10 +6,12 @@
 from __future__ import annotations
 
 import ipaddress
-from importlib.resources import files
-from pathlib import Path
 
 from network_toolkit.config import DeviceConfig, NetworkConfig
+from network_toolkit.transport.scrapli_sync import (
+    SCRAPLI_PLATFORM_ALIASES,
+    get_scrapli_definition_catalog,
+)
 
 
 def is_ip_address(target: str) -> bool:
@@ -201,8 +203,6 @@ def get_supported_device_types() -> dict[str, str]:
     dict[str, str]
         Mapping of device type names to descriptions
     """
-    from scrapli.cli import CLI_DEFINITIONS_PATH_OVERRIDE
-
     # Map device types to human-readable descriptions
     descriptions = {
         "mikrotik_routeros": "MikroTik RouterOS",
@@ -217,22 +217,12 @@ def get_supported_device_types() -> dict[str, str]:
         "generic": "Generic SSH",
     }
 
-    definitions = (
-        Path(CLI_DEFINITIONS_PATH_OVERRIDE)
-        if CLI_DEFINITIONS_PATH_OVERRIDE is not None
-        else files("scrapli.definitions")
-    )
-    if not definitions.is_dir():
-        return {}
-    exact_names = {
-        entry.name.removesuffix(".yaml")
-        for entry in definitions.iterdir()
-        if entry.name.endswith(".yaml") and entry.is_file()
-    }
-    aliases = {"cisco_ios": "cisco_iosxe", "generic": "default", "linux": "default"}
-    supported_types = exact_names - aliases.keys()
+    exact_names, _ = get_scrapli_definition_catalog()
+    supported_types = exact_names - SCRAPLI_PLATFORM_ALIASES.keys()
     supported_types.update(
-        alias for alias, definition in aliases.items() if definition in exact_names
+        alias
+        for alias, definition in SCRAPLI_PLATFORM_ALIASES.items()
+        if (definition or "default") in exact_names
     )
 
     return {name: descriptions.get(name, name) for name in sorted(supported_types)}

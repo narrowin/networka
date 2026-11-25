@@ -45,7 +45,7 @@ $ nw [OPTIONS] COMMAND [ARGS]...
 * `firmware`: Firmware management operations
 * `schema`: JSON schema management commands
 * `sync`: Sync inventory from external sources
-* `platforms`: Show platform and vendor support information
+* `platforms`: Inspect Scrapli definitions and registered...
 
 ## `nw info`
 
@@ -58,8 +58,9 @@ Examples:
 - nw info sw-acc1 --trace            # Show device info with source provenance
 - nw info sw-acc1,sw-acc2           # Show multiple devices
 - nw info access_switches           # Show group info
-- nw info system_info               # Show sequence info (all vendors)
+- nw info system_info               # Show sequence definitions by source
 - nw info system_info --vendor cisco_iosxe  # Show vendor-specific commands
+- nw info system_info --device sw-acc1  # Show the device&#x27;s effective sequence
 - nw info sw-acc1,access_switches,health_check  # Mixed types
 
 **Usage**:
@@ -74,8 +75,9 @@ $ nw info [OPTIONS] {targets}
 
 **Options**:
 
-* `-c, --config <path>`: Configuration directory or file path  [default: /Users/md/Library/Application Support/networka]
-* `--vendor <str>`: Show vendor-specific commands for sequences (e.g., cisco_iosxe, mikrotik_routeros)
+* `-c, --config <path>`: Configuration directory or file path
+* `--vendor <str>`: Show the sequence selected for a platform (e.g., cisco_iosxe, mikrotik_routeros)
+* `--device <str>`: Show the sequence selected for this configured device
 * `-o, --output-mode <default|light|dark|no-color|raw|json>`: Output decoration mode: default, light, dark, no-color, raw
 * `-v, --verbose`: Enable verbose logging
 * `-t, --trace`: Show verbose provenance with full file paths and line numbers
@@ -308,8 +310,8 @@ $ nw list sequences [OPTIONS]
 
 **Options**:
 
-* `-c, --config <path>`: Configuration file path  [default: /Users/md/Library/Application Support/networka]
-* `-v, --vendor <str>`: Filter by vendor platform
+* `-c, --config <path>`: Configuration directory or file path
+* `-v, --vendor <str>`: Show sequences selected for a platform
 * `--category <str>`: Filter by sequence category
 * `-o, --output-mode <default|light|dark|no-color|raw|json>`: Output decoration mode: default, light, dark, no-color, raw
 * `--verbose`: Show detailed information
@@ -733,7 +735,7 @@ $ nw sync ssh-config [OPTIONS] [ssh_config_path]
 
 ## `nw platforms`
 
-Show platform and vendor support information
+Inspect Scrapli definitions and registered platform support
 
 **Usage**:
 
@@ -747,12 +749,12 @@ $ nw platforms [OPTIONS] COMMAND [ARGS]...
 
 **Commands**:
 
-* `list`: List all supported network platforms.
-* `info`: Show detailed information about a specific...
+* `list`: List active Scrapli definitions and...
+* `info`: Show the connection definition, vendor...
 
 ### `nw platforms list`
 
-List all supported network platforms.
+List active Scrapli definitions and registered network platforms.
 
 **Usage**:
 
@@ -769,7 +771,7 @@ $ nw platforms list [OPTIONS]
 
 ### `nw platforms info`
 
-Show detailed information about a specific platform.
+Show the connection definition, vendor operations, and platform sequences.
 
 **Usage**:
 
@@ -779,7 +781,7 @@ $ nw platforms info [OPTIONS] {platform}
 
 **Arguments**:
 
-* `platform <str>`: Platform device type (e.g., mikrotik_routeros, cisco_ios)  [required]
+* `platform <str>`: Platform or definition name (e.g., mikrotik_routeros, cumulus_linux)  [required]
 
 **Options**:
 

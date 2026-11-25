@@ -5,26 +5,109 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Annotated
 
 import typer
 from rich.table import Table
 
 from network_toolkit.api.platforms import (
+    PlatformDetails,
     PlatformFilterError,
     PlatformListOptions,
     get_platform_details,
     list_platforms,
 )
 from network_toolkit.common.command_helpers import CommandContext
+from network_toolkit.config import NetworkConfig, load_inspection_config
+from network_toolkit.exceptions import ConfigurationError
 from network_toolkit.platforms.registry import PlatformStatus
+from network_toolkit.sequence_manager import SequenceManager
+from network_toolkit.transport.scrapli_sync import (
+    SCRAPLI_PLATFORM_ALIASES,
+    get_scrapli_definition_catalog,
+)
+
+_STATUS_LABELS = {
+    PlatformStatus.IMPLEMENTED: "[green]Implemented[/green]",
+    PlatformStatus.PLANNED: "[yellow]Planned[/yellow]",
+    PlatformStatus.SEQUENCES_ONLY: "[blue]Sequences Only[/blue]",
+    PlatformStatus.EXPERIMENTAL: "[magenta]Experimental[/magenta]",
+}
+
+
+def _catalog_source(override: Path | None, name: str | None = None) -> str:
+    path = override if override is not None else Path("scrapli.definitions")
+    if name is not None:
+        path /= f"{name}.yaml"
+    label = "SCRAPLI_DEFINITIONS_PATH" if override is not None else "Packaged Scrapli"
+    return f"{label} ({path})"
+
+
+def _print_registered_operations(ctx: CommandContext, details: PlatformDetails) -> None:
+    ctx.console.print(f"Display Name: [bold]{details.display_name}[/bold]")
+    ctx.console.print(f"Vendor: [green]{details.vendor}[/green]")
+    ctx.console.print(f"Description: {details.description}")
+    ctx.console.print(f"Registry Status: {_STATUS_LABELS[details.status]}")
+    ctx.console.print(
+        f"Operations Class: [dim]{details.operations_class or 'Not configured'}[/dim]"
+    )
+    if details.firmware_extensions:
+        ctx.console.print(
+            f"Firmware Extensions: {', '.join(details.firmware_extensions)}"
+        )
+
+    ctx.console.print("\n[bold]Vendor operation capabilities[/bold]")
+    caps = details.capabilities
+    for label, enabled in (
+        ("Config Backup", caps.config_backup),
+        ("Firmware Upgrade", caps.firmware_upgrade),
+        ("Firmware Downgrade", caps.firmware_downgrade),
+        ("BIOS Upgrade", caps.bios_upgrade),
+        ("Comprehensive Backup", caps.comprehensive_backup),
+    ):
+        symbol = "[green]✓[/green]" if enabled else "[dim]—[/dim]"
+        ctx.console.print(f"  {label}: {symbol}")
+    if details.docs_path:
+        ctx.console.print(f"\n[bold]Documentation:[/bold] {details.docs_path}")
+
+
+def _print_platform_sequences(
+    ctx: CommandContext, config: NetworkConfig, platform: str
+) -> None:
+    records = SequenceManager(config).list_platform_sequences(platform)
+    if not records:
+        ctx.console.print("\nPlatform sequences: None")
+        return
+
+    ctx.console.print("\n[bold]Platform sequences and sources[/bold]")
+    for name, record in sorted(records.items()):
+        if record.source is None:
+            origin = "source unavailable"
+        else:
+            origin = (
+                "packaged"
+                if record.source.origin == "builtin"
+                else record.source.origin
+            )
+            if record.source.path is not None:
+                origin = f"{origin}: {record.source.path}"
+        ctx.console.print(
+            f"  {name} ({origin})", markup=False, highlight=False, soft_wrap=True
+        )
+
+    ctx.console.print(
+        f"Inspect commands with nw info <sequence> --vendor {platform}",
+        markup=False,
+        highlight=False,
+    )
 
 
 def register(app: typer.Typer) -> None:
     """Register the platforms command and its subcommands."""
     platforms_app = typer.Typer(
         name="platforms",
-        help="Show platform and vendor support information",
+        help="Inspect Scrapli definitions and registered platform support",
         no_args_is_help=True,
     )
 
@@ -55,7 +138,7 @@ def register(app: typer.Typer) -> None:
             ),
         ] = None,
     ) -> None:
-        """List all supported network platforms."""
+        """List active Scrapli definitions and registered network platforms."""
         ctx = CommandContext()
 
         options = PlatformListOptions(
@@ -75,21 +158,15 @@ def register(app: typer.Typer) -> None:
             raise typer.Exit(0)
 
         # Create Rich table
-        table = Table(title="Network Platforms", show_header=True, header_style="bold")
+        table = Table(
+            title="Network Platforms (registry)", show_header=True, header_style="bold"
+        )
         table.add_column("Platform", style="cyan", no_wrap=True)
         table.add_column("Vendor", style="green")
         table.add_column("Status", style="yellow")
         table.add_column("Config Backup", justify="center")
         table.add_column("Firmware", justify="center")
         table.add_column("Comprehensive", justify="center")
-
-        # Status indicators with color
-        status_map = {
-            PlatformStatus.IMPLEMENTED: "[green]Implemented[/green]",
-            PlatformStatus.PLANNED: "[yellow]Planned[/yellow]",
-            PlatformStatus.SEQUENCES_ONLY: "[blue]Sequences Only[/blue]",
-            PlatformStatus.EXPERIMENTAL: "[magenta]Experimental[/magenta]",
-        }
 
         for platform in result.platforms:
             capability_check = (
@@ -111,7 +188,7 @@ def register(app: typer.Typer) -> None:
             table.add_row(
                 platform.device_type,
                 platform.vendor,
-                status_map[platform.status],
+                _STATUS_LABELS[platform.status],
                 capability_check,
                 firmware_check,
                 comprehensive_check,
@@ -119,75 +196,67 @@ def register(app: typer.Typer) -> None:
 
         ctx.console.print(table)
 
+        if status is None and vendor is None and capability is None:
+            definitions, override = get_scrapli_definition_catalog()
+            ctx.console.print("\n[bold]Active Scrapli definitions[/bold]")
+            ctx.console.print(
+                f"Source: {_catalog_source(override)}",
+                markup=False,
+                highlight=False,
+                soft_wrap=True,
+            )
+            ctx.console.print(
+                ", ".join(sorted(definitions)) or "No definition files found.",
+                markup=False,
+                highlight=False,
+            )
+
     @platforms_app.command("info")
     def platform_info_cmd(
         platform: Annotated[
             str,
             typer.Argument(
-                help="Platform device type (e.g., mikrotik_routeros, cisco_ios)"
+                help="Platform or definition name (e.g., mikrotik_routeros, cumulus_linux)"
             ),
         ],
     ) -> None:
-        """Show detailed information about a specific platform."""
-        ctx = CommandContext()
+        """Show the connection definition, vendor operations, and platform sequences."""
+        try:
+            config = load_inspection_config(None)
+        except (ConfigurationError, OSError, ValueError) as exc:
+            CommandContext(config=NetworkConfig()).print_error(str(exc))
+            raise typer.Exit(1) from None
+        ctx = CommandContext(config=config)
 
         details = get_platform_details(platform)
-        if details is None:
+        definitions, override = get_scrapli_definition_catalog()
+        definition = SCRAPLI_PLATFORM_ALIASES.get(platform, platform) or "default"
+        available = definition in definitions
+        if details is None and not available:
             ctx.print_error(f"Platform not found: {platform}")
-            ctx.print_info("Run 'nw platforms list' to see available platforms")
+            ctx.print_info("Run 'nw platforms list' to see active definitions")
             raise typer.Exit(1)
 
-        # Status with color
-        status_map = {
-            PlatformStatus.IMPLEMENTED: "[green]Implemented[/green]",
-            PlatformStatus.PLANNED: "[yellow]Planned[/yellow]",
-            PlatformStatus.SEQUENCES_ONLY: "[blue]Sequences Only[/blue]",
-            PlatformStatus.EXPERIMENTAL: "[magenta]Experimental[/magenta]",
-        }
+        ctx.console.print(f"\n{platform}", style="bold cyan", markup=False)
+        if definition != platform:
+            ctx.console.print(f"Scrapli alias: {platform} → {definition}", markup=False)
+        status = definition if available else f"{definition} (unavailable)"
+        ctx.console.print(f"Scrapli definition: {status}", markup=False)
+        source = _catalog_source(override, definition if available else None)
+        ctx.console.print(
+            f"Definition source: {source}",
+            markup=False,
+            highlight=False,
+            soft_wrap=True,
+        )
+        if not available:
+            ctx.print_info("Run 'nw platforms list' to see active definitions")
 
-        # Display platform information
-        ctx.console.print(f"\n[bold cyan]{platform}[/bold cyan]")
-        ctx.console.print(f"Display Name: [bold]{details.display_name}[/bold]")
-        ctx.console.print(f"Vendor: [green]{details.vendor}[/green]")
-        ctx.console.print(f"Description: {details.description}")
-        ctx.console.print(f"Status: {status_map[details.status]}")
-
-        # Operations class
-        if details.operations_class:
-            ctx.console.print(
-                f"\nOperations Class: [dim]{details.operations_class}[/dim]"
-            )
+        if details is None:
+            ctx.console.print("Registered vendor operations: None")
         else:
-            ctx.console.print("\nOperations Class: [dim]Not configured[/dim]")
-
-        # File extensions
-        if details.firmware_extensions:
-            ctx.console.print(
-                f"Firmware Extensions: {', '.join(details.firmware_extensions)}"
-            )
-
-        # Capabilities
-        ctx.console.print("\n[bold]Capabilities:[/bold]")
-
-        def cap_symbol(x: bool) -> str:
-            return "[green]\u2713[/green]" if x else "[dim]\u2014[/dim]"
-
-        caps = details.capabilities
-        ctx.console.print(f"  Config Backup: {cap_symbol(caps.config_backup)}")
-        ctx.console.print(f"  Firmware Upgrade: {cap_symbol(caps.firmware_upgrade)}")
-        ctx.console.print(
-            f"  Firmware Downgrade: {cap_symbol(caps.firmware_downgrade)}"
-        )
-        ctx.console.print(f"  BIOS Upgrade: {cap_symbol(caps.bios_upgrade)}")
-        ctx.console.print(
-            f"  Comprehensive Backup: {cap_symbol(caps.comprehensive_backup)}"
-        )
-
-        # Documentation
-        if details.docs_path:
-            ctx.console.print(f"\n[bold]Documentation:[/bold] {details.docs_path}")
-
-        ctx.console.print()  # Empty line at end
+            _print_registered_operations(ctx, details)
+        _print_platform_sequences(ctx, config, platform)
 
     app.add_typer(platforms_app, rich_help_panel="Info & Configuration")
 

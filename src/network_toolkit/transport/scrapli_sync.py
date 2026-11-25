@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+from importlib.resources import files
 from pathlib import Path
 from threading import Lock, Timer
 from typing import Any
@@ -35,6 +36,36 @@ logger = logging.getLogger(__name__)
 _ROUTEROS_SUFFIX = "+ct511w4098h"
 _LEGACY_ROUTEROS_SUFFIX = "+cet511w4098h"
 _NS_PER_SECOND = 1_000_000_000
+
+# None lets Scrapli select its default and preserves generic connection options.
+SCRAPLI_PLATFORM_ALIASES: dict[str, str | None] = {
+    "cisco_ios": "cisco_iosxe",
+    "linux": None,
+    "generic": None,
+}
+
+
+def get_scrapli_definition_catalog() -> tuple[set[str], Path | None]:
+    """Return exact YAML names and the active override directory, if configured."""
+    from scrapli.cli import CLI_DEFINITIONS_PATH_OVERRIDE
+
+    # Use the same path construction as Scrapli, which replaces the packaged
+    # directory whenever the override is set.
+    override = (
+        Path(f"{CLI_DEFINITIONS_PATH_OVERRIDE}/")
+        if CLI_DEFINITIONS_PATH_OVERRIDE is not None
+        else None
+    )
+    definitions = override if override is not None else files("scrapli.definitions")
+    if not definitions.is_dir():
+        return set(), override
+
+    names = {
+        entry.name.removesuffix(".yaml")
+        for entry in definitions.iterdir()
+        if entry.name.endswith(".yaml") and entry.is_file()
+    }
+    return names, override
 
 
 def _transport_options(params: dict[str, Any]) -> Options:

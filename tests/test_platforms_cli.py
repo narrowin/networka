@@ -5,6 +5,9 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
 from typer.testing import CliRunner
 
 from network_toolkit.cli import app
@@ -15,8 +18,11 @@ runner = CliRunner()
 class TestPlatformsListCommand:
     """Tests for the 'nw platforms list' command."""
 
-    def test_list_all_platforms(self) -> None:
-        """Test listing all platforms without filters."""
+    def test_list_all_platforms(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """Show exact definition names and the active source next to registry data."""
+        monkeypatch.setattr("scrapli.cli.CLI_DEFINITIONS_PATH_OVERRIDE", None)
         result = runner.invoke(app, ["platforms", "list"])
         assert result.exit_code == 0
         assert "Network Platforms" in result.stdout
@@ -24,6 +30,27 @@ class TestPlatformsListCommand:
         assert "cisco_ios" in result.stdout
         assert "cisco_iosxe" in result.stdout
         assert "cisco_nxos" in result.stdout
+
+        definitions = result.stdout.split("Active Scrapli definitions", 1)[1]
+        assert "Packaged Scrapli" in definitions
+        assert "cumulus_linux" in definitions
+        assert "cisco_ios," not in definitions
+
+        (tmp_path / "cumulus_linux.yaml").touch()
+        monkeypatch.setattr("scrapli.cli.CLI_DEFINITIONS_PATH_OVERRIDE", str(tmp_path))
+        result = runner.invoke(app, ["platforms", "list"])
+        assert result.exit_code == 0
+        registry, definitions = result.stdout.split("Active Scrapli definitions", 1)
+        assert "mikrotik_routeros" in registry
+        assert f"SCRAPLI_DEFINITIONS_PATH ({tmp_path})" in definitions
+        assert "cumulus_linux" in definitions
+        assert "mikrotik_routeros" not in definitions
+
+        result = runner.invoke(app, ["platforms", "info", "cumulus_linux"])
+        assert result.exit_code == 0
+        assert "Scrapli definition: cumulus_linux" in result.stdout
+        assert str(tmp_path / "cumulus_linux.yaml") in result.stdout
+        assert "Registered vendor operations: None" in result.stdout
 
     def test_list_implemented_platforms(self) -> None:
         """Test filtering by implemented status."""
@@ -140,7 +167,7 @@ class TestPlatformsListCommand:
         result = runner.invoke(app, ["platforms", "list"])
         assert result.exit_code == 0
         # Check for checkmarks in output (using UTF-8 checkmark)
-        lines = result.stdout.split("\n")
+        lines = result.stdout.split("Active Scrapli definitions", 1)[0].splitlines()
         # Find mikrotik line and verify it has checkmarks
         mikrotik_line = [line for line in lines if "mikrotik_routeros" in line]
         assert len(mikrotik_line) == 1
@@ -151,7 +178,7 @@ class TestPlatformsListCommand:
         """Test that platforms without capabilities show dashes."""
         result = runner.invoke(app, ["platforms", "list"])
         assert result.exit_code == 0
-        lines = result.stdout.split("\n")
+        lines = result.stdout.split("Active Scrapli definitions", 1)[0].splitlines()
         # Find planned platform line
         planned_line = [line for line in lines if "cisco_iosxr" in line]
         assert len(planned_line) == 1
@@ -162,8 +189,12 @@ class TestPlatformsListCommand:
 class TestPlatformsInfoCommand:
     """Tests for the 'nw platforms info' command."""
 
-    def test_info_mikrotik_routeros(self) -> None:
-        """Test showing info for mikrotik_routeros platform."""
+    def test_info_mikrotik_routeros(
+        self, monkeypatch: pytest.MonkeyPatch, test_config_dir: Path
+    ) -> None:
+        """Show the definition, registered operations, and sequences with sources."""
+        monkeypatch.setattr("scrapli.cli.CLI_DEFINITIONS_PATH_OVERRIDE", None)
+        monkeypatch.setenv("NW_CONFIG_DIR", str(test_config_dir))
         result = runner.invoke(app, ["platforms", "info", "mikrotik_routeros"])
         assert result.exit_code == 0
         assert "mikrotik_routeros" in result.stdout
@@ -173,9 +204,17 @@ class TestPlatformsInfoCommand:
         assert "Config Backup" in result.stdout
         assert "Firmware Upgrade" in result.stdout
         assert ".npk" in result.stdout
+        assert (
+            "Packaged Scrapli (scrapli.definitions/mikrotik_routeros.yaml)"
+            in result.stdout
+        )
+        assert "Platform sequences and sources" in result.stdout
+        assert "health_check (packaged:" in result.stdout
+        assert "/builtin_sequences/mikrotik_routeros/common.yml" in result.stdout
 
-    def test_info_cisco_ios(self) -> None:
-        """Test showing info for cisco_ios platform."""
+    def test_info_cisco_ios(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Show the IOS connection alias separately from IOS operations."""
+        monkeypatch.setattr("scrapli.cli.CLI_DEFINITIONS_PATH_OVERRIDE", None)
         result = runner.invoke(app, ["platforms", "info", "cisco_ios"])
         assert result.exit_code == 0
         assert "cisco_ios" in result.stdout
@@ -183,6 +222,8 @@ class TestPlatformsInfoCommand:
         assert "Cisco" in result.stdout
         assert "Implemented" in result.stdout
         assert ".bin" in result.stdout or ".tar" in result.stdout
+        assert "Scrapli alias: cisco_ios → cisco_iosxe" in result.stdout
+        assert "scrapli.definitions/cisco_iosxe.yaml" in result.stdout
 
     def test_info_sequences_only_platform(self) -> None:
         """Test showing info for sequences_only platform."""
