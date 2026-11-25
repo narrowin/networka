@@ -4,6 +4,7 @@ import pytest
 
 from network_toolkit.client import NetworkaClient
 from network_toolkit.config import NetworkConfig
+from network_toolkit.exceptions import OperationUnconfirmedError
 
 
 @pytest.fixture
@@ -75,3 +76,32 @@ def test_client_context_manager(mock_device_session_cls, mock_load_config, mock_
         assert mock_device_session_cls.call_count == 1
 
     assert mock_session.disconnect.call_count == 1
+
+
+@patch("network_toolkit.client.load_config")
+@patch("network_toolkit.device.DeviceSession")
+def test_client_replaces_session_after_lost_transport(
+    mock_device_session_cls, mock_load_config, mock_config
+):
+    mock_load_config.return_value = mock_config
+    dead = MagicMock()
+    dead.execute_command.side_effect = OperationUnconfirmedError(
+        "Device did not acknowledge the command", command="cmd1"
+    )
+    fresh = MagicMock()
+    fresh.execute_command.return_value = "output"
+    mock_device_session_cls.side_effect = [dead, fresh]
+
+    client = NetworkaClient()
+
+    failed = client.run("router1", "cmd1")
+    assert failed.command_results[0].error == "Device did not acknowledge the command"
+    # The command is not repeated on a new session.
+    assert dead.execute_command.call_count == 1
+    assert dead.disconnect.call_count == 1
+    assert mock_device_session_cls.call_count == 1
+
+    result = client.run("router1", "cmd2")
+    assert result.command_results[0].output == "output"
+    assert mock_device_session_cls.call_count == 2
+    fresh.execute_command.assert_called_once_with("cmd2")

@@ -31,8 +31,10 @@ class NetworkaClient:
 
     Thread Safety:
         This client is thread-safe. The session pool is protected by a lock, allowing
-        safe concurrent access from multiple threads. Session pooling transparently
-        handles stale connections by removing them and retrying with fresh sessions.
+        safe concurrent access from multiple threads. A pooled session that fails to
+        connect is replaced once. A command that fails without a device reply removes
+        its session from the pool and is not repeated; the next call opens a new
+        session.
 
     Usage:
         >>> from network_toolkit import NetworkaClient
