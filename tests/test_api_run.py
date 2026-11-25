@@ -6,6 +6,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -326,3 +327,29 @@ def test_run_builds_sequence_manager_for_other_config(
 
     assert len(built) == 1
     assert built[0] is sample_config
+
+
+def test_connection_failure_reason_reaches_result(
+    sample_config: NetworkConfig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from scrapli.exceptions import ScrapliException
+
+    driver = MagicMock()
+    driver.ptr = None
+    driver.open.side_effect = ScrapliException("Permission denied (password)")
+    monkeypatch.setattr(
+        "network_toolkit.transport.scrapli_sync.Cli", MagicMock(return_value=driver)
+    )
+    monkeypatch.setattr("network_toolkit.device.time.sleep", lambda _s: None)
+
+    result = run_commands(
+        RunOptions(
+            target="test_device1",
+            command_or_sequence="/system/clock/print",
+            config=sample_config,
+        )
+    )
+
+    assert result.command_results[0].error == (
+        "Authentication failed for test_device1: Permission denied (password)"
+    )
