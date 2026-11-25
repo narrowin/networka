@@ -427,6 +427,37 @@ def test_concurrent_runs_replace_stale_session_once(
     assert pool.get("test_device1") is not stale
 
 
+class RefusedConnectSession(DummyDeviceSession):
+    """Dummy session whose connect always fails."""
+
+    connects = 0
+
+    def connect(self) -> None:
+        RefusedConnectSession.connects += 1
+        msg = "Connection failed for test_device1: timed out"
+        raise DeviceConnectionError(msg)
+
+    def disconnect(self) -> None:
+        return None
+
+
+def test_new_session_that_fails_to_connect_is_not_retried(
+    sample_config: NetworkConfig,
+    patch_device_session: Callable[[DummyDeviceSession], None],
+) -> None:
+    patch_device_session(RefusedConnectSession)
+    RefusedConnectSession.connects = 0
+    pool = SessionPool()
+
+    result = _run_pooled(sample_config, pool, "test_device1")
+
+    assert result.command_results[0].error == (
+        "Connection failed for test_device1: timed out"
+    )
+    assert RefusedConnectSession.connects == 1
+    assert pool.get("test_device1") is None
+
+
 def test_connecting_device_does_not_block_other_devices(
     sample_config: NetworkConfig,
     patch_device_session: Callable[[DummyDeviceSession], None],

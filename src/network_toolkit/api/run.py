@@ -234,7 +234,10 @@ def _with_session_retry(
     execute_fn: Callable[[device_module.DeviceSession], T],
 ) -> T:
     """
-    Retry a failed pooled connection once, then execute the operation once.
+    Replace a stale pooled session once, then execute the operation once.
+
+    A session created in this call that fails to connect is not retried here;
+    ``DeviceSession.connect`` already applies ``connection_retries``.
 
     Session setup holds the device's pool lock, so one device has at most one
     pooled session. Other devices do not wait. An operation that fails without a
@@ -257,6 +260,7 @@ def _with_session_retry(
     device_lock = session_pool.device_lock(device_name)
     with device_lock:
         session = session_pool.get(device_name)
+        from_pool = session is not None
         if session is None:
             session = create_session()
             session_pool[device_name] = session
@@ -264,16 +268,18 @@ def _with_session_retry(
         try:
             session.connect()
         except Exception as first_error:
-            logger.debug(
-                "Session for %s failed, attempting fresh connection: %s",
-                device_name,
-                first_error,
-            )
             session_pool.remove(device_name)
             try:
                 session.disconnect()
             except Exception:
                 pass
+            if not from_pool:
+                raise
+            logger.debug(
+                "Pooled session for %s failed, attempting fresh connection: %s",
+                device_name,
+                first_error,
+            )
 
             session = create_session()
             session.connect()
