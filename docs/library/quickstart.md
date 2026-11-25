@@ -74,11 +74,7 @@ from network_toolkit import NetworkaClient
 client = NetworkaClient()
 
 # Connect to an IP address (requires device_type)
-result = client.run(
-    "192.168.1.1",
-    "show version",
-    device_type="mikrotik_routeros"
-)
+result = client.run("192.168.1.1", "show version", device_type="mikrotik_routeros")
 if result.command_results:
     print(result.command_results[0].output)
 ```

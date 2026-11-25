@@ -15,7 +15,7 @@ client = NetworkaClient()
 result = client.run(
     target="192.168.1.100",
     command_or_sequence="/system/identity/print",
-    device_type="mikrotik_routeros"
+    device_type="mikrotik_routeros",
 )
 
 if result.command_results:
@@ -35,7 +35,7 @@ client = NetworkaClient()
 result = client.run(
     target="192.168.1.100,192.168.1.101",
     command_or_sequence="/system/identity/print",
-    device_type="mikrotik_routeros"
+    device_type="mikrotik_routeros",
 )
 
 # Access results
@@ -59,7 +59,7 @@ client.run(
     target="192.168.1.100",
     command_or_sequence="show version",
     device_type="cisco_iosxe",
-    interactive_creds=creds
+    interactive_creds=creds,
 )
 ```
 
@@ -93,7 +93,7 @@ client.run(
     target="192.168.1.100",
     command_or_sequence="show version",
     device_type="mikrotik_routeros",
-    port=2222
+    port=2222,
 )
 ```
 

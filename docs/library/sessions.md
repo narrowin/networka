@@ -21,7 +21,7 @@ with NetworkaClient() as client:
 
     # You can switch between devices freely
     client.run("switch1", "show vlan")  # Opens new connection to switch1
-    client.run("router1", "show clock") # Reuses existing connection to router1
+    client.run("router1", "show clock")  # Reuses existing connection to router1
 
 # All sessions (router1, switch1) are closed here
 ```
@@ -65,9 +65,7 @@ Transfer a file to the device:
 
 ```python
 client.upload(
-    target="router1",
-    local_file="firmware.npk",
-    remote_filename="firmware.npk"
+    target="router1", local_file="firmware.npk", remote_filename="firmware.npk"
 )
 ```
 
@@ -77,9 +75,7 @@ Download a file from the device:
 
 ```python
 client.download(
-    target="router1",
-    remote_file="backup.rsc",
-    local_path="./backups/backup.rsc"
+    target="router1", remote_file="backup.rsc", local_path="./backups/backup.rsc"
 )
 ```
 
@@ -93,15 +89,11 @@ from network_toolkit.common.credentials import InteractiveCredentials
 # Create credentials object
 creds = InteractiveCredentials(
     username="admin",
-    password="secret_password"  # pragma: allowlist secret
+    password="secret_password",  # pragma: allowlist secret
 )
 
 # Use credentials for this specific run
-client.run(
-    "router1",
-    "show version",
-    interactive_creds=creds
-)
+client.run("router1", "show version", interactive_creds=creds)
 ```
 
 ## Error Handling
@@ -128,9 +120,11 @@ Run commands on multiple devices simultaneously:
 from concurrent.futures import ThreadPoolExecutor
 from network_toolkit import NetworkaClient, DeviceSession
 
+
 def check_device(device_name, config):
     with DeviceSession(device_name, config) as session:
         return session.execute_command("/system/identity/print")
+
 
 client = NetworkaClient()
 devices = ["router1", "router2", "router3"]

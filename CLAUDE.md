@@ -73,6 +73,7 @@ def register(app: typer.Typer) -> None:
 Register in cli.py:
 ```python
 from network_toolkit.commands.example import register as register_example
+
 register_example(app)
 ```
 
