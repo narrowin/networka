@@ -8,6 +8,10 @@ from __future__ import annotations
 import ipaddress
 
 from network_toolkit.config import DeviceConfig, NetworkConfig
+from network_toolkit.transport.scrapli_sync import (
+    SCRAPLI_PLATFORM_ALIASES,
+    get_scrapli_definition_catalog,
+)
 
 
 def is_ip_address(target: str) -> bool:
@@ -111,11 +115,9 @@ def create_ip_device_config(
         msg = f"Invalid IP address '{ip}': {e}"
         raise ValueError(msg) from e
 
-    # Validate device_type against supported types
-    from network_toolkit.config import get_supported_device_types
-
-    if device_type not in get_supported_device_types():
-        supported = ", ".join(sorted(get_supported_device_types()))
+    available_types = get_supported_device_types()
+    if device_type not in available_types:
+        supported = ", ".join(available_types)
         msg = f"Unsupported device_type '{device_type}'. Supported types: {supported}"
         raise ValueError(msg)
 
@@ -194,15 +196,13 @@ def create_ip_based_config(
 
 def get_supported_device_types() -> dict[str, str]:
     """
-    Get supported device types with descriptions.
+    Get device types accepted for ad hoc connections.
 
     Returns
     -------
     dict[str, str]
         Mapping of device type names to descriptions
     """
-    from network_toolkit.config import get_supported_device_types
-
     # Map device types to human-readable descriptions
     descriptions = {
         "mikrotik_routeros": "MikroTik RouterOS",
@@ -217,23 +217,20 @@ def get_supported_device_types() -> dict[str, str]:
         "generic": "Generic SSH",
     }
 
-    # Only return descriptions for supported device types
-    supported_types = get_supported_device_types()
-    return {
-        dt: descriptions.get(dt, dt) for dt in supported_types if dt in descriptions
-    }
+    exact_names, _ = get_scrapli_definition_catalog()
+    supported_types = exact_names - SCRAPLI_PLATFORM_ALIASES.keys()
+    supported_types.update(
+        alias
+        for alias, definition in SCRAPLI_PLATFORM_ALIASES.items()
+        if (definition or "default") in exact_names
+    )
 
-
-# Backward compatibility alias
-get_supported_platforms = get_supported_device_types
+    return {name: descriptions.get(name, name) for name in sorted(supported_types)}
 
 
 def validate_platform(device_type: str) -> bool:
     """
     Validate if a device type is supported.
-
-    Note: This function name is maintained for backward compatibility,
-    but it actually validates device types (network drivers), not hardware platforms.
 
     Parameters
     ----------

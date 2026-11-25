@@ -1,10 +1,10 @@
 # User-defined Sequences
 
-Networka supports user-defined sequences layered on top of built-in and repo sequences.
-
-- Built-in: packaged defaults (no setup needed)
-- Repo: your project's `config/sequences/<vendor>/*.yml`
-- User: `~/.config/networka/sequences/<vendor>/*.yml` (highest priority)
+User sequences can override a packaged sequence by name and logical
+platform. See the [resolution order](../../multi-vendor-support.md#sequence-resolution-order)
+for project, user, device-local, and global definitions. The examples below
+use the default Linux configuration directory. On macOS, use
+`~/Library/Application Support/networka` as the root.
 
 ## Create your first user sequence
 
@@ -28,6 +28,7 @@ sequences:
 3. List sequences:
 
 - `nw list sequences --vendor mikrotik_routeros`
+- `nw info my_quick_diag --vendor mikrotik_routeros` shows the selected commands and source.
 
 4. Run the sequence:
 

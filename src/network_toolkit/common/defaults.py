@@ -12,4 +12,5 @@ from network_toolkit.common.paths import default_modular_config_dir
 # (e.g., ~/.config/networka) unless an explicit --config path is provided.
 DEFAULT_CONFIG_PATH = default_modular_config_dir()
 
-# Legacy single-file mode has been removed; no legacy path constant
+SSH_PORT_MIN = 1
+SSH_PORT_MAX = 65535

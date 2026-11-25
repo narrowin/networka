@@ -24,27 +24,30 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python-version: ["3.11", "3.12", "3.13", "3.14", "3.15"]
 
     steps:
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v7
+    - name: Checkout code
+      uses: actions/checkout@v7
+
+    - name: Set up uv and Python
+      uses: astral-sh/setup-uv@v10.4.0
       with:
-        python-version: ${{ matrix.python-version }}
+        version-file: pyproject.toml
+        python-version: "3.15"
 
     - name: Test direct Git installation
+      shell: bash
       run: |
-        python -m pip install --upgrade pip
-        python -m pip install git+https://github.com/narrowin/networka.git@${{ github.sha }}
-
-    - name: Test installed package
-      run: |
-        nw --help
-        python -c "import network_toolkit; print('[OK] Import successful')"
-        nw --version
-
-    - name: Uninstall for next test
-      run: python -m pip uninstall -y networka
+        tempdir="$(mktemp -d)"
+        trap 'rm -rf "$tempdir"' EXIT
+        unset PYTHONPATH
+        cd "$tempdir"
+        uv venv --python 3.15
+        uv pip install 'git+https://github.com/narrowin/networka.git@${{ github.sha }}'
+        uv pip check
+        uv run --no-project nw --help
+        uv run --no-project nw --version
+        uv run --no-project python -c 'from network_toolkit import NetworkaClient'
 
   test-local-build-install:
     name: Test local build and install
@@ -58,7 +61,7 @@ jobs:
       uses: astral-sh/setup-uv@v10.4.0
       with:
         version-file: pyproject.toml
-        python-version: "3.12"
+        python-version: "3.15"
 
     - name: Build package
       run: uv build --no-sources
@@ -66,11 +69,18 @@ jobs:
     - name: Install each artifact in a clean environment
       shell: bash
       run: |
-        for artifact in dist/*.whl dist/*.tar.gz; do
-          envdir="$(mktemp -d)"
-          uv venv --python 3.12 "$envdir"
+        tempdir="$(mktemp -d)"
+        trap 'rm -rf "$tempdir"' EXIT
+        unset PYTHONPATH
+        for artifact in "$PWD"/dist/*.whl "$PWD"/dist/*.tar.gz; do
+          envdir="$tempdir/$(basename "$artifact")-env"
+          uv venv --python 3.15 "$envdir"
           uv pip install --python "$envdir/bin/python" "$artifact"
-          "$envdir/bin/nw" --help
-          "$envdir/bin/nw" --version
-          "$envdir/bin/python" -c 'from network_toolkit import NetworkaClient'
+          uv pip check --python "$envdir/bin/python"
+          (
+            cd "$tempdir"
+            uv run --no-project --python "$envdir/bin/python" nw --help
+            uv run --no-project --python "$envdir/bin/python" nw --version
+            uv run --no-project --python "$envdir/bin/python" python -c 'from network_toolkit import NetworkaClient'
+          )
         done

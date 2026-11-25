@@ -2,7 +2,7 @@
 
 24 November 2026
 
-The release target is Networka 0.2.0 with Scrapli 2. The table keeps the original build names for the checks performed on those builds.
+This report records qualification for Networka 0.2.0 with Scrapli 2. Build names and Python versions describe the releases tested in November 2026. The current development branch requires Python 3.15 or later.
 
 ## Packaging and infrastructure
 
@@ -51,3 +51,15 @@ The device checks cover the package upgrade and rollback, SSH command execution,
 The existing suite passed on Python 3.11–3.15 with 1,134 tests passed and 31 skipped per version in isolated source checkouts.
 
 The artifacts are in `dist/rebirth` in the local checkout. [Scrapli 2 installation](https://carlmontanari.github.io/scrapli/installation/) · [RouterOS 7.25 changelog](https://mikrotik.com/download/changelogs?channelFilter=stable&versionFilter=7.25) · [Cisco IOL in Containerlab](https://containerlab.dev/manual/kinds/cisco_iol/)
+
+## Published 0.2.0 and hosted checks
+
+| Problem | Fix | Proof |
+| --- | --- | --- |
+| GitHub Actions could not resolve `astral-sh/setup-uv@v10`. | Pin the published `v10.4.0` action on `main` and allow the release workflow to build an existing tag. | All 11 GitHub installation jobs passed. The stable release build and all 10 wheel and source installation jobs passed on Ubuntu and macOS across Python 3.11–3.15. Both CI archives also passed CLI and SDK smoke checks in clean local macOS arm64 environments. [Installation run](https://github.com/narrowin/networka/actions/runs/45345758558) · [Release run](https://github.com/narrowin/networka/actions/runs/45345756470) |
+| PyPI originally rejected the workflow identity because it had no matching Trusted Publisher. This also skipped automated GitHub release creation. | Publish the two verified CI archives on the existing `v0.2.0` GitHub tag. Register the GitHub Trusted Publisher for `narrowin/networka`, `release.yml`, environment `pypi`. | GitHub published 0.2.0 as a stable release. GitHub's SHA-256 digests for both uploaded archives match the CI artifacts. [GitHub release](https://github.com/narrowin/networka/releases/tag/v0.2.0) · [PyPI publisher setup](https://docs.pypi.org/trusted-publishers/adding-a-publisher/) |
+| The release event ran the Docs workflow from the tag, which carries the original uv action reference. | Run the corrected Docs workflow from `main` and preserve the original release tag. | The strict MkDocs build and GitHub Pages deployment both passed. [Docs run](https://github.com/narrowin/networka/actions/runs/45346712252) |
+| PyPI issued a Trusted Publishing token for `networka`, then denied its upload to the same project. | Trace token issuance and upload authorization independently. | The project owner observed both GitHub tokens in the project's Security history. The GitHub claims, PyPI audience, artifact metadata, and SHA-256 hashes matched the intended release. PyPI returned HTTP 403 at upload after token issuance and artifact validation. The specific server-side permission condition remained unconfirmed. [Release retry](https://github.com/narrowin/networka/actions/runs/45345756470/attempts/3) · [PyPI upload authorization](https://github.com/pypi/warehouse/blob/main/warehouse/macaroons/security_policy.py) |
+| A public PyPI upgrade check needs 0.2.0 to be available on the index. | Qualify the same transition locally with 0.1.13 from PyPI and the SHA-256-verified 0.2.0 GitHub release wheel. | In a disposable macOS arm64 Python 3.13.11 environment, installed a working 0.1.13 with the documented legacy dependency pins, then upgraded in place. `uv pip check`, `nw --version`, `nw --help`, and imports of the SDK and native Scrapli CLI passed after the upgrade. |
+| PyPI's troubleshooting guide did not explain the 403 after issuing a token for an existing project. | Compare public reports at the token issuance and upload stages before changing the workflow. | `cbox-id-client` reported the same sequence, including a project-scoped token in Security history and a 403 on wheel upload. Recreating its publisher did not help. [Matching report](https://github.com/pypi/support/issues/13050) · [PyPI troubleshooting guide](https://docs.pypi.org/trusted-publishers/troubleshooting/) |
+| Automated PyPI upload remained blocked for 0.2.0. | Upload the verified GitHub wheel and source archive through Twine using a project-scoped PyPI token entered at its hidden local prompt. | PyPI published 0.2.0. The SHA-256 hashes of both public downloads match the tested GitHub files. A fresh install and an in-place upgrade from a working 0.1.13 passed on macOS arm64 with Python 3.13.11, including dependency checks, CLI startup, and SDK and native Scrapli imports. Trusted Publishing remained unresolved at release. [PyPI release](https://pypi.org/project/networka/0.2.0/) · [GitHub release](https://github.com/narrowin/networka/releases/tag/v0.2.0) |

@@ -1,75 +1,81 @@
 #!/usr/bin/env bash
-# Local test script that mimics GitHub Actions workflow
+# Build the working tree and verify both artifacts in separate, clean environments.
 set -euo pipefail
 
-echo "🧪 Testing local installation process..."
+unset CDPATH PYTHONPATH
+repo_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
+cd "$repo_dir"
+python_request=${UV_PYTHON:-$(cat .python-version)}
 
-# Clean up any previous test environments
-rm -rf .test-env-*
+temp_root=$(cd -- "${TMPDIR:-/tmp}" && pwd -P)
+if [[ "$temp_root" == "$repo_dir" || "$temp_root" == "$repo_dir/"* ]]; then
+    printf 'Set TMPDIR to a directory outside the checkout.\n' >&2
+    exit 1
+fi
+temp_dir=$(mktemp -d "$temp_root/networka-install.XXXXXX")
+trap 'rm -rf -- "$temp_dir"' EXIT
+build_dir="$temp_dir/dist"
+uv build --no-sources --python "$python_request" --out-dir "$build_dir"
 
-# Test 1: Build and install wheel
-echo "📦 Building package..."
-uv build
-
-echo "🔍 Testing wheel installation..."
-python -m venv .test-env-wheel
-source .test-env-wheel/bin/activate
-pip install --upgrade pip
-
-# Find and install wheel (same logic as GitHub Actions)
-wheel_file=$(find dist/ -name "*.whl" | head -1)
-if [ -n "$wheel_file" ]; then
-    pip install "$wheel_file"
-    echo "✅ Wheel installation successful"
-else
-    echo "❌ No wheel file found!"
+shopt -s nullglob
+wheels=("$build_dir"/*.whl)
+sdists=("$build_dir"/*.tar.gz)
+if [[ ${#wheels[@]} != 1 || ${#sdists[@]} != 1 ]]; then
+    printf 'Expected one wheel and one source archive in %s\n' "$build_dir" >&2
     exit 1
 fi
 
-# Test CLI
-echo "🧪 Testing CLI..."
-nw --help
-python -c "import network_toolkit; print('✅ Import successful')"
+# Use the new environment for each archive, even when the caller has one active.
+verify_install() (
+    artifact=$1
+    export VIRTUAL_ENV="$temp_dir/$2"
+    uv venv --python "$python_request" "$VIRTUAL_ENV"
+    uv pip install --python "$VIRTUAL_ENV/bin/python" "$artifact"
+    uv pip check --python "$VIRTUAL_ENV/bin/python"
 
-deactivate
+    export NO_COLOR=1
+    version=$(uv run --no-project --active --python "$VIRTUAL_ENV/bin/python" "$VIRTUAL_ENV/bin/nw" --version)
+    help=$(uv run --no-project --active --python "$VIRTUAL_ENV/bin/python" "$VIRTUAL_ENV/bin/nw" --help)
+    if [[ "$help" != *"Usage:"* || "$help" != *"--version"* ]]; then
+        printf 'Expected CLI usage and the version option:\n%s\n' "$help" >&2
+        exit 1
+    fi
+    uv run --no-project --active --python "$VIRTUAL_ENV/bin/python" python -I - "$artifact" "$version" <<'PY'
+import hashlib
+import os
+import sys
+from importlib.metadata import version
+from importlib.resources import files
+from pathlib import Path
 
-# Test 2: Test source distribution
-echo "🔍 Testing source distribution..."
-python -m venv .test-env-source
-source .test-env-source/bin/activate
-pip install --upgrade pip
+import yaml
+from scrapli import Cli
 
-tar_file=$(find dist/ -name "*.tar.gz" | head -1)
-if [ -n "$tar_file" ]; then
-    pip install "$tar_file"
-    echo "✅ Source distribution installation successful"
-else
-    echo "❌ No source distribution found!"
-    exit 1
-fi
+import network_toolkit
+from network_toolkit import NetworkaClient
 
-# Test CLI again
-nw --help
-python -c "import network_toolkit; print('✅ Source install import successful')"
+artifact = Path(sys.argv[1])
+environment = Path(os.environ["VIRTUAL_ENV"]).resolve()
+assert Path(sys.prefix).resolve() == environment
+assert Path(network_toolkit.__file__).resolve().is_relative_to(environment)
+assert sys.argv[2] == f"Networka (nw) version {version('networka')}", sys.argv[2]
 
-deactivate
+package = files("network_toolkit")
+assert package.joinpath("py.typed").is_file(), "Missing py.typed"
+platforms = ("arista_eos", "cisco_iosxe", "cisco_nxos", "juniper_junos", "mikrotik_routeros")
+for platform in platforms:
+    resource = package.joinpath("builtin_sequences", platform, "common.yml")
+    assert yaml.safe_load(resource.read_text(encoding="utf-8"))["sequences"], platform
 
-# Test 3: Git installation (if we're in a git repo)
-if git rev-parse --git-dir > /dev/null 2>&1; then
-    echo "🔍 Testing git installation..."
-    python -m venv .test-env-git
-    source .test-env-git/bin/activate
-    pip install --upgrade pip
+print(f"{artifact.name} sha256={hashlib.sha256(artifact.read_bytes()).hexdigest()}")
+print(f"Python {sys.version.split()[0]}: {sys.argv[2]}")
+print(
+    f"CLI help, {NetworkaClient.__name__} and Scrapli {Cli.__name__} imports, "
+    "py.typed, and built-in YAML passed."
+)
+PY
+)
 
-    # Install from current git repo
-    pip install git+file://$(pwd)
-    nw --help
-    python -c "import network_toolkit; print('✅ Git install successful')"
-
-    deactivate
-fi
-
-# Cleanup
-rm -rf .test-env-*
-
-echo "🎉 All local tests passed!"
+cd "$temp_dir"
+verify_install "${wheels[0]}" wheel
+verify_install "${sdists[0]}" sdist

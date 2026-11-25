@@ -4,7 +4,9 @@ Supported identifiers: `arista_eos`
 
 ## Highlights
 
-Status: coming soon. Vendor-specific documentation for firmware management, backups, and sequences is being prepared.
+The packaged Scrapli catalog includes `arista_eos`. Inspect the active
+definition and available sequences with `nw platforms info arista_eos`.
+The operations registry has no vendor-specific firmware or backup implementation.
 
 ## Quickstart
 
@@ -30,4 +32,4 @@ Command completed successfully
 ```bash
 nw run eos1 "show version"
 ```
-For now, you can browse example user sequences under `docs/examples/user_sequences/arista_eos/` and run ad-hoc commands:
+See [user sequence examples](../../examples/user_sequences/README.md) for local overrides.

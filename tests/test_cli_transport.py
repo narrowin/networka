@@ -1,6 +1,7 @@
 """Test CLI transport configuration."""
 
-from unittest.mock import MagicMock, patch
+from pathlib import Path
+from unittest.mock import patch
 
 from typer.testing import CliRunner
 
@@ -10,76 +11,49 @@ from network_toolkit.cli import app
 class TestCLITransportConfiguration:
     """Test CLI commands with transport configuration."""
 
-    def test_run_command_with_transport_option(self):
-        """Test that run command accepts transport option."""
-        runner = CliRunner()
-
-        # Mock the actual execution to avoid real network operations
-        with (
-            patch("network_toolkit.common.command.load_config") as mock_load_config,
-            patch("network_toolkit.api.run.SequenceManager"),
-            patch("network_toolkit.api.run._create_ip_based_config") as mock_create_ip,
-        ):
-            # Setup mocks
-            mock_config = MagicMock()
-            mock_load_config.return_value = mock_config
-            mock_create_ip.return_value = mock_config
-
-            # Test that the command accepts the transport option without error
-            result = runner.invoke(
+    def test_run_command_with_transport_option(self, config_file: Path) -> None:
+        """Run forwards the selected transport when opening the session."""
+        command = "/system/identity/print"
+        with patch("network_toolkit.device.DeviceSession") as session:
+            connected_session = session.return_value.__enter__.return_value
+            connected_session.execute_command.return_value = "identity: router"
+            result = CliRunner().invoke(
                 app,
                 [
                     "run",
-                    "192.168.1.1",
-                    "/system/identity/print",
-                    "--platform",
-                    "mikrotik_routeros",
+                    "test_device1",
+                    command,
+                    "--config",
+                    str(config_file),
                     "--transport",
                     "scrapli",
                 ],
             )
 
-            # Should not fail due to unknown option
-            assert "--transport" in str(result.stdout) or result.exit_code != 2
+        assert result.exit_code == 0, result.output
+        assert "identity: router" in result.output
+        session.assert_called_once()
+        assert session.call_args.args[4] == "scrapli"
+        connected_session.execute_command.assert_called_once_with(command)
 
-            # Verify create_ip_based_config was called with transport_type
-            if mock_create_ip.called:
-                call_args = mock_create_ip.call_args
-                if call_args and "transport_type" in call_args.kwargs:
-                    assert call_args.kwargs["transport_type"] == "scrapli"
-
-    def test_cli_command_with_transport_option(self):
-        """Test that cli command accepts transport option."""
-        runner = CliRunner()
-
-        # Mock the actual execution to avoid real network operations
-        with (
-            patch("network_toolkit.common.command.load_config") as mock_load_config,
-            patch("network_toolkit.commands.ssh.DeviceResolver"),
-            patch(
-                "network_toolkit.commands.ssh.create_ip_based_config"
-            ) as mock_create_ip,
-        ):
-            # Setup mocks
-            mock_config = MagicMock()
-            mock_load_config.return_value = mock_config
-            mock_create_ip.return_value = mock_config
-
-            # Test that the command accepts the transport option without error
-            result = runner.invoke(
+    def test_cli_command_rejects_unknown_transport(self, config_file: Path) -> None:
+        """Reject an unsupported transport before creating a tmux session."""
+        with patch("network_toolkit.commands.ssh._ensure_libtmux") as tmux:
+            result = CliRunner().invoke(
                 app,
                 [
                     "cli",
-                    "192.168.1.1",
-                    "--platform",
-                    "mikrotik_routeros",
+                    "test_device1",
+                    "--config",
+                    str(config_file),
                     "--transport",
-                    "scrapli",
+                    "unknown-transport",
                 ],
             )
 
-            # Should not fail due to unknown option
-            assert "--transport" in str(result.stdout) or result.exit_code != 2
+        assert result.exit_code == 1, result.output
+        assert "Unknown transport type: 'unknown-transport'" in result.output
+        tmux.assert_not_called()
 
     def test_supported_types_shows_transport_info(self):
         """Test that config supported-types command shows transport information."""

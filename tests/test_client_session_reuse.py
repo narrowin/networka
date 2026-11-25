@@ -20,7 +20,7 @@ def mock_config():
     config.get_device_connection_params.return_value = {}
     config.get_transport_type.return_value = "ssh"
     config.vendor_sequences = {}
-    config.sequences = {}
+    config.global_command_sequences = {}
     return config
 
 

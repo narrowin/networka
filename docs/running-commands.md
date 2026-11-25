@@ -14,7 +14,7 @@ nw info device1
 # Group info
 nw info access_switches
 # Sequence info
-nw info health_check
+nw info system_info --device router1
 ```
 
 Expected output (device):
@@ -81,7 +81,7 @@ A command fails when Networka cannot connect, the login is rejected or the devic
 nw upload device1 firmware.npk
 
 # Download a file from a device
-nw download device1 config.backup
+nw download device1 config.backup ./config.backup
 ```
 
 ## Results and formatting
@@ -102,9 +102,13 @@ Notes:
 - The results directory defaults to the value in `general.results_dir`; override per run with `--results-dir`.
 - Choose the serialization format via `general.results_format` in `config.yml` (txt/json/yaml).
 
+When running a command or sequence on a group or device list, `nw run` exits
+with status `1` if any resolved device fails. Use the per-device outcomes and
+summary to identify which devices failed.
+
 ## Next steps
 
-- See all flags and subcommands → CLI reference
-- Store and inspect outputs → Results
-- Customize CLI styling → Output modes
-- Back up devices across vendors → Backups
+- [CLI reference](reference/cli.md)
+- [Save output and compare a baseline](results.md)
+- [Choose an output mode](output-modes.md)
+- [Back up device configuration](backups.md)

@@ -156,7 +156,7 @@ Set variables directly before running commands:
 ```bash
 export NW_USER_DEFAULT=admin
 export NW_PASSWORD_DEFAULT=your_password
-python -m network_toolkit.cli run system_info sw-acc1
+uv run nw run sw-acc1 system_info
 ```
 
 ## Security Best Practices
@@ -166,6 +166,10 @@ python -m network_toolkit.cli run system_info sw-acc1
 3. **Limit environment access**: Only set these variables in environments where the tool runs
 4. **Regular rotation**: Change passwords regularly and update environment variables accordingly
 5. **Least privilege**: Create device-specific users with minimal required permissions
+
+For Cisco IOS and IOS-XE, set `NW_ENABLE_PASSWORD_<DEVICE>` or
+`NW_ENABLE_PASSWORD_DEFAULT` when your device requires a separate enable
+password. See [transport selection](transport.md).
 
 ## Credential Resolution Order
 

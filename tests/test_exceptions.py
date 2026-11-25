@@ -10,13 +10,12 @@ from typing import Any
 import pytest
 
 from network_toolkit.exceptions import (
-    AuthenticationError,
-    CommandExecutionError,
     ConfigurationError,
+    DeviceAuthError,
     DeviceConnectionError,
     DeviceExecutionError,
+    FileTransferError,
     NetworkToolkitError,
-    TransferError,
 )
 
 
@@ -90,12 +89,12 @@ class TestDeviceConnectionError:
         assert error.details == details
 
 
-class TestCommandExecutionError:
-    """Test the CommandExecutionError class."""
+class TestDeviceExecutionError:
+    """Test the DeviceExecutionError class."""
 
     def test_basic_creation(self) -> None:
         """Test basic command execution error creation."""
-        error = CommandExecutionError("Command failed")
+        error = DeviceExecutionError("Command failed")
         assert str(error) == "Command failed"
         assert isinstance(error, NetworkToolkitError)
         assert error.command is None
@@ -103,23 +102,23 @@ class TestCommandExecutionError:
 
     def test_with_command_and_exit_code(self) -> None:
         """Test command execution error with command and exit code."""
-        error = CommandExecutionError("Command failed", command="test_cmd", exit_code=1)
+        error = DeviceExecutionError("Command failed", command="test_cmd", exit_code=1)
         assert error.command == "test_cmd"
         assert error.exit_code == 1
 
     def test_with_details(self) -> None:
         """Test command execution error with details."""
         details: dict[str, Any] = {"stderr": "Permission denied", "stdout": ""}
-        error = CommandExecutionError("Command failed", details=details)
+        error = DeviceExecutionError("Command failed", details=details)
         assert error.details == details
 
 
-class TestTransferError:
-    """Test the TransferError class."""
+class TestFileTransferError:
+    """Test the FileTransferError class."""
 
     def test_basic_creation(self) -> None:
         """Test basic transfer error creation."""
-        error = TransferError("Transfer failed")
+        error = FileTransferError("Transfer failed")
         assert str(error) == "Transfer failed"
         assert isinstance(error, NetworkToolkitError)
         assert error.local_path is None
@@ -127,7 +126,7 @@ class TestTransferError:
 
     def test_with_paths(self) -> None:
         """Test transfer error with local and remote paths."""
-        error = TransferError(
+        error = FileTransferError(
             "Transfer failed",
             local_path="/tmp/file.txt",
             remote_path="/home/user/file.txt",
@@ -138,43 +137,27 @@ class TestTransferError:
     def test_with_details(self) -> None:
         """Test transfer error with details."""
         details: dict[str, Any] = {"size": 1024, "mode": "binary"}
-        error = TransferError("Transfer failed", details=details)
+        error = FileTransferError("Transfer failed", details=details)
         assert error.details == details
 
 
-class TestAuthenticationError:
-    """Test the AuthenticationError class."""
+class TestDeviceAuthError:
+    """Test the DeviceAuthError class."""
 
     def test_basic_creation(self) -> None:
         """Test basic authentication error creation."""
-        error = AuthenticationError("Authentication failed")
+        error = DeviceAuthError("Authentication failed")
         assert str(error) == "Authentication failed"
         assert isinstance(error, DeviceConnectionError)
         assert isinstance(error, NetworkToolkitError)
 
     def test_inheritance_chain(self) -> None:
-        """Test that AuthenticationError inherits properly."""
-        error = AuthenticationError("Auth failed")
-        assert isinstance(error, AuthenticationError)
+        """Test that DeviceAuthError inherits properly."""
+        error = DeviceAuthError("Auth failed")
+        assert isinstance(error, DeviceAuthError)
         assert isinstance(error, DeviceConnectionError)
         assert isinstance(error, NetworkToolkitError)
         assert isinstance(error, Exception)
-
-
-class TestDeviceExecutionError:
-    """Test the DeviceExecutionError class."""
-
-    def test_basic_creation(self) -> None:
-        """Test basic device execution error creation."""
-        error = DeviceExecutionError("Execution failed")
-        assert str(error) == "Execution failed"
-        assert isinstance(error, NetworkToolkitError)
-
-    def test_with_details(self) -> None:
-        """Test device execution error with details."""
-        details: dict[str, Any] = {"device": "router1", "command": "show version"}
-        error = DeviceExecutionError("Execution failed", details=details)
-        assert error.details == details
 
 
 class TestExceptionHierarchy:
@@ -215,10 +198,9 @@ class TestExceptionTypes:
             NetworkToolkitError("test"),
             ConfigurationError("test"),
             DeviceConnectionError("test"),
-            CommandExecutionError("test"),
             DeviceExecutionError("test"),
-            TransferError("test"),
-            AuthenticationError("test"),
+            FileTransferError("test"),
+            DeviceAuthError("test"),
         ]
 
         for exc in exceptions:
@@ -231,10 +213,9 @@ class TestExceptionTypes:
             NetworkToolkitError("base error"),
             ConfigurationError("config error"),
             DeviceConnectionError("connection error"),
-            CommandExecutionError("command error"),
-            DeviceExecutionError("execution error"),
-            TransferError("transfer error"),
-            AuthenticationError("auth error"),
+            DeviceExecutionError("command error"),
+            FileTransferError("transfer error"),
+            DeviceAuthError("auth error"),
         ]
 
         for exc in exceptions:
@@ -259,10 +240,10 @@ class TestExceptionContext:
         assert str(error) == "Connection failed"
 
     def test_command_execution_error_context(self) -> None:
-        """Test CommandExecutionError context information."""
-        with pytest.raises(CommandExecutionError) as exc_info:
+        """Test DeviceExecutionError context information."""
+        with pytest.raises(DeviceExecutionError) as exc_info:
             msg = "Command failed"
-            raise CommandExecutionError(msg, command="test_command")
+            raise DeviceExecutionError(msg, command="test_command")
 
         error = exc_info.value
         assert error.command == "test_command"

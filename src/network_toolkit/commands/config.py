@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+from importlib.resources import as_file, files
 from pathlib import Path
 from typing import Annotated, cast
 
@@ -405,55 +406,31 @@ def install_shell_completions(selected: str) -> tuple[Path | None, Path | None]:
         msg = "Only bash and zsh shells are supported for completion installation"
         raise ConfigurationError(msg)
 
-    # Try packaged resources under network_toolkit.shell_completion first
-    pkg_src: Path | None = None
-    try:
-        import importlib.resources as ir
+    filename = (
+        "bash_completion_nw.sh" if selected == "bash" else "zsh_completion_nw.zsh"
+    )
+    source = files("network_toolkit").joinpath("shell_completion", filename)
+    if not source.is_file():
+        repo_root = _detect_repo_root()
+        if repo_root is not None:
+            source = repo_root / "shell_completion" / filename
 
-        if selected == "bash":
-            with ir.path(
-                "network_toolkit.shell_completion", "bash_completion_nw.sh"
-            ) as p:
-                pkg_src = p if p.exists() else None
-        else:
-            with ir.path(
-                "network_toolkit.shell_completion", "zsh_completion_nw.zsh"
-            ) as p:
-                pkg_src = p if p.exists() else None
-    except Exception:  # pragma: no cover - safety
-        pkg_src = None
-
-    # Fallback to repo-root scripts in development mode
-    repo_src: Path | None = None
-    repo_root = _detect_repo_root()
-    if repo_root:
-        sc_dir = repo_root / "shell_completion"
-        if selected == "bash":
-            cand = sc_dir / "bash_completion_nw.sh"
-        else:
-            cand = sc_dir / "zsh_completion_nw.zsh"
-        if cand.exists():
-            repo_src = cand
-
-    if not pkg_src and not repo_src:
+    if not source.is_file():
         logger.warning("Completion scripts not found; skipping")
         return (None, None)
 
     try:
         home = Path.home()
-        # Pick packaged source first, otherwise repo source
-        src = pkg_src or repo_src
-        assert src is not None  # for type checkers
         if selected == "bash":
             dest = home / ".local" / "share" / "bash-completion" / "completions" / "nw"
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src, dest)
-            return (dest, home / ".bashrc")
+            rc_file = home / ".bashrc"
         else:  # zsh
             dest = home / ".zsh" / "completions" / "_nw"
-            dest.parent.mkdir(parents=True, exist_ok=True)
+            rc_file = home / ".zshrc"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        with as_file(source) as src:
             shutil.copy2(src, dest)
-            return (dest, home / ".zshrc")
+        return (dest, rc_file)
 
     except OSError as e:
         msg = f"Failed to install {selected} completion: {e}"
@@ -1205,7 +1182,6 @@ def register(app: typer.Typer) -> None:
         name="config",
         help="Configuration management commands",
         no_args_is_help=True,
-        context_settings={"help_option_names": ["-h", "--help"]},
     )
 
     @config_app.command("init")

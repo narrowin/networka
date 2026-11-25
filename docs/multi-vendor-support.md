@@ -1,15 +1,17 @@
-# Multi-Vendor Support Documentation
+# Multi-vendor support
 
 ## Overview
 
-The Network Toolkit now supports multiple network vendors through a flexible, vendor-specific command sequence architecture. This allows you to manage devices from different vendors using their native command syntax while maintaining a unified interface.
+Use a logical platform to select the commands and connection behavior for a device.
+Platform inspection shows the active Scrapli definition separately from
+Networka's sequences and registered operations.
 
 ## CLI Commands for Platform Information
 
 Query platform support directly from the command line:
 
 ```bash
-# List all supported platforms
+# List active Scrapli definitions and registry entries
 nw platforms list
 
 # Filter by status
@@ -25,12 +27,15 @@ nw platforms list --vendor mikrotik
 nw platforms list --capability firmware_upgrade
 nw platforms list --capability config_backup
 
-# Get detailed info about a specific platform
+# Inspect a logical platform and its definition and sequences
 nw platforms info mikrotik_routeros
 nw platforms info cisco_ios
 ```
 
 ## Supported Vendors
+
+The registry lists Networka's maintained operation and sequence capabilities.
+Use `nw platforms list` for the broader active Scrapli catalog.
 
 <!-- AUTO-GENERATED: Do not edit this section manually -->
 <!-- Generated from src/network_toolkit/platforms/registry.py -->
@@ -50,7 +55,8 @@ The architecture is designed to easily support additional vendors by:
 
 ### Vendor-Specific Sequences
 
-Sequences are organized by vendor platform following Scrapli naming conventions:
+Sequences use the logical `device_type`. A project can place its files in the
+sequence directory next to `config.yml`:
 
 ```text
 config/sequences/
@@ -68,19 +74,27 @@ config/sequences/
 
 ### Sequence Resolution Order
 
-When executing a sequence, the toolkit resolves commands in this priority order:
+Networka uses the target's configured `device_type` to select a sequence. It searches in this order.
 
-1. **Custom user sequences** (`sequences/custom/*.yml` in the user config directory)
-2. **User-defined vendor sequences** (`sequences/<vendor>/*.yml` in the user config directory)
-3. **Repository/vendor sequences** shipped with the project (`config/sequences/<vendor>/*.yml`)
-4. **Built-in sequences** packaged with Networka (`src/network_toolkit/builtin_sequences`)
-5. **Device-specific overrides** defined directly on a device entry
+1. Custom user sequences in the user config directory's `sequences/custom/`.
+2. User platform sequences in the user config directory's `sequences/<platform>/`.
+3. Project platform sequences. Files selected in `vendor_platforms.sequence_path` and `default_files` take priority over the scan of `config/sequences/<platform>/`.
+4. Packaged platform sequences.
+5. `command_sequences` on the selected device.
+6. Applicable global sequences from the selected configuration.
 
-If a sequence name is defined at multiple levels, the higher level overrides the lower ones. The legacy `config.vendor_sequences` entries remain a fallback only when no higher-precedence definition exists.
+An override replaces the whole platform definition. Within a scanned directory, later filenames in sorted order win. Explicit `default_files` apply in the order written. For global sequences, `sequences:` in supplemental sequence files replace same-name definitions from `global_command_sequences:` in the main config. The loader processes root files first, then the subdirectory's named sequence file, then the remaining sibling files in filename order within each extension.
+
+Add `device_types` to restrict a sequence to the listed logical platforms. Device-local sequences apply only to their owner. If a known name has no applicable definition for a device, Networka does not send the name as a device command.
+
+A custom filename can start with a known platform name to scope the entire file. Otherwise, each custom definition applies to its `device_types`, or to the platforms known from defaults, configuration, and inventory when the key is omitted.
 
 ### Device Configuration
 
-Each device must specify its vendor type:
+Use the logical device type in inventory, or supply it with `--platform` for
+a raw IP. Scrapli loads the selected native definition. The generic `default`
+definition supplies shell prompting for `linux` and `generic`. There is no
+native device-platform detection.
 
 ```yaml
 devices:
@@ -99,7 +113,9 @@ devices:
 
 ### Common Sequences Across Vendors
 
-All vendors ship with a core set of sequence names implemented with vendor-appropriate commands:
+Maintained platforms ship sequences for common tasks. Available names and
+commands vary with the logical platform and configuration. Use
+`nw platforms info <platform>` to see winning sequence names and sources.
 
 - `system_info` - Complete system information gathering
 - `health_check` - Basic health monitoring
@@ -194,18 +210,24 @@ nw run all_switches health_check
 ### Listing Sequences by Vendor
 
 ```bash
-# List all sequences for all vendors
+# Browse available definitions by scope and origin
 nw list sequences
 
-# List sequences for a specific vendor
+# List sequences selected for a platform
 nw list sequences --vendor mikrotik_routeros
 
 # List sequences by category
 nw list sequences --category monitoring
 
-# Verbose output with command details
+# Include source paths
 nw list sequences --vendor cisco_iosxe --verbose
+
+# Print the exact source and commands selected for a platform or device
+nw info system_info --vendor cisco_iosxe
+nw info system_info --device cisco-switch
 ```
+
+When no default configuration is present, listing and platform inspection still show the packaged catalog and any user sequence files. A missing or invalid explicitly selected configuration is an error. Specify `--device` to inspect the exact winner for a device in inventory.
 
 ### Managing Multi-Vendor Groups
 
@@ -312,22 +334,6 @@ nw run new-device "show version"
 nw run new-device system_info
 ```
 
-## Migration from Single-Vendor
-
-### Existing Installations
-
-Legacy single-file `sequences.yml` configurations are no longer supported; use modular sequences/ files.
-
-- Gradual migration path available
-- No breaking changes to existing functionality
-
-### Migration Steps
-
-1. Move existing sequences to `sequences/mikrotik_routeros/common.yml`
-2. Update `sequences.yml` with vendor platform definitions
-3. Add new vendor sequences as needed
-4. Update device configurations with explicit `device_type`
-
 ## Troubleshooting
 
 ### Common Issues
@@ -363,18 +369,7 @@ nw list sequences --vendor cisco_iosxe
 nw run device-name system_info --verbose
 ```
 
-## Future Enhancements
+## Contributing platform support
 
-### Planned Features
-
-- **Dynamic sequence loading** - Load sequences based on device capabilities
-- **Vendor auto-detection** - Automatically detect vendor from device responses
-- **Command translation** - Translate common operations between vendor syntaxes
-- **Vendor-specific drivers** - Enhanced connection handling per vendor
-
-### Community Contributions
-
-- Submit vendor-specific sequences
-- Report vendor compatibility issues
-- Contribute new vendor support
-- Improve existing command mappings
+See [adding platform support](adding-platforms.md) for connection definitions,
+packaged sequences, registered capabilities, and verification.

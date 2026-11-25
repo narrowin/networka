@@ -28,7 +28,7 @@ with NetworkaClient() as client:
 
 ## Parallel Device Operations
 
-Run the same command on multiple devices simultaneously. Note that `NetworkaClient` is not thread-safe, so we create a new instance for each thread.
+Run the same command on multiple devices simultaneously. Each worker uses a client context to close its sessions.
 
 ```python
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -37,12 +37,13 @@ from network_toolkit import NetworkaClient
 
 def get_device_info(device_name):
     """Execute command on a single device."""
-    # Create a new client for each thread
-    client = NetworkaClient()
     try:
-        result = client.run(device_name, "/system/identity/print")
-        output = result.command_results[0].output if result.command_results else None
-        return {"device": device_name, "output": output, "error": None}
+        with NetworkaClient() as client:
+            result = client.run(device_name, "/system/identity/print")
+        if not result.command_results:
+            return {"device": device_name, "output": None, "error": "No command result"}
+        command = result.command_results[0]
+        return {"device": device_name, "output": command.output, "error": command.error}
     except Exception as e:
         return {"device": device_name, "output": None, "error": str(e)}
 
@@ -66,42 +67,33 @@ success = sum(1 for r in results if not r["error"])
 print(f"\nCompleted: {success}/{len(devices)} successful")
 ```
 
-## Automated Compliance Check
+## Check collected output
 
-Parse command output and validate against requirements:
+Collect several read-only responses with one session and distinguish a device
+error from a command that returns empty text.
 
 ```python
 from network_toolkit import NetworkaClient
 
+checks = {
+    "identity": "/system/identity/print",
+    "resources": "/system/resource/print",
+}
 
-def check_compliance(device_name):
-    """Run compliance checks on a device."""
-    checks = {
-        "identity": "/system/identity/print",
-        "uptime": "/system/resource/print",
-        "firewall": "/ip/firewall/filter/print",
-    }
+with NetworkaClient() as client:
+    for label, command in checks.items():
+        result = client.run("router1", command)
+        if not result.command_results:
+            print(f"{label}: no command result")
+            continue
 
-    results = {}
-    # Use context manager for efficient session reuse across checks
-    with NetworkaClient() as client:
-        for check_name, command in checks.items():
-            result = client.run(device_name, command)
-            # Example validation
-            output = result.command_results[0].output if result.command_results else ""
-            results[check_name] = {
-                "passed": len(output) > 0 if output else False,
-                "output": output,
-            }
-
-    return results
-
-
-compliance = check_compliance("router1")
-
-for check, result in compliance.items():
-    status = "PASS" if result["passed"] else "FAIL"
-    print(f"{check}: {status}")
+        response = result.command_results[0]
+        if response.error is not None:
+            print(f"{label}: {response.error}")
+        elif response.output:
+            print(f"{label}: {response.output}")
+        else:
+            print(f"{label}: empty response")
 ```
 
 ## Backup and Download
@@ -121,8 +113,9 @@ result = client.backup(
     delete_remote=True,  # Clean up after download
 )
 
-if result.totals.succeeded > 0:
-    print(f"Backup saved to: {result.results[0].local_path}")
+for backup in result.device_results:
+    if backup.success:
+        print(f"{backup.device}: {backup.backup_dir}")
 
 # Method 2: Using DeviceSession for more control
 from network_toolkit import DeviceSession
@@ -133,7 +126,7 @@ with DeviceSession("router1", client.config) as session:
 
     # Download it
     local_path = Path("./backups/router1-backup.backup")
-    session.download_file(remote_file="mybackup.backup", local_path=local_path)
+    session.download_file(remote_filename="mybackup.backup", local_path=local_path)
 
     # Delete remote backup
     session.execute_command("/file/remove mybackup.backup")
@@ -163,7 +156,7 @@ script_file.write_text(script_content)
 try:
     with DeviceSession("router1", client.config) as session:
         # Upload script
-        session.upload_file(local_file=script_file, remote_path="temp_script.rsc")
+        session.upload_file(local_path=script_file, remote_filename="temp_script.rsc")
 
         # Execute it
         output = session.execute_command("/import temp_script.rsc")
@@ -181,22 +174,24 @@ finally:
 Compare current config against a baseline:
 
 ```python
+from pathlib import Path
+
 from network_toolkit import NetworkaClient
 
-client = NetworkaClient()
+with NetworkaClient() as client:
+    result = client.diff(
+        targets="router1",
+        subject="/export",
+        baseline=Path("./baselines/router1-baseline.rsc"),
+    )
 
-result = client.diff(
-    targets="router1",
-    subject="/export",
-    baseline=Path("./baselines/router1-baseline.rsc"),
-)
-
-for item in result.diff_items:
-    if item.has_diff:
-        print(f"Drift detected on {item.device}!")
-        print(item.diff_output)
+for item in result.results:
+    if item.error is not None:
+        print(f"{item.device}: {item.error}")
+    elif item.outcome is not None and item.outcome.changed:
+        print(item.outcome.output)
     else:
-        print(f"{item.device}: No drift")
+        print(f"{item.device}: No differences")
 ```
 
 ## Error Handling Pattern

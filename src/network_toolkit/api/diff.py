@@ -199,7 +199,12 @@ def _save_artifact(device: str, name: str, text: str, save_path: Path | None) ->
 
 
 def _perform_device_diff(
-    device: str, options: DiffOptions, sequence_manager: SequenceManager
+    device: str,
+    options: DiffOptions,
+    sequence_manager: SequenceManager,
+    *,
+    is_config: bool,
+    is_command: bool,
 ) -> list[DiffItemResult]:
     if options.baseline is None:
         return [
@@ -213,8 +218,6 @@ def _perform_device_diff(
 
     results: list[DiffItemResult] = []
     subj = options.subject.strip()
-    is_config = subj.lower() == "config"
-    is_command = subj.startswith("/")
 
     try:
         if is_config:
@@ -301,7 +304,7 @@ def _perform_device_diff(
                 msg = "For sequence diff, baseline must be a directory."
                 raise NetworkToolkitError(msg)
 
-            seq_cmds = sequence_manager.resolve(device, subj)
+            seq_cmds = sequence_manager.resolve(sequence_name=subj, device_name=device)
             if not seq_cmds:
                 return [
                     DiffItemResult(
@@ -374,10 +377,10 @@ def diff_files(
 def diff_targets(options: DiffOptions) -> DiffResult:
     """Execute the diff operation based on the provided options."""
     subj = options.subject.strip()
-    is_config = subj.lower() == "config"
-    is_command = subj.startswith("/")
-
     sm = SequenceManager(options.config)
+    known_sequence = sm.exists(subj)
+    is_config = subj.lower() == "config" and not known_sequence
+    is_command = subj.startswith("/") and not known_sequence
     mode_label = "config" if is_config else ("command" if is_command else "sequence")
     cmd_ctx = f"diff_{options.targets}_{mode_label}_{_sanitize_filename(subj)}"
 
@@ -405,16 +408,17 @@ def diff_targets(options: DiffOptions) -> DiffResult:
         dev_a, dev_b = devices[0], devices[1]
 
         try:
+            if not (is_config or is_command):
+                msg = (
+                    "Device-to-device diff only supports 'config' or a single command."
+                )
+                raise NetworkToolkitError(msg)
 
             def _fetch_device_output(dev: str) -> str:
                 with _get_session(dev, options.config, options.session_pool) as s:
                     if is_config:
                         return s.execute_command("/export compact")
-                    elif is_command:
-                        return s.execute_command(subj)
-                    else:
-                        msg = "Device-to-device diff only supports 'config' or a single command."
-                        raise NetworkToolkitError(msg)
+                    return s.execute_command(subj)
 
             with ThreadPoolExecutor(max_workers=2) as executor:
                 future_a = executor.submit(_fetch_device_output, dev_a)
@@ -485,7 +489,13 @@ def diff_targets(options: DiffOptions) -> DiffResult:
     # Parallel execution
     parallel_results = execute_parallel(
         devices,
-        partial(_perform_device_diff, options=options, sequence_manager=sm),
+        partial(
+            _perform_device_diff,
+            options=options,
+            sequence_manager=sm,
+            is_config=is_config,
+            is_command=is_command,
+        ),
     )
 
     # Flatten results

@@ -4,13 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import TypeVar
-
-T = TypeVar("T")
-R = TypeVar("R")
 
 
-def execute_parallel(
+def execute_parallel[T, R](
     items: list[T],
     func: Callable[[T], R],
     max_workers: int | None = None,

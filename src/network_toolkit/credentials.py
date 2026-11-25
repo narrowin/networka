@@ -494,14 +494,9 @@ class ConnectionParameterBuilder:
         str | None
             Scrapli platform name, or None for generic/linux connections
         """
-        # Scrapli does not have 'cisco_ios' - use 'cisco_iosxe' for both IOS and IOS-XE
-        platform_mapping = {
-            "cisco_ios": "cisco_iosxe",
-            # For Linux/generic SSH, don't pass a platform - use GenericDriver
-            "linux": None,
-            "generic": None,
-        }
-        return platform_mapping.get(device_type, device_type)
+        from network_toolkit.transport.scrapli_sync import SCRAPLI_PLATFORM_ALIASES
+
+        return SCRAPLI_PLATFORM_ALIASES.get(device_type, device_type)
 
     def _apply_device_overrides(
         self, params: dict[str, Any], device: DeviceConfig

@@ -74,9 +74,3 @@ class DeviceAuthError(DeviceConnectionError):
 
 class DeviceTimeoutError(NetworkToolkitError):
     """Raised when device operations timeout."""
-
-
-# Legacy aliases for backward compatibility (to be removed)
-CommandExecutionError = DeviceExecutionError
-TransferError = FileTransferError
-AuthenticationError = DeviceAuthError

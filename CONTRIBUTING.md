@@ -13,32 +13,33 @@ git clone https://github.com/narrowin/networka.git
 cd networka
 ```
 
-2. Install development dependencies:
+2. Use the uv version pinned in `pyproject.toml` and sync the locked development
+   and documentation tools. uv selects Python 3.15.2 from `.python-version`.
 
 ```bash
-uv sync --dev
+uv sync --locked --group dev --extra docs
 ```
 
 3. Install pre-commit hooks:
 
 ```bash
-pre-commit install
+uv run --locked pre-commit install
 ```
 
 ## Code Standards
 
-- Python 3.11+ with full type annotations
-- Use async/await for all I/O operations
+- Use Python 3.15 and current repository APIs.
+- Follow the existing synchronous and asynchronous boundaries.
 - Follow existing patterns in the codebase
-- Add tests for new functionality
+- Verify changed behavior with the appropriate tests and CLI or package checks.
 - Update documentation as needed
 
 ## Testing
 
-Run tests using VS Code test feature or:
+Run the existing suite with:
 
 ```bash
-pytest
+uv run --locked pytest
 ```
 
 ## Code Quality
@@ -52,9 +53,9 @@ We use several tools to maintain code quality:
 Run quality checks:
 
 ```bash
-ruff check .
-ruff format .
-mypy src/
+uv run --locked ruff check .
+uv run --locked ruff format --check .
+uv run --locked mypy src/
 ```
 
 ## Commit Message Conventions
@@ -99,14 +100,14 @@ Optional but recommended. Use component names like: `cli`, `transport`, `config`
 ## Documentation
 
 - `docs/reference/cli.md` is generated. Do not edit it manually.
-- Regenerate the CLI docs with `task docs:generate` (or `uv run python scripts/generate_cli_docs.py`).
+- Regenerate the CLI docs with `task docs:generate` (or `uv run --locked python scripts/generate_cli_docs.py`).
 - Always commit the updated `docs/reference/cli.md` alongside CLI changes so reviewers can see the diff.
 
 ## Pull Request Process
 
 1. Fork the repository
 2. Create a feature branch
-3. Make your changes with tests
+3. Verify your changes
 4. Ensure all checks pass
 5. Submit a pull request
 

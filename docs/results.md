@@ -1,32 +1,49 @@
 # Results
 
-Networka can store command results under a timestamped directory when result capture is enabled.
-
-- Root directory: `general.results_dir` (default: `/tmp/results`)
-- Auto-created per run: `YYYYMMDD_HHMMSS/`
-- Storage toggles on with `--store-results` or by setting `general.store_results: true`
-
-Supported formats come from the configuration value `general.results_format` (`txt`, `json`, or `yaml`).
-
-Examples:
+Use `--store-results` to write command or sequence output to files.
 
 ```bash
-nw run sw-acc1 health_check --store-results
-nw run sw-acc1 system_info --store-results --results-dir ./maintenance-2025-08
-nw run group1 check --store-results
+nw run router1 system_info --store-results
+nw run router1 "/system/identity/print" --store-results --results-dir ./captures
 ```
 
-Config snippet:
+The command reports the results directory. Networka writes a timestamped
+subdirectory under `general.results_dir`, or under the directory supplied
+with `--results-dir`.
+
+Set the file format in `config.yml`. The accepted formats are `txt`, `json`,
+and `yaml`.
 
 ```yaml
 general:
-  store_results: true
   results_dir: ./results
-  results_format: json
+  results_format: txt
 ```
 
-Notes:
+See [output modes](output-modes.md) to control what the CLI prints.
 
-- Filenames and subfolders are derived from device/group and command/sequence names.
-- Set `general.results_format` to control serialization.
-- Results are safe to check into version control if they don't contain secrets.
+## Compare a baseline
+
+Before the change, save the device's command output in a text file. If
+you use a stored Networka result, copy the response without the generated
+headers. After the change, pass that baseline to `nw diff` to fetch and
+compare the same command on the same device.
+
+```bash
+nw diff router1 "/system/identity/print" --baseline ./baseline/router1-identity.txt
+```
+
+For a sequence, supply a directory with one response file per command.
+Name each file `cmd_<normalized-command>.txt`. Replace spaces and path
+separators with underscores and trim the leading and trailing underscores.
+For example, `/system/identity/print` uses `cmd_system_identity_print.txt`.
+Use `--save-current` to keep the newly fetched output.
+
+If you already have both text outputs, compare them offline.
+
+```bash
+nw diff before.txt after.txt
+```
+
+A comparison reports output changes. Decide which changes are expected for
+the work you are doing. [Diff options](reference/cli.md#nw-diff)

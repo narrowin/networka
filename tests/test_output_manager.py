@@ -54,20 +54,6 @@ class TestOutputManager:
         assert manager.mode == OutputMode.NO_COLOR
         assert manager.console.color_system is None
 
-    def test_light_mode_creation(self) -> None:
-        """Test creating output manager in light mode."""
-        manager = OutputManager(OutputMode.LIGHT)
-        assert manager.mode == OutputMode.LIGHT
-        # Light mode should have a console with color support
-        assert manager.console.color_system is not None
-
-    def test_dark_mode_creation(self) -> None:
-        """Test creating output manager in dark mode."""
-        manager = OutputManager(OutputMode.DARK)
-        assert manager.mode == OutputMode.DARK
-        # Dark mode should have a console with color support
-        assert manager.console.color_system is not None
-
 
 class TestOutputManagerRawMode:
     """Test OutputManager raw mode behavior."""
@@ -139,101 +125,97 @@ class TestOutputManagerRawMode:
 class TestOutputManagerNormalModes:
     """Test OutputManager normal mode behaviors."""
 
-    def test_normal_mode_console_output(self) -> None:
+    def test_normal_mode_console_output(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """Test that normal mode uses console output."""
         manager = OutputManager(OutputMode.DEFAULT)
 
-        # These should not raise exceptions and should use console
         manager.print_success("Test success")
         manager.print_error("Test error")
         manager.print_warning("Test warning")
         manager.print_info("Test info")
+        manager.print_command_output(
+            "sw-acc1", "/system/identity/print", "[red]literal[/output]"
+        )
+        output = capsys.readouterr().out
+        assert "Test success" in output
+        assert "Test error" in output
+        assert "Test warning" in output
+        assert "Test info" in output
+        assert "[red]literal[/output]" in output
 
-    def test_no_color_mode_console_output(self) -> None:
+    def test_no_color_mode_console_output(
+        self, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test that no-color mode uses console without colors."""
-        manager = OutputManager(OutputMode.NO_COLOR)
+        monkeypatch.delenv("TTY_COMPATIBLE", raising=False)
+        monkeypatch.setenv("NO_COLOR", "1")
+        monkeypatch.setenv("FORCE_COLOR", "1")
+        monkeypatch.setenv("NW_OUTPUT_MODE", "dark")
+        monkeypatch.setenv("TERM", "xterm-256color")
+        manager = OutputManager(get_output_mode_from_env())
 
-        # Should have no color system but still use console
-        assert manager.console.color_system is None
+        manager.print_text("[red]Styled text[/red]")
 
-        # These should not raise exceptions
-        manager.print_success("Test success")
-        manager.print_error("Test error")
+        assert manager.mode is OutputMode.NO_COLOR
+        assert capsys.readouterr().out == "Styled text\n"
 
-    def test_summary_printed_in_normal_mode(self) -> None:
+    def test_summary_printed_in_normal_mode(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """Test that summaries are printed in normal modes."""
         manager = OutputManager(OutputMode.DEFAULT)
 
-        # Should not raise exceptions - testing that it's called
         manager.print_summary(
             target="sw-acc1",
             operation_type="Command",
             name="test_command",
             duration=1.5,
         )
+        output = capsys.readouterr().out
+        assert "sw-acc1" in output
+        assert "test_command" in output
 
-    def test_results_directory_printed_in_normal_mode(self) -> None:
+    def test_results_directory_printed_in_normal_mode(
+        self, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test that results directory is printed in normal modes."""
-        manager = OutputManager(OutputMode.DEFAULT)
+        monkeypatch.setenv("NO_COLOR", "1")
+        manager = OutputManager(get_output_mode_from_env())
 
-        # Should not raise exceptions - testing that it's called
         manager.print_results_directory("/path/to/results")
+        assert "/path/to/results" in capsys.readouterr().out
 
 
 class TestEnvironmentVariables:
     """Test environment variable handling."""
 
-    def test_no_color_env_var(self) -> None:
+    def test_no_color_env_var(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test NO_COLOR environment variable detection."""
-        with patch("os.getenv") as mock_getenv:
-            mock_getenv.side_effect = lambda key, default="": {
-                "NO_COLOR": "1",
-                "NW_OUTPUT_MODE": "",
-            }.get(key, default)
+        monkeypatch.setenv("NO_COLOR", "1")
+        monkeypatch.setenv("FORCE_COLOR", "1")
+        monkeypatch.setenv("NW_OUTPUT_MODE", "raw")
+        assert get_output_mode_from_env() is OutputMode.NO_COLOR
 
-            mode = get_output_mode_from_env()
-            assert mode == OutputMode.NO_COLOR
-
-    def test_custom_output_mode_env_var(self) -> None:
+    @pytest.mark.parametrize(
+        "mode", [OutputMode.RAW, OutputMode.LIGHT, OutputMode.DARK]
+    )
+    def test_custom_output_mode_env_var(
+        self, monkeypatch: pytest.MonkeyPatch, mode: OutputMode
+    ) -> None:
         """Test NW_OUTPUT_MODE environment variable."""
-        with patch("os.getenv") as mock_getenv:
-            mock_getenv.side_effect = lambda key, default="": {
-                "NO_COLOR": "",
-                "NW_OUTPUT_MODE": "raw",
-            }.get(key, default)
+        monkeypatch.delenv("NO_COLOR", raising=False)
+        monkeypatch.delenv("FORCE_COLOR", raising=False)
+        monkeypatch.setenv("NW_OUTPUT_MODE", mode.value)
+        assert get_output_mode_from_env() is mode
 
-            mode = get_output_mode_from_env()
-            assert mode == OutputMode.RAW
-
-    def test_light_theme_env_var(self) -> None:
-        """Test light theme environment variable."""
-        with patch("os.getenv") as mock_getenv:
-            mock_getenv.side_effect = lambda key, default="": {
-                "NO_COLOR": "",
-                "NW_OUTPUT_MODE": "light",
-            }.get(key, default)
-
-            mode = get_output_mode_from_env()
-            assert mode == OutputMode.LIGHT
-
-    def test_dark_theme_env_var(self) -> None:
-        """Test dark theme environment variable."""
-        with patch("os.getenv") as mock_getenv:
-            mock_getenv.side_effect = lambda key, default="": {
-                "NO_COLOR": "",
-                "NW_OUTPUT_MODE": "dark",
-            }.get(key, default)
-
-            mode = get_output_mode_from_env()
-            assert mode == OutputMode.DARK
-
-    def test_default_mode_no_env_vars(self) -> None:
+    def test_default_mode_no_env_vars(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test default mode when no environment variables are set."""
-        with patch("os.getenv") as mock_getenv:
-            mock_getenv.side_effect = lambda _key, default="": default
-
-            mode = get_output_mode_from_env()
-            assert mode == OutputMode.DEFAULT
+        monkeypatch.delenv("NO_COLOR", raising=False)
+        monkeypatch.delenv("FORCE_COLOR", raising=False)
+        monkeypatch.delenv("NW_OUTPUT_MODE", raising=False)
+        assert get_output_mode_from_env() is OutputMode.DEFAULT
 
 
 class TestGlobalOutputManager:
@@ -263,8 +245,8 @@ class TestGlobalOutputManager:
         # Reset to normal for other tests
         set_output_mode(OutputMode.DEFAULT)
 
-    def test_convenience_functions(self) -> None:
-        """Test convenience functions work without exceptions."""
+    def test_convenience_functions(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Convenience functions write through the current output manager."""
         from network_toolkit.common.output import (
             print_device_output,
             print_error,
@@ -273,40 +255,60 @@ class TestGlobalOutputManager:
             print_warning,
         )
 
-        # These should not raise exceptions
+        set_output_mode(OutputMode.NO_COLOR)
         print_success("Test success")
         print_error("Test error")
         print_warning("Test warning")
         print_info("Test info")
         print_device_output("sw-acc1", "test command", "test output")
+        set_output_mode(OutputMode.DEFAULT)
+
+        output = capsys.readouterr().out
+        for message in (
+            "Test success",
+            "Test error",
+            "Test warning",
+            "Test info",
+            "test output",
+        ):
+            assert message in output
 
 
 class TestOutputManagerThemes:
     """Test output manager theme functionality."""
 
-    def test_light_theme_has_styles(self) -> None:
-        """Test light theme has theme styles applied."""
-        manager = OutputManager(OutputMode.LIGHT)
-        console = manager.console
+    @pytest.mark.parametrize(
+        "mode", [OutputMode.DEFAULT, OutputMode.LIGHT, OutputMode.DARK]
+    )
+    def test_themes_render_styled_output(
+        self,
+        capsys: pytest.CaptureFixture[str],
+        monkeypatch: pytest.MonkeyPatch,
+        mode: OutputMode,
+    ) -> None:
+        """Themed modes render semantic styles when color is forced."""
+        monkeypatch.delenv("NO_COLOR", raising=False)
+        monkeypatch.delenv("TTY_COMPATIBLE", raising=False)
+        monkeypatch.setenv("FORCE_COLOR", "1")
+        monkeypatch.setenv("NW_OUTPUT_MODE", mode.value)
+        monkeypatch.setenv("TERM", "xterm-256color")
+        manager = OutputManager(get_output_mode_from_env())
 
-        # Light theme should have color support enabled
-        assert console.color_system is not None
-        # Test that themed output doesn't raise exceptions
-        console.print("[info]Test info message[/info]")
-        console.print("[error]Test error message[/error]")
-        console.print("[success]Test success message[/success]")
+        manager.print_error("Test error message")
+        manager.print_warning("Test warning message")
+        manager.print_success("Test success message")
 
-    def test_dark_theme_has_styles(self) -> None:
-        """Test dark theme has theme styles applied."""
-        manager = OutputManager(OutputMode.DARK)
-        console = manager.console
-
-        # Dark theme should have color support enabled
-        assert console.color_system is not None
-        # Test that themed output doesn't raise exceptions
-        console.print("[info]Test info message[/info]")
-        console.print("[error]Test error message[/error]")
-        console.print("[success]Test success message[/success]")
+        assert manager.mode is mode
+        lines = capsys.readouterr().out.splitlines()
+        for line, label, message in zip(
+            lines,
+            ["FAIL", "WARN", "OK"],
+            ["Test error message", "Test warning message", "Test success message"],
+            strict=True,
+        ):
+            assert "\x1b[" in line
+            assert label in line
+            assert message in line
 
     def test_normal_mode_basic_output(self) -> None:
         """Test normal mode console output works."""
@@ -466,6 +468,8 @@ class TestOutputModeResolutionOrder:
         set_output_mode(OutputMode.DEFAULT)
 
         # Set config to light, env to dark
+        monkeypatch.delenv("NO_COLOR", raising=False)
+        monkeypatch.delenv("FORCE_COLOR", raising=False)
         monkeypatch.setenv("NW_OUTPUT_MODE", "dark")
 
         manager = get_output_manager_with_config("light")
@@ -478,6 +482,7 @@ class TestOutputModeResolutionOrder:
         set_output_mode(OutputMode.DEFAULT)
         monkeypatch.setenv("NW_OUTPUT_MODE", "dark")
         monkeypatch.setenv("NO_COLOR", "1")
+        monkeypatch.setenv("FORCE_COLOR", "1")
 
         manager = get_output_manager_with_config("light")
         assert manager.mode == OutputMode.NO_COLOR
@@ -489,78 +494,7 @@ class TestOutputModeResolutionOrder:
         set_output_mode(OutputMode.DEFAULT)
         monkeypatch.delenv("NW_OUTPUT_MODE", raising=False)
         monkeypatch.delenv("NO_COLOR", raising=False)
+        monkeypatch.delenv("FORCE_COLOR", raising=False)
 
         manager = get_output_manager_with_config("raw")
         assert manager.mode == OutputMode.RAW
-
-
-class TestOutputManagerFontStyles:
-    """Additional tests for style consistency across themes."""
-
-    def test_info_style_across_themes(self, capsys: Any) -> None:
-        """Ensure info style is applied and does not error across themes."""
-        # Light theme
-        light_manager = OutputManager(OutputMode.LIGHT)
-        light_manager.print_info("test message")
-        capsys.readouterr()
-
-        # Dark theme
-        dark_manager = OutputManager(OutputMode.DARK)
-        dark_manager.print_info("test message")
-        capsys.readouterr()
-
-        # Default theme
-        normal_manager = OutputManager(OutputMode.DEFAULT)
-        normal_manager.print_info("test message")
-        capsys.readouterr()
-
-    def test_success_style_across_themes(self, capsys: Any) -> None:
-        """Ensure success style is applied and does not error across themes."""
-        # Light theme
-        light_manager = OutputManager(OutputMode.LIGHT)
-        light_manager.print_success("test success")
-        capsys.readouterr()
-
-        # Dark theme
-        dark_manager = OutputManager(OutputMode.DARK)
-        dark_manager.print_success("test success")
-        capsys.readouterr()
-
-        # Default theme
-        normal_manager = OutputManager(OutputMode.DEFAULT)
-        normal_manager.print_success("test success")
-        capsys.readouterr()
-
-    def test_warning_style_across_themes(self, capsys: Any) -> None:
-        """Ensure warning style is applied and does not error across themes."""
-        # Light theme
-        light_manager = OutputManager(OutputMode.LIGHT)
-        light_manager.print_warning("test warning")
-        capsys.readouterr()
-
-        # Dark theme
-        dark_manager = OutputManager(OutputMode.DARK)
-        dark_manager.print_warning("test warning")
-        capsys.readouterr()
-
-        # Default theme
-        normal_manager = OutputManager(OutputMode.DEFAULT)
-        normal_manager.print_warning("test warning")
-        capsys.readouterr()
-
-    def test_error_style_across_themes(self, capsys: Any) -> None:
-        """Ensure error style is applied and does not error across themes."""
-        # Light theme
-        light_manager = OutputManager(OutputMode.LIGHT)
-        light_manager.print_error("test error")
-        capsys.readouterr()
-
-        # Dark theme
-        dark_manager = OutputManager(OutputMode.DARK)
-        dark_manager.print_error("test error")
-        capsys.readouterr()
-
-        # Default theme
-        normal_manager = OutputManager(OutputMode.DEFAULT)
-        normal_manager.print_error("test error")
-        capsys.readouterr()

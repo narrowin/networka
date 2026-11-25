@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -85,6 +86,8 @@ def test_run_backup_single_device(
     # Verify files were written
     backup_dir = result.device_results[0].backup_dir
     assert backup_dir is not None
+    assert backup_dir.parent == tmp_path
+    assert re.fullmatch(r"test_device1_\d{8}_\d{6}", backup_dir.name)
     assert (backup_dir / "config.rsc").exists()
     assert (backup_dir / "manifest.json").exists()
 

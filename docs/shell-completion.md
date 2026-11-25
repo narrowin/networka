@@ -1,6 +1,6 @@
 # Shell Completions for nw
 
-This directory contains dynamic shell completions for the `nw` (Networka) command.
+Networka provides dynamic shell completion for the `nw` command.
 Supported shells:
 
 - Bash (Linux/macOS)
@@ -231,16 +231,15 @@ The completion gracefully handles:
 
 3. **Test with explicit config:**
    ```bash
-   nw --config /path/to/config info <TAB>
+   nw info --config /path/to/config <TAB>
    ```
 
 ### Performance Issues
 
 If completion is slow with large configuration files:
 
-1. **Optimize YAML parsing** by simplifying the awk scripts
-2. **Cache results** (future enhancement)
-3. **Use a smaller configuration file** for testing
+Completion uses the active configuration through the CLI. Compare with
+a smaller inventory if loading a large configuration is slow.
 
 ## Files
 

@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from network_toolkit.api.list import get_device_list, get_group_list
 from network_toolkit.common.table_providers import (
     DeviceInfoTableProvider,
@@ -297,26 +295,9 @@ class TestTransportTypesTableProvider:
         assert "scrapli" in transport_names
 
 
-class TestSequenceTableProviders:
-    """Test sequence-related table providers."""
-
-    @pytest.mark.skip("Complex provider APIs need refactoring")
-    def test_vendor_sequences_table_provider(self) -> None:
-        """Test VendorSequencesTableProvider implementation."""
-        # Test skipped due to complex API refactoring needed
-        pass
-
-    @pytest.mark.skip("Complex provider APIs need refactoring")
-    def test_vendor_sequence_info_provider(self) -> None:
-        """Test VendorSequenceInfoTableProvider implementation."""
-        # Test skipped due to complex API refactoring needed
-        pass
-
-
 class TestInfoTableProviders:
     """Test info-related table providers."""
 
-    @pytest.mark.skip("Complex provider APIs need refactoring")
     def test_device_info_provider(self) -> None:
         """Test DeviceInfoTableProvider implementation."""
         config = NetworkConfig(
@@ -339,19 +320,20 @@ class TestInfoTableProviders:
         definition = provider.get_table_definition()
         assert definition.title == "Device: test_device"
 
-        rows = provider.get_table_rows()
-        assert len(rows) >= 4  # Should have host, device_type, etc.
+        rows = {row[0]: row[1] for row in provider.get_table_rows()}
+        assert rows["Host"] == "192.168.1.1"
+        assert rows["Description"] == "Test device info"
+        assert rows["Device Type"] == "mikrotik_routeros"
 
-    @pytest.mark.skip("Complex provider APIs need refactoring")
     def test_group_info_provider(self) -> None:
         """Test GroupInfoTableProvider implementation."""
         config = NetworkConfig(
             general=GeneralConfig(),
-            devices={},
+            devices={"device1": DeviceConfig(host="192.168.1.1")},
             device_groups={
                 "test_group": DeviceGroup(
                     description="Test group info",
-                    members=["device1", "device2", "device3"],
+                    members=["device1"],
                 )
             },
         )
@@ -361,8 +343,10 @@ class TestInfoTableProviders:
         definition = provider.get_table_definition()
         assert definition.title == "Group: test_group"
 
-        rows = provider.get_table_rows()
-        assert len(rows) >= 2  # Should have description and device count
+        rows = dict(provider.get_table_rows())
+        assert rows["Description"] == "Test group info"
+        assert rows["Device Count"] == "1"
+        assert rows["Devices"] == "device1"
 
     def test_transport_info_provider(self) -> None:
         """Test TransportInfoTableProvider implementation."""
@@ -492,7 +476,6 @@ class TestTableProviderEdgeCases:
         group_provider = GroupListTableProvider(groups=get_group_list(config))
         assert group_provider.get_table_rows() == []
 
-    @pytest.mark.skip("Complex provider APIs need refactoring")
     def test_none_values_handling(self) -> None:
         """Test providers handle None values in data."""
         config = NetworkConfig(

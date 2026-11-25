@@ -18,7 +18,6 @@ backup_app = typer.Typer(
     name="backup",
     help="Backup operations for network devices",
     no_args_is_help=True,
-    context_settings={"help_option_names": ["-h", "--help"]},
 )
 
 

@@ -11,13 +11,17 @@ import typer
 from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.common.logging import setup_logging
-from network_toolkit.common.output import OutputMode
+from network_toolkit.common.output import (
+    OutputManager,
+    OutputMode,
+    get_output_mode_from_config,
+)
 from network_toolkit.common.table_providers import (
     DeviceListTableProvider,
     GroupListTableProvider,
     VendorSequencesTableProvider,
 )
-from network_toolkit.config import NetworkConfig, load_config
+from network_toolkit.config import NetworkConfig, load_config, load_inspection_config
 from network_toolkit.exceptions import NetworkToolkitError
 
 if TYPE_CHECKING:
@@ -73,7 +77,7 @@ def _list_sequences_impl(
         elif category:
             ctx.print_warning(f"No sequences found for category '{category}'.")
         else:
-            ctx.print_warning("No vendor-specific sequences found.")
+            ctx.print_warning("No sequences found.")
         return
 
     provider = VendorSequencesTableProvider(
@@ -90,7 +94,6 @@ def register(app: typer.Typer) -> None:
         name="list",
         help="List network devices, groups, sequences, and platform information",
         no_args_is_help=True,
-        context_settings={"help_option_names": ["-h", "--help"]},
     )
 
     @list_app.command("devices")
@@ -194,11 +197,14 @@ def register(app: typer.Typer) -> None:
     @list_app.command("sequences")
     def sequences(
         config_file: Annotated[
-            Path, typer.Option("--config", "-c", help="Configuration file path")
-        ] = DEFAULT_CONFIG_PATH,
+            Path | None,
+            typer.Option("--config", "-c", help="Configuration directory or file path"),
+        ] = None,
         vendor: Annotated[
             str | None,
-            typer.Option("--vendor", "-v", help="Filter by vendor platform"),
+            typer.Option(
+                "--vendor", "-v", help="Show sequences selected for a platform"
+            ),
         ] = None,
         category: Annotated[
             str | None,
@@ -221,28 +227,25 @@ def register(app: typer.Typer) -> None:
         or category."""
         setup_logging("DEBUG" if verbose else "WARNING")
 
-        ctx = CommandContext(
-            config_file=config_file,
-            verbose=verbose,
-            output_mode=output_mode,
-        )
-
+        ctx = None
         try:
-            config = load_config(config_file)
-
-            # Use the local implementation
+            config = load_inspection_config(config_file)
+            ctx = CommandContext(
+                config=config,
+                config_file=config_file,
+                verbose=verbose,
+                output_mode=output_mode,
+            )
             _list_sequences_impl(config, ctx, vendor, category, verbose=verbose)
-
-        except NetworkToolkitError as e:
-            ctx.print_error(str(e))
-            if verbose and e.details:
-                ctx.print_error(f"Details: {e.details}")
-            raise typer.Exit(1) from None
         except typer.Exit:
-            # Allow clean exits (e.g., user cancellation) to pass through
             raise
-        except Exception as e:  # pragma: no cover - unexpected
-            ctx.print_error(f"Unexpected error: {e}")
+        except Exception as error:
+            if ctx is not None:
+                ctx.handle_error(error)
+            output = OutputManager(output_mode or get_output_mode_from_config())
+            output.print_error(str(error))
+            if verbose and isinstance(error, NetworkToolkitError) and error.details:
+                output.print_error(f"Details: {error.details}")
             raise typer.Exit(1) from None
 
     # Register the list command group with the main app

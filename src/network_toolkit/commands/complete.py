@@ -12,12 +12,11 @@ from typing import Annotated
 import typer
 
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
-from network_toolkit.config import NetworkConfig, load_config
+from network_toolkit.config import NetworkConfig, load_config, load_inspection_config
 from network_toolkit.inventory.resolve import (
     list_unique_device_names,
     list_unique_group_names,
     resolve_named_targets,
-    select_named_target,
 )
 from network_toolkit.sequence_manager import SequenceManager
 
@@ -82,52 +81,14 @@ def _list_vendors(config: NetworkConfig) -> list[str]:
 
 
 def _list_sequences(config: NetworkConfig, *, target: str | None) -> list[str]:
-    names: set[str] = set()
-    target_kind: str | None = None
-    if target:
-        target_kind = select_named_target(config, target)
+    manager = SequenceManager(config)
+    if not target:
+        return sorted({record.name for record in manager.catalog_records()})
 
-    # Global command sequences (vendor-agnostic)
-    if config.global_command_sequences:
-        names.update(config.global_command_sequences.keys())
-
-    # Device-specific sequences (either for a specific device/group or across all)
-    if config.devices:
-        if target_kind == "device" and target and target in config.devices:
-            dev = config.devices[target]
-            if dev.command_sequences:
-                names.update(dev.command_sequences.keys())
-        elif target_kind == "group" and target:
-            members = resolve_named_targets(config, target).resolved_devices
-            for dev_name in members:
-                dev2 = (config.devices or {}).get(dev_name)
-                if dev2 and dev2.command_sequences:
-                    names.update(dev2.command_sequences.keys())
-        else:
-            for dev in config.devices.values():
-                if dev.command_sequences:
-                    names.update(dev.command_sequences.keys())
-
-    # Vendor/user sequences via SequenceManager if we have a target context
-    sm = SequenceManager(config)
-    if target and config.devices:
-        if target_kind == "device" and target in config.devices:
-            # Single device: include its vendor sequences
-            platform = config.devices[target].device_type
-            vendor = sm.list_vendor_sequences(platform)
-            names.update(vendor.keys())
-        elif target_kind == "group":
-            members = resolve_named_targets(config, target).resolved_devices
-            platforms: set[str] = set()
-            for dev_name in members:
-                dev3 = (config.devices or {}).get(dev_name)
-                if dev3 and dev3.device_type:
-                    platforms.add(dev3.device_type)
-            for plat in platforms:
-                vendor_map = sm.list_vendor_sequences(plat)
-                names.update(vendor_map.keys())
-
-    return sorted(names)
+    devices = resolve_named_targets(config, target).resolved_devices
+    return sorted(
+        {name for device in devices for name in manager.list_device_sequences(device)}
+    )
 
 
 def register(app: typer.Typer) -> None:
@@ -145,8 +106,8 @@ def register(app: typer.Typer) -> None:
             ),
         ],
         config_file: Annotated[
-            Path, typer.Option("--config", "-c", help="Configuration file path")
-        ] = DEFAULT_CONFIG_PATH,
+            Path | None, typer.Option("--config", "-c", help="Configuration file path")
+        ] = None,
         device: Annotated[
             str | None,
             typer.Option(
@@ -165,7 +126,11 @@ def register(app: typer.Typer) -> None:
             if for_ == "commands":
                 items = _list_commands()
             else:
-                cfg = load_config(config_file)
+                cfg = (
+                    load_inspection_config(config_file)
+                    if for_ in {"sequences", "vendors"}
+                    else load_config(config_file or DEFAULT_CONFIG_PATH)
+                )
                 if for_ == "devices":
                     items = _list_devices(cfg)
                 elif for_ == "groups":
@@ -184,6 +149,8 @@ def register(app: typer.Typer) -> None:
             for item in items:
                 # Plain newline-delimited output; no styles
                 typer.echo(item)
-        except Exception as _exc:
-            # On error, return no suggestions to avoid noisy completion
+        except Exception as error:
+            if for_ in {"sequences", "vendors"}:
+                typer.echo(str(error), err=True)
+                raise typer.Exit(1) from None
             raise typer.Exit(0) from None

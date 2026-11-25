@@ -1,5 +1,5 @@
 [tool.uv]
-required-version = "==0.13.9"
+required-version = "==0.13.10"
 cache-keys = [{ file = "pyproject.toml" }, { file = "src/network_toolkit/__about__.py" }]
 
 [build-system]
@@ -11,7 +11,7 @@ name = "networka"
 dynamic = ["version"]
 description = "Modern Python cli toolkit for network device automation"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.15"
 license = { text = "Apache-2.0" }
 keywords = ["network", "automation", "mikrotik", "routeros", "cli", "async", "narrowin", "networking", "infrastructure", "library", "sdk", "programmatic", "python-api"]
 authors = [
@@ -30,10 +30,6 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: 3.15",
     "Programming Language :: Python :: 3 :: Only",
     "Topic :: System :: Networking",
@@ -49,35 +45,16 @@ dependencies = [
     "pyyaml>=6.0",
     "typer>=0.12.0",
     "rich>=13.0.0",
-    "libtmux>=0.67.1,<0.68",
+    "libtmux>=0.68.0,<0.69",
     "python-dotenv>=1.0.0",
-    "textual>=0.58.0",
+    "platformdirs>=3.6.0,<5",
 ]
 
 [project.optional-dependencies]
-dev = [
-    "ruff==0.17.6",
-    "mypy==2.4.1",
-    "pytest>=7.4.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-cov>=4.1.0",
-    "pytest-mock>=3.14.0",
-    "pytest-xdist>=3.8.0",
-    "detect-secrets>=1.4.0",
-    "bandit>=1.7.0",
-    "build>=0.10.0",
-    "twine>=4.0.0",
-    "types-PyYAML>=6.0.0",
-    "types-paramiko>=3.0.0",
-    "cffconvert>=2.0.0",
-]
 docs = [
     "mkdocs>=1.5.0",
     "mkdocs-material>=9.0.0",
     "mkdocstrings[python]>=0.24.0",
-]
-tmux = [
-    "libtmux>=0.21.0",
 ]
 
 [project.urls]
@@ -91,41 +68,12 @@ Changelog = "https://github.com/narrowin/networka/blob/main/CHANGELOG.md"
 
 [project.scripts]
 nw = "network_toolkit.cli:app"
-# nw-tui = "network_toolkit.tui:run"  # TODO: Enable when TUI is ready for release
 
 [tool.hatch.version]
 path = "src/network_toolkit/__about__.py"
 
-[tool.hatch.envs.default]
-dependencies = [
-    "coverage[toml]>=6.5",
-    "pytest",
-    "pytest-asyncio",
-]
-[tool.hatch.envs.default.scripts]
-test = "pytest {args:tests}"
-test-cov = "coverage run -m pytest {args:tests}"
-cov-report = [
-    "- coverage combine",
-    "coverage report",
-]
-cov = [
-    "test-cov",
-    "cov-report",
-]
-
-[[tool.hatch.envs.all.matrix]]
-python = ["3.11", "3.12"]
-
-[tool.hatch.envs.types]
-dependencies = [
-    "mypy>=1.0.0",
-]
-[tool.hatch.envs.types.scripts]
-check = "mypy --install-types --non-interactive {args:src/network_toolkit tests}"
-
 [tool.coverage.run]
-source_pkgs = ["network_toolkit", "tests"]
+source_pkgs = ["network_toolkit"]
 branch = true
 parallel = true
 omit = [
@@ -134,7 +82,6 @@ omit = [
 
 [tool.coverage.paths]
 network_toolkit = ["src/network_toolkit", "*/networka/src/network_toolkit"]
-tests = ["tests", "*/networka/tests"]
 
 [tool.coverage.report]
 exclude_lines = [
@@ -168,7 +115,7 @@ include = [
 ]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py315"
 line-length = 88
 include = [
     "src/**/*.py",
@@ -250,8 +197,6 @@ ban-relative-imports = "all"
 # CLI commands using Typer often need boolean flags and default arguments
 "src/network_toolkit/commands/**/*" = ["FBT001", "FBT002"]
 "src/network_toolkit/cli.py" = ["FBT002"]
-# TUI code often needs boolean parameters for theming and state
-"src/network_toolkit/tui/**/*" = ["FBT001"]
 # Platform operations often need boolean flags for hardware control
 "src/network_toolkit/platforms/**/*" = ["FBT001", "FBT002"]
 # Core device operations often need boolean flags for operational control
@@ -262,7 +207,7 @@ ban-relative-imports = "all"
 "scripts/**/*" = ["FBT001", "FBT002"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.15"
 incremental = true
 cache_dir = ".mypy_cache"
 cache_fine_grained = true
@@ -288,13 +233,14 @@ exclude = [
 [dependency-groups]
 dev = [
     "detect-secrets>=1.5.0",
+    "bandit>=1.7.0",
+    "build>=0.10.0",
+    "twine>=4.0.0",
+    "cffconvert>=2.0.0",
     "pytest>=8.4.1",
-    "pytest-asyncio>=1.1.0",
     "pytest-cov>=6.2.1",
     "pytest-mock>=3.14.1",
     "pytest-xdist>=3.8.0",
-    # Helper tooling for developing the Textual TUI (live reload, inspector)
-    "textual-dev>=1.0.0",
     # Type checking - pinned exactly for consistency (FastAPI approach)
     "mypy==2.4.1",
     "ruff==0.17.6",

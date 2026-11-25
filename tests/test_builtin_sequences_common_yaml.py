@@ -7,37 +7,18 @@ contain exactly the five approved sequences with the expected commands.
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
 
+from network_toolkit.config import NetworkConfig
 from network_toolkit.sequence_manager import SequenceManager
-
-
-class _DummyConfig:
-    """Minimal duck-typed config for SequenceManager.
-
-    We disable repo and user sequences by monkeypatching the roots to None.
-    """
-
-    # Attributes consulted by SequenceManager during init/load
-    vendor_platforms: dict[str, Any] | None = None
-    vendor_sequences: list[str] | None = None
-    global_command_sequences: dict[str, Any] | None = None
-    devices: dict[str, Any] | None = None
 
 
 @pytest.fixture()
 def sm_isolated(monkeypatch: pytest.MonkeyPatch) -> SequenceManager:
-    """SequenceManager with user/repo layers disabled to test builtin only."""
-
-    # Force user and repo roots to None so only builtin is loaded
-    def _none(*_args: Any, **_kwargs: Any) -> None:
-        return None
-
-    monkeypatch.setattr(SequenceManager, "_user_sequences_root", _none)
-    monkeypatch.setattr(SequenceManager, "_repo_sequences_root", _none)
-    return SequenceManager(_DummyConfig())
+    """Load built-in sequences without user files."""
+    monkeypatch.setattr(SequenceManager, "_user_sequences_root", lambda _self: None)
+    monkeypatch.setattr(SequenceManager, "_custom_sequences_root", lambda _self: None)
+    return SequenceManager(NetworkConfig())
 
 
 def test_mikrotik_builtin_sequences_common(sm_isolated: SequenceManager) -> None:

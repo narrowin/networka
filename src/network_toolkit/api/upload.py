@@ -169,6 +169,10 @@ def upload_file(options: UploadOptions) -> UploadResult:
     Raises:
         NetworkToolkitError: If target resolution fails completely or configuration is invalid.
     """
+    if not isinstance(options.max_concurrent, int) or options.max_concurrent < 1:
+        msg = "max_concurrent must be a positive integer"
+        raise NetworkToolkitError(msg)
+
     start_time = perf_counter()
 
     if not options.local_file.exists():

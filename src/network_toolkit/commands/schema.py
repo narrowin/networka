@@ -19,7 +19,6 @@ def register(app: typer.Typer) -> None:
         name="schema",
         help="JSON schema management commands",
         no_args_is_help=True,
-        context_settings={"help_option_names": ["-h", "--help"]},
     )
 
     @schema_app.command("install")

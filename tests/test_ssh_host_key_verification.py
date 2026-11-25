@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
+import pytest
+
 from network_toolkit.config import DeviceConfig, GeneralConfig, NetworkConfig
+from network_toolkit.device import DeviceSession
 
 
 class TestSSHHostKeyVerification:
@@ -46,28 +51,27 @@ class TestSSHHostKeyVerification:
 class TestSSHHostKeyVerificationIntegration:
     """Integration tests for SSH host key verification in device sessions."""
 
-    def test_device_connection_params_reflect_config_strict_enabled(self) -> None:
-        """Test DeviceSession uses strict checking when enabled in config."""
+    @pytest.mark.parametrize("strict", [True, False])
+    def test_device_session_passes_host_key_policy_to_transport(
+        self, strict: bool
+    ) -> None:
+        """DeviceSession passes the configured OpenSSH policy to Scrapli."""
         config = NetworkConfig(
-            general=GeneralConfig(ssh_strict_host_key_checking=True),
+            general=GeneralConfig(ssh_strict_host_key_checking=strict),
             devices={
-                "test_device": DeviceConfig(host="192.168.1.1", device_type="cisco_ios")
+                "test_device": DeviceConfig(
+                    host="192.168.1.1",
+                    device_type="cisco_ios",
+                    user="testuser",
+                    password="testpass",
+                )
             },
         )
 
-        # The device session should use the config setting
-        # Note: DeviceSession adds auth_strict_key in __init__
-        # We're testing that the config has the right value available
-        assert config.general.ssh_strict_host_key_checking is True
+        with patch("network_toolkit.transport.scrapli_sync.Cli") as driver:
+            with DeviceSession("test_device", config):
+                driver.return_value.open.assert_called_once_with()
 
-    def test_device_connection_params_reflect_config_strict_disabled(self) -> None:
-        """Test DeviceSession uses insecure mode when explicitly disabled in config."""
-        config = NetworkConfig(
-            general=GeneralConfig(ssh_strict_host_key_checking=False),
-            devices={
-                "test_device": DeviceConfig(host="192.168.1.1", device_type="cisco_ios")
-            },
-        )
-
-        # Verify config has insecure setting (disabled for lab use)
-        assert config.general.ssh_strict_host_key_checking is False
+        driver.assert_called_once()
+        options = driver.call_args.kwargs["transport_options"]
+        assert options.enable_strict_key is strict

@@ -5,42 +5,19 @@
 
 <br/>
 
-Network automation CLI. Apache 2.0 licensed. Fully open-source.
-Originally developed at [narrowin](https://narrowin.ch/en/about.html), now community maintained.
+Networka is a lightweight CLI for network engineers and integrators. Run ad hoc
+commands or reusable sequences across network devices from multiple vendors,
+then save the output and compare it with a baseline.
 
-<br/>
+Use Networka for on-demand troubleshooting and before-and-after checks. Pair it
+with continuous monitoring for alerting, telemetry, and ongoing health checks.
 
-**Networka: `Eierlegende Wollmilchsau` of network operations — optimized for your daily workflows.**
-
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.15+](https://img.shields.io/badge/python-3.15%2B-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20arm64-lightgrey.svg)](https://github.com/narrowin/networka)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Type checked with mypy](https://img.shields.io/badge/mypy-checked-blue.svg)](http://mypy-lang.org/)
 [![Docs](https://img.shields.io/github/actions/workflow/status/narrowin/networka/docs.yml?label=Docs&logo=github)](https://narrowin.github.io/networka/)
-
-Networka is a modern CLI tool for automating network devices across multiple vendors. Designed for network engineers who want fast, scalable automation with full cross-platform support.
-
----
-
-## _The Networka Monologue_
-
-_“People ask the question…_ <br>
-**what’s a Networka?** <br>
-
-And I tell 'em — <br>
-it's **not** about cables, configs, and pings. <br>
-_Oh no._ <br>
-There’s more to it than that, my friend. <br>
-
-We all like a bit of the good life — <br>
-some the uptime, some the security, <br>
-others the automation, the visibility, or the compliance. <br>
-
-But a **Networka**, oh, they're different. <br>
-Why? <br>
-Because a real **Networka** wants the f\*ing lot.”<br><br>
-(inspired by: [RockNRolla](https://www.youtube.com/watch?v=s4YLBqMJYOo))
 
 ## Getting Started
 
@@ -49,6 +26,10 @@ Because a real **Networka** wants the f\*ing lot.”<br><br>
 - Shell completion → https://narrowin.github.io/networka/shell-completion/
 - CLI reference → https://narrowin.github.io/networka/reference/cli/
 - API reference → https://narrowin.github.io/networka/reference/api/
+
+See how to [run a reusable sequence](docs/running-commands.md),
+[save the output](docs/results.md), and
+[compare it with a baseline](docs/reference/cli.md#nw-diff).
 
 <div align="center">
   <img src="https://narrowin.github.io/networka/assets/gifs/networka-setup.gif" alt="Networka Setup Demo" width="800"/>
@@ -104,31 +85,35 @@ Networka is built for network engineers who want to run commands now. Ansible ex
 ### System Requirements
 
 - **Operating System**: Linux x86-64/arm64 or macOS arm64
+- **Python**: 3.15 or later
 - **Network Access**: SSH connectivity to target devices
 - **Package Manager**: uv (recommended) or pip
 - **tmux for `nw cli`**: Install tmux to use the multi-pane CLI command (`brew install tmux` on macOS, `apt install tmux` on Debian/Ubuntu). libtmux is installed automatically with Networka.
 
 ### Install from the checkout
 
-With uv 0.13.9 in this checkout, use a project environment to keep the native driver isolated.
+With uv 0.13.10 in this checkout, use a project environment to keep the native driver isolated.
 
 ```bash
 uv sync --locked
-uv run nw --version
-uv run nw --help
+uv run --locked nw --version
+uv run --locked nw --help
 ```
 
 Networka 0.2.0 uses Scrapli 2 via the `scrapli==2026.11.12` distribution. An in-place upgrade replaces legacy Scrapli through pip or uv. Early candidate installations that included `scrapli2==2.0.4` should use a fresh environment. Networka 0.2.0 targets Linux and Apple Silicon macOS. RouterOS restart confirmation and Cisco enable-password escalation passed in disposable labs. WSL2 remains unverified. [Transport selection](docs/transport.md) · [Platform compatibility](docs/platform-compatibility.md)
 
 ## Quick Start
 
-Get up and running with config init command:
+Inspect a packaged sequence and run it on a RouterOS device. Replace the
+example address and enter your device credentials when prompted.
 
 ```bash
-# Initialize in default location with interactive prompts
-nw config init
-
+nw info system_info --vendor mikrotik_routeros
+nw run 192.0.2.10 system_info --platform mikrotik_routeros --interactive-auth
 ```
+
+For recurring work, use `nw config init` to create your
+[configuration](docs/configuration.md) and target devices by name.
 
 ### Library API
 
@@ -167,11 +152,10 @@ nw run --platform cisco_iosxe 198.51.100.20 "show version" --interactive-auth
 
 ## Terminology: device_type vs hardware platform vs transport
 
-- device_type: Network OS driver used for connections and commands (Scrapli "platform"). Examples: mikrotik_routeros, cisco_iosxe, arista_eos, juniper_junos.
-- platform (hardware/firmware): Hardware architecture used for firmware-related operations (x86, x86_64, arm, mipsbe, tile).
-- transport: Connection backend. Default is scrapli.
-
-Note: When targeting IPs directly, `--platform` refers to the network driver (device_type), not hardware architecture.
+- `device_type` is the logical platform used to select commands and the native connection definition.
+- The inventory `platform` field describes hardware architecture for firmware.
+- `--platform` names the logical platform for a raw IP target.
+- `--transport` selects the Scrapli driver family. The underlying connection backend defaults to OpenSSH. [Transport settings](docs/transport.md)
 
 ## Quick links
 

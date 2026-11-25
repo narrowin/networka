@@ -2,7 +2,9 @@
 
 Supported identifiers: `nokia_srlinux`
 
-Status: initial support available. Vendor-specific documentation for firmware management and backups will follow as platform operations are implemented.
+The packaged Scrapli catalog includes `nokia_srlinux`. Run
+`nw platforms info nokia_srlinux` to inspect the active definition.
+Device behavior depends on the OS version and commands used.
 
 ## Quickstart
 

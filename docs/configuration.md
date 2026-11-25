@@ -2,15 +2,19 @@
 
 This guide explains how to define devices, groups, and sequences for Networka. YAML is the preferred and most expressive format. CSV is supported mainly for users who manage inventories in spreadsheets on Windows. You can mix formats; use YAML by default and add CSV where it makes workflow sense.
 
-Note on credentials: See Environment variables (TL;DR at the top) for how credentials are resolved and how to set defaults and overrides.
+See [environment variables](environment-variables.md) for credential defaults and overrides.
 
 ## Directory layout
 
-Networka expects a modular configuration rooted at the platform-specific application directory created by `nw config init` (Linux: `~/.config/networka`, macOS: `~/Library/Application Support/networka`, Windows: `%APPDATA%\networka`). Within that root, place configuration under the `config/` directory:
+Use the platform-specific directory created by `nw config init`.
+On Linux it is typically `~/.config/networka` and on macOS it is
+`~/Library/Application Support/networka`. Place the modular files directly
+in that directory, or pass your own directory with the command's
+`--config` option.
 
 ```text
-config/
-├── config.yml                 # Optional global defaults
+networka/
+├── config.yml                 # Main configuration file
 ├── devices/                   # Device definitions (YAML or CSV)
 │   ├── router1.yml
 │   └── inventory.csv
@@ -28,11 +32,12 @@ Networka loads all files in these folders. Later files override earlier ones whe
 
 - Device name: unique identifier used on the CLI (e.g., `nw run router1 ...`).
 - Host: IP or DNS name to connect to.
-- Device type: vendor/platform key (e.g., `mikrotik_routeros`, `cisco_iosxe`).
+- `device_type` is the logical network OS used for definition and sequence selection, for example `mikrotik_routeros`.
+- `platform` in inventory is an optional hardware architecture such as `arm` for firmware selection.
 - Groups: explicit member lists and/or tag-based membership.
 - Sequences: named sets of commands to run consistently.
 
-Credentials come from environment variables; see Environment variables for details.
+For the active definition catalog, run `nw platforms list`.
 
 ## Using Nornir / Containerlab inventory (optional) {#nornir-inventory}
 
@@ -66,36 +71,41 @@ YAML gives you clarity, comments, nesting, and future-proofing. Prefer it for ev
 
 ```yaml
 # config/devices/router1.yml
-host: 192.0.2.10
-device_type: mikrotik_routeros
-tags: [edge, router]
+devices:
+  router1:
+    host: 192.0.2.10
+    device_type: mikrotik_routeros
+    tags: [edge, router]
 ```
 
 ### Group examples
 
 ```yaml
-# config/groups/core.yml
-name: core
-description: Core network devices
-members: [sw-01, sw-02]
-
----
-# config/groups/edge.yml
-name: edge
-description: Edge devices
-match_tags: [edge]
+# groups/groups.yml
+groups:
+  core:
+    description: Core network devices
+    members: [router1]
+  edge:
+    description: Edge devices
+    match_tags: [edge]
 ```
 
 ### Sequence example
 
 ```yaml
 # config/sequences/common.yml
-health_check:
-  description: Basic health check
-  commands:
-    - /system/resource/print
-    - /interface/print stats
+sequences:
+  router_summary:
+    description: Basic RouterOS summary
+    device_types: [mikrotik_routeros]
+    commands:
+      - /system/resource/print
+      - /interface/print stats
 ```
+
+Global definitions are a fallback after platform and device-local sequences.
+See the [resolution order](multi-vendor-support.md#sequence-resolution-order).
 
 ## CSV {#csv}
 
@@ -125,19 +135,9 @@ core_switches,Core network switches,sw-01;sw-02,switch;core
 edge_devices,Edge routers and firewalls,,edge;firewall
 ```
 
-### Sequences CSV
-
-Required: `name`, `description`, `commands` (semicolon-separated)
-
-Optional: `tags` (semicolon-separated)
-
-```csv
-name,description,commands,tags
-health_check,Basic health check,/system/resource/print;/interface/print stats,monitoring;health
-```
-
 ## YAML vs CSV: differences at a glance
 
+- Scope: Use YAML for sequences. Device and group inventories also support CSV.
 - Expressiveness: YAML supports comments, nesting, and complex structures; CSV is flat.
 - Multi-valued fields: In YAML, use lists; in CSV, use semicolon-separated values.
 - Merging/overrides: Both support file-level overrides by name; YAML is clearer for intent.
@@ -147,7 +147,7 @@ Recommendation: Use YAML for long-term, reviewable configuration. Use CSV for qu
 
 ## Mixing formats
 
-Mixing is supported. If both YAML and CSV define the same device/group/sequence name, the later-loaded file wins according to filesystem order. Keep ownership clear to avoid surprises.
+Device and group inventories can mix YAML and CSV. Keep each name in one file to make its source clear.
 
 ## Next steps
 
@@ -157,35 +157,18 @@ Mixing is supported. If both YAML and CSV define the same device/group/sequence 
 
 ## Global settings (config.yml)
 
-The optional `config/config.yml` file can specify global defaults that apply to all devices. This is particularly useful for SSH security settings and connection timeouts.
-
-### SSH security settings
-
-#### ssh_strict_host_key_checking
-
-- **Type**: boolean
-- **Default**: `false` (accept-new behavior)
-- **Description**: Control SSH host key verification behavior
-- **Impact**:
-  - When `false` (default): Uses `accept-new` - automatically accepts new host keys, but verifies existing ones. Protects against MITM on known hosts while allowing new devices.
-  - When `true`: Strict mode - fails on any unknown or changed host key (most secure, but requires manual key management)
-  - With `--no-strict-host-key-checking` flag: Completely disables all verification (INSECURE - lab use only)
-
-Example `config/config.yml`:
+Use `config.yml` for settings that apply to all devices.
 
 ```yaml
 general:
-  ssh_strict_host_key_checking: false  # Default: accept-new (accept new, verify existing)
-  # Set to true for maximum security (requires manual key management)
+  ssh_strict_host_key_checking: true
+  timeout: 30
+  command_timeout: 60
 ```
 
-For the `run` and `cli` commands, you can completely disable all host key verification per-command:
-
-```bash
-# Completely disable host key verification (INSECURE - lab use only)
-nw run router1 '/system/identity/print' --no-strict-host-key-checking
-nw cli router1 --no-strict-host-key-checking
-```
+Host-key checking defaults to disabled. See
+[transport selection](transport.md) for how command sessions, tmux panes,
+and SFTP apply the setting.
 
 #### ssh_known_hosts_file
 

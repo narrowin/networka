@@ -16,14 +16,14 @@ from network_toolkit.api.run import (
     TargetResolutionError,
     run_commands,
 )
-from network_toolkit.common.command import CommandContext
+from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.common.credentials import prompt_for_credentials
-from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
-from network_toolkit.common.output import (
-    OutputMode,
-    get_output_mode_from_config,
-    set_output_mode,
+from network_toolkit.common.defaults import (
+    DEFAULT_CONFIG_PATH,
+    SSH_PORT_MAX,
+    SSH_PORT_MIN,
 )
+from network_toolkit.common.output import OutputMode
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.ip_device import is_ip_list
 from network_toolkit.results_enhanced import ResultsManager
@@ -40,7 +40,6 @@ class RawFormat(str, Enum):
 def register(app: typer.Typer) -> None:
     @app.command(
         rich_help_panel="Remote Operations",
-        context_settings={"help_option_names": ["-h", "--help"]},
     )
     def run(
         target: Annotated[
@@ -114,6 +113,8 @@ def register(app: typer.Typer) -> None:
             typer.Option(
                 "--port",
                 help="SSH port when using IP addresses (default: 22)",
+                min=SSH_PORT_MIN,
+                max=SSH_PORT_MAX,
             ),
         ] = None,
         transport_type: Annotated[
@@ -155,15 +156,11 @@ def register(app: typer.Typer) -> None:
             verbose=verbose,
             config_file=config_file,
             config=config,
+            require_config=True,
         )
-
-        # Allow config-driven output mode when CLI flag not set
-        output_mgr = ctx.output
-        if output_mode is None:
-            chosen_mode = get_output_mode_from_config(
-                getattr(getattr(ctx.config, "general", None), "output_mode", None)
-            )
-            output_mgr = set_output_mode(chosen_mode)
+        config = ctx.config
+        assert config is not None
+        output_mgr = ctx.output_manager
 
         interactive_creds = None
         if interactive_auth:
@@ -228,7 +225,7 @@ def register(app: typer.Typer) -> None:
             options = RunOptions(
                 target=target,
                 command_or_sequence=command_or_sequence,
-                config=ctx.config,
+                config=config,
                 device_type=device_type,
                 port=port,
                 transport_type=transport_type,
@@ -266,7 +263,7 @@ def register(app: typer.Typer) -> None:
                 return None
             # Mirror results manager used by API for consistent directory handling
             return ResultsManager(
-                ctx.config,
+                config,
                 store_results=store_results,
                 results_dir=results_dir,
                 command_context=f"run_{target}_{command_or_sequence}",

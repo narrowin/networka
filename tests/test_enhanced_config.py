@@ -21,7 +21,7 @@ class TestCSVLoading:
         """Test loading valid devices CSV file."""
         csv_content = """name,host,device_type,description,platform,model,location,tags
 sw-01,192.168.1.1,mikrotik_routeros,Switch 1,mipsbe,CRS326,Lab,switch;access;lab
-rtr-01,192.168.1.254,mikrotik_routeros,Router 1,arm,RB4011,Office,router;edge"""
+rtr-01,192.168.1.254,cumulus_linux,Router 1,arm,,Office,router;edge"""
 
         csv_file = tmp_path / "devices.csv"
         csv_file.write_text(csv_content)
@@ -40,11 +40,12 @@ rtr-01,192.168.1.254,mikrotik_routeros,Router 1,arm,RB4011,Office,router;edge"""
         assert sw01.model == "CRS326"
         assert sw01.location == "Lab"
         assert sw01.tags == ["switch", "access", "lab"]
+        assert devices["rtr-01"].device_type == "cumulus_linux"
 
     def test_load_csv_devices_empty_tags(self, tmp_path):
         """Test loading devices CSV with empty tags."""
         csv_content = """name,host,device_type,description,platform,model,location,tags
-sw-01,192.168.1.1,mikrotik_routeros,Switch 1,mipsbe,CRS326,Lab,"""
+sw-01,192.168.1.1,,Switch 1,mipsbe,CRS326,Lab,"""
 
         csv_file = tmp_path / "devices.csv"
         csv_file.write_text(csv_content)
@@ -53,6 +54,7 @@ sw-01,192.168.1.1,mikrotik_routeros,Switch 1,mipsbe,CRS326,Lab,"""
 
         assert len(devices) == 1
         assert devices["sw-01"].tags is None
+        assert devices["sw-01"].device_type == "linux"
 
     def test_load_csv_devices_missing_name(self, tmp_path):
         """Test loading devices CSV with missing name field."""

@@ -1,90 +1,31 @@
 #!/usr/bin/env python3
-"""
-Lab Validation Script
-=====================
+"""Run Networka SDK smoke checks on explicitly authorized lab devices.
 
-This script performs basic health and validation checks on lab devices using the
-Networka library. It is designed to be simple, robust, and easy to extend.
+For a live check, name the approved device and inspect the command output::
 
-Usage:
-    python3 scripts/lab_validation.py [options]
+    uv run python scripts/lab_validation.py --config /path/to/lab-config --target lab-router
 
-Options:
-    --target <name>   Target a specific device by name.
-    --tag <tag>       Target devices with a specific tag.
-    --list            List available devices and exit.
-
+Use `--list` to inspect the inventory without connecting. Without `--target`
+or `--tag`, the script selects every device. A pass means a command returned
+nonempty output. Verify device identity and OS version in that output.
 """
 
 import argparse
-import sys
 
 from network_toolkit import NetworkaClient
-from network_toolkit.api.run import RunResult
 
 
-def main() -> None:
-    """Main entry point for the lab validation script."""
-    parser = argparse.ArgumentParser(description="Lab Validation Script")
-    parser.add_argument("--config", help="Inventory configuration file or directory")
-    parser.add_argument("--target", help="Target a specific device by name")
-    parser.add_argument("--tag", help="Target devices with a specific tag")
-    parser.add_argument("--list", action="store_true", help="List available devices")
-    args = parser.parse_args()
-
-    # Initialize the client
-    # The client automatically loads configuration from standard locations
-    try:
-        client = NetworkaClient(config_path=args.config)
-    except Exception as e:
-        print(f"Error initializing Networka client: {e}")
-        sys.exit(1)
-
-    # List devices if requested
-    if args.list:
-        print("Available Devices:")
-        for name, device in client.devices.items():
-            print(f"  - {name} ({device.device_type})")
-        return
-
-    # Determine targets
-    targets: list[str] = []
-    if args.target:
-        if args.target in client.devices:
-            targets.append(args.target)
-        else:
-            print(f"Error: Device '{args.target}' not found in configuration.")
-            sys.exit(1)
-    elif args.tag:
-        for name, device in client.devices.items():
-            if device.tags and args.tag in device.tags:
-                targets.append(name)
-        if not targets:
-            print(f"No devices found with tag '{args.tag}'.")
-            sys.exit(1)
-    else:
-        # Default to all devices if no specific target is given
-        targets = list(client.devices.keys())
-
-    if not targets:
-        print("No targets selected.")
-        sys.exit(1)
-
-    print(f"Starting validation for {len(targets)} devices...")
+def _check_devices(client: NetworkaClient, targets: list[str]) -> int:
+    print(f"Starting smoke checks for {len(targets)} devices...")
     print("-" * 60)
 
-    # Execute checks
     success_count = 0
     failure_count = 0
 
     for target_name in targets:
-        device_config = client.devices[target_name]
-        platform = device_config.device_type
-
+        platform = client.devices[target_name].device_type
         print(f"Checking {target_name} ({platform})...")
 
-        # Define commands based on platform
-        commands: list[str] = []
         if "linux" in platform.lower():
             commands = ["uname -r", "uptime"]
         elif "mikrotik" in platform.lower() or "routeros" in platform.lower():
@@ -96,45 +37,32 @@ def main() -> None:
             failure_count += 1
             continue
 
-        # Run commands
         device_failed = False
-        for cmd in commands:
+        for command in commands:
             try:
-                # Run the command using the client
-                # We use the client.run() method which handles connection management
-                result: RunResult = client.run(
-                    target=target_name, command_or_sequence=cmd
-                )
+                result = client.run(target=target_name, command_or_sequence=command)
+            except Exception as exc:
+                print(f"  [ERR] Exception running '{command}': {exc}")
+                device_failed = True
+                continue
 
-                # Process results
-                # client.run returns a RunResult object which contains a list of DeviceCommandResult objects
-                # Since we targeted a single device, we expect one result
-                if not result.command_results:
-                    print(f"  [FAIL] No results returned for command '{cmd}'")
-                    device_failed = True
-                    break
+            if not result.command_results:
+                print(f"  [FAIL] No results returned for command '{command}'")
+                device_failed = True
+                break
 
-                device_result = result.command_results[0]
+            device_result = result.command_results[0]
+            if device_result.error:
+                print(f"  [FAIL] Command '{command}' failed: {device_result.error}")
+                device_failed = True
+                continue
 
-                if device_result.error:
-                    print(f"  [FAIL] Command '{cmd}' failed: {device_result.error}")
-                    device_failed = True
-                else:
-                    # Basic validation: check if output is not empty
-                    output = (
-                        device_result.output.strip() if device_result.output else ""
-                    )
-                    if output:
-                        print(f"  [PASS] {cmd}")
-                        # Optional: Print first line of output for verification
-                        first_line = output.split("\n")[0]
-                        print(f"         > {first_line[:50]}...")
-                    else:
-                        print(f"  [FAIL] Command '{cmd}' returned empty output")
-                        device_failed = True
-
-            except Exception as e:
-                print(f"  [ERR] Exception running '{cmd}': {e}")
+            output = (device_result.output or "").strip()
+            if output:
+                print(f"  [PASS] {command} returned output")
+                print(output)
+            else:
+                print(f"  [FAIL] Command '{command}' returned empty output")
                 device_failed = True
 
         if device_failed:
@@ -144,15 +72,58 @@ def main() -> None:
 
         print("-" * 60)
 
-    # Summary
-    print("Validation Summary")
+    print("Smoke Check Summary")
     print(f"Total Devices: {len(targets)}")
     print(f"Successful:    {success_count}")
     print(f"Failed:        {failure_count}")
+    return int(failure_count > 0)
 
-    if failure_count > 0:
-        sys.exit(1)
+
+def main() -> int:
+    """Load inventory, select devices, and close the client on every exit."""
+    parser = argparse.ArgumentParser(description="Lab Validation Script")
+    parser.add_argument("--config", help="Inventory configuration file or directory")
+    parser.add_argument("--target", help="Target a specific device by name")
+    parser.add_argument("--tag", help="Target devices with a specific tag")
+    parser.add_argument("--list", action="store_true", help="List available devices")
+    args = parser.parse_args()
+
+    with NetworkaClient(config_path=args.config) as client:
+        try:
+            devices = client.devices
+        except Exception as exc:
+            print(f"Error loading inventory: {exc}")
+            return 1
+
+        if args.list:
+            print("Available Devices:")
+            for name, device in devices.items():
+                print(f"  - {name} ({device.device_type})")
+            return 0
+
+        if args.target:
+            if args.target not in devices:
+                print(f"Error: Device '{args.target}' not found in configuration.")
+                return 1
+            targets = [args.target]
+        elif args.tag:
+            targets = [
+                name
+                for name, device in devices.items()
+                if device.tags and args.tag in device.tags
+            ]
+            if not targets:
+                print(f"No devices found with tag '{args.tag}'.")
+                return 1
+        else:
+            targets = list(devices)
+
+        if not targets:
+            print("No targets selected.")
+            return 1
+
+        return _check_devices(client, targets)
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

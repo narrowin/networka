@@ -46,7 +46,6 @@ from network_toolkit.exceptions import NetworkToolkitError
 def register(app: typer.Typer) -> None:
     @app.command(
         rich_help_panel="Remote Operations",
-        context_settings={"help_option_names": ["-h", "--help"]},
     )
     def diff(
         target: Annotated[

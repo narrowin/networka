@@ -22,6 +22,10 @@ user         admin              env: NW_USER_DEFAULT
 port         22                 default
 ```
 
+For sequences, use `nw info system_info --vendor mikrotik_routeros` for the
+platform choice or `nw info system_info --device router1` for a device's
+choice. Both show the selected commands and source.
+
 ## Source Types
 
 The `Source` column shows where each value originated:

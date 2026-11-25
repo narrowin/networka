@@ -7,11 +7,7 @@ from typing import Any
 
 from network_toolkit.config import NetworkConfig
 from network_toolkit.inventory.catalog import get_inventory_catalog
-from network_toolkit.sequence_manager import (
-    SequenceManager,
-    SequenceRecord,
-    SequenceSource,
-)
+from network_toolkit.sequence_manager import SequenceManager, SequenceSource
 
 
 @dataclass
@@ -51,6 +47,7 @@ class SequenceInfo:
     commands: list[str] | None = None
     timeout: float | None = None
     device_types: list[str] | None = None
+    device: str | None = None
 
 
 def get_device_list(config: NetworkConfig) -> list[DeviceInfo]:
@@ -202,45 +199,27 @@ def get_sequence_list(
     category: str | None = None,
 ) -> list[SequenceInfo]:
     """Get list of available sequences."""
-    sm = SequenceManager(config)
-    result = []
-
-    def _create_info(
-        name: str, seq: SequenceRecord, v_name: str | None
-    ) -> SequenceInfo:
-        cmds = []
-        if seq.commands:
-            if isinstance(seq.commands[0], str):
-                cmds = seq.commands
-            else:
-                cmds = [cmd.command for cmd in seq.commands]
-
-        return SequenceInfo(
-            name=name,
-            category=seq.category,
-            description=seq.description,
-            source=seq.source,
-            vendor=v_name,
-            commands=cmds,
-            timeout=seq.timeout,
-            device_types=seq.device_types,
-        )
-
-    if vendor:
-        vendor_seqs = sm.list_vendor_sequences(vendor)
-        if not vendor_seqs:
-            return []
-
-        for name, seq in vendor_seqs.items():
-            if category and seq.category != category:
-                continue
-            result.append(_create_info(name, seq, vendor))
-    else:
-        all_vendor = sm.list_all_sequences()
-        for v_name, sequences in all_vendor.items():
-            for name, seq in sequences.items():
-                if category and seq.category != category:
-                    continue
-                result.append(_create_info(name, seq, v_name))
-
-    return sorted(result, key=lambda x: (x.vendor or "", x.name))
+    manager = SequenceManager(config)
+    records = (
+        manager.list_platform_sequences(vendor).values()
+        if vendor
+        else manager.catalog_records()
+    )
+    return sorted(
+        (
+            SequenceInfo(
+                name=record.name,
+                category=record.category,
+                description=record.description,
+                source=record.source,
+                vendor=record.vendor or vendor,
+                commands=record.commands,
+                timeout=record.timeout,
+                device_types=record.device_types,
+                device=record.device,
+            )
+            for record in records
+            if not category or record.category == category
+        ),
+        key=lambda item: (item.device or "", item.vendor or "", item.name),
+    )

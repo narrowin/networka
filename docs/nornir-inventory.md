@@ -38,6 +38,11 @@ nw list groups --config /path/to/networka-config-dir
 nw run mikrotik "/system/identity/print" --config /path/to/networka-config-dir
 ```
 
+The imported device type selects its definition and sequences. Use
+`nw platforms list` to look up the active definition names and
+`nw info mikrotik --config /path/to/networka-config-dir` to inspect the
+imported device.
+
 ## Adding groups via Containerlab labels
 
 Containerlab can write Nornir groups into `nornir-simple-inventory.yml` using node labels that start with `nornir-group`:

@@ -1,6 +1,6 @@
 """Tests for list API."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -9,7 +9,7 @@ from network_toolkit.api.list import (
     get_group_list,
     get_sequence_list,
 )
-from network_toolkit.config import NetworkConfig
+from network_toolkit.config import DeviceConfig, NetworkConfig, VendorSequence
 
 
 @pytest.fixture
@@ -66,38 +66,52 @@ def test_get_group_list(mock_config):
     assert groups[0].description == "Core Devices"
 
 
-def test_get_sequence_list(mock_config):
-    # Mock SequenceManager
-    with patch("network_toolkit.api.list.SequenceManager") as mock_sm_cls:
-        sm = mock_sm_cls.return_value
+def test_get_sequence_list() -> None:
+    config = NetworkConfig(
+        vendor_sequences={
+            "cisco_iosxe": {
+                "scope_check": VendorSequence(
+                    description="Upgrade",
+                    commands=["platform command"],
+                    category="test_scope",
+                    timeout=30,
+                ),
+            }
+        },
+        global_command_sequences={
+            "scope_check": VendorSequence(
+                description="Fallback",
+                commands=["global command"],
+                category="test_scope",
+            ),
+            "restricted_check": VendorSequence(
+                description="Router health",
+                commands=["router command"],
+                category="test_scope",
+                device_types=["mikrotik_routeros"],
+            ),
+        },
+        devices={
+            "rack_router": DeviceConfig(
+                host="192.0.2.1", command_sequences={"owner_check": ["owner command"]}
+            )
+        },
+    )
 
-        seq1 = MagicMock()
+    sequences = get_sequence_list(config, vendor="cisco_iosxe", category="test_scope")
+    assert [sequence.name for sequence in sequences] == ["scope_check"]
+    winner = sequences[0]
+    assert winner.vendor == "cisco_iosxe"
+    assert winner.commands == ["platform command"]
+    assert winner.timeout == 30
+    assert winner.source and winner.source.origin == "repo"
 
-        seq1.category = "maintenance"
-        seq1.description = "Upgrade"
-        seq1.source = "repo"
-        seq1.commands = ["cmd1"]
-        seq1.timeout = 30
-        seq1.device_types = ["cisco_ios"]
-
-        seq2 = MagicMock()
-        seq2.category = "info"
-        seq2.description = "Show info"
-        seq2.source = "builtin"
-        seq2.commands = ["cmd2"]
-        seq2.timeout = None
-        seq2.device_types = []
-
-        sm.list_all_sequences.return_value = {
-            "cisco_ios": {"upgrade": seq1},
-            "mikrotik_routeros": {"info": seq2},
-        }
-
-        sequences = get_sequence_list(mock_config)
-
-        assert len(sequences) == 2
-        # Sorted by vendor then name. cisco_ios < mikrotik_routeros
-        assert sequences[0].name == "upgrade"
-        assert sequences[0].vendor == "cisco_ios"
-        assert sequences[1].name == "info"
-        assert sequences[1].vendor == "mikrotik_routeros"
+    catalogue = get_sequence_list(config)
+    assert any(
+        sequence.name == "owner_check" and sequence.device == "rack_router"
+        for sequence in catalogue
+    )
+    assert any(
+        sequence.name == "scope_check" and sequence.vendor is None
+        for sequence in catalogue
+    )

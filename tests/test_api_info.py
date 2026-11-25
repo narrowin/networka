@@ -1,35 +1,47 @@
-from unittest.mock import MagicMock, patch
-
-import pytest
-
 from network_toolkit.api.info import InfoOptions, get_info
-from network_toolkit.config import NetworkConfig
+from network_toolkit.config import (
+    DeviceConfig,
+    DeviceGroup,
+    NetworkConfig,
+    VendorSequence,
+)
 
 
-@pytest.fixture
-def mock_config():
-    config = MagicMock(spec=NetworkConfig)
-    config.devices = {"dev1": MagicMock()}
-    config.device_groups = {"group1": ["dev1"]}
-    return config
+def test_get_info_targets() -> None:
+    config = NetworkConfig(
+        devices={
+            "dev1": DeviceConfig(
+                host="192.0.2.1", command_sequences={"owner_check": ["owner command"]}
+            )
+        },
+        device_groups={
+            "group1": DeviceGroup(description="Check devices", members=["dev1"])
+        },
+        global_command_sequences={
+            "seq1": VendorSequence(
+                description="Check health", commands=["global command"]
+            )
+        },
+    )
 
-
-@patch("network_toolkit.api.info.SequenceManager")
-def test_get_info_targets(mock_sm_cls, mock_config):
-    mock_sm = MagicMock()
-    mock_sm_cls.return_value = mock_sm
-    mock_sm.list_all_sequences.return_value = {"vendor1": ["seq1"]}
-
-    options = InfoOptions(targets="dev1,group1,seq1,unknown1", config=mock_config)
-
-    result = get_info(options)
+    result = get_info(InfoOptions(targets="dev1,group1,seq1,unknown1", config=config))
 
     assert result.device_count == 1
-    assert len(result.targets) == 3
+    assert {target.name: target.type for target in result.targets} == {
+        "dev1": "device",
+        "group1": "group",
+        "seq1": "sequence",
+    }
+    assert result.targets[2].sequence_records[0].commands == ["global command"]
+    assert result.unknown_targets == ["unknown1"]
 
-    target_names = {t.name: t.type for t in result.targets}
-    assert target_names["dev1"] == "device"
-    assert target_names["group1"] == "group"
-    assert target_names["seq1"] == "sequence"
+    scoped = get_info(InfoOptions(targets="owner_check", config=config, device="dev1"))
+    record = scoped.targets[0].sequence_records[0]
+    assert record.commands == ["owner command"]
+    assert record.source and record.source.origin == "device"
 
-    assert "unknown1" in result.unknown_targets
+    vendor = get_info(
+        InfoOptions(targets="owner_check", config=config, vendor="mikrotik_routeros")
+    )
+    assert vendor.targets[0].sequence_records == []
+    assert vendor.unknown_targets == []

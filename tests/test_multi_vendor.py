@@ -16,7 +16,7 @@ from network_toolkit.config import VendorSequence, load_config
 
 
 @pytest.fixture
-def multi_vendor_config_dir() -> Generator[Path, None, None]:
+def multi_vendor_config_dir() -> Generator[Path]:
     """Create a temporary directory with multi-vendor configuration."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         config_dir = Path(tmp_dir)

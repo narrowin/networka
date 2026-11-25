@@ -176,7 +176,7 @@ TODAY=$(date +%Y-%m-%d)
 
 if [[ "$DRY_RUN" != true ]]; then
     echo "Updating CHANGELOG.md..."
-    python3 - "$CHANGELOG_FILE" "$VERSION" "$TODAY" <<'PYTHON'
+    uv run --no-sync python - "$CHANGELOG_FILE" "$VERSION" "$TODAY" <<'PYTHON'
 from pathlib import Path
 import sys
 
@@ -216,14 +216,10 @@ fi
 if [[ -f "CITATION.cff" ]]; then
     if [[ "$DRY_RUN" != true ]]; then
         echo "Validating CITATION.cff..."
-        if command -v cffconvert >/dev/null 2>&1; then
-            if cffconvert --validate; then
-                echo "CITATION.cff is valid"
-            else
-                echo "WARNING: CITATION.cff validation failed"
-            fi
+        if uv run --no-sync cffconvert --validate; then
+            echo "CITATION.cff is valid"
         else
-            echo "cffconvert not found - skipping CITATION.cff validation"
+            echo "WARNING: CITATION.cff validation failed"
         fi
     else
         echo "Would validate CITATION.cff"

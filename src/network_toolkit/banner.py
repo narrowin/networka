@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from rich.console import Console
 from rich.text import Text
+
+from network_toolkit.common.command_helpers import CommandContext
+from network_toolkit.common.output import OutputMode
 
 # ASCII Art Banner for NETWORKA (plain text for fallback)
 BANNER_PLAIN = """
@@ -15,29 +17,22 @@ BANNER_PLAIN = """
 ╚═╝  ╚═══╝╚══════╝   ╚═╝    ╚══╝╚══╝  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝
 """
 
-# Keep BANNER for backward compatibility
-BANNER = BANNER_PLAIN
-
 
 def show_banner() -> None:
     """Show the banner with welcome message and cyan-to-blue gradient colors."""
-    from network_toolkit.common.command_helpers import CommandContext
+    output = CommandContext().output_manager
 
-    ctx = CommandContext()
-
-    # Check if we should suppress colors
-    if ctx.should_suppress_colors():
-        # Raw mode - just print plain banner
-        ctx.print_info(BANNER_PLAIN.rstrip())
-        ctx.print_info("Welcome to Networka! Multi-vendor network automation CLI.")
-        ctx.print_info(
+    if output.mode in (OutputMode.RAW, OutputMode.NO_COLOR):
+        output.print_info(BANNER_PLAIN.rstrip())
+        output.print_info("Welcome to Networka! Multi-vendor network automation CLI.")
+        output.print_info(
             "Type 'nw --help' for available commands or 'nw config init' to get started."
         )
         return
 
     # Use Rich to render banner with colors matching the logo image
     # Create smooth gradient from Sky blue (top) to softer pink (bottom)
-    console = Console()
+    console = output.console
     banner_lines = BANNER_PLAIN.strip().split("\n")
 
     # Gradient from sky blue (45,121,210) to soft muted pink
@@ -56,7 +51,7 @@ def show_banner() -> None:
         console.print(text)
 
     # Print welcome messages
-    ctx.print_info("Welcome to Networka! Multi-vendor network automation CLI.")
-    ctx.print_info(
+    output.print_info("Welcome to Networka! Multi-vendor network automation CLI.")
+    output.print_info(
         "Type 'nw --help' for available commands or 'nw config init' to get started."
     )

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from unittest.mock import Mock, patch
+from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from network_toolkit.cli import app
@@ -11,62 +12,48 @@ from network_toolkit.common.output import OutputMode
 from network_toolkit.common.styles import StyleManager, StyleName
 
 
-def test_color_system_no_color_mode() -> None:
-    """Test that no-color mode works without errors."""
-    runner = CliRunner()
+def test_color_system_no_color_mode(
+    config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An explicit no-color mode keeps ANSI out of rendered tables."""
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.delenv("TTY_COMPATIBLE", raising=False)
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    monkeypatch.setenv("NW_OUTPUT_MODE", "dark")
+    monkeypatch.setenv("TERM", "xterm-256color")
 
-    # Create a mock config with empty devices
-    mock_config = Mock()
-    mock_config.devices = {}
-    mock_config.general = Mock()
-    mock_config.general.output_mode = "default"
-    mock_config.general.log_level = "WARNING"
-    mock_config.general.enable_logging = False
-
-    with (
-        patch("network_toolkit.common.command.load_config", return_value=mock_config),
-        patch("network_toolkit.commands.list.load_config", return_value=mock_config),
-    ):
-        # Test the command works in no-color mode
-        result = runner.invoke(app, ["list", "devices", "--output-mode", "no-color"])
-
-        # Should not crash with color errors
-        assert result.exit_code == 0
-        # Should not contain color markup in output
-        assert "[" not in result.stdout or "No devices configured" in result.stdout
-
-
-def test_color_system_default_mode() -> None:
-    """Test that default color mode works."""
-    from network_toolkit.config import DeviceConfig, GeneralConfig, NetworkConfig
-
-    runner = CliRunner()
-
-    # Create proper Pydantic config objects
-    general = GeneralConfig(
-        output_mode="default", log_level="WARNING", enable_logging=False
-    )
-    device = DeviceConfig(
-        host="192.168.1.1",
-        port=22,
-        device_type="mikrotik_routeros",
-        platform="tile",
-    )
-    mock_config = NetworkConfig(
-        devices={"test-device": device},
-        device_groups={},
-        general=general,
+    result = CliRunner().invoke(
+        app,
+        ["list", "devices", "--config", str(config_file), "--output-mode", "no-color"],
+        color=True,
     )
 
-    with (
-        patch("network_toolkit.common.command.load_config", return_value=mock_config),
-        patch("network_toolkit.commands.list.load_config", return_value=mock_config),
-    ):
-        # Test the command works in default mode
-        result = runner.invoke(app, ["list", "devices"])
+    assert result.exit_code == 0, result.output
+    assert "test_device1" in result.stdout
+    assert "\x1b[" not in result.stdout
 
-        # Should not crash
-        assert result.exit_code == 0
+
+def test_color_system_default_mode(
+    config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Default output detects whether a terminal was requested."""
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.delenv("FORCE_COLOR", raising=False)
+    monkeypatch.delenv("NW_OUTPUT_MODE", raising=False)
+    monkeypatch.delenv("TTY_COMPATIBLE", raising=False)
+    monkeypatch.setenv("TERM", "xterm-256color")
+    args = ["list", "devices", "--config", str(config_file)]
+
+    redirected = CliRunner().invoke(app, args, color=True)
+    assert redirected.exit_code == 0, redirected.output
+    assert "test_device1" in redirected.stdout
+    assert "\x1b[" not in redirected.stdout
+
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    forced = CliRunner().invoke(app, args, color=True)
+    assert forced.exit_code == 0, forced.output
+    assert "test_device1" in forced.stdout
+    assert "\x1b[" in forced.stdout
 
 
 def test_style_manager_no_color_returns_none() -> None:

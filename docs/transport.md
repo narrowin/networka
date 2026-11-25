@@ -2,7 +2,16 @@
 
 Networka 0.2.0 uses the Scrapli 2.0.4 implementation via the `scrapli==2026.11.12` distribution. This lets the resolver replace the legacy `scrapli` distribution in the same environment. Use a fresh environment if an early preview installed the separate `scrapli2` distribution.
 
-The driver family remains `scrapli`. The CLI `--transport` option takes precedence over the device's `transport_type` and then `general.default_transport_type`. Set the underlying connection backend with `general.transport` or `overrides.transport` for a device.
+The driver family is `scrapli`. The CLI `--transport` option takes precedence
+over `transport_type` and `general.default_transport_type`. Set the connection
+backend with `general.transport` or a device's `overrides.transport`.
+
+The inventory's `device_type` or the IP target's `--platform` supplies the
+connection definition. Scrapli selects a named definition from its packaged
+catalog or the active override directory. The generic `default` definition
+handles shell prompts for the existing `linux` and `generic` aliases.
+Use [platform inspection](platform-compatibility.md#inspect-connection-definitions-and-capabilities)
+to see the exact names and sources.
 
 | Backend | Configuration and behavior |
 | --- | --- |
@@ -11,7 +20,13 @@ The driver family remains `scrapli`. The CLI `--transport` option takes preceden
 | `telnet` | Uses native Telnet. Set the inventory port explicitly, normally 23. |
 | Legacy `paramiko`, `asyncssh`, `asynctelnet` | Choose a supported backend for this candidate or use the compatibility line. Paramiko still handles SFTP. |
 
-For CLI SSH sessions with a populated known-hosts file, enable `general.ssh_strict_host_key_checking`. The default value of false disables verification. SFTP uses an independent Paramiko connection and applies the same flag. In strict mode it checks the inventory host and port against `~/.ssh/known_hosts` before sending the password.
+Host-key checking defaults to disabled. Enable
+`general.ssh_strict_host_key_checking` for SSH command sessions that use a
+known-hosts file. For `nw cli` tmux panes, the same setting enables OpenSSH's
+`accept-new` behavior. A new key is added and a changed key is rejected.
+SFTP uses an independent Paramiko connection. With checking enabled, it
+checks the inventory host and port against `~/.ssh/known_hosts` before
+authenticating.
 
 `general.timeout` sets the session opening deadline. `general.command_timeout` sets the command deadline. Prompted operations can set their own deadline. An interrupted operation can already have reached the device. Check device state before repeating it.
 

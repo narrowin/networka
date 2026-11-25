@@ -8,9 +8,17 @@ from __future__ import annotations
 import subprocess
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
-import pytest
+NW_RUN = [
+    "uv",
+    "run",
+    "--no-project",
+    "--python",
+    sys.executable,
+    "python",
+    "-m",
+    "network_toolkit",
+]
 
 
 class TestCLIIntegration:
@@ -20,7 +28,7 @@ class TestCLIIntegration:
         """Test CLI help via subprocess."""
         # Test the CLI as it would be run by a user
         result = subprocess.run(
-            [sys.executable, "-m", "network_toolkit", "--help"],
+            [*NW_RUN, "--help"],
             check=False,
             capture_output=True,
             text=True,
@@ -41,15 +49,7 @@ class TestCLIIntegration:
     def test_list_devices_with_config(self, config_file: Path) -> None:
         """Test list devices command with a real config file."""
         result = subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "network_toolkit.cli",
-                "--config",
-                str(config_file),
-                "list",
-                "devices",
-            ],
+            [*NW_RUN, "list", "devices", "--config", str(config_file)],
             check=False,
             capture_output=True,
             text=True,
@@ -57,21 +57,14 @@ class TestCLIIntegration:
             timeout=30,
         )
 
-        # Should succeed or fail gracefully
-        assert result.returncode in [0, 1]
+        assert result.returncode == 0, result.stderr
+        assert "test_device1" in result.stdout
+        assert "192.168.1.10" in result.stdout
 
     def test_info_command_with_config(self, config_file: Path) -> None:
         """Test info command with a real config file."""
         result = subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "network_toolkit.cli",
-                "--config",
-                str(config_file),
-                "info",
-                "test_device1",
-            ],
+            [*NW_RUN, "info", "test_device1", "--config", str(config_file)],
             check=False,
             capture_output=True,
             text=True,
@@ -79,13 +72,14 @@ class TestCLIIntegration:
             timeout=30,
         )
 
-        # Should succeed or fail gracefully
-        assert result.returncode in [0, 1]
+        assert result.returncode == 0, result.stderr
+        assert "test_device1" in result.stdout
+        assert "192.168.1.10" in result.stdout
 
     def test_invalid_command(self) -> None:
         """Test CLI with invalid command."""
         result = subprocess.run(
-            [sys.executable, "-m", "network_toolkit", "invalid-command"],
+            [*NW_RUN, "invalid-command"],
             check=False,
             capture_output=True,
             text=True,
@@ -93,21 +87,15 @@ class TestCLIIntegration:
             timeout=30,
         )
 
-        # Should fail with non-zero exit code
-        assert result.returncode != 0
+        assert result.returncode == 2
+        assert "No such command" in result.stderr
+        assert "invalid-command" in result.stderr
 
-    def test_missing_config_file(self) -> None:
+    def test_missing_config_file(self, tmp_path: Path) -> None:
         """Test CLI with missing config file."""
+        missing_path = tmp_path / "missing.yml"
         result = subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "network_toolkit",
-                "--config",
-                "/nonexistent/config.yml",
-                "list",
-                "devices",
-            ],
+            [*NW_RUN, "list", "devices", "--config", str(missing_path)],
             check=False,
             capture_output=True,
             text=True,
@@ -115,39 +103,8 @@ class TestCLIIntegration:
             timeout=30,
         )
 
-        # Should fail with non-zero exit code
-        assert result.returncode != 0
-
-
-class TestConfigurationIntegration:
-    """Integration tests for configuration loading."""
-
-    def test_load_real_config_file(self, config_file: Path) -> None:
-        """Test loading a real configuration file."""
-        try:
-            from network_toolkit.config import load_config
-
-            config = load_config(config_file)
-            assert config is not None
-            assert config.devices is not None
-            assert "test_device1" in config.devices
-        except ImportError:
-            # Dependencies not available, skip test
-            pytest.skip("network_toolkit not importable")
-
-    def test_config_validation(self, temp_dir: Path) -> None:
-        """Test configuration validation with various inputs."""
-        try:
-            from network_toolkit.config import NetworkConfig
-
-            # Test with minimal valid config
-            config_data = {"devices": {"test": {"host": "192.168.1.1"}}}
-            config = NetworkConfig(**config_data)
-            assert config.devices is not None
-            assert "test" in config.devices
-
-        except ImportError:
-            pytest.skip("network_toolkit not importable")
+        assert result.returncode == 1
+        assert "Configuration file not found" in result.stdout
 
 
 class TestModuleStructure:
@@ -229,33 +186,3 @@ class TestModuleStructure:
             return
 
     # No legacy fallback; modular config directory is required for examples
-
-
-class TestEndToEndWorkflow:
-    """End-to-end workflow tests."""
-
-    @patch("network_toolkit.transport.scrapli_sync.Cli")
-    def test_device_session_workflow(
-        self, mock_scrapli: MagicMock, sample_config
-    ) -> None:
-        """Test complete device session workflow."""
-        try:
-            from network_toolkit.device import DeviceSession
-
-            # Mock the scrapli driver
-            mock_driver = MagicMock()
-            mock_scrapli.return_value = mock_driver
-
-            # Create device session
-            session = DeviceSession("test_device1", sample_config)
-
-            # Test connection
-            session.connect()
-            mock_driver.open.assert_called_once()
-
-            # Test disconnect
-            session.disconnect()
-            mock_driver.close.assert_called_once()
-
-        except ImportError:
-            pytest.skip("network_toolkit not importable")

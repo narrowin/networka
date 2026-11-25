@@ -14,10 +14,11 @@ from network_toolkit.common.logging import setup_logging
 from network_toolkit.common.output import (
     OutputMode,
     get_output_manager,
+    get_output_mode_from_config,
     set_output_mode,
 )
-from network_toolkit.common.styles import StyleManager, StyleName
-from network_toolkit.config import load_config
+from network_toolkit.common.styles import StyleName
+from network_toolkit.config import NetworkConfig, load_config
 from network_toolkit.exceptions import NetworkToolkitError
 
 if TYPE_CHECKING:
@@ -53,24 +54,35 @@ class CommandContext:
         output_mode: OutputMode | None = None,
         verbose: bool = False,
         config_file: Path | None = None,
-    ):
-        """Initialize command context with output styling."""
+        *,
+        config: NetworkConfig | None = None,
+        require_config: bool = False,
+    ) -> None:
+        """Initialize styling and logging using a preloaded or on-disk config."""
         self.verbose = verbose
         self.config_file = config_file or DEFAULT_CONFIG_PATH
 
-        config = None
-        if self.config_file and self.config_file.exists():
-            try:
+        if config is None:
+            if verbose and output_mode != OutputMode.RAW:
+                setup_logging("DEBUG")
+            if require_config:
                 config = load_config(self.config_file)
-            except Exception:
-                config = None
+            elif self.config_file.exists():
+                try:
+                    config = load_config(self.config_file)
+                except Exception:
+                    # Presentation-only callers can work without a valid config.
+                    pass
 
         active_output_mode = output_mode
         if active_output_mode is None and config is not None:
-            active_output_mode = OutputMode(config.general.output_mode)
+            active_output_mode = get_output_mode_from_config(config.general.output_mode)
 
-        if active_output_mode is not None:
+        self.output_manager = (
             set_output_mode(active_output_mode)
+            if active_output_mode is not None
+            else get_output_manager()
+        )
 
         if verbose:
             logging.disable(logging.NOTSET)
@@ -85,19 +97,11 @@ class CommandContext:
             )
             setup_logging(effective_level)
 
-        self.output_manager = get_output_manager()
-        if active_output_mode is None:
-            active_output_mode = self.output_manager.mode
-
         self.config = config
-        self.output_mode = active_output_mode
-
-        # Create style manager for themed output
-        self.style_manager = StyleManager(self.output_manager.mode)
-
-        # Expose commonly used objects
-        self.console = self.style_manager.console
         self.mode = self.output_manager.mode
+        self.output_mode = self.mode
+        self.style_manager = self.output_manager.style_manager
+        self.console = self.output_manager.console
 
     @property
     def table_generator(self) -> TableGenerator:
@@ -105,9 +109,7 @@ class CommandContext:
         if not hasattr(self, "_table_generator"):
             from network_toolkit.common.table_generator import TableGenerator
 
-            self._table_generator = TableGenerator(
-                self.style_manager, self.output_manager
-            )
+            self._table_generator = TableGenerator(self.output_manager)
         return self._table_generator
 
     def render_table(self, provider: TableDataProvider, verbose: bool = False) -> None:
