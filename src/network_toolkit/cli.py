@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import logging
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -169,6 +170,11 @@ def main(
     ] = None,
 ) -> None:
     """Configure global settings for the network toolkit."""
+    # The package silences library logging; the CLI keeps printing warnings to
+    # stderr until a command configures logging.
+    root_logger = logging.getLogger()
+    if not root_logger.handlers and logging.lastResort is not None:
+        root_logger.addHandler(logging.lastResort)
     set_runtime_settings(
         inventory_paths=list(inventory or []), inventory_prefer=inventory_prefer
     )

@@ -28,6 +28,8 @@ from network_toolkit.inventory.catalog import InventoryCatalog, set_inventory_ca
 from network_toolkit.inventory.nornir_simple import compile_nornir_simple_inventory
 from network_toolkit.runtime import get_runtime_settings
 
+logger = logging.getLogger(__name__)
+
 
 class ConfigHistoryMixin:
     """Mixin providing config history tracking methods.
@@ -126,7 +128,7 @@ def load_dotenv_files(config_path: Path | None = None) -> None:
     # Load .env from current working directory first (lowest priority)
     cwd_env = Path.cwd() / ".env"
     if cwd_env.exists():
-        logging.debug(f"Loading .env from current directory: {cwd_env.resolve()}")
+        logger.debug(f"Loading .env from current directory: {cwd_env.resolve()}")
         load_dotenv(cwd_env, override=False)
 
     # Load .env from config directory (if config_path provided)
@@ -134,7 +136,7 @@ def load_dotenv_files(config_path: Path | None = None) -> None:
         config_dir = config_path.parent if config_path.is_file() else config_path
         config_env = config_dir / ".env"
         if config_env.exists():
-            logging.debug(f"Loading .env from config directory: {config_env.resolve()}")
+            logger.debug(f"Loading .env from config directory: {config_env.resolve()}")
             # This will override any values loaded from cwd .env
             load_dotenv(config_env, override=True)
 
@@ -744,11 +746,11 @@ def _load_csv_devices(csv_path: Path) -> dict[str, DeviceConfig]:
 
                 devices[name] = device_config
 
-        logging.debug(f"Loaded {len(devices)} devices from CSV: {csv_path}")
+        logger.debug(f"Loaded {len(devices)} devices from CSV: {csv_path}")
         return devices
 
     except Exception as e:  # pragma: no cover - robustness
-        logging.warning(f"Failed to load devices from CSV {csv_path}: {e}")
+        logger.warning(f"Failed to load devices from CSV {csv_path}: {e}")
         return {}
 
 
@@ -794,11 +796,11 @@ def _load_csv_groups(csv_path: Path) -> dict[str, DeviceGroup]:
 
                 groups[name] = group_config
 
-        logging.debug(f"Loaded {len(groups)} groups from CSV: {csv_path}")
+        logger.debug(f"Loaded {len(groups)} groups from CSV: {csv_path}")
         return groups
 
     except Exception as e:  # pragma: no cover - robustness
-        logging.warning(f"Failed to load groups from CSV {csv_path}: {e}")
+        logger.warning(f"Failed to load groups from CSV {csv_path}: {e}")
         return {}
 
 
@@ -846,11 +848,11 @@ def _load_csv_sequences(csv_path: Path) -> dict[str, VendorSequence]:
 
                 sequences[name] = sequence_config
 
-        logging.debug(f"Loaded {len(sequences)} sequences from CSV: {csv_path}")
+        logger.debug(f"Loaded {len(sequences)} sequences from CSV: {csv_path}")
         return sequences
 
     except Exception as e:  # pragma: no cover - robustness
-        logging.warning(f"Failed to load sequences from CSV {csv_path}: {e}")
+        logger.warning(f"Failed to load sequences from CSV {csv_path}: {e}")
         return {}
 
 
@@ -1057,7 +1059,7 @@ def _auto_export_schemas_if_project() -> None:
     ]
 
     if not any(indicator.exists() for indicator in project_indicators):
-        logging.debug("Not in a project directory, skipping schema export")
+        logger.debug("Not in a project directory, skipping schema export")
         return
 
     schema_dir = Path("schemas")
@@ -1068,15 +1070,15 @@ def _auto_export_schemas_if_project() -> None:
         # Check if schema is less than 1 day old
         schema_age = time.time() - schema_file.stat().st_mtime
         if schema_age < 86400:  # 24 hours
-            logging.debug("Schemas are up to date, skipping export")
+            logger.debug("Schemas are up to date, skipping export")
             return
 
     try:
         export_schemas_to_workspace()
-        logging.debug("Auto-exported JSON schemas for editor validation")
+        logger.debug("Auto-exported JSON schemas for editor validation")
     except Exception as e:
         # Don't fail config loading if schema export fails
-        logging.debug(f"Failed to auto-export schemas: {e}")
+        logger.debug(f"Failed to auto-export schemas: {e}")
 
 
 def _is_project_config(config_path: Path) -> bool:
@@ -1106,7 +1108,7 @@ def _load_device_defaults(config_dir: Path) -> dict[str, Any]:
             defaults_config: dict[str, Any] = yaml.safe_load(df) or {}
             return defaults_config.get("defaults", {})
     except yaml.YAMLError as e:
-        logging.warning(f"Invalid YAML in defaults file {defaults_file}: {e}")
+        logger.warning(f"Invalid YAML in defaults file {defaults_file}: {e}")
         return {}
 
 
@@ -1153,7 +1155,7 @@ def _load_devices(
                         typed_file_devices[_device_name] = device_dict
                     all_devices.update(typed_file_devices)
             except yaml.YAMLError as e:
-                logging.warning(f"Invalid YAML in {device_file}: {e}")
+                logger.warning(f"Invalid YAML in {device_file}: {e}")
 
     return all_devices, device_sources
 
@@ -1188,7 +1190,7 @@ def _load_groups(
                         group_sources[_group_name] = group_file
                     all_groups.update(file_groups_node)
             except yaml.YAMLError as e:
-                logging.warning(f"Invalid YAML in {group_file}: {e}")
+                logger.warning(f"Invalid YAML in {group_file}: {e}")
 
     return all_groups, group_sources
 
@@ -1227,7 +1229,7 @@ def _load_sequences(
                             sequences_config, seq_yaml_config
                         )
             except yaml.YAMLError as e:
-                logging.warning(f"Invalid YAML in {seq_file}: {e}")
+                logger.warning(f"Invalid YAML in {seq_file}: {e}")
 
     vendor_sequences = _load_vendor_sequences(config_dir, sequences_config)
 
@@ -1340,7 +1342,7 @@ def _discover_local_inventories() -> list[Path]:
     for cand in local_candidates:
         if _is_containerlab_inventory_path(cand):
             local_inventory_paths.append(cand)
-            logging.info(
+            logger.info(
                 "Auto-discovered local inventory: %s (use --inventory to override)",
                 cand,
             )
@@ -1680,9 +1682,9 @@ def load_modular_config(
             ),
         }
 
-        logging.debug(f"Loaded modular configuration from {config_dir.resolve()}")
-        logging.debug(f"  - Devices: {len(all_devices)}")
-        logging.debug(f"  - Groups: {len(all_groups)}")
+        logger.debug(f"Loaded modular configuration from {config_dir.resolve()}")
+        logger.debug(f"  - Devices: {len(all_devices)}")
+        logger.debug(f"  - Groups: {len(all_groups)}")
 
         # Build the model and then assign private source paths
         model = NetworkConfig(**merged_config)
@@ -1814,7 +1816,7 @@ def _load_vendor_sequences(
         # Auto-discovery fallback for backward compatibility
         vendor_sequences = _auto_discover_vendor_sequences(config_dir)
         if vendor_sequences:
-            logging.debug(
+            logger.debug(
                 f"Auto-discovered {len(vendor_sequences)} vendor platforms "
                 f"in {config_dir / 'sequences'}"
             )
@@ -1832,7 +1834,7 @@ def _load_vendor_platform_sequences(
     sequence_path = config_dir / platform_config.get("sequence_path", "")
 
     if not sequence_path.exists():
-        logging.debug(f"Vendor sequence path not found: {sequence_path}")
+        logger.debug(f"Vendor sequence path not found: {sequence_path}")
         return platform_sequences
 
     # Load default sequence files for this vendor
@@ -1842,7 +1844,7 @@ def _load_vendor_platform_sequences(
         vendor_file_path = sequence_path / sequence_file
 
         if not vendor_file_path.exists():
-            logging.debug(f"Vendor sequence file not found: {vendor_file_path}")
+            logger.debug(f"Vendor sequence file not found: {vendor_file_path}")
             continue
 
         sequences = _load_sequence_file(vendor_file_path, platform_name)
@@ -1864,7 +1866,7 @@ def _auto_discover_vendor_sequences(
     sequences_dir = config_dir / "sequences"
 
     if not sequences_dir.exists():
-        logging.debug(f"Sequences directory not found: {sequences_dir}")
+        logger.debug(f"Sequences directory not found: {sequences_dir}")
         return vendor_sequences
 
     # Scan for vendor subdirectories
@@ -1903,7 +1905,7 @@ def _auto_discover_vendor_sequences(
 
         if platform_sequences:
             vendor_sequences[vendor_name] = platform_sequences
-            logging.debug(
+            logger.debug(
                 f"Auto-discovered {len(platform_sequences)} sequences for {vendor_name}"
             )
 
@@ -1928,17 +1930,17 @@ def _load_sequence_file(file_path: Path, vendor_name: str) -> dict[str, VendorSe
                 seq_obj.set_source_path(file_path)
                 sequences[seq_name] = seq_obj
             except Exception as e:
-                logging.warning(f"Invalid sequence '{seq_name}' in {file_path}: {e}")
+                logger.warning(f"Invalid sequence '{seq_name}' in {file_path}: {e}")
                 continue
 
-        logging.debug(
+        logger.debug(
             f"Loaded {len(sequence_data)} sequences for {vendor_name} from {file_path}"
         )
 
     except yaml.YAMLError as e:
-        logging.warning(f"Invalid YAML in vendor sequence file {file_path}: {e}")
+        logger.warning(f"Invalid YAML in vendor sequence file {file_path}: {e}")
     except Exception as e:  # pragma: no cover - robustness
-        logging.warning(f"Failed to load vendor sequence file {file_path}: {e}")
+        logger.warning(f"Failed to load vendor sequence file {file_path}: {e}")
 
     return sequences
 
@@ -2079,8 +2081,8 @@ def export_schemas_to_workspace() -> None:
     with settings_path.open("w", encoding="utf-8") as f:
         json.dump(yaml_schema_config, f, indent=2)
 
-    logging.debug(f"Exported schemas to {schema_dir.resolve()}")
-    logging.debug(f"Updated VS Code settings at {settings_path.resolve()}")
+    logger.debug(f"Exported schemas to {schema_dir.resolve()}")
+    logger.debug(f"Updated VS Code settings at {settings_path.resolve()}")
 
 
 def get_supported_device_types() -> set[str]:

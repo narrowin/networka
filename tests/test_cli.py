@@ -6,6 +6,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -674,3 +676,19 @@ class TestCLI:
         assert obj2["device"] == "test_device1"
         assert obj2["cmd"] == "c2"
         assert obj2["output"] == "o2"
+
+
+def test_cli_keeps_printing_library_warnings_without_logging_setup() -> None:
+    """The nw CLI prints warnings to stderr even before a command sets up logging."""
+    code = (
+        "import logging\n"
+        "from typer.testing import CliRunner\n"
+        "from network_toolkit.cli import app\n"
+        "CliRunner().invoke(app, ['__complete', '--for', 'commands'])\n"
+        "logging.getLogger('network_toolkit.device').warning('connect retry')\n"
+        "logging.getLogger('network_toolkit.device').info('hidden')\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, check=True
+    )
+    assert result.stderr == "connect retry\n"

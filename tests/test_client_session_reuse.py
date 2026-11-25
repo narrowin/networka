@@ -1,3 +1,6 @@
+import os
+import subprocess
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -122,3 +125,57 @@ def test_client_reuses_sequence_manager(
 
     run_manager_cls.assert_not_called()
     assert client.sequence_manager.config is mock_config
+
+
+def test_library_run_prints_no_log_lines(tmp_path):
+    """A failed run through NetworkaClient prints nothing and configures no logging.
+
+    Loading the config and failing to connect both log records; neither may
+    reach the console or install a root handler.
+    """
+    (tmp_path / "config.yml").write_text(
+        "general:\n"
+        "  transport: system\n"
+        "  ssh_config_file: false\n"
+        "  timeout: 3\n"
+        "  connection_retries: 1\n"
+        "devices:\n"
+        "  r1:\n"
+        "    host: 127.0.0.1\n"
+        "    port: 1\n"
+        "    device_type: mikrotik_routeros\n"
+    )
+    code = (
+        "import logging, sys\n"
+        "from network_toolkit import NetworkaClient\n"
+        "with NetworkaClient(sys.argv[1]) as client:\n"
+        "    result = client.run('r1', '/system/identity/print')\n"
+        "assert result.command_results[0].error, result\n"
+        "assert logging.getLogger().handlers == [], logging.getLogger().handlers\n"
+    )
+    env = {**os.environ, "NW_USER_DEFAULT": "labtest", "NW_PASSWORD_DEFAULT": "labtest"}
+    result = subprocess.run(
+        [sys.executable, "-c", code, str(tmp_path)],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=60,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    assert result.stdout == ""
+
+
+def test_application_logging_still_receives_library_records():
+    """An application that configures logging still gets Networka records."""
+    code = (
+        "import logging, sys\n"
+        "logging.basicConfig(stream=sys.stdout, format='%(name)s %(message)s')\n"
+        "import network_toolkit\n"
+        "logging.getLogger('network_toolkit.device').error('connect failed')\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, check=True
+    )
+    assert result.stdout == "network_toolkit.device connect failed\n"
