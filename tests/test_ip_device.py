@@ -86,11 +86,13 @@ class TestPlatformValidation:
         assert "mikrotik_routeros" in platforms
         assert "cisco_iosxe" in platforms
 
-    def test_validate_platform_valid(self) -> None:
+    def test_validate_platform_valid(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test validation of valid platforms."""
+        monkeypatch.setattr("scrapli.cli.CLI_DEFINITIONS_PATH_OVERRIDE", None)
         assert validate_platform("mikrotik_routeros")
         assert validate_platform("cisco_iosxe")
         assert validate_platform("linux")
+        assert validate_platform("cumulus_linux")
 
     def test_validate_platform_invalid(self) -> None:
         """Test validation of invalid platforms."""

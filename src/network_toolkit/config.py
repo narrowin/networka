@@ -717,27 +717,11 @@ def _load_csv_devices(csv_path: Path) -> dict[str, DeviceConfig]:
                     else None
                 )
 
-                # Validate device_type and use fallback if invalid
-                device_type_raw = row.get("device_type", "linux").strip()
-                valid_types = {
-                    "mikrotik_routeros",
-                    "cisco_iosxe",
-                    "cisco_ios",
-                    "cisco_iosxr",
-                    "cisco_nxos",
-                    "juniper_junos",
-                    "arista_eos",
-                    "linux",
-                    "generic",
-                }
-                device_type = cast(
-                    SupportedDeviceType,
-                    device_type_raw if device_type_raw in valid_types else "linux",
-                )
+                device_type = (row.get("device_type") or "").strip() or "linux"
 
                 device_config = DeviceConfig(
                     host=row.get("host", "").strip(),
-                    device_type=device_type,  # Now guaranteed to be valid
+                    device_type=device_type,
                     description=row.get("description", "").strip() or None,
                     platform=row.get("platform", "").strip() or None,
                     model=row.get("model", "").strip() or None,
