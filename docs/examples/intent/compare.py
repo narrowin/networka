@@ -209,7 +209,7 @@ def check_routeros_port_json(
         forwarding = observed
     except (OSError, ValueError) as error:
         print(f"  extraction failed: {error}")
-    show_intent("STP forwarding", True, forwarding)
+    show_intent("Bridge-port forwarding", True, forwarding)
     print()
 
 

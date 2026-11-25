@@ -60,6 +60,39 @@ a forwarding bond supplied `true` (match), and a disabled `ether3` omitted
 the field (unavailable). A command error, invalid JSON, ambiguous port, or
 wrong monitor ID also makes the check unavailable.
 
+### Medium MikroTik lab replay
+
+On 2026-11-25 the two Medium cores and the access switch ran RouterOS CHR
+7.26beta7. This read-only SSH capture used the commands above. Each core's
+`access-uplink` resolved to `*1` and the access switch's `uplink` to `*0`.
+The check ran on the saved device replies.
+
+On `dc1-core-mlag1`, the port statistics contained this row with unrelated
+fields omitted. The `monitor *1 once as-value` reply carried the same `.id`
+and the native Boolean shown below.
+
+```json
+{".id":"*1","bridge":"bridge","interface":"access-uplink"}
+```
+
+```json
+{".id":"*1","interface":"access-uplink","forwarding":true,"status":"in-bridge"}
+```
+
+| Device | Selected bridge port | Expected forwarding | Observed forwarding | Verdict |
+| --- | --- | --- | --- | --- |
+| `dc1-core-mlag1` | `access-uplink` (`*1`) | `true` | `true` | Match |
+| `dc1-core-mlag2` | `access-uplink` (`*1`) | `true` | `true` | Match |
+| `dc1-access-switch1` | `uplink` (`*0`) | `true` | `true` | Match |
+
+As an offline negative control, the comparator expected `false` against
+the unchanged core-1 reply and reported a mismatch. A separate native JSON
+read with `:put [:serialize to=json options=json.no-string-conversion
+[/interface/bridge/print as-value]]` returned `protocol-mode: "none"` on all
+three bridges. That differs from the checked-in `rstp` startup profile.
+The forwarding verdict describes the bridge-port flag. The live snapshot had
+no active STP election. [Medium startup reference][medium-startup].
+
 ### Cumulus Linux (provisional)
 
 The offline example accepts two Cumulus JSON sources and reuses the same
