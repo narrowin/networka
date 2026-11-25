@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-25
+
+### Changed
+
+- `nw run` on a group or a device list exits with code 1 when the command or sequence failed on any device. Single-device runs already did. Scripts that run groups now see device failures.
+- RouterOS replies that start with `syntax error`, `bad command name`, `expected end of command`, `input does not match any value`, `failure:` or `no such item` count as failed commands in the CLI and the library.
+- When a pooled library session loses its connection during a command, Networka closes the session, removes it from the pool and reports the error. It does not send the command again, because the device may already have run it. The next call opens a new session.
+- Importing `network_toolkit` no longer configures logging in the calling program. Networka and Scrapli log records go only to the handlers the application sets up. Programs that relied on the default printing of these warnings need to configure logging, for example with `logging.basicConfig()`. The `nw` CLI still prints warnings to stderr.
+- `NetworkaClient.run()` reuses the client's sequence manager instead of building a new one for each call.
+
+### Added
+
+- `general.ssh_known_hosts_file` sets the known-hosts file for CLI SSH sessions. The `system` transport always uses it and the `ssh2` transport uses it in strict mode. SFTP transfers still check `~/.ssh/known_hosts`.
+
+### Fixed
+
+- A failed sequence command keeps the outputs of the commands that ran before it in `DeviceSequenceResult.outputs`.
+- Connection errors include the reason. A rejected login raises `DeviceAuthError`, a subclass of `DeviceConnectionError`. The device password is masked in the message and the logs.
+- Command errors include the device's reply, for example `bad command name bogus (line 1 column 12)`.
+- A new pooled session that cannot connect is connected once per call, with the configured `connection_retries`, instead of twice.
+- Concurrent library calls to the same device open at most one pooled session. Calls to other devices do not wait.
+- Containerlab `mikrotik_chr` nodes map to `mikrotik_routeros` with `platform_mapping: netmiko_to_networka`.
+- Name clash errors between inventories name the `--inventory-prefer` option. The documentation no longer describes the unused `inventory.merge_mode` setting.
+
 ## [0.2.0] - 2026-11-24
 
 ### Changed

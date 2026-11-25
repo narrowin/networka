@@ -4,6 +4,8 @@
 
 `NetworkaClient` automatically manages SSH sessions for you. When you run a command, it checks if a connection to that device already exists. If so, it reuses it; if not, it opens a new one.
 
+If a pooled session cannot connect, the client replaces it once. If a session loses its connection during a command, the call reports the error and the client closes that session and removes it from the pool. Networka does not send the command again, because the device may already have run it. The next call to that device opens a new session.
+
 To ensure these connections are closed properly when you are done, you should use the client as a context manager.
 
 **Recommended Pattern:**
@@ -112,6 +114,20 @@ except ValueError as e:
 # Connection still closes properly
 ```
 
+`execute_command` raises `DeviceExecutionError` when the device rejects a command, and the message includes the device's reply. On RouterOS, replies that start with `syntax error`, `bad command name`, `expected end of command`, `input does not match any value`, `failure:` or `no such item` count as rejected. A connection failure raises `DeviceConnectionError` with the reason, and a rejected login raises its subclass `DeviceAuthError`.
+
+`client.run()` does not raise for device failures. It reports them in `DeviceCommandResult.error` or `DeviceSequenceResult.error`, with the connection reason or the device's reply. A sequence stops at its first failed command, and `DeviceSequenceResult.outputs` keeps the outputs of the commands that ran before it.
+
+## Logging
+
+Networka does not configure logging when you use it as a library, and it prints nothing by default. Networka logs under the `network_toolkit` logger and Scrapli under `scrapli`. To see their records, configure logging in your application:
+
+```python
+import logging
+
+logging.basicConfig(level=logging.WARNING)
+```
+
 ## Parallel Sessions
 
 Run commands on multiple devices simultaneously:
@@ -146,6 +162,7 @@ general:
   connection_retries: 3
   retry_delay: 2
   ssh_strict_host_key_checking: true
+  ssh_known_hosts_file: ~/lab/known_hosts
 ```
 
 Disable strict host key checking programmatically:
