@@ -131,17 +131,15 @@ class TestCLI:
     def test_run_sequence_on_group(
         self, mock_device_session: MagicMock, config_file: Path
     ) -> None:
-        """Test running a sequence on a group via `run` command."""
-        # Mock successful sequence execution on group
+        """A partial sequence failure still emits results and a JSON summary."""
         mock_session = MagicMock()
-        mock_session.execute_sequence.return_value = {
-            "/system/identity/print": "Identity: RouterOS",
-            "/system/resource/print": "CPU: 5%",
-            "/system/clock/print": "12:00:00",
-        }
-        mock_session.__enter__ = MagicMock(return_value=mock_session)
-        mock_session.__exit__ = MagicMock(return_value=None)
-        mock_device_session.return_value = mock_session
+        mock_session.execute_command.return_value = "Sequence output"
+        mock_session.__enter__.return_value = mock_session
+        failed_session = MagicMock()
+        failed_session.__enter__.side_effect = RuntimeError("Connection failed")
+        mock_device_session.side_effect = lambda device, *_: (
+            failed_session if device == "test_device2" else mock_session
+        )
 
         runner = CliRunner()
         result = runner.invoke(
@@ -152,10 +150,29 @@ class TestCLI:
                 str(config_file),
                 "lab_devices",
                 "system_info",
+                "--raw",
+                "json",
             ],
         )
-        # Accept exit code 0 or 1 (might fail due to actual connection attempts)
-        assert result.exit_code in [0, 1]
+        assert result.exit_code == 1, result.output
+        *events, summary = map(json.loads, result.stdout.splitlines())
+        assert events
+        assert all(
+            event["event"] == "result"
+            and event["device"] == "test_device1"
+            and event["output"] == "Sequence output"
+            for event in events
+        )
+        assert summary.pop("duration") >= 0
+        assert summary == {
+            "event": "summary",
+            "target": "lab_devices",
+            "type": "Sequence",
+            "name": "system_info",
+            "total": 2,
+            "succeeded": 1,
+            "failed": 1,
+        }
 
     @patch("network_toolkit.api.upload.DeviceSession")
     def test_upload_command(
@@ -387,8 +404,8 @@ class TestCLI:
                 "/system/clock/print",
             ],
         )
-        # Accept exit code 0 or 1 (1 might be due to missing group definition)
-        assert result.exit_code in [0, 1]
+        assert result.exit_code == 0, result.output
+        assert "2 total | 2 succeeded, 0 failed" in result.output
 
     @patch("network_toolkit.device.DeviceSession")
     def test_run_command_with_mocked_session(
@@ -420,13 +437,15 @@ class TestCLI:
     def test_run_command_comma_separated_devices(
         self, mock_device_session: MagicMock, config_file: Path
     ) -> None:
-        """Support 'run dev1,dev2 "+cmd"' executes on both devices."""
-        # Mock execute_command to return different outputs per call
+        """Both comma-separated targets report their outcomes on partial failure."""
         mock_session = MagicMock()
-        mock_session.execute_command.return_value = "OK"
-        mock_session.__enter__ = MagicMock(return_value=mock_session)
-        mock_session.__exit__ = MagicMock(return_value=None)
-        mock_device_session.return_value = mock_session
+        mock_session.execute_command.return_value = "Command output"
+        mock_session.__enter__.return_value = mock_session
+        failed_session = MagicMock()
+        failed_session.__enter__.side_effect = RuntimeError("Connection failed")
+        mock_device_session.side_effect = lambda device, *_: (
+            failed_session if device == "test_device2" else mock_session
+        )
 
         runner = CliRunner()
         result = runner.invoke(
@@ -439,10 +458,11 @@ class TestCLI:
                 "/system/clock/print",
             ],
         )
-        # Should treat as group; accept success or failure depending on mocks
-        assert result.exit_code in [0, 1]
-        # Should mention members listing
-        assert "Members:" in result.output
+        assert result.exit_code == 1, result.output
+        assert "Members: test_device1, test_device2" in result.output
+        assert "Command output" in result.output
+        assert "Connection failed" in result.output
+        assert "2 total | 1 succeeded, 1 failed" in result.output
 
     @patch("network_toolkit.device.DeviceSession")
     def test_run_command_mixed_targets_group_and_device(

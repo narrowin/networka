@@ -435,6 +435,8 @@ def register(app: typer.Typer) -> None:
                         "failed": run_result.totals.failed,
                     }
                 )
+            if run_result.totals.failed:
+                raise typer.Exit(1)
             return
 
         # Single command execution
@@ -526,3 +528,5 @@ def register(app: typer.Typer) -> None:
                     "failed": run_result.totals.failed,
                 }
             )
+        if run_result.totals.failed:
+            raise typer.Exit(1)
