@@ -118,8 +118,30 @@ def test_ambiguous_device_errors_without_prefer(tmp_path: Path) -> None:
     # Error now raised at config load time, not resolution time
     with pytest.raises(
         ConfigurationError, match="exists in multiple inventory sources"
-    ):
+    ) as exc_info:
         load_modular_config(tmp_path)
+    assert "Use --inventory-prefer to specify" in exc_info.value.message
+
+
+def test_ambiguous_group_errors_name_inventory_prefer(tmp_path: Path) -> None:
+    """A group defined in two inventory sources names the real CLI option."""
+    _write_yaml(
+        tmp_path / "config.yml",
+        {
+            "inventory": {"discover_local": False, "nornir_inventory_dir": "./inv1"},
+            "groups": {"core": {"description": "core", "members": []}},
+        },
+    )
+    _write_yaml(
+        tmp_path / "inv1" / "hosts.yml",
+        {"dev1": {"hostname": "2.2.2.2", "platform": "linux", "groups": ["core"]}},
+    )
+
+    with pytest.raises(
+        ConfigurationError, match="Group 'core' exists in multiple inventory sources"
+    ) as exc_info:
+        load_modular_config(tmp_path)
+    assert "Use --inventory-prefer to specify" in exc_info.value.message
 
 
 def test_inventory_prefer_selects_source_for_ambiguous_device(tmp_path: Path) -> None:

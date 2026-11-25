@@ -1618,7 +1618,7 @@ def load_modular_config(
                         msg = (
                             f"Device '{dev_name}' exists in multiple inventory sources: "
                             f"'{existing_source}' and '{source_id}'. "
-                            "Use --prefer to specify which source to use."
+                            "Use --inventory-prefer to specify which source to use."
                         )
                         raise ConfigurationError(
                             msg,
@@ -1641,7 +1641,7 @@ def load_modular_config(
                         msg = (
                             f"Group '{grp_name}' exists in multiple inventory sources: "
                             f"'{existing_source}' and '{source_id}'. "
-                            "Use --prefer to specify which source to use."
+                            "Use --inventory-prefer to specify which source to use."
                         )
                         raise ConfigurationError(
                             msg,

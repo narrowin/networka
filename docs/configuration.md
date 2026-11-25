@@ -44,7 +44,6 @@ Configure this in `config/config.yml`:
 inventory:
   source: nornir_simple
   nornir_inventory_dir: /path/to/clab-<lab-dir>   # or a direct file path
-  merge_mode: replace
 ```
 
 See [Nornir & Containerlab inventory](nornir-inventory.md) for the full workflow and options.
