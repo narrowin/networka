@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
+import threading
+import time
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 from unittest.mock import MagicMock
 
 import pytest
@@ -18,7 +21,11 @@ from network_toolkit.api.run import (
     run_commands,
 )
 from network_toolkit.config import NetworkConfig
-from network_toolkit.exceptions import DeviceExecutionError, OperationUnconfirmedError
+from network_toolkit.exceptions import (
+    DeviceConnectionError,
+    DeviceExecutionError,
+    OperationUnconfirmedError,
+)
 from network_toolkit.sequence_manager import SequenceManager
 from network_toolkit.session_pool import SessionPool
 
@@ -353,3 +360,91 @@ def test_connection_failure_reason_reaches_result(
     assert result.command_results[0].error == (
         "Authentication failed for test_device1: Permission denied (password)"
     )
+
+
+class SlowConnectSession(DummyDeviceSession):
+    """Dummy session whose connect can be held open by a test."""
+
+    created: ClassVar[list[str]] = []
+    release: ClassVar[dict[str, threading.Event]] = {}
+
+    def __init__(self, device_name: str, *args: Any) -> None:
+        super().__init__(device_name, *args)
+        self.stale = False
+        SlowConnectSession.created.append(device_name)
+
+    def connect(self) -> None:
+        if self.stale:
+            msg = "Connection failed for stale session"
+            raise DeviceConnectionError(msg)
+        gate = SlowConnectSession.release.get(self.device_name)
+        if gate is not None:
+            assert gate.wait(5)
+
+    def disconnect(self) -> None:
+        return None
+
+
+def _run_pooled(config: NetworkConfig, pool: SessionPool, device: str) -> RunResult:
+    return run_commands(
+        RunOptions(
+            target=device,
+            command_or_sequence="/system/clock/print",
+            config=config,
+            session_pool=pool,
+        )
+    )
+
+
+def test_concurrent_runs_replace_stale_session_once(
+    sample_config: NetworkConfig,
+    patch_device_session: Callable[[DummyDeviceSession], None],
+) -> None:
+    patch_device_session(SlowConnectSession)
+    stale = SlowConnectSession("test_device1", sample_config)
+    stale.stale = True
+    SlowConnectSession.created = []
+    gate = threading.Event()
+    SlowConnectSession.release = {"test_device1": gate}
+    pool = SessionPool()
+    pool["test_device1"] = stale  # type: ignore[assignment]
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = [
+            executor.submit(_run_pooled, sample_config, pool, "test_device1")
+            for _ in range(4)
+        ]
+        # Give every thread time to reach session setup while connect is held.
+        deadline = time.monotonic() + 0.5
+        while len(SlowConnectSession.created) < 2 and time.monotonic() < deadline:
+            time.sleep(0.01)
+        gate.set()
+        results = [f.result(timeout=5) for f in futures]
+
+    # One replacement session; without the device lock each thread opens its own.
+    assert SlowConnectSession.created == ["test_device1"]
+    assert all(not r.command_results[0].error for r in results)
+    assert pool.get("test_device1") is not stale
+
+
+def test_connecting_device_does_not_block_other_devices(
+    sample_config: NetworkConfig,
+    patch_device_session: Callable[[DummyDeviceSession], None],
+) -> None:
+    patch_device_session(SlowConnectSession)
+    SlowConnectSession.created = []
+    gate = threading.Event()
+    SlowConnectSession.release = {"test_device1": gate}
+    pool = SessionPool()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        blocked = executor.submit(_run_pooled, sample_config, pool, "test_device1")
+        other = executor.submit(_run_pooled, sample_config, pool, "test_device2")
+        try:
+            result = other.result(timeout=5)
+            assert not blocked.done()
+        finally:
+            gate.set()
+        blocked.result(timeout=5)
+
+    assert result.command_results[0].output == "test_device2:/system/clock/print"
