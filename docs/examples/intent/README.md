@@ -1,5 +1,9 @@
 # Experimental operational intent comparison
 
+Start with the [intent verification guide](../../intent.md) for the workflow
+and the Cumulus lab instructions. This example provides the replay and
+supporting evidence.
+
 Run this offline example from the Networka repository root. It reads selected
 records from the MLAG lab checkout and uses the lab's existing RouterOS parser.
 It also reads a projection of one published Junos interface row embedded in
@@ -95,37 +99,9 @@ no active STP election. [Medium startup reference][medium-startup].
 
 ### Cumulus Linux (provisional)
 
-The offline example accepts two Cumulus JSON sources and reuses the same
-expected/actual comparison. These selectors come from NVIDIA documentation
-and the iproute2 source. The exact commands and response shapes still need
-qualification on a Cumulus lab switch.
-
-| Read-only command | Selector | Expectation |
-| --- | --- | --- |
-| `nv show interface --output json` | Interface or bond name, then `link.oper-status` | `up` matches and `down` mismatches. |
-| `bridge -j link show dev swp1` | One row with `master=br_default` and `ifname=swp1`, then `state` | `forwarding` matches. `blocking`, `learning`, `listening`, and `disabled` mismatch. |
-
-Save each successful command's raw JSON reply and run the example with one
-or both options. Repeat `--cumulus-interface` to check individual interfaces
-or bonds from the same NVUE reply.
-
-```bash
-PYTHONPATH="$MLAG/src" uv run --offline --no-project python docs/examples/intent/compare.py "$MLAG" \
-  --cumulus-interface bond1 interfaces.json \
-  --cumulus-stp-port br_default swp1 bridge-swp1.json
-```
-
-Missing or unrecognized fields, invalid JSON, and ambiguous bridge-port rows
-are unavailable. NVUE omits unset fields. The bond check uses operational
-status. LACP collecting and distributing require separate evidence.
-[NVUE JSON output][nvue-cli] · [Published interface JSON][nvue-api] ·
-[Bonding commands][nvue-bond] · [iproute2 bridge JSON implementation][iproute2-bridge].
-
-For lab qualification, compare the bridge-port result with the switch's
-spanning-tree mode and daemon view. VLAN-specific PVRST requires a separate
-reply. Use `nv show bridge domain br_default stp vlan 110` to find the
-VLAN and port state, and verify the JSON form on the target release before
-adding its selector. [Cumulus PVRST command reference][nvue-stp].
+Use the [Cumulus lab instructions](../../intent.md#validate-cumulus-in-the-lab)
+to collect the live replies, replay them with this example, and record the
+verdicts in the draft PR.
 
 ## Intent verdicts
 
@@ -314,9 +290,4 @@ Both fields matched in the live sample. A different reported value produces
 [juniper]: https://www.juniper.net/documentation/en_US/day-one-books/DO_Automating_SALT.pdf#page=58
 [networka-run]: ../../running-commands.md
 [routeros-scripting]: https://manual.mikrotik.com/docs/developer-guides/scripting/
-[nvue-cli]: https://docs.nvidia.com/networking-ethernet-software/cumulus-linux-519/System-Configuration/NVIDIA-User-Experience-NVUE/NVUE-CLI/
-[nvue-api]: https://docs.nvidia.com/networking-ethernet-software/cumulus-linux-519/System-Configuration/NVIDIA-User-Experience-NVUE/NVUE-API/#use-filters-in-a-query
-[nvue-bond]: https://docs.nvidia.com/networking-ethernet-software/cumulus-linux-519/Layer-2/Bonding-Link-Aggregation/
-[nvue-stp]: https://docs.nvidia.com/networking-ethernet-software/nvue-reference/Show-Commands/Bridge/#nv-show-bridge-domain-domain-id-stp-vlan-vid
-[iproute2-bridge]: https://github.com/iproute2/iproute2/blob/main/bridge/link.c
 [medium-startup]: https://github.com/narrowin/mikrotik-mlag-testsuite/blob/59299681efd9089e6bba5a008cb1e220bb94d19e/labs/medium/medium.rsc#L2-L16

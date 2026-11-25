@@ -31,5 +31,5 @@ operation. See the [RouterOS guide](../vendors/mikrotik/index.md#firmware-manage
 
 ## Compare operational evidence offline
 
-The [experimental intent example](intent/README.md) compares selected facts
-using native values and a shared definition of physical link status.
+The [intent verification guide](../intent.md) shows how to declare expected
+state and compare it with saved device replies.
