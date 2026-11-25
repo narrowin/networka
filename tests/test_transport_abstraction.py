@@ -1,6 +1,7 @@
 """Test the transport abstraction implementation."""
 
 import os
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -9,7 +10,10 @@ from network_toolkit.config import DeviceConfig, GeneralConfig, NetworkConfig
 from network_toolkit.exceptions import OperationUnconfirmedError
 from network_toolkit.transport.factory import get_transport_factory
 from network_toolkit.transport.interfaces import Transport
-from network_toolkit.transport.scrapli_sync import ScrapliSyncTransport
+from network_toolkit.transport.scrapli_sync import (
+    ScrapliSyncTransport,
+    _transport_options,
+)
 
 
 class TestTransportAbstraction:
@@ -173,3 +177,31 @@ class TestScrapliSyncTransport:
             transport.send_command("/system/identity/print")
         transport.close()
         driver.close.assert_called_once_with(force=True)
+
+    def test_known_hosts_file_passed_to_system_transport(self) -> None:
+        options = _transport_options({"ssh_known_hosts_file": "~/lab/known_hosts"})
+        assert options.known_hosts_path == os.path.expanduser("~/lab/known_hosts")
+
+    def test_known_hosts_file_unset_keeps_default(self) -> None:
+        assert _transport_options({}).known_hosts_path is None
+        strict_ssh2 = _transport_options(
+            {"transport": "ssh2", "ssh_config_file": False, "auth_strict_key": True}
+        )
+        assert strict_ssh2.known_hosts_path == str(Path.home() / ".ssh/known_hosts")
+
+    def test_known_hosts_file_passed_to_strict_ssh2_transport(self) -> None:
+        params = {
+            "transport": "ssh2",
+            "ssh_config_file": False,
+            "auth_strict_key": True,
+            "ssh_known_hosts_file": "/etc/lab_known_hosts",
+        }
+        assert _transport_options(params).known_hosts_path == "/etc/lab_known_hosts"
+
+    def test_known_hosts_setting_reaches_connection_params(self) -> None:
+        config = NetworkConfig(
+            general=GeneralConfig(ssh_known_hosts_file="/etc/lab_known_hosts"),
+            devices={"r1": DeviceConfig(host="192.168.1.1", user="u", password="p")},
+        )
+        params = config.get_device_connection_params("r1")
+        assert params["ssh_known_hosts_file"] == "/etc/lab_known_hosts"

@@ -163,6 +163,7 @@ class GeneralConfig(ConfigHistoryMixin, BaseModel):
     default_transport_type: str = "scrapli"
     ssh_config_file: bool = True
     ssh_strict_host_key_checking: bool = False  # Enable to require trusted SSH keys
+    ssh_known_hosts_file: str | None = None  # Unset uses the SSH client's default
 
     # Connection retry settings
     connection_retries: int = 3

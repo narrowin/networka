@@ -188,6 +188,18 @@ nw run router1 '/system/identity/print' --no-strict-host-key-checking
 nw cli router1 --no-strict-host-key-checking
 ```
 
+#### ssh_known_hosts_file
+
+- **Type**: string (path, `~` is expanded)
+- **Default**: unset, so the SSH client uses its own default file
+- **Description**: Known-hosts file for CLI SSH sessions. The `system` transport always uses it. The `ssh2` transport uses it in strict mode. SFTP transfers still check `~/.ssh/known_hosts`.
+
+```yaml
+general:
+  ssh_strict_host_key_checking: true
+  ssh_known_hosts_file: ~/lab/known_hosts
+```
+
 ## Bootstrap configuration (CLI)
 
 Use the built-in `config` commands to inspect and manage configuration from the CLI. See the CLI reference for the full command set and options.
