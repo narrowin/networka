@@ -28,6 +28,10 @@ class SessionPoolProtocol(Protocol):
         """Remove a session from the pool."""
         ...
 
+    def device_lock(self, device_name: str) -> threading.Lock:
+        """Return the lock that serializes session setup for one device."""
+        ...
+
 
 class SessionPool:
     """
@@ -51,12 +55,18 @@ class SessionPool:
 
     def __init__(self) -> None:
         self._sessions: dict[str, DeviceSession] = {}
+        self._device_locks: dict[str, threading.Lock] = {}
         self._lock = threading.Lock()
 
     def get(self, device_name: str) -> DeviceSession | None:
         """Get a session from the pool, or None if not present."""
         with self._lock:
             return self._sessions.get(device_name)
+
+    def device_lock(self, device_name: str) -> threading.Lock:
+        """Return the lock that serializes session setup for one device."""
+        with self._lock:
+            return self._device_locks.setdefault(device_name, threading.Lock())
 
     def __getitem__(self, device_name: str) -> DeviceSession:
         """Get a session, raising KeyError if not found."""

@@ -153,6 +153,11 @@ class TestSessionPoolCleanup:
 class TestSessionPoolThreadSafety:
     """Test thread-safe concurrent access."""
 
+    def test_device_lock_is_shared_per_device(self, pool: SessionPool) -> None:
+        """One device always gets the same lock; other devices get their own."""
+        assert pool.device_lock("r1") is pool.device_lock("r1")
+        assert pool.device_lock("r1") is not pool.device_lock("r2")
+
     def test_concurrent_set_operations(self, pool: SessionPool) -> None:
         """Multiple threads can safely add sessions."""
 

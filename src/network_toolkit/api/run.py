@@ -236,8 +236,10 @@ def _with_session_retry(
     """
     Retry a failed pooled connection once, then execute the operation once.
 
-    An operation that fails without a device reply removes the session from the
-    pool, so the next call opens a new one. The operation itself is not repeated.
+    Session setup holds the device's pool lock, so one device has at most one
+    pooled session. Other devices do not wait. An operation that fails without a
+    device reply removes the session from the pool, so the next call opens a new
+    one. The operation itself is not repeated.
 
     Args:
         execute_fn: Callable that takes a connected session and returns result
@@ -252,32 +254,37 @@ def _with_session_retry(
             transport_override,
         )
 
-    session = session_pool.get(device_name)
-    if session is None:
-        session = create_session()
-        session_pool[device_name] = session
+    device_lock = session_pool.device_lock(device_name)
+    with device_lock:
+        session = session_pool.get(device_name)
+        if session is None:
+            session = create_session()
+            session_pool[device_name] = session
 
-    try:
-        session.connect()
-    except Exception as first_error:
-        logger.debug(
-            "Session for %s failed, attempting fresh connection: %s",
-            device_name,
-            first_error,
-        )
-        session_pool.remove(device_name)
         try:
-            session.disconnect()
-        except Exception:
-            pass
+            session.connect()
+        except Exception as first_error:
+            logger.debug(
+                "Session for %s failed, attempting fresh connection: %s",
+                device_name,
+                first_error,
+            )
+            session_pool.remove(device_name)
+            try:
+                session.disconnect()
+            except Exception:
+                pass
 
-        session = create_session()
-        session.connect()
-        session_pool[device_name] = session
+            session = create_session()
+            session.connect()
+            session_pool[device_name] = session
     try:
         return execute_fn(session)
     except OperationUnconfirmedError:
-        session_pool.remove(device_name)
+        with device_lock:
+            # Another thread may already have stored a new session.
+            if session_pool.get(device_name) is session:
+                session_pool.remove(device_name)
         session.disconnect()
         raise
 
