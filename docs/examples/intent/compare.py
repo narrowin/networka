@@ -11,16 +11,15 @@ from pathlib import Path
 from mlag_lab.direct_topology import DIRECT_FLOWS
 from mlag_lab.root_evidence import summarize_router
 
+from network_toolkit.platforms.mikrotik_routeros.intent import (
+    check_bridge_port_forwarding,
+)
+
 POWER_CASE = Path("results/2026-11-24-power-loss/small-stp-off/01-primary-power-loss")
 BOND_CASE = Path("results/2026-11-24-small-search/mstp-default-l2/01-bond-member-loss")
 PROBE_CASES = Path("results/2026-11-24-forwarding-checks/small-mstp-reboots")
 ROUTEROS_LINK = "/interface ethernet monitor ether2 once"
 ROUTEROS_MLAG = "/interface bridge monitor bridge once"
-ROUTEROS_JSON = ":put [:serialize to=json options=json.no-string-conversion {}]"
-ROUTEROS_PORTS = ROUTEROS_JSON.format("[/interface/bridge/port/print stats as-value]")
-ROUTEROS_PORT_MONITOR = ROUTEROS_JSON.format(
-    "[/interface/bridge/port/monitor {port_id} once as-value]"
-)
 CIST_ROOT = "0x1000.52:54:00:d7:0b:01"
 JUNOS_COMMAND = "show interfaces terse | display json"
 JUNOS_SOURCE = (
@@ -166,48 +165,23 @@ def compare_published_link() -> None:
     print()
 
 
-def check_routeros_port_json(
-    bridge: str, interface: str, ports_path: Path, monitor_path: Path
-) -> None:
-    print(f"RouterOS native JSON, {bridge}/{interface}")
-    print(f"  source: {ports_path}\n  command: {ROUTEROS_PORTS}")
-    print(f"  monitor source: {monitor_path}")
-    forwarding = None
+def check_routeros_port_json(bridge: str, interface: str, evidence_path: Path) -> None:
+    print(f"RouterOS native JSON, {bridge}/{interface}\n  source: {evidence_path}")
     try:
-        ports = json.loads(ports_path.read_text(encoding="utf-8"))
-        if not isinstance(ports, list) or any(
-            not isinstance(row, dict) for row in ports
-        ):
-            msg = "expected an array of bridge port records"
-            raise ValueError(msg)
-        selected = [
-            row
-            for row in ports
-            if row.get("bridge") == bridge and row.get("interface") == interface
-        ]
-        if len(selected) != 1:
-            msg = "expected exactly one port with this bridge and interface name"
-            raise ValueError(msg)
-        port_id = selected[0].get(".id")
-        if not isinstance(port_id, str) or not port_id:
-            msg = "selected port has no .id"
-            raise ValueError(msg)
-        if sum(row.get(".id") == port_id for row in ports) != 1:
-            msg = "selected port .id is ambiguous"
-            raise ValueError(msg)
-        print(f"  command: {ROUTEROS_PORT_MONITOR.format(port_id=port_id)}")
-        monitor = json.loads(monitor_path.read_text(encoding="utf-8"))
-        if not isinstance(monitor, dict) or monitor.get(".id") != port_id:
-            msg = "monitor object does not identify the selected port"
-            raise ValueError(msg)
-        observed = monitor.get("forwarding")
-        if not isinstance(observed, bool):
-            msg = "monitor forwarding is missing or is not a JSON boolean"
-            raise ValueError(msg)
-        forwarding = observed
+        evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
-        print(f"  extraction failed: {error}")
-    show_intent("Bridge-port forwarding", True, forwarding)
+        print(f"  evidence unreadable: {error}")
+        evidence = {}
+    if not isinstance(evidence, dict):
+        evidence = {}
+    for key in ("stats", "monitor"):
+        reply = evidence.get(key)
+        if isinstance(reply, dict):
+            print(f"  command: {reply.get('command')}")
+    result = check_bridge_port_forwarding(evidence, bridge, interface)
+    if result.reason:
+        print(f"  extraction failed: {result.reason}")
+    show_intent("Bridge-port forwarding", result.expected, result.observed)
     print()
 
 
@@ -380,9 +354,9 @@ def main() -> None:
     parser.add_argument("mlag_checkout", type=Path, help="pinned MLAG lab checkout")
     parser.add_argument(
         "--routeros-stp-port",
-        nargs=4,
-        metavar=("BRIDGE", "INTERFACE", "PORTS_JSON", "MONITOR_JSON"),
-        help="also check spanning-tree forwarding from two saved RouterOS JSON replies",
+        nargs=3,
+        metavar=("BRIDGE", "INTERFACE", "EVIDENCE_JSON"),
+        help="also check bridge-port forwarding from evidence saved by collect_bridge_port",
     )
     args = parser.parse_args()
     root = args.mlag_checkout
@@ -394,8 +368,8 @@ def main() -> None:
         root / PROBE_CASES / "01-secondary-reboot" / "result.json"
     )
     if args.routeros_stp_port:
-        bridge, interface, ports, monitor = args.routeros_stp_port
-        check_routeros_port_json(bridge, interface, Path(ports), Path(monitor))
+        bridge, interface, evidence = args.routeros_stp_port
+        check_routeros_port_json(bridge, interface, Path(evidence))
 
 
 if __name__ == "__main__":

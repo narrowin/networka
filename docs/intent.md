@@ -1,59 +1,71 @@
 # Intent verification
 
-Use the offline intent example to compare how a switch should be operating
-with what its read-only commands report. The script prints the source,
-command, expected value, observed value, and verdict for each check.
+Compare how a switch should be operating with what its read-only commands
+report. Each check prints the source, command, expected value, observed
+value, and verdict.
 
 ## Declare the intent
 
-An intent identifies an object, a field, and the value you expect. The example
-takes the object names as command-line arguments. Its expected values are
-declared in Python and shown in the report.
+An intent identifies an object, a field, and the value you expect.
 
-| Example target | Field being checked | Expected value |
-| --- | --- | --- |
-| RouterOS `bridge/access-uplink` | Bridge-port monitor `forwarding` | `true` |
-| Cumulus `bond1` | NVUE `link.oper-status` | `up` |
-| Cumulus `br_default/swp1` | Linux bridge port `state` | `forwarding` |
+| Target | Field being checked | Expected value | Where |
+| --- | --- | --- | --- |
+| RouterOS bridge port, for example `bridge/access-uplink` | Bridge-port monitor `forwarding` | `true` | Library |
+| Cumulus `bond1` | NVUE `link.oper-status` | `up` | [Draft PR #47](#validate-cumulus-in-the-lab) |
+| Cumulus `br_default/swp1` | Linux bridge port `state` | `forwarding` | [Draft PR #47](#validate-cumulus-in-the-lab) |
 
-## Evaluate a reply
+## Check a RouterOS bridge port
 
-1. Capture the successful reply from the selected device and command. Save the
-   raw JSON locally so the same evidence can be reviewed and replayed.
-2. Decode with `json.loads` and select the named object. RouterOS finds the
-   bridge and interface in the port statistics, then checks the matching `.id`
-   in the monitor reply. Cumulus selects the NVUE interface by name and the
-   Linux bridge port by `master` and `ifname`.
-3. Compare the observed value with the expected value. Equality is **match**.
-   A recognized differing value is **mismatch**. A failed read, invalid JSON,
-   absent field, unknown value, or ambiguous object is **unavailable**.
-   The Cumulus bridge check maps `forwarding` to `true` and other recognized
-   states to `false` before comparing.
+`network_toolkit.platforms.mikrotik_routeros.intent` reads and checks the
+RouterOS bridge-port forwarding flag. Collection and evaluation are separate,
+so saved evidence replays to the same verdict without the device.
 
-For example, this illustrative NVUE reply gives a mismatch for `bond1`.
+```python
+import json
+from pathlib import Path
 
-```json
-{"bond1":{"link":{"oper-status":"down"}}}
+from network_toolkit import NetworkaClient
+from network_toolkit.platforms.mikrotik_routeros.intent import (
+    check_bridge_port_forwarding,
+    collect_bridge_port,
+)
+
+with NetworkaClient() as client:
+    evidence = collect_bridge_port(client, "dc1-core-mlag1", "bridge", "access-uplink")
+Path("access-uplink.json").write_text(json.dumps(evidence))
+
+result = check_bridge_port_forwarding(
+    evidence, "bridge", "access-uplink", expected=True
+)
+print(result.expected, result.observed, result.verdict, result.reason)
 ```
 
-```text
-Operational status       expected='up' actual='down' → mismatch
-```
+1. `collect_bridge_port` runs the bridge-port statistics command, selects the
+   row whose `bridge` and `interface` match, and runs the monitor command for
+   that row's `.id`. Each reply is kept as `command`, `output`, and `error`.
+   A read failure is recorded in the evidence, not raised. Extra keyword
+   arguments go to `NetworkaClient.run`, for example `interactive_creds`.
+2. `check_bridge_port_forwarding` selects the port again from the saved
+   statistics, requires the monitor reply for the same `.id`, and reads its
+   `forwarding` Boolean.
+3. Equality is **match**. A differing Boolean is **mismatch**. A read error,
+   invalid JSON, a missing or ambiguous port, a reply for another command, or
+   a missing field is **unavailable**, and `reason` says why.
 
-Check the verdict lines. The process exit status reports whether the example
-ran. For a live RouterOS match and an offline negative control using the same
+For a live RouterOS match and an offline negative control using the same
 reply, see the [Medium MikroTik lab replay](examples/intent/README.md#medium-mikrotik-lab-replay).
 
 ## Run the archive example
 
 From the Networka checkout, set `MLAG` to the local checkout of
 `narrowin/mikrotik-mlag-testsuite`. The archive replay uses commit
-`59299681efd9089e6bba5a008cb1e220bb94d19e` and Python 3.11 or later.
+`59299681efd9089e6bba5a008cb1e220bb94d19e`. The example runs in the Networka
+project environment because it uses the library check.
 [Archive details and additional examples](examples/intent/README.md).
 
 ```bash
 MLAG=/absolute/path/to/mikrotik-mlag-testsuite
-PYTHONPATH="$MLAG/src" uv run --offline --no-project python docs/examples/intent/compare.py "$MLAG"
+PYTHONPATH="$MLAG/src" uv run --locked python docs/examples/intent/compare.py "$MLAG"
 ```
 
 ## Validate Cumulus in the lab

@@ -5,8 +5,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from network_toolkit.api.run import DeviceCommandResult
 from network_toolkit.exceptions import DeviceConnectionError, DeviceExecutionError
 from network_toolkit.platforms.base import BackupResult
+from network_toolkit.platforms.mikrotik_routeros.intent import (
+    PORT_MONITOR,
+    PORT_STATS,
+    check_bridge_port_forwarding,
+    collect_bridge_port,
+)
 from network_toolkit.platforms.mikrotik_routeros.operations import (
     MikroTikRouterOSOperations,
 )
@@ -261,3 +268,31 @@ class TestMikroTikRouterOSOperations:
         assert (
             self.platform_ops.is_operation_supported("nonexistent_operation") is False
         )
+
+
+PORTS = '[{".id":"*1","bridge":"bridge","interface":"ether1"}]'
+
+
+def test_bridge_port_forwarding_collects_and_replays() -> None:
+    """Collected replies replay to a verdict without the device."""
+    replies = {
+        PORT_STATS: PORTS,
+        PORT_MONITOR.format(port_id="*1"): '{".id":"*1","forwarding":false}',
+    }
+    client = MagicMock()
+    client.run.side_effect = lambda device, command, **_: MagicMock(
+        command_results=[DeviceCommandResult(device, command, replies[command])]
+    )
+
+    evidence = collect_bridge_port(client, "r1", "bridge", "ether1")
+
+    assert check_bridge_port_forwarding(evidence, "bridge", "ether1").verdict == (
+        "mismatch"
+    )
+    match = check_bridge_port_forwarding(evidence, "bridge", "ether1", expected=False)
+    assert (match.observed, match.verdict) == (False, "match")
+    missing = check_bridge_port_forwarding(evidence, "bridge", "ether2")
+    assert missing.verdict == "unavailable"
+    assert missing.reason == "expected one bridge port bridge/ether2, found 0"
+    failed = {"stats": {"command": PORT_STATS, "output": None, "error": "timeout"}}
+    assert check_bridge_port_forwarding(failed, "bridge", "ether1").reason == "timeout"

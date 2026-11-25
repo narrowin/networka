@@ -13,10 +13,11 @@ exit status indicates whether the example ran. [Example script](compare.py).
 
 ```bash
 MLAG=/path/to/mikrotik-mlag-testsuite
-PYTHONPATH="$MLAG/src" uv run --offline --no-project python docs/examples/intent/compare.py "$MLAG"
+PYTHONPATH="$MLAG/src" uv run --locked python docs/examples/intent/compare.py "$MLAG"
 ```
 
-The command uses the parser from source and requires Python 3.11 or later.
+The command uses the lab's parser from source and Networka's RouterOS
+bridge-port check from the project environment.
 Use an MLAG checkout at commit
 `59299681efd9089e6bba5a008cb1e220bb94d19e` to reproduce the archive results.
 The power-loss case is
@@ -34,29 +35,25 @@ contains one observation for this example. [Published Junos sample, pp. 58–59]
 
 ## Native JSON for spanning-tree intent
 
-To check whether a RouterOS bridge port is forwarding, collect these two
-read-only replies from the same device in one collection window. Save each
-command's JSON output separately. For a single target, `nw run` with
-`--output-mode raw` prints the device reply. With SDK results, use the
-successful command's `output` string. [Networka command collection][networka-run].
+To check whether a RouterOS bridge port is forwarding, save the evidence
+from `collect_bridge_port` as JSON, as shown in the
+[intent guide](../../intent.md#check-a-routeros-bridge-port). It reads these two
+read-only replies from the same device in one collection window. The `.id`
+in the monitor command comes from the statistics row whose `bridge` and
+`interface` match, and only joins the two replies.
 
 ```routeros
 :put [:serialize to=json options=json.no-string-conversion [/interface/bridge/port/print stats as-value]]
 :put [:serialize to=json options=json.no-string-conversion [/interface/bridge/port/monitor *4 once as-value]]
 ```
 
-In the first reply, find the row whose `bridge` and `interface` match your
-target. Replace `*4` in the second command with that row's `.id`. This ID is
-only used to join the two replies from this device and collection window.
-`json.loads` decodes both replies. The example requires the same `.id` in the
-monitor object and compares its `forwarding` Boolean with the expected `true`.
-The example declares that expectation in Python, equivalent to writing
-`forwarding: true` in YAML. [Example implementation](compare.py) ·
-[RouterOS scripting reference][routeros-scripting].
+Replay the saved evidence with the example. It calls
+`check_bridge_port_forwarding` with the expected `true`.
+[Example implementation](compare.py) · [RouterOS scripting reference][routeros-scripting].
 
 ```bash
-PYTHONPATH="$MLAG/src" uv run --offline --no-project python docs/examples/intent/compare.py "$MLAG" \
-  --routeros-stp-port bridge ether2 ports.json monitor-ether2.json
+PYTHONPATH="$MLAG/src" uv run --locked python docs/examples/intent/compare.py "$MLAG" \
+  --routeros-stp-port bridge ether2 ether2-evidence.json
 ```
 
 In CHR 7.20.6 and 7.24.5 evidence, `ether2` supplied `false` (mismatch),

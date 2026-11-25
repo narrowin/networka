@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Check RouterOS bridge-port forwarding with `network_toolkit.platforms.mikrotik_routeros.intent`. `collect_bridge_port` reads the port statistics and monitor replies through `NetworkaClient` and keeps each command with its output or error. `check_bridge_port_forwarding` replays that evidence offline to `match`, `mismatch`, or `unavailable` with a reason.
+
+### Changed
+
+- The offline intent example uses the library check and replays one saved evidence file per port: `--routeros-stp-port BRIDGE INTERFACE EVIDENCE_JSON`. It now runs in the Networka project environment.
+- The intent guide marks the Cumulus checks as available only from draft PR #47.
+
 ## [0.4.1] - 2026-11-25
 
 ### Added
