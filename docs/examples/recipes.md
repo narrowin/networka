@@ -28,3 +28,8 @@ nw upload router1 firmware.npk
 
 This copies the file to the device. Firmware installation is a separate
 operation. See the [RouterOS guide](../vendors/mikrotik/index.md#firmware-management).
+
+## Compare operational evidence offline
+
+The [experimental intent example](intent/README.md) compares selected facts
+using native values and a shared definition of physical link status.
