@@ -458,6 +458,27 @@ def test_new_session_that_fails_to_connect_is_not_retried(
     assert pool.get("test_device1") is None
 
 
+def test_rejected_command_reply_reaches_result(
+    sample_config: NetworkConfig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    transport = MagicMock()
+    transport.send_command.return_value = MagicMock(
+        result="bad command name bogus (line 1 column 12)", failed=True
+    )
+    factory = MagicMock()
+    factory.create_transport.return_value = transport
+    monkeypatch.setattr(
+        "network_toolkit.device.get_transport_factory", lambda _name: factory
+    )
+
+    result = _run_pooled(sample_config, SessionPool(), "test_device1")
+
+    assert result.command_results[0].error == (
+        "Command failed on test_device1: /system/clock/print: "
+        "bad command name bogus (line 1 column 12)"
+    )
+
+
 def test_connecting_device_does_not_block_other_devices(
     sample_config: NetworkConfig,
     patch_device_session: Callable[[DummyDeviceSession], None],
