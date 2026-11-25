@@ -28,6 +28,10 @@ name="MikroTik"
 Command completed successfully
 ```
 
+See how to [run a reusable sequence](running-commands.md),
+[save the output](results.md), and
+[compare it with a baseline](reference/cli.md#nw-diff).
+
 <div align="center">
   <img src="assets/gifs/networka-setup.gif" alt="Networka Setup Demo" width="100%"/>
   <p><em>Networka setup and command execution demonstration</em></p>

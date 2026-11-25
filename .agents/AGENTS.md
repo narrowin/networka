@@ -82,5 +82,8 @@ artifact installation procedures.
 - Use [networka-verify](skills/networka-verify/SKILL.md) to verify a
   code or package change. Match the checks to the changed contract. Record
   commands, concrete observations, skips or warnings, and layers left untested.
+- In multi-agent work, the coordinator assigns scope and allows only one
+  agent to stage or commit at a time. Authors stage and commit their own
+  completed work after relevant checks and independent review.
 - Run `git diff --check` before handing off changes. For commit and contribution
   conventions, see [CONTRIBUTING.md](../CONTRIBUTING.md).

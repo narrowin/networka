@@ -5,12 +5,12 @@
 
 <br/>
 
-Network automation CLI. Apache 2.0 licensed. Fully open-source.
-Originally developed at [narrowin](https://narrowin.ch/en/about.html), now community maintained.
+Networka is a lightweight CLI for network engineers and integrators. Run ad hoc
+commands or reusable sequences across network devices from multiple vendors,
+then save the output and compare it with a baseline.
 
-<br/>
-
-**Networka: `Eierlegende Wollmilchsau` of network operations — optimized for your daily workflows.**
+Use Networka for on-demand troubleshooting and before-and-after checks. Pair it
+with continuous monitoring for alerting, telemetry, and ongoing health checks.
 
 [![Python 3.15+](https://img.shields.io/badge/python-3.15%2B-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20arm64-lightgrey.svg)](https://github.com/narrowin/networka)
@@ -19,29 +19,6 @@ Originally developed at [narrowin](https://narrowin.ch/en/about.html), now commu
 [![Type checked with mypy](https://img.shields.io/badge/mypy-checked-blue.svg)](http://mypy-lang.org/)
 [![Docs](https://img.shields.io/github/actions/workflow/status/narrowin/networka/docs.yml?label=Docs&logo=github)](https://narrowin.github.io/networka/)
 
-Networka is a modern CLI tool for automating network devices across multiple vendors. Designed for network engineers who want fast, scalable automation with full cross-platform support.
-
----
-
-## _The Networka Monologue_
-
-_“People ask the question…_ <br>
-**what’s a Networka?** <br>
-
-And I tell 'em — <br>
-it's **not** about cables, configs, and pings. <br>
-_Oh no._ <br>
-There’s more to it than that, my friend. <br>
-
-We all like a bit of the good life — <br>
-some the uptime, some the security, <br>
-others the automation, the visibility, or the compliance. <br>
-
-But a **Networka**, oh, they're different. <br>
-Why? <br>
-Because a real **Networka** wants the f\*ing lot.”<br><br>
-(inspired by: [RockNRolla](https://www.youtube.com/watch?v=s4YLBqMJYOo))
-
 ## Getting Started
 
 - Installation: see the docs → https://narrowin.github.io/networka/getting-started/
@@ -49,6 +26,10 @@ Because a real **Networka** wants the f\*ing lot.”<br><br>
 - Shell completion → https://narrowin.github.io/networka/shell-completion/
 - CLI reference → https://narrowin.github.io/networka/reference/cli/
 - API reference → https://narrowin.github.io/networka/reference/api/
+
+See how to [run a reusable sequence](docs/running-commands.md),
+[save the output](docs/results.md), and
+[compare it with a baseline](docs/reference/cli.md#nw-diff).
 
 <div align="center">
   <img src="https://narrowin.github.io/networka/assets/gifs/networka-setup.gif" alt="Networka Setup Demo" width="800"/>
