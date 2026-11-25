@@ -76,5 +76,5 @@ With Scrapli’s default `system` transport, Networka will use your local OpenSS
 - `inventory.nornir_inventory_dir`: directory containing `hosts.(yml|yaml)` (and optional `groups/defaults`), **or** a Containerlab lab directory, **or** a direct path to a `*.yml`/`*.yaml` hosts inventory file.
 - `inventory.credentials_mode`: `env` (default) or `inventory` (opt-in)
 - `inventory.group_membership`: `extended` (default) or `direct` (nested group inheritance only applies when `groups.(yml|yaml)` exists)
-- `inventory.platform_mapping`: `none` (default) or `netmiko_to_networka`
+- `inventory.platform_mapping`: `none` (default) or `netmiko_to_networka`. `netmiko_to_networka` maps Containerlab's `mikrotik_ros` and `mikrotik_chr` to `mikrotik_routeros`, `nokia_srl` to `nokia_srlinux`, `cisco_xe` to `cisco_iosxe` and `cisco_xr` to `cisco_iosxr`.
 - `inventory.connect_host`: `inventory_hostname` (default), `host_key`, or `containerlab_longname`

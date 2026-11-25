@@ -68,6 +68,12 @@ device1: step 3/3 ... ok
 Sequence completed successfully
 ```
 
+## Exit status
+
+`nw run` exits with code 0 when the command or sequence succeeded on every target device. It exits with code 1 when it failed on at least one device. This applies to a single device, a group and a device list. A group run prints the summary for all devices before it exits.
+
+A command fails when Networka cannot connect, the login is rejected or the device rejects the command. On RouterOS, a reply that starts with `syntax error`, `bad command name`, `expected end of command`, `input does not match any value`, `failure:` or `no such item` counts as a rejected command. A sequence stops on a device at its first failed command.
+
 ## Upload and download
 
 ```bash
