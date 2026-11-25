@@ -6,6 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from rich.text import Text
 from typer.testing import CliRunner
 
 from network_toolkit import __version__
@@ -33,7 +34,7 @@ class TestBasicCommandCoverage:
         result = CliRunner().invoke(app, [*command, "--help"])
 
         assert result.exit_code == 0, result.output
-        assert expected in result.output
+        assert expected in Text.from_ansi(result.output).plain
 
     def test_root_version(self) -> None:
         result = CliRunner().invoke(app, ["--version"])
@@ -45,8 +46,9 @@ class TestBasicCommandCoverage:
         result = CliRunner().invoke(app, [])
 
         assert result.exit_code == 0, result.output
-        assert "Networka" in result.output
-        assert "--inventory" in result.output
+        help_text = Text.from_ansi(result.output).plain
+        assert "Networka" in help_text
+        assert "--inventory" in help_text
 
 
 class TestSequenceManagerCoverage:

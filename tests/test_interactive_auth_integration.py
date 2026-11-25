@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from rich.text import Text
 from typer import BadParameter
 from typer.testing import CliRunner
 
@@ -70,8 +71,9 @@ class TestInteractiveAuthIntegration:
         result = CliRunner().invoke(app, ["info", "--help"])
 
         assert result.exit_code == 0, result.output
-        assert "--interactive-auth" in result.output
-        assert "Prompt for username and password interactively" in result.output
+        help_text = Text.from_ansi(result.output).plain
+        assert "--interactive-auth" in help_text
+        assert "Prompt for username and password interactively" in help_text
 
 
 class TestInteractiveAuthErrorHandling:
