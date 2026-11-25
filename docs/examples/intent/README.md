@@ -128,9 +128,65 @@ Networka can supply the acquisition side from `RunResult`. Use
 `sequence_results` for its command-keyed outputs and device error. Route
 the raw string to the decoder for its platform and exact command and carry
 any failure into the verdict. Networka's stored JSON also carries the
-command result as a string in `output`. The example has no live
-Networka-to-device acquisition and qualifies only these archive rows and
-the published Junos shape. [Networka run and storage guide][networka-run].
+command result as a string in `output`. The runnable `compare.py` example
+uses the archive rows and the published Junos shape offline.
+[Networka run and storage guide][networka-run].
+
+## Medium lab qualification on 2026-11-25
+
+A one-off SDK capture with the published Networka v0.3.0 wheel and native
+Scrapli on Python 3.15.2 supplied live RouterOS output for the same selected
+operational checks. The two core peers and access switch all ran RouterOS CHR
+7.26beta7. The check used read-only RouterOS commands and VLAN 110 endpoint
+probes. The results describe one live snapshot. No faults were injected and no
+configuration was changed.
+
+- **Ethernet and MLAG.** Each of the three devices reported `link-ok` on
+  `ether2`, `ether3` and `ether4`. The core peers both reported
+  `mlag-state=connected`, with `primary` on the first peer and `secondary`
+  on the second.
+- **LACP.** All six selected members were eligible. The actor and partner
+  both reported `SCD` on `access-uplink/ether3` and `client2/ether4` on each
+  core peer, and on `uplink/ether2` and `uplink/ether3` on the access switch.
+- **Reachability.** All three VLAN 110 pings succeeded in each direction
+  between the two selected endpoints.
+- **Spanning tree.** The running bridges reported `protocol-mode=none`,
+  which differs from the startup reference's RSTP mode. The selected ports
+  reported `forwarding=yes`. Active spanning-tree root and port-role checks
+  were inapplicable with STP disabled. The reported root ID
+  `0x8000.00:00:00:00:00:00` is a placeholder. [Medium startup reference][medium-startup].
+
+For core 1, the intent declares the two expected RouterOS bridge fields
+directly. This fragment uses an initialized `NetworkaClient` as `client`
+and the example's `summarize_router` and `show_intent` helpers.
+
+```python
+intent = {
+    "device": "dc1-core-mlag1",
+    "command": "/interface bridge monitor bridge once",
+    "expected": {"mlag-state": "connected", "mlag-active-role": "primary"},
+}
+
+result = client.run(intent["device"], intent["command"])
+reply = next(
+    (
+        row
+        for row in result.command_results
+        if (row.device, row.command) == (intent["device"], intent["command"])
+    ),
+    None,
+)
+facts = {}
+if reply is not None and reply.error is None and reply.output is not None:
+    facts = summarize_router(reply.output)["bridge"]
+
+for field, expected in intent["expected"].items():
+    show_intent(field, expected, facts.get(field))
+```
+
+Both fields matched in the live sample. A different reported value produces
+`mismatch`. A failed or missing reply or an omitted field produces
+`unavailable` for the affected checks.
 
 [archive]: https://github.com/narrowin/mikrotik-mlag-testsuite/tree/59299681efd9089e6bba5a008cb1e220bb94d19e/results/2026-11-24-power-loss/small-stp-off/01-primary-power-loss
 [collector]: https://github.com/narrowin/mikrotik-mlag-testsuite/blob/59299681efd9089e6bba5a008cb1e220bb94d19e/src/mlag_lab/external_run.py#L215-L218
@@ -158,3 +214,4 @@ the published Junos shape. [Networka run and storage guide][networka-run].
 [probe-score]: https://github.com/narrowin/mikrotik-mlag-testsuite/blob/59299681efd9089e6bba5a008cb1e220bb94d19e/src/mlag_lab/measure.py#L23-L49
 [juniper]: https://www.juniper.net/documentation/en_US/day-one-books/DO_Automating_SALT.pdf#page=58
 [networka-run]: ../../running-commands.md
+[medium-startup]: https://github.com/narrowin/mikrotik-mlag-testsuite/blob/59299681efd9089e6bba5a008cb1e220bb94d19e/labs/medium/medium.rsc#L2-L16
