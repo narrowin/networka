@@ -16,6 +16,8 @@ from network_toolkit.api.run import (
     run_commands,
 )
 from network_toolkit.config import NetworkConfig
+from network_toolkit.exceptions import DeviceExecutionError, OperationUnconfirmedError
+from network_toolkit.session_pool import SessionPool
 
 
 class DummyDeviceSession:
@@ -137,3 +139,80 @@ def test_run_commands_unknown_target_raises(sample_config: NetworkConfig) -> Non
         run_commands(options)
 
     assert "No devices resolved" in excinfo.value.message
+
+
+class FailingDeviceSession(DummyDeviceSession):
+    """Dummy session that rejects one command and loses the transport on another."""
+
+    disconnects = 0
+
+    def connect(self) -> None:
+        return None
+
+    def disconnect(self) -> None:
+        FailingDeviceSession.disconnects += 1
+
+    def execute_command(self, command: str) -> str:
+        if command == "rejected":
+            msg = f"Command failed on {self.device_name}: {command}"
+            raise DeviceExecutionError(msg)
+        if command == "lost":
+            msg = "Device did not acknowledge the command"
+            raise OperationUnconfirmedError(msg, command=command)
+        return super().execute_command(command)
+
+
+def _force_sequence(monkeypatch: pytest.MonkeyPatch, commands: list[str]) -> None:
+    monkeypatch.setattr(
+        "network_toolkit.api.run.SequenceManager.exists", lambda _self, _name: True
+    )
+    monkeypatch.setattr(
+        "network_toolkit.api.run.SequenceManager.resolve",
+        lambda _self, _name, _device: commands,
+    )
+
+
+@pytest.mark.parametrize("use_pool", [False, True])
+def test_sequence_failure_keeps_earlier_outputs(
+    sample_config: NetworkConfig,
+    patch_device_session: Callable[[DummyDeviceSession], None],
+    monkeypatch: pytest.MonkeyPatch,
+    use_pool: bool,
+) -> None:
+    patch_device_session(FailingDeviceSession)
+    _force_sequence(monkeypatch, ["cmd_a", "rejected", "cmd_c"])
+
+    result = run_commands(
+        RunOptions(
+            target="test_device1",
+            command_or_sequence="health_check",
+            config=sample_config,
+            session_pool=SessionPool() if use_pool else None,
+        )
+    )
+
+    device_result = result.sequence_results[0]
+    assert result.totals.failed == 1
+    assert device_result.error == "Command failed on test_device1: rejected"
+    assert device_result.outputs == {"cmd_a": "test_device1:cmd_a"}
+
+
+def test_sequence_success_has_no_error(
+    sample_config: NetworkConfig,
+    patch_device_session: Callable[[DummyDeviceSession], None],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    patch_device_session(FailingDeviceSession)
+    _force_sequence(monkeypatch, ["cmd_a", "cmd_b"])
+
+    result = run_commands(
+        RunOptions(
+            target="test_device1",
+            command_or_sequence="health_check",
+            config=sample_config,
+            session_pool=SessionPool(),
+        )
+    )
+
+    assert result.sequence_results[0].error is None
+    assert result.totals.failed == 0

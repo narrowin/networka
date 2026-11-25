@@ -305,6 +305,7 @@ def _run_sequence_on_device(
     sequence_manager: SequenceManager,
     session_pool: SessionPoolProtocol | None = None,
 ) -> DeviceSequenceResult:
+    outputs: dict[str, str] = {}
     try:
         commands = sequence_manager.resolve(sequence_name, device_name)
         if not commands:
@@ -316,13 +317,12 @@ def _run_sequence_on_device(
                 error=msg,
             )
 
-        outputs: dict[str, str] = {}
-
         if session_pool is not None:
-            outputs = _execute_sequence_with_session_pool(
+            _execute_sequence_with_session_pool(
                 device_name,
                 config,
                 commands,
+                outputs,
                 username_override,
                 password_override,
                 transport_override,
@@ -342,7 +342,7 @@ def _run_sequence_on_device(
         return DeviceSequenceResult(
             device=device_name,
             sequence=sequence_name,
-            outputs=None,
+            outputs=outputs or None,
             error=exc.message,
         )
     except Exception as exc:
@@ -350,7 +350,7 @@ def _run_sequence_on_device(
         return DeviceSequenceResult(
             device=device_name,
             sequence=sequence_name,
-            outputs=None,
+            outputs=outputs or None,
             error=str(exc),
         )
 
@@ -370,17 +370,19 @@ def _execute_sequence_with_session_pool(
     device_name: str,
     config: NetworkConfig,
     commands: list[str],
+    outputs: dict[str, str],
     username_override: str | None,
     password_override: str | None,
     transport_override: str | None,
     session_pool: SessionPoolProtocol,
-) -> dict[str, str]:
-    """Execute a sequence of commands using a pooled session with retry."""
+) -> None:
+    """Execute a sequence using a pooled session and add each output to ``outputs``."""
 
-    def execute_all(session: device_module.DeviceSession) -> dict[str, str]:
-        return {cmd: session.execute_command(cmd) for cmd in commands}
+    def execute_all(session: device_module.DeviceSession) -> None:
+        for cmd in commands:
+            outputs[cmd] = session.execute_command(cmd)
 
-    return _with_session_retry(
+    _with_session_retry(
         device_name,
         config,
         username_override,
