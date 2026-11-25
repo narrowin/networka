@@ -18,6 +18,7 @@ from scrapli.exceptions import ScrapliException
 from network_toolkit.common.interactive_confirmation import create_confirmation_handler
 from network_toolkit.device_transfers import calculate_file_checksum, verify_file_upload
 from network_toolkit.exceptions import (
+    DeviceAuthError,
     DeviceConnectionError,
     DeviceExecutionError,
     FileTransferError,
@@ -39,6 +40,12 @@ if TYPE_CHECKING:
     from network_toolkit.transport.interfaces import Transport
 
 logger = logging.getLogger(__name__)
+# Lowercase text that SSH clients and libscrapli use for a rejected login.
+_AUTH_FAILURE_MARKERS = (
+    "permission denied",
+    "authentication failed",
+    "too many authentication failures",
+)
 
 
 class DeviceSession:
@@ -152,7 +159,7 @@ class DeviceSession:
                         attempt,
                         attempts,
                         self.device_name,
-                        exc,
+                        self._error_reason(exc),
                     )
                     if attempt == attempts:
                         raise
@@ -178,14 +185,25 @@ class DeviceSession:
                 details={"original_error": str(e)},
             ) from e
         except Exception as e:
+            reason = self._error_reason(e)
             logger.error(
-                f"Failed to connect to {self.device_name} using {transport_type}: {e}"
+                f"Failed to connect to {self.device_name} using {transport_type}: "
+                f"{reason}"
             )
-            msg = f"Connection failed for {self.device_name}"
-            raise DeviceConnectionError(
-                msg,
-                details={"original_error": str(e), "transport_type": transport_type},
-            ) from e
+            details = {"original_error": reason, "transport_type": transport_type}
+            if any(marker in reason.lower() for marker in _AUTH_FAILURE_MARKERS):
+                msg = f"Authentication failed for {self.device_name}: {reason}"
+                raise DeviceAuthError(msg, details=details) from e
+            msg = f"Connection failed for {self.device_name}: {reason}"
+            raise DeviceConnectionError(msg, details=details) from e
+
+    def _error_reason(self, exc: BaseException) -> str:
+        """Return the exception text without the device password."""
+        reason = str(exc) or type(exc).__name__
+        password = self._connection_params.get("auth_password")
+        if password:
+            reason = reason.replace(password, "***")
+        return reason
 
     def disconnect(self) -> None:
         """Close connection to the device."""

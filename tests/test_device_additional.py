@@ -10,7 +10,11 @@ import pytest
 
 from network_toolkit.config import NetworkConfig
 from network_toolkit.device import DeviceSession
-from network_toolkit.exceptions import DeviceConnectionError, DeviceExecutionError
+from network_toolkit.exceptions import (
+    DeviceAuthError,
+    DeviceConnectionError,
+    DeviceExecutionError,
+)
 from network_toolkit.transport import ScrapliSyncTransport
 
 
@@ -332,6 +336,59 @@ class TestDeviceSessionAdditional:
 
             with pytest.raises(DeviceConnectionError):
                 session.connect()
+
+    def test_connection_failure_reports_reason(
+        self, sample_config: NetworkConfig
+    ) -> None:
+        """A failed connection names the transport's reason, not only the device."""
+        from scrapli.exceptions import ScrapliException
+
+        with (
+            patch("network_toolkit.transport.scrapli_sync.Cli") as mock_scrapli,
+            patch("network_toolkit.device.time.sleep"),
+        ):
+            mock_driver = MagicMock()
+            mock_driver.ptr = None
+            mock_driver.open.side_effect = ScrapliException("connection refused")
+            mock_scrapli.return_value = mock_driver
+
+            session = DeviceSession("test_device1", sample_config)
+
+            with pytest.raises(DeviceConnectionError) as exc_info:
+                session.connect()
+
+        assert not isinstance(exc_info.value, DeviceAuthError)
+        assert exc_info.value.message == (
+            "Connection failed for test_device1: connection refused"
+        )
+
+    def test_rejected_login_raises_auth_error_without_password(
+        self, sample_config: NetworkConfig
+    ) -> None:
+        """A rejected login is a DeviceAuthError and never shows the password."""
+        from scrapli.exceptions import ScrapliException
+
+        with (
+            patch("network_toolkit.transport.scrapli_sync.Cli") as mock_scrapli,
+            patch("network_toolkit.device.time.sleep"),
+        ):
+            mock_driver = MagicMock()
+            mock_driver.ptr = None
+            mock_driver.open.side_effect = ScrapliException(
+                "admin@10.0.0.1: Permission denied (password testpass)"
+            )
+            mock_scrapli.return_value = mock_driver
+
+            session = DeviceSession("test_device1", sample_config)
+
+            with pytest.raises(DeviceAuthError) as exc_info:
+                session.connect()
+
+        message = exc_info.value.message
+        assert message.startswith("Authentication failed for test_device1: ")
+        assert "Permission denied" in message
+        assert "testpass" not in message
+        assert "testpass" not in exc_info.value.details["original_error"]
 
     def test_command_execution_scrapli_error(
         self, sample_config: NetworkConfig
