@@ -132,6 +132,35 @@ def test_nornir_simple_inventory_containerlab_connect_host_longname(
     assert cfg.devices["sw-acc1"].device_type == "mikrotik_routeros"
 
 
+@pytest.mark.parametrize(
+    ("platform_mapping", "expected"),
+    [("netmiko_to_networka", "mikrotik_routeros"), ("none", "mikrotik_chr")],
+)
+def test_nornir_simple_inventory_maps_containerlab_chr_platform(
+    tmp_path: Path, platform_mapping: str, expected: str
+) -> None:
+    inv_dir = tmp_path / "clab-mlag"
+    inv_dir.mkdir()
+    _write_yaml(
+        inv_dir / "nornir-simple-inventory.yml",
+        {"chr1": {"hostname": "172.20.20.5", "platform": "mikrotik_chr"}},
+    )
+    _write_yaml(
+        tmp_path / "config.yml",
+        {
+            "inventory": {
+                "source": "nornir_simple",
+                "nornir_inventory_dir": "clab-mlag",
+                "platform_mapping": platform_mapping,
+            }
+        },
+    )
+
+    cfg = load_modular_config(tmp_path)
+    assert cfg.devices is not None
+    assert cfg.devices["chr1"].device_type == expected
+
+
 def test_nornir_simple_inventory_missing_platform_is_error(tmp_path: Path) -> None:
     inventory_file = tmp_path / "hosts.yml"
     _write_yaml(
