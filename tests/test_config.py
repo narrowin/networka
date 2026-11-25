@@ -280,6 +280,7 @@ class TestNetworkConfig:
             "timeout_transport": 30,
             "transport": "system",
             "ssh_config_file": True,
+            "ssh_known_hosts_file": None,
             "platform": "mikrotik_routeros",  # Now correctly uses device_type, not hardware platform
         }
 
@@ -300,6 +301,7 @@ class TestNetworkConfig:
             "timeout_transport": 60,
             "transport": "system",
             "ssh_config_file": True,
+            "ssh_known_hosts_file": None,
             "platform": "mikrotik_routeros",
         }
 

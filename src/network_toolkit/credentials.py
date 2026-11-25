@@ -459,6 +459,7 @@ class ConnectionParameterBuilder:
             "timeout_transport": self.config.general.timeout,
             "transport": self.config.general.transport,
             "ssh_config_file": self.config.general.ssh_config_file,
+            "ssh_known_hosts_file": self.config.general.ssh_known_hosts_file,
         }
 
         # Only add platform if it's not None (for generic/linux connections)

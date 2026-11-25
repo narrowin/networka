@@ -50,17 +50,23 @@ def _transport_options(params: dict[str, Any]) -> Options:
     backend = (params.get("transport") or "system").lower()
     strict = params.get("auth_strict_key", False)
     ssh_config = params.get("ssh_config_file", True)
+    known_hosts = params.get("ssh_known_hosts_file")
+    if known_hosts:
+        known_hosts = os.path.expanduser(known_hosts)
     if backend == "system":
         return TransportBinOptions(
             enable_strict_key=strict,
             ssh_config_path=None if ssh_config else os.devnull,
+            known_hosts_path=known_hosts,
         )
     if backend == "ssh2":
         if ssh_config:
             msg = "ssh2 requires ssh_config_file: false. Use system for OpenSSH configuration."
             raise ValueError(msg)
         return TransportSsh2Options(
-            known_hosts_path=str(Path.home() / ".ssh/known_hosts") if strict else None
+            known_hosts_path=(known_hosts or str(Path.home() / ".ssh/known_hosts"))
+            if strict
+            else None
         )
     if backend == "telnet":
         return TransportTelnetOptions()

@@ -474,6 +474,18 @@
           "title": "Ssh Strict Host Key Checking",
           "type": "boolean"
         },
+        "ssh_known_hosts_file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ssh Known Hosts File"
+        },
         "connection_retries": {
           "default": 3,
           "title": "Connection Retries",
@@ -685,6 +697,7 @@
         "default_transport_type": "scrapli",
         "ssh_config_file": true,
         "ssh_strict_host_key_checking": false,
+        "ssh_known_hosts_file": null,
         "connection_retries": 3,
         "retry_delay": 5,
         "transfer_timeout": 300,

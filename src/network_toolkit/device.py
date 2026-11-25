@@ -101,6 +101,7 @@ class DeviceSession:
         defaults = {
             "auth_strict_key": config.general.ssh_strict_host_key_checking,
             "ssh_config_file": config.general.ssh_config_file,
+            "ssh_known_hosts_file": config.general.ssh_known_hosts_file,
             "timeout_socket": 10,  # Socket timeout
             "timeout_transport": 30,  # Transport timeout
             "timeout_ops": config.general.command_timeout,

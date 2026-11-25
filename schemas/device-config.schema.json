@@ -490,6 +490,18 @@
           "title": "Ssh Strict Host Key Checking",
           "type": "boolean"
         },
+        "ssh_known_hosts_file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ssh Known Hosts File"
+        },
         "connection_retries": {
           "default": 3,
           "title": "Connection Retries",
