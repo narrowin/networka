@@ -12,6 +12,7 @@ import pytest
 from network_toolkit.api.run import (
     DeviceSequenceResult,
     RunOptions,
+    RunResult,
     TargetResolutionError,
     run_commands,
 )
@@ -216,3 +217,56 @@ def test_sequence_success_has_no_error(
 
     assert result.sequence_results[0].error is None
     assert result.totals.failed == 0
+
+
+def test_lost_transport_drops_pooled_session_without_repeating(
+    sample_config: NetworkConfig,
+    patch_device_session: Callable[[DummyDeviceSession], None],
+) -> None:
+    patch_device_session(FailingDeviceSession)
+    FailingDeviceSession.disconnects = 0
+    pool = SessionPool()
+
+    def run(command: str) -> RunResult:
+        return run_commands(
+            RunOptions(
+                target="test_device1",
+                command_or_sequence=command,
+                config=sample_config,
+                session_pool=pool,
+            )
+        )
+
+    run("cmd_a")
+    first = pool.get("test_device1")
+    assert first is not None
+
+    lost = run("lost")
+    assert lost.command_results[0].error == "Device did not acknowledge the command"
+    assert pool.get("test_device1") is None
+    assert FailingDeviceSession.disconnects == 1
+
+    again = run("cmd_b")
+    second = pool.get("test_device1")
+    assert again.command_results[0].output == "test_device1:cmd_b"
+    assert second is not None and second is not first
+    assert second.commands == ["cmd_b"]
+
+
+def test_rejected_command_keeps_pooled_session(
+    sample_config: NetworkConfig,
+    patch_device_session: Callable[[DummyDeviceSession], None],
+) -> None:
+    patch_device_session(FailingDeviceSession)
+    pool = SessionPool()
+    options = RunOptions(
+        target="test_device1",
+        command_or_sequence="rejected",
+        config=sample_config,
+        session_pool=pool,
+    )
+
+    result = run_commands(options)
+
+    assert result.command_results[0].error is not None
+    assert pool.get("test_device1") is not None

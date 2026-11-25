@@ -14,7 +14,7 @@ import network_toolkit.device as device_module
 from network_toolkit.api.execution import execute_parallel
 from network_toolkit.common.credentials import InteractiveCredentials
 from network_toolkit.config import NetworkConfig
-from network_toolkit.exceptions import NetworkToolkitError
+from network_toolkit.exceptions import NetworkToolkitError, OperationUnconfirmedError
 from network_toolkit.inventory.resolve import resolve_named_targets
 from network_toolkit.ip_device import (
     create_ip_based_config as _create_ip_based_config,
@@ -235,6 +235,9 @@ def _with_session_retry(
     """
     Retry a failed pooled connection once, then execute the operation once.
 
+    An operation that fails without a device reply removes the session from the
+    pool, so the next call opens a new one. The operation itself is not repeated.
+
     Args:
         execute_fn: Callable that takes a connected session and returns result
     """
@@ -270,7 +273,12 @@ def _with_session_retry(
         session = create_session()
         session.connect()
         session_pool[device_name] = session
-    return execute_fn(session)
+    try:
+        return execute_fn(session)
+    except OperationUnconfirmedError:
+        session_pool.remove(device_name)
+        session.disconnect()
+        raise
 
 
 def _execute_with_session_pool(

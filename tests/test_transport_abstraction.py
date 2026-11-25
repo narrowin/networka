@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from network_toolkit.config import DeviceConfig, GeneralConfig, NetworkConfig
+from network_toolkit.exceptions import OperationUnconfirmedError
 from network_toolkit.transport.factory import get_transport_factory
 from network_toolkit.transport.interfaces import Transport
 from network_toolkit.transport.scrapli_sync import ScrapliSyncTransport
@@ -163,3 +164,12 @@ class TestScrapliSyncTransport:
     def test_error_prefix_ignored_for_other_platforms(self) -> None:
         result = self._transport("syntax error", routeros=False).send_command("x")
         assert result.failed is False
+
+    def test_lost_session_raises_unconfirmed_and_forces_close(self) -> None:
+        driver = MagicMock()
+        driver.send_input.side_effect = OSError("connection reset")
+        transport = ScrapliSyncTransport(driver, 1, routeros=True)
+        with pytest.raises(OperationUnconfirmedError):
+            transport.send_command("/system/identity/print")
+        transport.close()
+        driver.close.assert_called_once_with(force=True)

@@ -151,6 +151,8 @@ class ScrapliSyncTransport:
                     command, operation_timeout_ns=self._command_timeout_ns
                 )
             except (ScrapliException, OSError) as exc:
+                # The session state is unknown, so do not wait for a clean logout.
+                self._force_close = True
                 msg = "Device did not acknowledge the command"
                 raise OperationUnconfirmedError(msg, command=command) from exc
         output = result.result
