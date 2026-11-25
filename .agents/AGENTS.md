@@ -15,7 +15,7 @@ compatibility requirements only when the user explicitly requests them.
 - `src/network_toolkit/device.py`, `session_pool.py`, and `transport/` handle
   connection lifecycle, the native Scrapli command transport, and Paramiko SFTP.
 - `src/network_toolkit/platforms/` and `builtin_sequences/` contain platform
-  operations and packaged command sequences. `tui/` contains the Textual UI.
+  operations and packaged command sequences.
 - `tests/` contains pytest cases. `docs/` is the MkDocs site.
   `scripts/` and `Taskfile.yml` provide development checks.
 
@@ -59,7 +59,6 @@ artifact installation procedures.
   `test_output_manager.py` cover CLI and output behavior.
   `test_client_session_reuse.py` and `test_session_pool.py` cover connection
   ownership. `test_nornir_simple_inventory_import.py` covers inventory mapping.
-  `test_tui_services_cancellation.py` covers TUI cancellation.
 - Repair existing tests and use existing entry points. Assert specific results
   and isolate network access at the boundary where a case needs it. Create or
   expand automated suites, fixtures, mock harnesses, or failure-injection
