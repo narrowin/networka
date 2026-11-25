@@ -35,6 +35,15 @@ logger = logging.getLogger(__name__)
 _ROUTEROS_SUFFIX = "+ct511w4098h"
 _LEGACY_ROUTEROS_SUFFIX = "+cet511w4098h"
 _NS_PER_SECOND = 1_000_000_000
+# RouterOS reports a rejected command with one of these at the start of the reply.
+_ROUTEROS_ERROR_PREFIXES = (
+    "syntax error",
+    "bad command name",
+    "expected end of command",
+    "input does not match any value",
+    "failure:",
+    "no such item",
+)
 
 
 def _transport_options(params: dict[str, Any]) -> Options:
@@ -145,6 +154,7 @@ class ScrapliSyncTransport:
                 msg = "Device did not acknowledge the command"
                 raise OperationUnconfirmedError(msg, command=command) from exc
         output = result.result
+        failed = result.failed
         if self._routeros:
             first, _, remainder = output.partition("\n")
             first = first.rstrip("\r").strip()
@@ -152,7 +162,8 @@ class ScrapliSyncTransport:
                 r"\[[^\]\r\n]+\][^>\r\n]*>\s*" + re.escape(command), first
             ):
                 output = remainder
-        return CommandResult(result=output, failed=result.failed)
+            failed = failed or output.lstrip().startswith(_ROUTEROS_ERROR_PREFIXES)
+        return CommandResult(result=output, failed=failed)
 
     def send_interactive(
         self,
