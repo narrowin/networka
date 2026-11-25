@@ -28,10 +28,10 @@ The Python library supports the core automation features of Networka. Some manag
 | **Sequence Execution** | `nw run` | `client.run()` |
 | **File Upload** | `nw upload` | `client.upload()` |
 | **File Download** | `nw download` | `client.download()` |
-| **Config Backup** | `nw backup` | `client.backup()` |
+| **Config Backup** | `nw backup config` | `client.backup()` |
 | **Config Diff** | `nw diff` | `client.diff()` |
 | **Firmware Upgrade** | `nw firmware upgrade` | *Not yet supported* |
-| **RouterOS Upgrade** | `nw routerboard-upgrade` | *Not yet supported* |
+| **RouterOS Upgrade** | `nw firmware bios` | *Not yet supported* |
 | **Interactive SSH** | `nw cli` | *Not supported (interactive)* |
 | **Config Management** | `nw config ...` | *Not supported* |
 | **Inventory List** | `nw list` | *Access via `client.devices`* |
@@ -40,16 +40,12 @@ The Python library supports the core automation features of Networka. Some manag
 
 ### NetworkaClient
 
-High-level client that loads configuration and provides methods for all operations. It supports context manager usage for automatic session reuse.
+The client loads inventory and connection settings and reuses sessions across supported operations. Use it as a context manager to close its pool when finished.
 
 ```python
 from network_toolkit import NetworkaClient
 
-# Simple usage
-client = NetworkaClient()
-result = client.run("router1", "show version")
-
-# Efficient usage (reuses connections)
+# Reuse a connection for successive commands.
 with NetworkaClient() as client:
     client.run("router1", "show version")
     client.run("router1", "show ip int brief")
@@ -74,7 +70,7 @@ See [DeviceSession API reference](../reference/api.md#network_toolkit.device.Dev
 
 ## Quick Links
 
-- [60-second quickstart](quickstart.md) - Get started immediately
+- [Quickstart](quickstart.md) - Run a command or packaged sequence
 - [Persistent sessions](sessions.md) - Efficient multi-command workflows
 - [Ad-hoc IP targeting](adhoc-targets.md) - Connect without configuration
 - [Code recipes](recipes.md) - Common patterns and examples

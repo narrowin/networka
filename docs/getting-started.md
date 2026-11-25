@@ -1,73 +1,72 @@
 # Installation
 
-## Installation
+Networka requires Python 3.15 or later. Use Linux x86-64 or ARM64, or Apple
+Silicon macOS. See [platform compatibility](platform-compatibility.md).
 
-Install from PyPI using an isolated tool installer (recommended).
-
-```bash
-uv tool install networka
-# or
-pipx install networka
-```
-
-Short install video (30s):
-
-[asciinema placeholder – will be embedded here]
-
-### tmux requirement for `nw cli`
-
-The multi-pane CLI command (`nw cli`) requires tmux on your PATH. Install it with `brew install tmux` (macOS), `apt install tmux` (Debian/Ubuntu), or your distro’s package manager. Without tmux the command falls back to sequential SSH sessions.
-
-## Verify installation
+The examples on this page use the current checkout. Install it in an
+isolated tool environment from the checkout directory.
 
 ```bash
-nw --help
+uv tool install --python 3.15 .
 nw --version
 ```
 
-## Minimal configuration
+To use the project environment instead, run `uv sync --locked` and prefix
+the examples with `uv run --locked`.
 
-Option 1 (recommended): bootstrap the default config tree and follow the prompts.
+For the published release, use `uv tool install --python 3.15 networka`.
+Use the installed release's `nw --help` to check its available commands.
+
+## Run your first sequence
+
+Inspect the active definitions and the packaged RouterOS sequence.
+
+```bash
+nw platforms list
+nw info system_info --vendor mikrotik_routeros
+```
+
+Replace the example IP with a RouterOS device you can access. Enter the
+username and password when prompted.
+
+```bash
+nw run 192.0.2.10 system_info --platform mikrotik_routeros --interactive-auth
+```
+
+The inspection shows the commands and source. The run displays their output.
+Learn more about [IP targets](ip-address-support.md) and [stored results](results.md).
+
+## Add inventory for recurring work
+
+Initialize a modular configuration to reuse named devices or groups.
 
 ```bash
 nw config init
 ```
 
-This creates a modular configuration at the platform-specific application path:
-
-- Linux: `~/.config/networka`
-- macOS: `~/Library/Application Support/networka`
-- Windows: `%APPDATA%\networka` (typically `C:\Users\<you>\AppData\Roaming\networka`)
-
-Option 2: copy the repository’s `config/` directory into that application path if you prefer to start from the examples committed in source control. Make sure the destination contains `config.yml`, `devices/`, `groups/`, and `sequences/` exactly as expected by the loader.
-
-With the configuration in place, add a device definition under `devices/` (for example, `devices/router1.yml`):
+Within the configuration directory, edit the generated `router1`
+entry under `devices/`. If you started with an empty configuration,
+add it in a file such as `devices/router1.yml`.
 
 ```yaml
-host: 192.0.2.10
-device_type: mikrotik_routeros
+devices:
+  router1:
+    host: 192.0.2.10
+    device_type: mikrotik_routeros
 ```
 
-Run a command:
+Then run the sequence by name. The inventory supplies the platform.
 
 ```bash
-nw run router1 "/system/identity/print"
+nw run router1 system_info --interactive-auth
 ```
 
-Expected output (trimmed):
-
-```text
-Executing on router1: /system/identity/print
-name="MikroTik"
-Command completed successfully
-```
-
-See the User guide for additional configuration options.
+See [configuration](configuration.md) for file locations and inventory sources
+and [environment variables](environment-variables.md) for setting credentials.
 
 ## Next steps
 
-- Explore supported platforms → `nw platforms list`
-- Define more devices and groups → Configuration
-- Learn how to run common operations → Running commands
-- Control formatting and capture outputs → Output modes and Results
-- Troubleshooting connection/auth issues → Troubleshooting
+- [Run commands and sequences](running-commands.md)
+- [Save results and compare a baseline](results.md)
+- [Open interactive SSH panes with tmux](tmux-ssh.md)
+- [Troubleshoot installation or connections](troubleshooting.md)

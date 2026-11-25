@@ -1,44 +1,20 @@
-# Cross-Platform CLI fanout
+# tmux CLI sessions
 
-This adds a `nw cli` command that opens CLI sessions to multiple devices simultaneously. The implementation adapts to your platform capabilities.
+`nw cli` opens one interactive OpenSSH pane per selected device. It uses
+the devices and groups in your [configuration](configuration.md).
 
 ## Platform Support
 
-### Full tmux-based fanout (Recommended)
-
-**Platforms:** Linux, macOS, Windows with WSL
-
-- Opens tmux session with one pane per device
-- Synchronized typing across all panes
-- Native tmux navigation and controls
-
-### Sequential SSH fallback
-
-**Platforms:** Windows (native), any system without tmux
-
-- Opens SSH connections one by one
-- No synchronized typing
-- Basic cross-platform compatibility
+Install Networka on a [compatible host](platform-compatibility.md). If
+tmux fanout is unavailable and Networka finds a supported SSH client, the
+command can open sequential sessions.
 
 ## Requirements
 
-### For tmux-based fanout:
-
-- tmux installed and available
-- libtmux Python package (install with `uv add libtmux` or `pip install libtmux`)
-- SSH client (OpenSSH recommended)
-- sshpass for password authentication (Linux/macOS: `apt install sshpass` or `brew install hudochenkov/sshpass/sshpass`)
-
-### For sequential fallback:
-
-- Any SSH client (OpenSSH, PuTTY plink, etc.)
-- libtmux package still required (but tmux server not needed)
-
-### Windows-specific notes:
-
-- **Option 1 (Recommended):** Use WSL2 with tmux for full functionality
-- **Option 2:** Native Windows with sequential SSH fallback
-- **SSH clients supported:** Windows OpenSSH (Win10+), PuTTY plink, Git Bash SSH
+- OpenSSH and tmux on your PATH for multi-pane sessions.
+- Networka includes the Python libtmux dependency.
+- Use sshpass when you want automatic password entry. OpenSSH can also prompt
+  in each pane.
 
 ## Usage
 
@@ -73,10 +49,11 @@ This adds a `nw cli` command that opens CLI sessions to multiple devices simulta
 
 Authentication modes:
 
-- `--auth auto` (default): uses password auth via sshpass if a password is available from env/config; otherwise uses key-based SSH.
-- `--auth key`: always uses your SSH keys/agent.
-- `--auth password`: forces password auth (requires sshpass).
-- `--auth interactive`: lets ssh prompt in each pane.
+- `--auth key-first` is the default. OpenSSH tries public keys before passwords.
+  Networka can supply an available password through sshpass.
+- `--auth key` leaves authentication to OpenSSH without automatic password entry.
+- `--auth password` supplies a configured password through sshpass.
+- `--auth interactive` lets OpenSSH prompt in each pane.
 
 ## Layouts
 
@@ -114,10 +91,7 @@ With synchronize-panes enabled (default), type any command once and press Enter 
 
 ## Security note on password authentication
 
-When password auth is used, the password is passed to `sshpass` and may appear in process lists. Prefer SSH keys for security. If you cannot use keys, consider interactive auth (`--auth interactive`) to avoid passing passwords via arguments.
-
-Python-only alternative: We could embed an SSH client (e.g., Paramiko) to avoid `sshpass`, but then interactive TTY behavior and tmux integration get more complex. For now we keep it lean by delegating to the system `ssh`.
-
-## tmuxp integration
-
-This prototype keeps it slim with libtmux directly. In future we can accept a `--tmuxp` YAML to load complex layouts via tmuxp (https://tmuxp.git-pull.com/). For now, built-ins cover common needs without extra files.
+Networka supplies passwords to sshpass through a private pipe. Passing
+`--password` puts the value on the command line. Use the
+[credential configuration](environment-variables.md) or an interactive
+prompt for password authentication.

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Use the `--interactive-auth` flag (or the short `-i`) when you want the CLI to prompt for credentials at runtime instead of reading them from files or environment variables. Interactive prompts are available on the commands that establish device sessions: `nw run` and `nw info`.
+Use the `--interactive-auth` flag (or the short `-i`) when you want the CLI to prompt for credentials at runtime instead of reading them from files or environment variables. `nw run` uses the prompted values to connect. `nw info` uses them when displaying credential provenance.
 
 ## How It Works
 

@@ -10,11 +10,11 @@ Networka provides a common interface across multiple network operating systems. 
 
 ## Command-Line Status Check
 
-To see which vendors currently support firmware and backup operations in your build, run:
+Use the registry capability filters to find implementations in your build.
 
 ```bash
 nw firmware vendors
-nw backup vendors
+nw platforms list --capability config_backup
 ```
 
 Note: Each vendor page follows the same structure so it’s easy to read and easy for tools/LLMs to parse: overview, identifiers, supported operations, firmware management, backups, built-in sequences, examples, and configuration tips. When adding a new vendor, mirror this structure for consistency.

@@ -1,44 +1,30 @@
 # Recipes
 
-Short, copy-pasteable workflows for common tasks.
+These examples use devices and groups from your
+[configuration](../configuration.md).
 
-## Backup configs across a group
-
-```bash
-nw backup access_switches --store-results
-```
-
-Expected output (trimmed):
-
-```
-access_switches: device sw-acc1 ... ok
-access_switches: device sw-acc2 ... ok
-Backups completed; results stored in results/<timestamp>
-```
-
-## Audit health across devices
+## Back up configurations across a group
 
 ```bash
-nw run core_switches health_check --store-results --results-format json
+nw backup config access_switches
 ```
 
-Expected output (trimmed):
+See [backups](../backups.md) for downloading or retaining the generated files.
 
-```
-core_switches: step 1/3 ... ok
-core_switches: step 2/3 ... ok
-core_switches: step 3/3 ... ok
-Sequence completed successfully; results stored
-```
-
-## Upload a firmware file to a device
+## Capture device health
 
 ```bash
-nw upload rtr-01 firmware.npk
+nw run core_switches health_check --store-results
 ```
 
-Expected output (trimmed):
+Choose the file format with `general.results_format` in `config.yml`.
+See [results](../results.md) for comparing a later capture with a baseline.
 
+## Upload a firmware file
+
+```bash
+nw upload router1 firmware.npk
 ```
-Uploading firmware.npk to rtr-01 ... done
-```
+
+This copies the file to the device. Firmware installation is a separate
+operation. See the [RouterOS guide](../vendors/mikrotik/index.md#firmware-management).

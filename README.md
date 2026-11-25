@@ -96,21 +96,24 @@ With uv 0.13.10 in this checkout, use a project environment to keep the native d
 
 ```bash
 uv sync --locked
-uv run nw --version
-uv run nw --help
+uv run --locked nw --version
+uv run --locked nw --help
 ```
 
 Networka 0.2.0 uses Scrapli 2 via the `scrapli==2026.11.12` distribution. An in-place upgrade replaces legacy Scrapli through pip or uv. Early candidate installations that included `scrapli2==2.0.4` should use a fresh environment. Networka 0.2.0 targets Linux and Apple Silicon macOS. RouterOS restart confirmation and Cisco enable-password escalation passed in disposable labs. WSL2 remains unverified. [Transport selection](docs/transport.md) · [Platform compatibility](docs/platform-compatibility.md)
 
 ## Quick Start
 
-Get up and running with config init command:
+Inspect a packaged sequence and run it on a RouterOS device. Replace the
+example address and enter your device credentials when prompted.
 
 ```bash
-# Initialize in default location with interactive prompts
-nw config init
-
+nw info system_info --vendor mikrotik_routeros
+nw run 192.0.2.10 system_info --platform mikrotik_routeros --interactive-auth
 ```
+
+For recurring work, use `nw config init` to create your
+[configuration](docs/configuration.md) and target devices by name.
 
 ### Library API
 
@@ -149,11 +152,10 @@ nw run --platform cisco_iosxe 198.51.100.20 "show version" --interactive-auth
 
 ## Terminology: device_type vs hardware platform vs transport
 
-- device_type: Network OS driver used for connections and commands (Scrapli "platform"). Examples: mikrotik_routeros, cisco_iosxe, arista_eos, juniper_junos.
-- platform (hardware/firmware): Hardware architecture used for firmware-related operations (x86, x86_64, arm, mipsbe, tile).
-- transport: Connection backend. Default is scrapli.
-
-Note: When targeting IPs directly, `--platform` refers to the network driver (device_type), not hardware architecture.
+- `device_type` is the logical platform used to select commands and the native connection definition.
+- The inventory `platform` field describes hardware architecture for firmware.
+- `--platform` names the logical platform for a raw IP target.
+- `--transport` selects the Scrapli driver family. The underlying connection backend defaults to OpenSSH. [Transport settings](docs/transport.md)
 
 ## Quick links
 

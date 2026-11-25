@@ -1,32 +1,33 @@
 # Output modes
 
-Control colors and formatting globally with `general.output_mode`.
+Use `--output-mode` on commands that expose it. Set
+`general.output_mode` in `config.yml` to `default`, `light`, `dark`,
+`no-color`, or `raw` for a shared default.
 
-- default: Adaptive styling (Rich defaults)
-- light: Colors optimized for light terminals
-- dark: Colors optimized for dark terminals
-- no-color: Structured output without ANSI colors
-- raw: Minimal formatting for scripts/automation
+| Mode | Output |
+| --- | --- |
+| `default` | Adaptive terminal styling |
+| `light` | Colors for light terminals |
+| `dark` | Colors for dark terminals |
+| `no-color` | Readable output without ANSI colors |
+| `raw` | Minimal decoration for scripts |
+| `json` | JSON status records via the CLI option or environment on supported commands |
 
-Precedence (highest to lowest):
-1) CLI flag: `--output-mode`
-2) A nonempty `NO_COLOR` environment variable selects no-color mode
-3) Environment: `NW_OUTPUT_MODE`
-4) Config: `general.output_mode`
+Output mode selection follows this order.
 
-Rich uses terminal detection for ANSI styling. Redirected output is plain by
-default. `FORCE_COLOR` can request ANSI colors in redirected styled output.
+1. The command's `--output-mode` option.
+2. A nonempty `NO_COLOR`.
+3. `NW_OUTPUT_MODE`.
+4. `general.output_mode`.
 
-Examples:
+Redirected styled output is plain by default. `FORCE_COLOR` requests ANSI
+color in redirected styled output.
 
 ```bash
-nw info device1 --output-mode raw
-export NW_OUTPUT_MODE=light && nw run device1 system_info
+nw info router1 --output-mode raw
+nw run router1 system_info --output-mode json
 ```
 
-Config snippet:
-
-```yaml
-general:
-  output_mode: dark
-```
+In a run, JSON status records can appear alongside plain device output.
+Set `general.results_format` to choose the format of
+[stored result files](results.md).

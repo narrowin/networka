@@ -1,92 +1,61 @@
-# Quickstart: 60 Seconds to Your First Command
-
-## Minimal Example
-
-```python
-from network_toolkit import NetworkaClient
-
-with NetworkaClient() as client:
-    output = client.run("my_router", "show version")
-    print(output)
-```
-
-That's it. One connection, execute commands, automatic cleanup.
+# Python library quickstart
 
 ## Prerequisites
 
-1. Networka installed (see [Installation Guide](../getting-started.md#installation))
-2. Device configured in `~/.config/networka/devices/devices.yml`:
+Install Networka and create a [configuration](../configuration.md) for the
+device. This example uses a RouterOS device with the configuration name
+`router1`.
 
 ```yaml
+# devices/router1.yml
 devices:
-  my_router:
-    host: 192.168.1.1
+  router1:
+    host: 192.0.2.10
     device_type: mikrotik_routeros
-    username: admin
-    password: your_password
 ```
 
-## Running the Example
+Set the [credentials](../environment-variables.md) for the device and replace
+the example address.
 
-Save this as `test.py`:
+## Run a command
+
+Save this example as `example.py`.
 
 ```python
 from network_toolkit import NetworkaClient
 
 with NetworkaClient() as client:
-    # Run a command
-    result = client.run("my_router", "/system/identity/print")
-    print(f"Device identity: {result}")
-
-    # Run another command (reuses the same connection!)
-    result2 = client.run("my_router", "/system/resource/print")
-    print(f"Resources: {result2}")
+    result = client.run("router1", "/system/identity/print")
+    for command in result.command_results:
+        print(command.output if command.error is None else command.error)
 ```
 
-Run it (ensure networka is installed in your current environment):
+From the checkout after `uv sync --locked`, use
+`uv run --locked python example.py`. The client can reuse a connection
+between operations in the same context. Leaving the context closes its pool.
 
-```bash
-python test.py
-```
-
-## Using NetworkaClient Instead
-
-For single commands, NetworkaClient is even simpler:
+## Run a packaged sequence
 
 ```python
 from network_toolkit import NetworkaClient
 
-client = NetworkaClient()
-result = client.run("my_router", "/system/identity/print")
-if result.command_results:
-    print(result.command_results[0].output)
+with NetworkaClient() as client:
+    result = client.run("router1", "system_info")
+    for sequence in result.sequence_results:
+        if sequence.error is not None:
+            print(sequence.error)
+            continue
+        for command, output in (sequence.outputs or {}).items():
+            print(command, output)
 ```
 
-NetworkaClient opens and closes connections automatically. Use `DeviceSession` directly only if you need low-level control over the connection lifecycle or are building a custom integration.
+## Without configuration files
 
-## Without Configuration Files
+To use only an IP, platform, and credentials, call the
+[run operation with a minimal configuration](adhoc-targets.md#without-configuration-files).
 
-Don't have a config file? Connect directly to an IP:
+## Next steps
 
-```python
-from network_toolkit import NetworkaClient
-
-client = NetworkaClient()
-
-# Connect to an IP address (requires device_type)
-result = client.run(
-    "192.168.1.1",
-    "show version",
-    device_type="mikrotik_routeros"
-)
-if result.command_results:
-    print(result.command_results[0].output)
-```
-
-See [ad-hoc targets](adhoc-targets.md) for details.
-
-## Next Steps
-
-- [Persistent sessions](sessions.md) - Run multiple commands efficiently
-- [Recipes](recipes.md) - Common patterns and workflows
-- [API Reference](../reference/api.md) - Complete class documentation
+- [Persistent sessions](sessions.md)
+- [Python recipes](recipes.md)
+- [API reference](../reference/api.md)

@@ -68,7 +68,7 @@ Sequence completed successfully
 
 IOS (classic, monolithic image):
 
-- Upload image to flash (SCP).
+- Upload the image to flash using SFTP.
 - Configure `boot system flash:<image>` after clearing existing `boot system` lines.
 - Save config and `reload` with interactive confirmation.
 
@@ -90,20 +90,21 @@ Pre-checks: by default Networka runs the `pre_maintenance` sequence before firmw
 
 ## Backups
 
-- Config backup (text): `nw backup config <device|group>`
-  - Uses `show running-config` (and optionally other show commands). For Cisco, output is not saved as a remote file by default; Networka captures command output.
-- Comprehensive backup: `nw backup comprehensive <device|group>`
-  - Can include `show running-config`, `show startup-config`, `show version`, `show inventory`, etc.
-
-You can define/override sequences under `config/sequences/cisco_iosxe/common.yml` (also applies to many IOS show commands). Device-specific sequences can be set per device in your config.
+`nw backup config switch1` captures the selected configuration command
+output locally. See [backups](../../backups.md) for the CLI options.
 
 ## Built-in command sequences
 
-Common examples you can reference via `nw run <device> <sequence-name>`:
+Inspect the current IOS-XE sequence set and its source.
 
-- `system_info`, `health_check`, `interface_status`, `network_overview`, `routing_info`, `security_audit`
+```bash
+nw platforms info cisco_iosxe
+nw info system_info --vendor cisco_iosxe
+```
 
-See file: `config/sequences/cisco_iosxe/common.yml` for a rich set of examples that work on IOS-XE and often IOS.
+The logical type `cisco_ios` uses the same native connection definition as
+IOS-XE. Sequence lookup still uses `cisco_ios`. Add IOS sequences to its own
+logical platform in configuration if needed.
 
 ## Examples
 
@@ -119,7 +120,7 @@ Firmware and backups:
 ```bash
 nw firmware upgrade switch1 ~/images/cat9k_iosxe.17.6.5.SPA.bin
 nw firmware downgrade switch1 ~/images/cat9k_iosxe.17.3.7.SPA.bin
-nw backup config switch1 --download=false
+nw backup config switch1 --no-download
 ```
 
 ## Notes and tips
@@ -131,5 +132,5 @@ nw backup config switch1 --download=false
 
 ```bash
 nw firmware vendors
-nw backup vendors
+nw platforms list --capability config_backup
 ```

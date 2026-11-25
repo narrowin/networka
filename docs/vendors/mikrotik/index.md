@@ -65,7 +65,7 @@ Sequence completed successfully
 
 Workflow used by Networka (RouterOS operations):
 
-- Upload `.npk` package via SCP.
+- Upload `.npk` package using SFTP.
 - Optional verification of packages with `/system/package/print`.
 - Reboot with interactive confirmation to apply the package.
 
@@ -79,14 +79,10 @@ Pre-checks: by default Networka runs the `pre_maintenance` sequence before firmw
 
 ## Backups
 
-Two flavors exist:
-
-- Config backup (text export): `nw backup config <device|group>`
-  - Creates an export (default: `/export file=nw-config-export`), then can download `nw-config-export.rsc` to `general.backup_dir`.
-- Comprehensive backup: `nw backup comprehensive <device|group>`
-  - Uses export plus system backup (e.g., `/system/backup/save name=nw-system-backup`).
-
-You can also define/override sequences under config: `config/sequences/mikrotik_routeros/common.yml`.
+Use `nw backup config router1` to run the selected backup sequence and
+download its generated files. Configure storage with `general.backup_dir`.
+With `--delete-remote`, Networka removes generated files after download.
+See [backups](../../backups.md) for options.
 
 ## Built-in command sequences
 
@@ -124,5 +120,5 @@ nw backup config router1 --download --delete-remote
 
 ```bash
 nw firmware vendors
-nw backup vendors
+nw platforms list --capability config_backup
 ```

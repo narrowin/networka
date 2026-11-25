@@ -27,7 +27,7 @@ nw sync ssh-config ~/.ssh/config.d/routers -o routers.yml
 
 ```
 Added 5 hosts: router1, switch1, firewall1, jump-host, dev-server
-Wrote 5 devices to /home/user/.config/networka/config/devices/ssh-hosts.yml
+Wrote 5 devices to /home/user/.config/networka/devices/ssh-hosts.yml
 ```
 
 **Expected output (subsequent run with changes):**
@@ -36,7 +36,7 @@ Wrote 5 devices to /home/user/.config/networka/config/devices/ssh-hosts.yml
 Added 1 hosts: new-server
 Updated 2 hosts: router1, switch1
 No changes (3 hosts unchanged)
-Wrote 6 devices to /home/user/.config/networka/config/devices/ssh-hosts.yml
+Wrote 6 devices to /home/user/.config/networka/devices/ssh-hosts.yml
 ```
 
 ## Options reference
@@ -51,6 +51,10 @@ Wrote 6 devices to /home/user/.config/networka/config/devices/ssh-hosts.yml
 | `--prune` | | Remove hosts no longer in SSH config |
 | `--dry-run` | | Show changes without writing |
 | `--verbose` | `-v` | Enable verbose output |
+
+The default type `generic` selects a generic shell definition. Set
+`--default-device-type` for new hosts of a known network OS, or update the
+device type in inventory. Inspect definition names with `nw platforms list`.
 
 ## How syncing works
 

@@ -1,108 +1,67 @@
-# IP Address Support
+# IP address support
 
-Networka lets you target devices directly by IP address (single or comma-separated list) without predefining them in configuration files.
+Use an IP address to run commands before adding a device to inventory. A raw IP
+needs a platform even if the same address appears in inventory. To use the
+platform and other settings from inventory, target the configured device name.
 
-## Usage examples
+## Run a command without configuration
 
-### Single IP address
-
-```bash
-# Run a command
-nw run 192.168.1.1 "/system/clock/print" --platform mikrotik_routeros
-
-# SSH to device by IP
-nw cli 192.168.1.1 --platform mikrotik_routeros
-
-# (Info requires configured device entries; see notes below)
-```
-
-### Multiple IP addresses
+For a RouterOS device, replace the example address with your device's address.
+The interactive prompt supplies its access details.
 
 ```bash
-# Execute command on multiple IPs (comma-separated, no spaces)
-nw run "192.168.1.1,192.168.1.2,192.168.1.3" "/system/clock/print" --platform mikrotik_routeros
-
-# SSH to multiple IPs (opens tmux with multiple panes)
-nw cli "192.168.1.1,192.168.1.2" --platform mikrotik_routeros
-
-# Mix IPs and configured device names
-nw run "192.168.1.1,sw-acc1,192.168.1.2" "/system/clock/print" --platform mikrotik_routeros
+nw run 192.0.2.10 "/system/identity/print" --platform mikrotik_routeros --interactive-auth
 ```
 
-### With custom port
+You can also inspect and run a packaged sequence.
 
 ```bash
-nw run 192.168.1.1 "/system/clock/print" --platform mikrotik_routeros --port 2222
+nw info system_info --vendor mikrotik_routeros
+nw run 192.0.2.10 system_info --platform mikrotik_routeros --interactive-auth
 ```
 
-### Interactive authentication
+The first command shows the selected commands and their source. The second
+runs them on the device. This interactive path works without a configuration
+file for a target made up entirely of IP addresses.
+
+## Choose a platform
+
+Use `nw platforms list` for the active Scrapli definition names and
+`nw platforms info mikrotik_routeros` for the source, sequences, and available
+vendor operations. Installed definitions describe how to communicate with a
+platform. Device qualification depends on the model, OS version, and operation.
+
+Supply the network OS with `--platform`. Scrapli loads the selected definition
+by name. It has no device-platform detection API. The existing aliases
+`linux` and `generic` select Scrapli's generic `default` definition for shell
+prompts. Use the actual platform name when you need its prompts or sequences.
+
+## Multiple targets and connection options
+
+A comma-separated list of raw IPs uses the same platform for every address.
 
 ```bash
-# Prompt for credentials at runtime
-nw run 192.168.1.1 "/system/clock/print" --platform mikrotik_routeros --interactive-auth
+nw run 192.0.2.10,192.0.2.11 system_info --platform mikrotik_routeros --interactive-auth
 ```
 
-## Required parameters
+Use a separate invocation for configured names. The ad hoc address list
+requires every target to be an IP. Named devices and groups can share an
+invocation and use their configured `device_type`.
 
-When using IP addresses, you must specify:
+Supply credentials through your configuration or
+[environment variables](environment-variables.md), or prompt with
+`--interactive-auth`. Add `--port 2222` for a non-default port. The
+[transport guide](transport.md) explains SSH backend and host-key settings.
 
-- `--platform`: The device type (network driver), e.g. `mikrotik_routeros`, `cisco_iosxe`.
+For interactive SSH panes, `nw cli` uses OpenSSH and loads configuration.
+For example, `nw cli 192.0.2.10 --platform mikrotik_routeros --auth interactive`.
+See [tmux CLI sessions](tmux-ssh.md).
 
-Optional parameters:
+## Inspect and troubleshoot
 
-- `--port`: SSH port (defaults to 22)
-- `--interactive-auth`: Prompt for username/password instead of environment
-- `--transport`: Transport driver to use for the session (supported on `run`/`cli`)
+If an IP target cannot resolve its platform, use `nw platforms list` and pass
+an available name with `--platform`. If the definition directory is an
+override, only definitions in that directory are available by name.
 
-## Supported platforms
-
-- mikrotik_routeros — MikroTik RouterOS
-- cisco_iosxe — Cisco IOS-XE
-- cisco_ios — Cisco IOS
-- cisco_iosxr — Cisco IOS-XR
-- cisco_nxos — Cisco NX-OS
-- juniper_junos — Juniper JunOS
-- arista_eos — Arista EOS
-- nokia_srlinux — Nokia SR Linux
-- linux — Linux SSH
-
-## Authentication
-
-IP-based connections use the same authentication as configured devices:
-
-1. Environment variables: `NW_USER_DEFAULT` and `NW_PASSWORD_DEFAULT`
-2. Interactive mode with `--interactive-auth`
-3. SSH keys (via the underlying transport)
-
-## Error handling
-
-If you omit the platform when using IPs:
-
-```text
-Error: When using IP addresses, --platform is required
-Supported platforms:
-  mikrotik_routeros: MikroTik RouterOS
-  cisco_iosxe: Cisco IOS-XE
-  cisco_ios: Cisco IOS
-  cisco_iosxr: Cisco IOS-XR
-  cisco_nxos: Cisco NX-OS
-  juniper_junos: Juniper JunOS
-  arista_eos: Arista EOS
-  nokia_srlinux: Nokia SR Linux
-  linux: Linux SSH
-```
-
-## Implementation details
-
-When IPs are used as the target:
-
-1. Networka detects the IPs in the target argument
-2. Creates temporary devices with generated names (e.g. `ip_192_168_1_1`)
-3. Applies the specified `--platform` for connection parameters
-4. Merges with any configured devices so you can mix both
-5. Executes commands as usual and supports results storage
-
-## Limitations
-
-- `nw info` requires preconfigured devices or groups; it does not accept raw IP addresses.
-- IP targets are supported on commands that accept the `--platform` option (`nw run`, `nw cli`, and other operations built on the device resolver).
+`nw info` inspects configured names and sequences. For Python usage, see
+[ad hoc targets](library/adhoc-targets.md).

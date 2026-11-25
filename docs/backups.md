@@ -1,33 +1,22 @@
 # Backups
 
-Vendor-aware backup commands streamline configuration and system snapshots.
-
-Common commands:
+Run a configuration backup for a named device or group.
 
 ```bash
-# Configuration export only
-nw backup config device1
-
-# Comprehensive backup (configuration + system data)
-nw backup comprehensive device1
-
-# Group operations with options
-nw backup comprehensive office_switches --delete-remote
-nw backup config device1 --delete-remote
+nw backup config router1
+nw backup config office_switches
 ```
 
-Platform behavior:
+Backup downloads are enabled by default. Use `--no-download` to leave files
+on the device, or `--delete-remote` to remove generated files after successful
+download.
 
-- MikroTik RouterOS: creates `.rsc` (export) and optionally `.backup` (system)
-- Cisco IOS/IOS-XE: collects configuration and system info outputs
-
-Tips:
-
-- Use device groups to back up multiple devices concurrently.
-- Control remote file cleanup with `--delete-remote/--keep-remote`.
-- See vendor pages for platform-specific details.
-- Discover which vendors support backup operations in your build:
+See which registered platforms implement configuration backup.
 
 ```bash
-nw backup vendors
+nw platforms list --capability config_backup
 ```
+
+The device platform determines the backup behavior. See the
+[RouterOS guide](vendors/mikrotik/index.md#backups) or
+[Cisco guide](vendors/cisco/index.md#backups) for details.

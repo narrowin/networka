@@ -2,7 +2,9 @@
 
 Supported identifiers: `juniper_junos`
 
-Status: coming soon. Vendor-specific documentation for firmware management, backups, and sequences is being prepared.
+The packaged Scrapli catalog includes `juniper_junos`. Inspect the active
+definition and available sequences with `nw platforms info juniper_junos`.
+The operations registry has no vendor-specific firmware or backup implementation.
 
 ## Quickstart
 

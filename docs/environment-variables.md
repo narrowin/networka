@@ -167,6 +167,10 @@ uv run nw run sw-acc1 system_info
 4. **Regular rotation**: Change passwords regularly and update environment variables accordingly
 5. **Least privilege**: Create device-specific users with minimal required permissions
 
+For Cisco IOS and IOS-XE, set `NW_ENABLE_PASSWORD_<DEVICE>` or
+`NW_ENABLE_PASSWORD_DEFAULT` when your device requires a separate enable
+password. See [transport selection](transport.md).
+
 ## Credential Resolution Order
 
 The toolkit resolves credentials in this priority order:

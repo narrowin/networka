@@ -1,15 +1,17 @@
-# Multi-Vendor Support Documentation
+# Multi-vendor support
 
 ## Overview
 
-The Network Toolkit now supports multiple network vendors through a flexible, vendor-specific command sequence architecture. This allows you to manage devices from different vendors using their native command syntax while maintaining a unified interface.
+Use a logical platform to select the commands and connection behavior for a device.
+Platform inspection shows the active Scrapli definition separately from
+Networka's sequences and registered operations.
 
 ## CLI Commands for Platform Information
 
 Query platform support directly from the command line:
 
 ```bash
-# List all supported platforms
+# List active Scrapli definitions and registry entries
 nw platforms list
 
 # Filter by status
@@ -25,12 +27,15 @@ nw platforms list --vendor mikrotik
 nw platforms list --capability firmware_upgrade
 nw platforms list --capability config_backup
 
-# Get detailed info about a specific platform
+# Inspect a logical platform and its definition and sequences
 nw platforms info mikrotik_routeros
 nw platforms info cisco_ios
 ```
 
 ## Supported Vendors
+
+The registry lists Networka's maintained operation and sequence capabilities.
+Use `nw platforms list` for the broader active Scrapli catalog.
 
 <!-- AUTO-GENERATED: Do not edit this section manually -->
 <!-- Generated from src/network_toolkit/platforms/registry.py -->
@@ -50,7 +55,8 @@ The architecture is designed to easily support additional vendors by:
 
 ### Vendor-Specific Sequences
 
-Sequences are organized by vendor platform following Scrapli naming conventions:
+Sequences use the logical `device_type`. A project can place its files in the
+sequence directory next to `config.yml`:
 
 ```text
 config/sequences/
@@ -85,7 +91,10 @@ A custom filename can start with a known platform name to scope the entire file.
 
 ### Device Configuration
 
-Each device must specify its vendor type:
+Use the logical device type in inventory, or supply it with `--platform` for
+a raw IP. Scrapli loads the selected native definition. The generic `default`
+definition supplies shell prompting for `linux` and `generic`. There is no
+native device-platform detection.
 
 ```yaml
 devices:
@@ -104,7 +113,9 @@ devices:
 
 ### Common Sequences Across Vendors
 
-All vendors ship with a core set of sequence names implemented with vendor-appropriate commands:
+Maintained platforms ship sequences for common tasks. Available names and
+commands vary with the logical platform and configuration. Use
+`nw platforms info <platform>` to see winning sequence names and sources.
 
 - `system_info` - Complete system information gathering
 - `health_check` - Basic health monitoring
@@ -358,18 +369,7 @@ nw list sequences --vendor cisco_iosxe
 nw run device-name system_info --verbose
 ```
 
-## Future Enhancements
+## Contributing platform support
 
-### Planned Features
-
-- **Dynamic sequence loading** - Load sequences based on device capabilities
-- **Vendor auto-detection** - Automatically detect vendor from device responses
-- **Command translation** - Translate common operations between vendor syntaxes
-- **Vendor-specific drivers** - Enhanced connection handling per vendor
-
-### Community Contributions
-
-- Submit vendor-specific sequences
-- Report vendor compatibility issues
-- Contribute new vendor support
-- Improve existing command mappings
+See [adding platform support](adding-platforms.md) for connection definitions,
+packaged sequences, registered capabilities, and verification.

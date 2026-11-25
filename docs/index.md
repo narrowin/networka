@@ -3,29 +3,20 @@ template: home.html
 title: Networka
 ---
 
-## 60-second success {#quick-start}
+## Quick start {#quick-start}
 
-First, install networka:
-
-```bash
-uv tool install networka
-```
-
-Goal: run a command against a device without creating any files.
+[Install Networka from the checkout](getting-started.md#installation) and
+inspect a packaged RouterOS sequence.
 
 ```bash
-nw run --platform mikrotik_routeros 192.0.2.10 "/system/identity/print" --interactive-auth
+nw info system_info --vendor mikrotik_routeros
 ```
 
-Expected output (trimmed):
+Replace the example IP with your RouterOS device and enter its credentials
+when prompted.
 
-```
-Interactive authentication mode enabled
-Username: admin
-Password: ********
-Executing on 192.0.2.10: /system/identity/print
-name="MikroTik"
-Command completed successfully
+```bash
+nw run 192.0.2.10 system_info --platform mikrotik_routeros --interactive-auth
 ```
 
 See how to [run a reusable sequence](running-commands.md),

@@ -9,7 +9,7 @@ This table applies to Networka 0.2.0 with Scrapli 2.0.4.
 | Windows with WSL2 | A Linux environment is a candidate installation target. WSL2 execution awaits verification. |
 | Native Windows and Intel macOS | No compatible upstream wheel for the current driver. |
 
-The package requires Python 3.15 or later. CI uses Python 3.15. Install OpenSSH to use the system transport and tmux for multi-pane sessions. [Scrapli 2.0.4 release files](https://pypi.org/project/scrapli2/2.0.4/#files) · [Transport selection](transport.md)
+The package requires Python 3.15 or later. CI uses Python 3.15. Install OpenSSH to use the system transport and tmux for multi-pane sessions. [Scrapli 2026.11.12 release files](https://pypi.org/project/scrapli/2026.11.12/#files) · [Transport selection](transport.md)
 
 ## Inspect connection definitions and capabilities
 

@@ -1,6 +1,6 @@
-# File Upload Functionality for MikroTik Devices
+# File upload
 
-This document describes the file upload functionality added to the `DeviceSession` class, which allows uploading files to MikroTik RouterOS devices using SCP (Secure Copy Protocol).
+Networka uses Paramiko SFTP for file transfers. Use `nw upload` or the Python API when the device supports SFTP and your credentials permit file writes. See [transport selection](transport.md) for connection and host-key settings.
 
 ## Features
 
@@ -28,7 +28,7 @@ with DeviceSession("router1", config) as session:
     success = session.upload_file(
         local_path="config_backup.rsc",
         remote_filename="uploaded_config.rsc",  # Optional: custom remote name
-        verify_upload=True  # Optional: verify the upload
+        verify_upload=True,  # Optional: verify the upload
     )
 
     if success:
@@ -49,7 +49,7 @@ results = DeviceSession.upload_file_to_devices(
     local_path="firmware.npk",
     remote_filename="new_firmware.npk",
     verify_upload=True,
-    max_concurrent=3  # Upload to max 3 devices at once
+    max_concurrent=3,  # Upload to max 3 devices at once
 )
 
 # Check results
@@ -165,7 +165,7 @@ The upload functionality supports any file type that MikroTik RouterOS can handl
 
 The file upload functionality requires:
 
-- `paramiko`: For SCP/SFTP functionality
+- `paramiko`: SFTP transport
 - `scrapli`: For SSH connections and verification
 - `concurrent.futures`: For concurrent uploads (Python standard library)
 - `threading`: For thread-safe logging (Python standard library)
