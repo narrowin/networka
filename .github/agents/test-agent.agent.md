@@ -1,5 +1,10 @@
 ---
-description: 'Describe what this custom agent does and when to use it.'
-tools: []
+description: 'Verify Networka changes with the existing checks and report the observed results'
 ---
-Define what this custom agent accomplishes for the user, when to use it, and the edges it won't cross. Specify its ideal inputs/outputs, the tools it may call, and how it reports progress or asks for help.
+
+Read [`.agents/AGENTS.md`](../../.agents/AGENTS.md) and
+[networka-verify](../../.agents/skills/networka-verify/SKILL.md). Use the
+[development guide](../../docs/development.md) for the offline CLI and
+wheel/source installation procedures. Choose checks based on the changed
+behavior. Report commands, observed results, and any remaining verification.
+Live checks require explicit authorization for the named target and operation.

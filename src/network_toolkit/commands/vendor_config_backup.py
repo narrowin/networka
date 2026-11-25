@@ -620,7 +620,6 @@ def register(app: typer.Typer) -> None:
     @app.command(
         rich_help_panel="Vendor-Specific Remote Operations",
         name="config-backup",
-        context_settings={"help_option_names": ["-h", "--help"]},
     )
     def config_backup(
         target_name: Annotated[

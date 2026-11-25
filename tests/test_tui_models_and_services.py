@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from pathlib import Path
 
 import pytest
 
@@ -41,19 +41,19 @@ def test_iter_commands_splits_and_trims() -> None:
 
 
 @pytest.mark.asyncio
-async def test_execution_service_build_and_run_plan_smoke(monkeypatch: Any) -> None:
-    data = TuiData("config")
+async def test_execution_service_build_and_run_plan_smoke(
+    monkeypatch: pytest.MonkeyPatch, mock_repo_config: Path
+) -> None:
+    data = TuiData(str(mock_repo_config))
     svc = ExecutionService(data, concurrency=2)
 
-    devices = data.targets().devices[:2]
-    if not devices:
-        pytest.skip("No devices available in repository test config")
+    devices = data.targets().devices
+    assert devices == ["router1", "switch1"]
 
     plan: ExecutionPlan = svc.build_plan(
         devices, sequences=[], command_text="/system/identity/print"
     )
-    assert set(plan.keys()) == set(devices)
-    assert all(plan[d] for d in plan)
+    assert plan == {device: ["/system/identity/print"] for device in devices}
 
     calls: list[str] = []
 
@@ -86,4 +86,8 @@ async def test_execution_service_build_and_run_plan_smoke(monkeypatch: Any) -> N
     assert result.successes == len(devices)
     assert not errors
     assert any("connected" in m for m in metas)
-    assert outputs
+    assert sorted(calls) == devices
+    assert sorted(outputs) == [
+        "router1: output for /system/identity/print",
+        "switch1: output for /system/identity/print",
+    ]

@@ -8,9 +8,10 @@ from typing import Protocol
 
 from pydantic import BaseModel
 from rich.table import Table
+from rich.text import Text
 
 from network_toolkit.common.output import OutputManager, OutputMode
-from network_toolkit.common.styles import StyleManager, StyleName
+from network_toolkit.common.styles import StyleName
 
 
 class TableColumn(BaseModel):
@@ -52,14 +53,14 @@ class TableDataProvider(Protocol):
 class TableGenerator:
     """Centralized table generation with consistent styling and output modes."""
 
-    def __init__(self, style_manager: StyleManager, output_manager: OutputManager):
+    def __init__(self, output_manager: OutputManager):
         """Initialize table generator."""
-        self.style_manager = style_manager
+        self.style_manager = output_manager.style_manager
         self.output_manager = output_manager
 
     def create_table(self, definition: TableDefinition) -> Table:
         """Create a styled table from definition."""
-        table = self.style_manager.create_table(title=definition.title)
+        table = self.style_manager.create_table(title=Text(definition.title))
 
         for column in definition.columns:
             self.style_manager.add_column(
@@ -84,11 +85,12 @@ class TableGenerator:
         # Handle normal table rendering
         definition = provider.get_table_definition()
         rows = provider.get_table_rows()
+        title = Text(
+            definition.title, style=self.style_manager.get_style(StyleName.BOLD) or ""
+        )
 
         if not rows:
-            self.output_manager.print_text(
-                self.style_manager.format_message(definition.title, StyleName.BOLD)
-            )
+            self.output_manager.console.print(title)
             self.output_manager.print_blank_line()
             self.output_manager.print_text(
                 self.style_manager.format_message(
@@ -98,15 +100,13 @@ class TableGenerator:
             return
 
         # Display title
-        self.output_manager.print_text(
-            self.style_manager.format_message(definition.title, StyleName.BOLD)
-        )
+        self.output_manager.console.print(title)
         self.output_manager.print_blank_line()
 
         # Create and populate table
         table = self.create_table(definition)
         for row in rows:
-            table.add_row(*row)
+            table.add_row(*(Text(cell) for cell in row))
 
         # Print table
         self.output_manager.print_table(table)
@@ -132,7 +132,7 @@ class TableGenerator:
             if verbose_info:
                 self.output_manager.print_blank_line()
                 for info_line in verbose_info:
-                    self.output_manager.print_text(info_line)
+                    self.output_manager.console.print(Text(info_line))
 
     def _print_default_raw(self, provider: TableDataProvider) -> None:
         """Print default raw mode output."""

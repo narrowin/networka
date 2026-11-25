@@ -224,16 +224,9 @@ def get_supported_device_types() -> dict[str, str]:
     }
 
 
-# Backward compatibility alias
-get_supported_platforms = get_supported_device_types
-
-
 def validate_platform(device_type: str) -> bool:
     """
     Validate if a device type is supported.
-
-    Note: This function name is maintained for backward compatibility,
-    but it actually validates device types (network drivers), not hardware platforms.
 
     Parameters
     ----------

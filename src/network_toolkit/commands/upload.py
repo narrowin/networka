@@ -9,10 +9,8 @@ from typing import Annotated
 import typer
 
 from network_toolkit.api.upload import UploadOptions, upload_file
-from network_toolkit.common.command import CommandContext
+from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
-from network_toolkit.common.logging import setup_logging
-from network_toolkit.config import load_config
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.inventory.resolve import resolve_named_targets, select_named_target
 
@@ -22,7 +20,6 @@ MAX_LIST_PREVIEW = 10
 def register(app: typer.Typer) -> None:
     @app.command(
         rich_help_panel="Remote Operations",
-        context_settings={"help_option_names": ["-h", "--help"]},
     )
     def upload(  # pyright: ignore[reportUnusedFunction]
         target_name: Annotated[
@@ -67,6 +64,7 @@ def register(app: typer.Typer) -> None:
                 "--max-concurrent",
                 "-j",
                 help="Maximum concurrent uploads when target is a group",
+                min=1,
             ),
         ] = 5,
         config_file: Annotated[
@@ -77,20 +75,17 @@ def register(app: typer.Typer) -> None:
         ] = False,
     ) -> None:
         """Upload a file to a device or to all devices in a group."""
-        setup_logging("DEBUG" if verbose else "WARNING")
-
-        # ACTION command - use global config theme
         ctx = CommandContext(
             config_file=config_file,
             verbose=verbose,
-            output_mode=None,  # Use global config theme
+            require_config=True,
         )
 
-        output = ctx.output
+        config = ctx.config
+        assert config is not None
+        output = ctx.output_manager
 
         try:
-            config = load_config(config_file)
-
             if not local_file.exists():
                 ctx.print_error(f"Local file not found: {local_file}")
                 raise typer.Exit(1)

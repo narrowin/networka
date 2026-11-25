@@ -3,22 +3,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import pytest
-
 from network_toolkit.config import NetworkConfig, load_config
 from network_toolkit.sequence_manager import SequenceManager
 from network_toolkit.tui.data import TuiData
-
-# Get the repository root directory (parent of tests directory)
-REPO_ROOT = Path(__file__).parent.parent
-CONFIG_DIR = REPO_ROOT / "config"
 
 
 def _non_empty_dict(d: dict[str, Any] | None) -> dict[str, Any]:
     return d or {}
 
 
-def test_tui_targets_match_config_devices_and_groups() -> None:
+def test_tui_targets_match_config_devices_and_groups(mock_repo_config: Path) -> None:
     # Load via same discovery as CLI and TUI default
     cfg: NetworkConfig = load_config("config")
     data = TuiData("config")
@@ -36,7 +30,7 @@ def test_tui_targets_match_config_devices_and_groups() -> None:
     assert tui_groups == cfg_groups
 
 
-def test_tui_sequences_are_union_of_known_sources() -> None:
+def test_tui_sequences_are_union_of_known_sources(mock_repo_config: Path) -> None:
     cfg: NetworkConfig = load_config("config")
     sm = SequenceManager(cfg)
     data = TuiData("config")
@@ -62,23 +56,14 @@ def test_tui_sequences_are_union_of_known_sources() -> None:
     assert "" not in tui_seq
 
 
-def test_all_groups_resolve_to_devices() -> None:
-    cfg: NetworkConfig = load_config("config")
+def test_all_groups_resolve_to_devices(mock_repo_config: Path) -> None:
+    cfg = load_config(mock_repo_config)
 
-    if not cfg.device_groups:
-        pytest.skip("No groups defined in config")
-
-    found_non_empty = False
-    for gname in cfg.device_groups.keys():
-        members = cfg.get_group_members(gname)
-        # All resolved members must be valid device names
-        for m in members:
-            assert cfg.devices and m in cfg.devices
-        if members:
-            found_non_empty = True
-
-    # At least one group should have members (catches empty discovery regressions)
-    assert found_non_empty
+    assert cfg.device_groups is not None
+    assert {name: cfg.get_group_members(name) for name in cfg.device_groups} == {
+        "office": ["router1"],
+        "critical": ["router1"],
+    }
 
 
 def test_can_resolve_a_vendor_sequence_for_a_real_device(

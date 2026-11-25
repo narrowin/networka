@@ -1,340 +1,193 @@
 # Development Guide
 
-This guide is for contributors and maintainers working on the Networka codebase.
-
-For information about project governance, decision-making, and stability commitments, see [GOVERNANCE.md](https://github.com/narrowin/networka/blob/main/GOVERNANCE.md) in the repository root.
+For project governance, see
+[GOVERNANCE.md](https://github.com/narrowin/networka/blob/main/GOVERNANCE.md).
 
 ## Quick start
 
-### Prerequisites
-
-- Python 3.11+
-- [uv](https://docs.astral.sh/uv/) package manager
-- git
-
-### Setup development environment
+Install git and the [uv](https://docs.astral.sh/uv/) version pinned in
+`pyproject.toml`. uv selects Python 3.15.2 from `.python-version`. Networka
+requires Python 3.15 or later, and CI uses Python 3.15.
 
 ```bash
-# Clone the repository
 git clone https://github.com/narrowin/networka.git
 cd networka
-
-# Install dependencies with development tools
-uv sync --locked --all-extras
-
-# Install pre-commit hooks
-uv run pytest --version
-uv run ruff --version
-uv run mypy --version
+uv sync --locked --group dev --extra docs
+uv run --locked pre-commit install
 ```
 
-### Development workflow
+## Development checks
 
 ```bash
-# Run all quality checks
-uv run ruff check .              # Linting
-uv run ruff format .             # Code formatting
-uv run mypy src/                 # Type checking
-uv run pytest                   # Run tests
-
-# Or use the convenience script
-./scripts/build.sh               # Run all checks + build
-
-# Or use task runner (if you have go-task installed)
-task dev                         # Complete development setup
-task test                        # Run tests
-### CI workflow checks locally
-
-- Lint workflows (fast):
-    - With Docker: `docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest`
-    - Or with act: `act pull_request -W .github/workflows/ci.yml -j workflow-lint`
-
-Why run as a PR? Pull requests trigger different paths/conditions (e.g., `pull_request` filters, PR-only jobs). Simulating PR avoids surprises that don’t appear on `push`.
-
-### Docs
-
-- Regenerate CLI reference before building:
-    - `task docs:generate`
-    - or `uv run python scripts/generate_cli_docs.py`
-- Build docs (includes regeneration):
-    - `task docs`
-    - or `uv run --extra docs mkdocs build --clean`
-- Serve docs locally (auto-regenerates): `task docs:serve`
-
-`docs/reference/cli.md` is generated. Do not edit it manually. Link checking runs in CI only.
-task lint                        # Run linting
-task build                       # Build package
+uv run --locked ruff check .
+uv run --locked ruff format --check .
+uv run --locked mypy src/
+uv run --locked pytest
 ```
 
-## Code standards
+For a targeted check, run an existing file or test, such as
+`uv run --locked pytest tests/test_api_run.py`. When investigating coverage,
+use `uv run --locked pytest --cov=network_toolkit --cov-report=term-missing`.
+Choose cases that assert the public result, output, or lifecycle that changed.
 
-### Style guidelines
+Run `bash scripts/test-like-ci.sh` for local lint, format, type, and coverage
+checks. Use `task test:ci` for the coverage run alone. If editing workflows,
+run `actionlint` when available.
 
-- **Type hints**: All functions must have type annotations
-- **Docstrings**: Use NumPy-style docstrings for public functions
-- **Async patterns**: Use async/await for all I/O operations
-- **Error handling**: Use custom exceptions from `exceptions.py`
-- **Testing**: Write tests for all new features
+### Documentation
 
-### Code quality tools
-
-- **Linting**: ruff (replaces flake8, isort, black)
-- **Type checking**: mypy with strict settings
-- **Testing**: pytest
-- **Security**: bandit for security linting
-
-## Testing
-
-### Running tests
+Regenerate the CLI reference after changing help or commands. MkDocs uses
+the generated file in `docs/reference/cli.md`.
 
 ```bash
-# Run all tests
-uv run pytest
-
-# Run with coverage
-uv run pytest --cov=network_toolkit --cov-report=term-missing
-
-# Run specific test file
-uv run pytest tests/test_device.py
-
-# Run with verbose output
-uv run pytest -v
-
-
+uv run --locked python scripts/generate_cli_docs.py
+uv run --locked --extra docs mkdocs build --clean --strict
 ```
+
+With go-task, use `task docs` to regenerate the references and build the
+site, or `task docs:serve` to preview it.
+
+## Functional verification
+
+### Offline CLI walkthrough
+
+From the checkout after the locked setup, run this Bash block. It uses
+a temporary example inventory and keeps optional sequences, schema,
+and shell completion installation disabled. It clears color overrides
+inside the block to exercise default rendering with redirected output.
+
+```bash
+(
+    set -eu
+    work_dir=$(mktemp -d "${TMPDIR:-/tmp}/networka-offline.XXXXXX")
+    trap 'rm -rf -- "$work_dir"' EXIT
+    export COLUMNS=200
+    unset FORCE_COLOR NO_COLOR NW_OUTPUT_MODE
+
+    config_dir="$work_dir/config"
+    uv run --locked nw config init "$config_dir" --yes \
+        --no-install-sequences --no-install-completions \
+        --no-activate-completions --no-install-schemas
+    uv run --locked nw config validate --config "$config_dir" > "$work_dir/validate.txt"
+    uv run --locked nw list devices --config "$config_dir" > "$work_dir/devices.txt"
+    uv run --locked nw list groups --config "$config_dir" > "$work_dir/groups.txt"
+    uv run --locked nw list sequences --config "$config_dir" --vendor mikrotik_routeros \
+        > "$work_dir/sequences.txt"
+    uv run --locked nw info health_check --config "$config_dir" > "$work_dir/health-check.txt"
+    uv run --locked nw info system_info --config "$config_dir" --vendor mikrotik_routeros \
+        > "$work_dir/system-info.txt"
+
+    uv run --locked nw --help > "$work_dir/help.txt"
+    uv run --locked nw platforms --help > "$work_dir/platforms-help.txt"
+    uv run --locked nw run -h > "$work_dir/run-help.txt"
+    status=0
+    uv run --locked nw run --not-an-option > "$work_dir/bad-option.txt" 2>&1 || status=$?
+    test "$status" -eq 2
+    grep -F -- 'No such option: --not-an-option' "$work_dir/bad-option.txt"
+
+    grep -F 'Configuration is valid!' "$work_dir/validate.txt"
+    grep -Fw router1 "$work_dir/devices.txt"
+    grep -Fw switch1 "$work_dir/devices.txt"
+    grep -Fw office "$work_dir/groups.txt"
+    grep -Fw critical "$work_dir/groups.txt"
+    grep -Fw system_info "$work_dir/sequences.txt"
+    grep -F 'Usage:' "$work_dir/help.txt" "$work_dir/platforms-help.txt" "$work_dir/run-help.txt"
+    grep -F -- '--port' "$work_dir/run-help.txt"
+    grep -F '/system resource print' "$work_dir/health-check.txt"
+    grep -F '/interface print brief' "$work_dir/health-check.txt"
+    grep -F "$(cd "$config_dir" && pwd -P)/sequences/sequences.yml" "$work_dir/health-check.txt"
+    if LC_ALL=C grep -l $'\033' "$work_dir/"*.txt; then
+        printf 'Unexpected ANSI escape in redirected output\n' >&2
+        exit 1
+    fi
+    cat "$work_dir/system-info.txt"
+)
+```
+
+Record the `Source` and commands from the displayed `system_info` table.
+A temporary inventory still consults user-level sequences. Compare the
+commands to the reported file, or to
+`src/network_toolkit/builtin_sequences/mikrotik_routeros/common.yml` if
+the table reports the built-in file. The `health_check` assertions check
+the generated, global sequence and its temporary source.
+
+### Clean installation
+
+```bash
+bash scripts/test-local-install.sh
+```
+
+The script builds the current working tree with `uv build --no-sources`.
+It installs the exact new wheel and source archive into separate temporary
+uv environments outside the checkout. Package dependencies resolve from the
+configured index or uv cache. The script reports SHA-256 hashes, the tested
+Python version, dependency consistency, CLI help and version, SDK and native
+Scrapli imports, and packaged typing and YAML resources.
+
+### Authorized lab check
+
+For an explicitly approved device and operation, pass the lab config and
+exact target name. Inspect the actual identity and OS version output.
+
+```bash
+uv run --locked python scripts/lab_validation.py --config /path/to/lab-config --target lab-router
+```
+
+The script checks for command errors and nonempty output. With `--list` it
+only lists configured devices. For live checks, keep `--target` explicit.
+The script selects every device without either selector, and `--tag` can
+select several.
+
+| Check | Evidence |
+| --- | --- |
+| Unit and service tests | Named code contracts with the boundaries used by the cases |
+| Offline CLI walkthrough | Startup, parsing, config generation and loading, sequence inspection, and redirected output |
+| Clean artifact installation | Packaging, dependencies, resources, imports, and startup for the tested Python and OS |
+| Authorized lab check | Results from the specific commands on the recorded device and OS |
+
+## Code and project structure
+
+- `src/network_toolkit/cli.py` registers the Typer application. Command
+  implementations in `commands/` own parsing and Rich presentation.
+- `src/network_toolkit/api/` returns structured results to CLI and SDK
+  callers. `config.py` owns the Pydantic models and configuration loading.
+- `src/network_toolkit/device.py`, `session_pool.py`, and `transport/`
+  handle sessions, native Scrapli CLI transport, and Paramiko SFTP.
+- `src/network_toolkit/platforms/` and `builtin_sequences/` hold
+  platform-specific operations and packaged YAML.
+- `tests/`, `docs/`, and `scripts/` contain the existing tests,
+  documentation, and development automation.
+
+Follow existing typing, exception, and session lifecycle patterns. Keep
+vendor-specific behavior in its existing layer. Use current APIs and carry
+backward compatibility requirements only when explicitly requested. See
+[CONTRIBUTING.md](https://github.com/narrowin/networka/blob/main/CONTRIBUTING.md)
+for contribution and commit conventions.
 
 ## Building and releasing
 
-### Local build
+For local distribution checks, use `uv build --no-sources` followed by
+`uv run --locked twine check dist/*` on the resulting artifacts. Use the
+clean installation check to verify package behavior from the working tree.
+
+For an authorized release, first update the unreleased changelog on the
+intended branch and start from a clean checkout. Run the pre-release
+quality checks and dry run for the intended version.
 
 ```bash
-# Build package locally
-task build
-
-# Verify build
-uv run twine check dist/*
-
-# Test installation
-pip install dist/*.whl
-nw --help
+./scripts/pre-release-check.sh
+./scripts/release.sh --version 1.0.0 --dry-run
 ```
 
-### Publishing to PyPI
-
-#### Manual publishing (local)
-
-```bash
-# Test on TestPyPI first
-task publish:test
-
-# Publish to production PyPI
-task publish:pypi
-```
-
-#### Automated publishing (recommended)
-
-Publishing is automated via GitHub Actions when you create a release tag.
-
-### Release process
-
-**IMPORTANT**: Always use the pre-release check script before releasing. The release script will not run without it.
-
-1. **Prepare for release**
-
-   ```bash
-   # Ensure you're on main branch with clean working directory
-   git checkout main
-   git pull origin main
-   git status  # Should show no uncommitted changes
-   ```
-
-2. **Update CHANGELOG.md**
-
-   Manually update the changelog with new features, fixes, and changes for the upcoming version.
-
-3. **Run pre-release quality checks**
-
-   ```bash
-   ./scripts/pre-release-check.sh
-   ```
-
-   This script runs all quality checks locally:
-   - Lint (ruff)
-   - Format check (ruff format)
-   - Type check (mypy)
-   - Full test suite
-
-   If all checks pass, a marker file is created that allows the release script to proceed.
-
-4. **Execute release**
-
-   ```bash
-   # Test the release process first
-   ./scripts/release.sh --version 1.0.0 --dry-run
-
-   # Execute the actual release
-   ./scripts/release.sh --version 1.0.0
-   ```
-
-   The release script verifies that pre-release checks passed, then:
-
-   - Updates version in `src/network_toolkit/__about__.py`
-   - Updates `CHANGELOG.md` with release date
-   - Commits changes with `chore: bump version to v1.0.0`
-   - Pushes the commit to main
-   - Creates and pushes the release tag
-
-5. **Automated GitHub Actions**
-
-   When the tag is pushed, the release workflow automatically:
-
-   - Validates version consistency between tag and code
-   - Builds wheel and source distribution
-   - Tests installation on multiple platforms (Linux, Windows, macOS) with Python 3.11–3.15
-   - Creates GitHub release with build artifacts
-   - Generates release notes from CHANGELOG.md
-   - Publishes to PyPI automatically (stable releases) or TestPyPI (pre-releases)
-   - Attaches wheel and source distribution files
-
-   **Note**: Quality checks were already validated by the pre-release script, so the release workflow focuses on building and distributing.
-
-**Never manually create release tags** - this will cause version mismatch errors in the build process.
-
-## Project structure
-
-```text
-networka/
-├── src/network_toolkit/     # Main package
-│   ├── cli.py              # CLI interface
-│   ├── config.py           # Configuration models
-│   ├── device.py           # Device connections
-│   ├── exceptions.py       # Custom exceptions
-│   └── results_enhanced.py # Results management
-├── tests/                  # Test suite
-├── docs/                   # Documentation
-├── scripts/                # Build and utility scripts
-├── config/                 # Example configurations
-└── pyproject.toml         # Project configuration
-```
-
-## Adding new features
-
-### 1. Plan the feature
-
-- Create or discuss GitHub issue
-- Design API and data models
-- Consider backward compatibility
-
-### 2. Implement the feature
-
-- Follow existing code patterns
-- Add proper type annotations
-- Include comprehensive error handling
-- Write docstrings
-
-### 3. Add tests
-
-- Unit tests for core functionality
-- Integration tests for CLI commands
-- Mock external dependencies (network calls)
-- Aim for >90% coverage
-
-### 4. Update documentation
-
-- Update relevant docs in `docs/`
-- Add examples if applicable
-- Update CLI help text
-
-### 5. Submit pull request
-
-- Run all quality checks locally
-- Write clear commit messages
-- Include tests and documentation
-- Reference related issues
-
-## Common development tasks
-
-### Adding a new CLI command
-
-```python
-@app.command()
-def new_command(
-    device: Annotated[str, typer.Argument(help="Device name")],
-    verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
-) -> None:
-    """Description of the new command."""
-    setup_logging("DEBUG" if verbose else "INFO")
-
-    try:
-        config = load_config()
-        # Implementation here
-        console.print("[green]Success[/green]")
-    except NetworkToolkitError as e:
-        console.print(f"[red]Error: {e}[/red]")
-        raise typer.Exit(1)
-```
-
-### Adding device type support
-
-1. Add device type to `DeviceType` enum in `config.py`
-2. Add scrapli platform mapping in `device.py`
-3. Add vendor-specific sequences in `builtin_sequences/`
-4. Write tests for the new device type
-
-### Debugging tips
-
-```bash
-# Enable debug logging
-export NW_LOG_LEVEL=DEBUG
-nw your-command
-
-# Use pytest debugging
-uv run pytest --pdb tests/test_file.py::test_function
-
-# Profile performance
-uv run python -m cProfile -o profile.stats -m network_toolkit.cli run device command
-```
-
-## Continuous integration
-
-The project uses GitHub Actions for CI/CD:
-
-- **Tests**: Run on Python 3.11–3.15 across Ubuntu, Windows, macOS
-- **Quality**: Linting, type checking, security scans
-- **Build**: Package building and validation
-- **Release**: Automated releases on git tags
-
-### Local CI simulation
-
-```bash
-# Run the same checks as CI
-./scripts/build.sh
-
-# Or with task runner
-task ci
-```
+Pre-release verification records the commit checked. A real release updates
+version and changelog metadata, commits those changes, and pushes the branch
+and tag. GitHub Actions checks the release artifacts on Python 3.15 on
+Ubuntu and macOS and routes stable and prerelease
+publication to their respective indexes. For previous release evidence, see
+[Networka release qualification](development/networka-release-qualification.md).
 
 ## Getting help
 
-- **Code questions**: Create GitHub issue with "question" label
-- **Bugs**: Use bug report template in GitHub issues
-- **Features**: Use feature request template
-- **Security**: See SECURITY.md for reporting process
-
-## Code review guidelines
-
-### For contributors
-
-- Keep PRs focused and small
-- Write clear commit messages
-- Include tests for new functionality
-- Update documentation as needed
-- Be responsive to feedback
-
-### For reviewers
-
-- Focus on code correctness and maintainability
-- Check that tests adequately cover new code
-- Verify documentation updates
-- Ensure adherence to coding standards
-- Be constructive and helpful in feedback
+Use the GitHub issue template for bugs, questions, and feature requests.
+Follow [SECURITY.md](https://github.com/narrowin/networka/blob/main/SECURITY.md)
+for vulnerability reports.

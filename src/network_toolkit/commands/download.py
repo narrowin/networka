@@ -20,7 +20,6 @@ from network_toolkit.inventory.resolve import resolve_named_targets, select_name
 def register(app: typer.Typer) -> None:
     @app.command(
         rich_help_panel="Remote Operations",
-        context_settings={"help_option_names": ["-h", "--help"]},
     )
     def download(  # pyright: ignore[reportUnusedFunction]
         target_name: Annotated[

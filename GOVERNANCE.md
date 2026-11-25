@@ -17,15 +17,13 @@
 ## Decision Making
 
 - **Feature requests**: Community discussion in GitHub issues
-- **Breaking changes**: Minimum 60-day deprecation notice
+- **User-facing changes**: Documented in the release notes
 - **Major architectural changes**: Public RFC process in GitHub Discussions
-- **Backwards compatibility**: Maintained within major versions
 
 ## Stability Commitments
 
 - **License**: Will remain Apache 2.0 (any change requires fork)
-- **API stability**: Semantic versioning (MAJOR.MINOR.PATCH)
-- **Deprecation policy**: Warnings for at least one minor version before removal
+- **API releases**: Versioned with MAJOR.MINOR.PATCH. Release-specific compatibility commitments are recorded in the release plan.
 - **Security updates**: Addressed within 30 days of responsible disclosure
 
 ## Contributing

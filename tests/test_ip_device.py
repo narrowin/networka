@@ -14,7 +14,7 @@ from network_toolkit.ip_device import (
     create_ip_based_config,
     create_ip_device_config,
     extract_ips_from_target,
-    get_supported_platforms,
+    get_supported_device_types,
     is_ip_address,
     is_ip_list,
     validate_platform,
@@ -79,9 +79,9 @@ class TestIPDetection:
 class TestPlatformValidation:
     """Test platform validation functions."""
 
-    def test_get_supported_platforms(self) -> None:
-        """Test getting supported platforms."""
-        platforms = get_supported_platforms()
+    def test_get_supported_device_types(self) -> None:
+        """Test getting supported device types."""
+        platforms = get_supported_device_types()
         assert isinstance(platforms, dict)
         assert "mikrotik_routeros" in platforms
         assert "cisco_iosxe" in platforms

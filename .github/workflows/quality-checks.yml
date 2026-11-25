@@ -2,18 +2,12 @@ name: Quality Checks
 
 on:
   workflow_call:
-    inputs:
-      python-version:
-        description: "Python version for quality checks"
-        required: false
-        default: "3.13"
-        type: string
 
 env:
   FORCE_COLOR: "1"
   PYTHONUNBUFFERED: "1"
   UV_LOCKED: "true"
-  UV_PYTHON: ${{ inputs.python-version }}
+  UV_PYTHON: "3.15"
 
 jobs:
   code-quality:
@@ -30,11 +24,11 @@ jobs:
           enable-cache: true
 
       - name: Set up Python
-        run: uv python install ${{ inputs.python-version }}
+        run: uv python install "$UV_PYTHON"
 
       - name: Install dependencies
         run: |
-          uv sync --locked --all-extras
+          uv sync --locked --group dev --extra docs
           uv run python -c "import os, sys; assert sys.version_info[:2] == tuple(map(int, os.environ['UV_PYTHON'].split('.')))"
 
       - name: Lint
@@ -60,11 +54,11 @@ jobs:
           enable-cache: true
 
       - name: Set up Python
-        run: uv python install ${{ inputs.python-version }}
+        run: uv python install "$UV_PYTHON"
 
       - name: Install dependencies
         run: |
-          uv sync --locked --all-extras
+          uv sync --locked --group dev --extra docs
           uv run python -c "import os, sys; assert sys.version_info[:2] == tuple(map(int, os.environ['UV_PYTHON'].split('.')))"
 
       - name: Run tests with coverage
@@ -89,11 +83,11 @@ jobs:
           enable-cache: true
 
       - name: Set up Python
-        run: uv python install ${{ inputs.python-version }}
+        run: uv python install "$UV_PYTHON"
 
       - name: Install dependencies
         run: |
-          uv sync --locked --all-extras
+          uv sync --locked --group dev --extra docs
           uv run python -c "import os, sys; assert sys.version_info[:2] == tuple(map(int, os.environ['UV_PYTHON'].split('.')))"
 
       - name: Security scan

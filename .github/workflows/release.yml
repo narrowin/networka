@@ -50,7 +50,7 @@ jobs:
       uses: astral-sh/setup-uv@v10.4.0
       with:
         version-file: pyproject.toml
-        python-version: "3.13"
+        python-version: "3.15"
 
     - name: Check lock and classify the release
       id: channel
@@ -104,13 +104,18 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python-version: ["3.11", "3.12", "3.13", "3.14", "3.15"]
 
     steps:
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v7
+    - name: Checkout code
+      uses: actions/checkout@v7
       with:
-        python-version: ${{ matrix.python-version }}
+        ref: refs/tags/${{ env.RELEASE_TAG }}
+
+    - name: Set up uv and Python
+      uses: astral-sh/setup-uv@v10.4.0
+      with:
+        version-file: pyproject.toml
+        python-version: "3.15"
 
     - name: Download build artifacts
       uses: actions/download-artifact@v8
@@ -119,24 +124,22 @@ jobs:
         path: dist/
 
     - name: Install and run each distribution independently
-      shell: python
+      shell: bash
       run: |
-        import os
-        import subprocess
-        import sys
-        import tempfile
-        from pathlib import Path
-
-        for suffix in ("*.whl", "*.tar.gz"):
-            artifact, = Path("dist").glob(suffix)
-            with tempfile.TemporaryDirectory() as directory:
-                subprocess.run([sys.executable, "-m", "venv", directory], check=True)
-                bin_dir = Path(directory, "Scripts" if os.name == "nt" else "bin")
-                python = bin_dir / ("python.exe" if os.name == "nt" else "python")
-                nw = bin_dir / ("nw.exe" if os.name == "nt" else "nw")
-                subprocess.run([python, "-m", "pip", "install", artifact.resolve()], check=True)
-                subprocess.run([nw, "--version"], cwd=directory, check=True)
-                subprocess.run([nw, "--help"], cwd=directory, check=True)
+        tempdir="$(mktemp -d)"
+        trap 'rm -rf "$tempdir"' EXIT
+        unset PYTHONPATH
+        for artifact in "$PWD"/dist/*.whl "$PWD"/dist/*.tar.gz; do
+          envdir="$tempdir/$(basename "$artifact")-env"
+          uv venv --python 3.15 "$envdir"
+          uv pip install --python "$envdir/bin/python" "$artifact"
+          uv pip check --python "$envdir/bin/python"
+          (
+            cd "$tempdir"
+            uv run --no-project --python "$envdir/bin/python" nw --version
+            uv run --no-project --python "$envdir/bin/python" nw --help
+          )
+        done
 
   create-release:
     name: Create GitHub Release
@@ -157,9 +160,15 @@ jobs:
         name: dist
         path: dist/
 
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v10.4.0
+      with:
+        version-file: pyproject.toml
+        python-version: "3.15"
+
     - name: Extract changelog for this tag
-      shell: python
       run: |
+        uv run --no-project python - <<'PYTHON'
         import os
         import re
         from pathlib import Path
@@ -167,6 +176,7 @@ jobs:
         sections = re.split(r"^## ", Path("CHANGELOG.md").read_text(), flags=re.MULTILINE)
         notes = next((s.partition("\n")[2] for s in sections if s.startswith(f"[{version}]")), "")
         Path("release_notes.txt").write_text(notes.strip() + "\n")
+        PYTHON
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v3

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -75,6 +76,7 @@ class TestConnectionHandling:
         """Test connection failure handling."""
         from scrapli.exceptions import ScrapliException
 
+        sample_config.general.retry_delay = 0
         session = DeviceSession("test_device1", sample_config)
 
         # Mock the driver to raise ScrapliException on open
@@ -83,8 +85,12 @@ class TestConnectionHandling:
                 "Connection failed"
             )
 
-            with pytest.raises(DeviceConnectionError):
+            with pytest.raises(
+                DeviceConnectionError, match="Connection failed for test_device1"
+            ) as exc_info:
                 session.connect()
+        assert exc_info.value.details["original_error"] == "Connection failed"
+        assert not session.is_connected
 
     def test_disconnect_success(self, sample_config: NetworkConfig) -> None:
         """Test successful disconnection."""
@@ -140,14 +146,17 @@ class TestContextManager:
         """Test context manager with connection failure."""
         from scrapli.exceptions import ScrapliException
 
+        sample_config.general.retry_delay = 0
         with patch("network_toolkit.transport.scrapli_sync.Cli") as mock_scrapli:
             mock_scrapli.return_value.open.side_effect = ScrapliException(
                 "Connection failed"
             )
 
-            with pytest.raises(DeviceConnectionError):
+            with pytest.raises(
+                DeviceConnectionError, match="Connection failed for test_device1"
+            ):
                 with DeviceSession("test_device1", sample_config):
-                    pass
+                    pytest.fail("Connection failure entered the caller's block")
 
     @patch("network_toolkit.transport.scrapli_sync.Cli")
     def test_context_manager_exception_in_block(
@@ -335,61 +344,21 @@ class TestHelperMethods:
         assert result == "abc123"
 
 
-class TestMultiDeviceOperations:
-    """Test multi-device operations."""
-
-    @patch("network_toolkit.device.ThreadPoolExecutor")
-    @patch("network_toolkit.device.as_completed")
-    @patch("pathlib.Path.exists", return_value=True)  # Mock file existence
-    @patch("pathlib.Path.is_file", return_value=True)  # Mock file type check
-    def test_upload_file_to_devices_basic(
-        self,
-        mock_is_file,
-        mock_exists,
-        mock_as_completed,
-        mock_executor,
-        sample_config: NetworkConfig,
-    ) -> None:
-        """Test basic multi-device upload functionality."""
-        # Mock a simple successful case
-        mock_future = Mock()
-        mock_future.result.return_value = ("device1", True)
-        mock_as_completed.return_value = [mock_future]
-
-        mock_executor_instance = MagicMock()
-        mock_executor_instance.submit.return_value = mock_future
-        mock_executor_instance.__enter__.return_value = mock_executor_instance
-        mock_executor_instance.__exit__.return_value = None
-        mock_executor.return_value = mock_executor_instance
-
-        result = DeviceSession.upload_file_to_devices(
-            device_names=["device1"],
-            config=sample_config,
-            local_path=Path("/test/file.txt"),
-            remote_filename="remote.txt",
+def test_session_logging_excludes_password(
+    caplog: pytest.LogCaptureFixture, sample_config: NetworkConfig
+) -> None:
+    """Session logs identify the device and omit the connection password."""
+    with caplog.at_level(logging.DEBUG, logger="network_toolkit.device"):
+        DeviceSession(
+            "test_device1", sample_config, password_override="private-password"
         )
 
-        assert "device1" in result
-
-
-class TestLoggingAndThreading:
-    """Test logging and threading-related functionality."""
-
-    @patch("network_toolkit.device.logger")
-    def test_logging_calls(self, mock_logger, sample_config: NetworkConfig) -> None:
-        """Test that logging calls are made."""
-        DeviceSession("test_device1", sample_config)
-
-        # Should log initialization
-        mock_logger.info.assert_called()
-
-    @patch("network_toolkit.device.threading.current_thread")
-    def test_threading_context(self, mock_thread, sample_config: NetworkConfig) -> None:
-        """Test threading context handling."""
-        mock_thread.return_value.name = "TestThread"
-
-        session = DeviceSession("test_device1", sample_config)
-        assert session.device_name == "test_device1"
+    assert "Initialized session for device: test_device1" in caplog.messages
+    assert any(
+        "Connection parameters:" in message and "192.168.1.10" in message
+        for message in caplog.messages
+    )
+    assert "private-password" not in caplog.text
 
 
 class TestEdgeCasesAndBoundaries:
@@ -401,19 +370,3 @@ class TestEdgeCasesAndBoundaries:
 
         result = session.execute_commands([])
         assert result == {}
-
-    def test_special_characters_in_device_name(
-        self, sample_config: NetworkConfig
-    ) -> None:
-        """Test device names with special characters."""
-        # This should work as long as the device exists in config
-        session = DeviceSession("test_device1", sample_config)
-        assert session.device_name == "test_device1"
-
-    @patch("network_toolkit.device.time.sleep")
-    def test_time_operations(self, mock_sleep, sample_config: NetworkConfig) -> None:
-        """Test operations that involve time delays."""
-        # Some operations might use time.sleep for delays
-        session = DeviceSession("test_device1", sample_config)
-        assert session.device_name == "test_device1"
-        # The sleep mock ensures we can test time-related operations

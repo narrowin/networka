@@ -113,7 +113,7 @@ class TestDownload:
         )
 
     @patch("network_toolkit.commands.download.load_config")
-    @patch("network_toolkit.cli.DeviceSession")
+    @patch("network_toolkit.api.download.DeviceSession")
     def test_download_device_failure(
         self, mock_session_class: MagicMock, mock_load_config: MagicMock
     ) -> None:
@@ -135,6 +135,7 @@ class TestDownload:
 
         assert result.exit_code == 1
         assert "Download failed!" in result.output
+        mock_session.download_file.assert_called_once()
 
     @patch("network_toolkit.commands.download.load_config")
     def test_download_device_not_found(self, mock_load_config: MagicMock) -> None:

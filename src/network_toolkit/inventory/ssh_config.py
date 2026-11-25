@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 from paramiko import SSHConfig
 
+from network_toolkit.common.defaults import SSH_PORT_MAX, SSH_PORT_MIN
 from network_toolkit.exceptions import ConfigurationError
 
 if TYPE_CHECKING:
@@ -152,8 +153,11 @@ def _safe_port(port_value: Any, host_name: str) -> int | None:
         return None
     try:
         port = int(port_value)
-        if not (1 <= port <= 65535):
-            msg = f"Port out of range for host '{host_name}': {port} (must be 1-65535)"
+        if not SSH_PORT_MIN <= port <= SSH_PORT_MAX:
+            msg = (
+                f"Port out of range for host '{host_name}': {port} "
+                f"(must be {SSH_PORT_MIN}-{SSH_PORT_MAX})"
+            )
             raise ConfigurationError(
                 msg,
                 details={"host": host_name, "port": port},

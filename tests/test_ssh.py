@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
+import pytest
 from typer.testing import CliRunner
 
 from network_toolkit.cli import app
@@ -152,7 +153,16 @@ def _patch_tmux_env() -> tuple[Any, Any, Any]:
     )
 
 
-def test_ssh_device_opens_session(config_file: Path) -> None:
+@pytest.mark.parametrize(
+    ("target", "exit_code", "message"),
+    [
+        ("test_device1", 0, "Created tmux session"),
+        ("missing-device", 1, "Unknown targets: missing-device"),
+    ],
+)
+def test_ssh_device_opens_session(
+    config_file: Path, target: str, exit_code: int, message: str
+) -> None:
     runner = CliRunner()
     with (
         _patch_tmux_env()[0] as p1,
@@ -166,14 +176,17 @@ def test_ssh_device_opens_session(config_file: Path) -> None:
                 "cli",
                 "--config",
                 str(config_file),
-                "test_device1",
+                target,
+                "--transport",
+                "scrapli",
                 "--no-attach",
                 "--no-sync",
             ],
         )
-    assert result.exit_code == 0
-    assert "Created tmux session" in result.output
-    assert "1" in result.output and "pane" in result.output
+    assert result.exit_code == exit_code, result.output
+    assert message in result.output
+    if exit_code == 0:
+        assert "1 pane(s)" in result.output
 
 
 def test_ssh_group_two_panes(config_file: Path) -> None:

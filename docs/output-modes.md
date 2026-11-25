@@ -10,8 +10,12 @@ Control colors and formatting globally with `general.output_mode`.
 
 Precedence (highest to lowest):
 1) CLI flag: `--output-mode`
-2) Environment: `NW_OUTPUT_MODE`
-3) Config: `general.output_mode`
+2) A nonempty `NO_COLOR` environment variable selects no-color mode
+3) Environment: `NW_OUTPUT_MODE`
+4) Config: `general.output_mode`
+
+Rich uses terminal detection for ANSI styling. Redirected output is plain by
+default. `FORCE_COLOR` can request ANSI colors in redirected styled output.
 
 Examples:
 

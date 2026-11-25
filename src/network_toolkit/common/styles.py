@@ -7,6 +7,7 @@ from enum import Enum
 
 from rich.console import Console
 from rich.table import Table
+from rich.text import Text
 from rich.theme import Theme
 
 from network_toolkit.common.output import OutputMode
@@ -141,18 +142,11 @@ class StyleManager:
                 height=None,
             )
         elif self.mode == OutputMode.NO_COLOR:
-            # No color mode disables colors but keeps other formatting
-            return Console(color_system=None, force_terminal=True, stderr=False)
+            return Console(color_system=None)
         else:
             # Themed modes
             theme_styles = self.themes.get(self.mode, self.themes[OutputMode.DEFAULT])
-            theme = Theme(theme_styles)
-            return Console(
-                theme=theme,
-                stderr=False,
-                force_terminal=True,
-                color_system="standard",
-            )
+            return Console(theme=Theme(theme_styles))
 
     @property
     def console(self) -> Console:
@@ -170,7 +164,7 @@ class StyleManager:
         theme_styles = self.themes.get(self.mode, self.themes[OutputMode.DEFAULT])
         return theme_styles.get(style_name.value)
 
-    def create_table(self, title: str = "") -> Table:
+    def create_table(self, title: str | Text = "") -> Table:
         """Create a Rich Table with appropriate styling for the current mode."""
         if self.mode in [OutputMode.NO_COLOR, OutputMode.RAW]:
             # For no-color modes, create table without styling

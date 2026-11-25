@@ -27,12 +27,12 @@ The matrix used the existing suite with the network marker excluded. Some tests 
 
 ### Running the local builds
 
-From the repository root with uv 0.13.9, use `uv sync --locked --all-extras` and `uv run nw --version` for the checked-out development branch. To compare packages without switching branches or installing over an operator's CLI, create an environment for each wheel. For example:
+For the checked-out development branch, use the uv version pinned in `pyproject.toml` and run `uv sync --locked --group dev --extra docs` and `uv run --locked nw --version` from the repository root. To compare packages without switching branches or installing over an operator's CLI, create an environment for each wheel. For example:
 
 ```bash
 uv venv --python 3.13 .venv-rebirth-preview
 uv pip install --python .venv-rebirth-preview/bin/python dist/rebirth/scrapli2/networka-0.3.0.dev0-py3-none-any.whl
-.venv-rebirth-preview/bin/nw --version
+uv run --no-project --python .venv-rebirth-preview/bin/python nw --version
 ```
 
 The local artifacts are under `dist/rebirth/patch/`, `dist/rebirth/refresh/`, and `dist/rebirth/scrapli2/`. Rebuild any of them from its branch with `uv build --no-sources`.

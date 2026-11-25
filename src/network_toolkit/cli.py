@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Annotated, Any
 
 import typer
-from typer.core import TyperGroup
 from typer.main import get_command as _get_click_command
 
 from network_toolkit import __version__
@@ -55,61 +54,6 @@ class _DynamicConsoleProxy:
 console = _DynamicConsoleProxy()
 
 
-# Preserve insertion order and group commands under a single Commands section
-class CategorizedHelpGroup(TyperGroup):
-    def list_commands(self, ctx: Any) -> list[str]:
-        _ = ctx  # unused
-        return list(self.commands)
-
-    def format_commands(self, ctx: Any, formatter: Any) -> None:
-        # Desired categories
-        exec_names = [
-            "run",
-            "cli",
-            "diff",
-            "upload",
-            "download",
-        ]
-        vendor_names: list[str] = [
-            "backup",
-            "firmware",
-        ]
-        info_names = [
-            "info",
-            "list",
-            "config",
-            "schema",
-        ]
-
-        def rows(names: list[str]) -> list[tuple[str, str]]:
-            items: list[tuple[str, str]] = []
-            for name in names:
-                cmd = self.get_command(ctx, name)
-                if not cmd:
-                    continue
-                # Prefer short help if available
-                short_getter = getattr(cmd, "get_short_help_str", None)
-                short_text = (
-                    short_getter() if callable(short_getter) else (cmd.help or "")
-                )
-                items.append((name, str(short_text)))
-            return items
-
-        exec_rows = rows(exec_names)
-        vendor_rows = rows(vendor_names)
-        info_rows = rows(info_names)
-
-        if exec_rows:
-            formatter.write_text("\nRemote Operations")
-            formatter.write_dl(exec_rows)
-        if vendor_rows:
-            formatter.write_text("\nVendor-Specific Remote Operations")
-            formatter.write_dl(vendor_rows)
-        if info_rows:
-            formatter.write_text("\nInfo & Configuration")
-            formatter.write_dl(info_rows)
-
-
 # Typer application instance
 help_text = (
     "\n    Networka (nw)\n\n"
@@ -128,8 +72,7 @@ app = typer.Typer(
     no_args_is_help=False,
     rich_markup_mode="rich",
     add_completion=False,
-    cls=CategorizedHelpGroup,
-    context_settings={"help_option_names": []},  # Disable default help
+    context_settings={"help_option_names": ["-h", "--help"]},
     invoke_without_command=True,
 )
 
@@ -141,9 +84,6 @@ def main(
     ctx: typer.Context,
     version: Annotated[
         bool, typer.Option("--version", help="Show version information")
-    ] = False,
-    help_flag: Annotated[
-        bool, typer.Option("--help", "-h", help="Show this message and exit")
     ] = False,
     inventory: Annotated[
         list[Path] | None,
@@ -174,18 +114,13 @@ def main(
     )
 
     if version:
-        cmd_ctx = CommandContext()
-        cmd_ctx.print_info(f"Networka (nw) version {__version__}")
+        CommandContext().print_info(f"Networka (nw) version {__version__}")
         raise typer.Exit()
 
-    # If help flag is used or no command is invoked, show banner and help
-    if help_flag or ctx.invoked_subcommand is None:
-        cmd_ctx = CommandContext()
-        # Show banner first
+    if ctx.invoked_subcommand is None:
         show_banner()
-        print()  # Add spacing
-        # Then show help
-        cmd_ctx.output_manager.print_text(ctx.get_help())
+        typer.echo()
+        typer.echo(ctx.get_help(), nl=False)
         raise typer.Exit()
 
 

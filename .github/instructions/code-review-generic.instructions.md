@@ -6,7 +6,9 @@ excludeAgent: ["coding-agent"]
 
 # Generic Code Review Instructions
 
-Comprehensive code review guidelines for GitHub Copilot that can be adapted to any project. These instructions follow best practices from prompt engineering and provide a structured approach to code quality, security, testing, and architecture review.
+Read [`.agents/AGENTS.md`](../../.agents/AGENTS.md) for Networka's architecture, supported
+versions, and verification requirements. Use the review checklist for issues
+that affect the change or its callers.
 
 ## Review Language
 
@@ -21,7 +23,7 @@ When performing a code review, prioritize issues in the following order:
 ### 🔴 CRITICAL (Block merge)
 - **Security**: Vulnerabilities, exposed secrets, authentication/authorization issues
 - **Correctness**: Logic errors, data corruption risks, race conditions
-- **Breaking Changes**: API contract changes without versioning
+- **API Behavior**: Unintended changes to current API behavior
 - **Data Loss**: Risk of data loss or corruption
 
 ### 🟡 IMPORTANT (Requires discussion)
@@ -56,8 +58,7 @@ When performing a code review, check for:
 - Descriptive and meaningful names for variables, functions, and classes
 - Single Responsibility Principle: each function/class does one thing well
 - DRY (Don't Repeat Yourself): no code duplication
-- Functions should be small and focused (ideally < 20-30 lines)
-- Avoid deeply nested code (max 3-4 levels)
+- Keep functions focused and flag nesting that obscures behavior
 - Avoid magic numbers and strings (use constants)
 - Code should be self-documenting; comments only when necessary
 
@@ -97,6 +98,7 @@ def process_user(user_id):
         user.process()
     except:
         pass
+
 
 # ✅ GOOD: Explicit error handling
 def process_user(user_id):
@@ -149,7 +151,7 @@ const API_KEY = process.env.API_KEY;
 
 When performing a code review, verify test quality:
 
-- **Coverage**: Critical paths and new functionality must have tests
+- **Coverage**: Identify tests for changed contracts and gaps that affect correctness
 - **Test Names**: Descriptive names that explain what is being tested
 - **Test Structure**: Clear Arrange-Act-Assert or Given-When-Then pattern
 - **Independence**: Tests should not depend on each other or external state
@@ -338,7 +340,7 @@ When performing a code review, systematically verify:
 - [ ] Input validation on all user inputs
 - [ ] No SQL injection vulnerabilities
 - [ ] Authentication and authorization properly implemented
-- [ ] Dependencies are up-to-date and secure
+- [ ] Dependency changes preserve support and address known issues relevant to the review
 
 ### Testing
 - [ ] New code has appropriate test coverage

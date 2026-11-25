@@ -125,6 +125,8 @@
         "port": {
           "anyOf": [
             {
+              "maximum": 65535,
+              "minimum": 1,
               "type": "integer"
             },
             {
@@ -282,6 +284,8 @@
         "port": {
           "anyOf": [
             {
+              "maximum": 65535,
+              "minimum": 1,
               "type": "integer"
             },
             {
@@ -467,6 +471,8 @@
         },
         "port": {
           "default": 22,
+          "maximum": 65535,
+          "minimum": 1,
           "title": "Port",
           "type": "integer"
         },

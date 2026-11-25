@@ -34,11 +34,11 @@ jobs:
         uses: astral-sh/setup-uv@v10.4.0
         with:
           version-file: pyproject.toml
-          python-version: "3.12"
+          python-version: "3.15"
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --extra docs --locked
+        run: uv sync --locked --group dev --extra docs
 
       - name: Validate documentation structure
         run: |

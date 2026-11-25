@@ -13,9 +13,13 @@ from typing import Any, cast
 
 import yaml
 from dotenv import load_dotenv
-from pydantic import BaseModel, PrivateAttr, field_validator
+from pydantic import BaseModel, Field, PrivateAttr, field_validator
 
-from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
+from network_toolkit.common.defaults import (
+    DEFAULT_CONFIG_PATH,
+    SSH_PORT_MAX,
+    SSH_PORT_MIN,
+)
 
 # from network_toolkit.common.paths import default_modular_config_dir
 from network_toolkit.credentials import (
@@ -158,7 +162,7 @@ class GeneralConfig(ConfigHistoryMixin, BaseModel):
 
     # Default connection settings (credentials now come from environment variables)
     transport: str = "system"
-    port: int = 22
+    port: int = Field(default=22, ge=SSH_PORT_MIN, le=SSH_PORT_MAX)
     timeout: int = 30
     default_transport_type: str = "scrapli"
     ssh_config_file: bool = True
@@ -267,7 +271,7 @@ class DeviceOverrides(BaseModel):
 
     user: str | None = None
     password: str | None = None
-    port: int | None = None
+    port: int | None = Field(default=None, ge=SSH_PORT_MIN, le=SSH_PORT_MAX)
     timeout: int | None = None
     transport: str | None = None
     command_timeout: int | None = None
@@ -309,7 +313,7 @@ class DeviceConfig(ConfigHistoryMixin, BaseModel):
     location: str | None = None
     user: str | None = None
     password: str | None = None
-    port: int | None = None
+    port: int | None = Field(default=None, ge=SSH_PORT_MIN, le=SSH_PORT_MAX)
     transport_type: str | None = None
     tags: list[str] | None = None
     overrides: DeviceOverrides | None = None
@@ -2071,7 +2075,7 @@ def export_schemas_to_workspace() -> None:
             # Only update yaml.schemas, preserve other settings
             existing_settings.update(yaml_schema_config)
             yaml_schema_config = existing_settings
-        except (json.JSONDecodeError, KeyError):
+        except json.JSONDecodeError, KeyError:
             # If existing settings are malformed, just use our config
             pass
 

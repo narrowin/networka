@@ -156,7 +156,7 @@ Set variables directly before running commands:
 ```bash
 export NW_USER_DEFAULT=admin
 export NW_PASSWORD_DEFAULT=your_password
-python -m network_toolkit.cli run system_info sw-acc1
+uv run nw run sw-acc1 system_info
 ```
 
 ## Security Best Practices

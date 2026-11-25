@@ -3,7 +3,9 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from typer.testing import CliRunner
 
+from network_toolkit.cli import app
 from network_toolkit.commands.complete import (
     _list_commands,
     _list_devices,
@@ -81,11 +83,12 @@ class TestListCommands:
 
         assert commands == expected_commands
 
-    def test_list_commands_returns_list(self) -> None:
-        """Test that _list_commands returns a list."""
-        result = _list_commands()
-        assert isinstance(result, list)
-        assert len(result) > 0
+    def test_cli_completes_commands(self) -> None:
+        """The shell completion entry point emits one candidate per line."""
+        result = CliRunner().invoke(app, ["__complete", "--for", "commands"])
+
+        assert result.exit_code == 0, result.output
+        assert result.stdout.splitlines() == _list_commands()
 
 
 class TestListDevices:

@@ -8,11 +8,11 @@ from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
 from time import perf_counter
-from typing import TypeVar
 
 import network_toolkit.device as device_module
 from network_toolkit.api.execution import execute_parallel
 from network_toolkit.common.credentials import InteractiveCredentials
+from network_toolkit.common.defaults import SSH_PORT_MAX, SSH_PORT_MIN
 from network_toolkit.config import NetworkConfig
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.inventory.resolve import resolve_named_targets
@@ -21,7 +21,7 @@ from network_toolkit.ip_device import (
 )
 from network_toolkit.ip_device import (
     extract_ips_from_target,
-    get_supported_platforms,
+    get_supported_device_types,
     is_ip_list,
     validate_platform,
 )
@@ -31,8 +31,6 @@ from network_toolkit.session_pool import SessionPoolProtocol
 from network_toolkit.transport.factory import get_transport_factory
 
 logger = logging.getLogger(__name__)
-
-T = TypeVar("T")
 
 
 @dataclass(slots=True)
@@ -223,7 +221,7 @@ def _run_command_on_device(
     )
 
 
-def _with_session_retry(
+def _with_session_retry[T](
     device_name: str,
     config: NetworkConfig,
     username_override: str | None,
@@ -400,12 +398,12 @@ def _prepare_config_for_ips(
 ) -> tuple[NetworkConfig, list[str]]:
     ips = extract_ips_from_target(target)
     if device_type is None:
-        supported = get_supported_platforms()
+        supported = get_supported_device_types()
         msg = "When using IP addresses, --platform is required"
         raise TargetResolutionError(msg, unknown_targets=list(supported.keys()))
 
     if not validate_platform(device_type):
-        supported = get_supported_platforms()
+        supported = get_supported_device_types()
         msg = f"Invalid device type '{device_type}'"
         raise TargetResolutionError(msg, unknown_targets=list(supported.keys()))
 
@@ -426,6 +424,13 @@ def run_commands(options: RunOptions) -> RunResult:
     NetworkToolkitError
         For configuration or execution errors that prevent the run
     """
+
+    if options.port is not None and (
+        not isinstance(options.port, int)
+        or not SSH_PORT_MIN <= options.port <= SSH_PORT_MAX
+    ):
+        msg = f"SSH port must be an integer between {SSH_PORT_MIN} and {SSH_PORT_MAX}"
+        raise NetworkToolkitError(msg)
 
     _validate_transport(options.transport_type)
 

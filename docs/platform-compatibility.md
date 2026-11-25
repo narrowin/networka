@@ -7,6 +7,6 @@ This table applies to Networka 0.2.0 with Scrapli 2.0.4.
 | macOS arm64 | Upstream wheel available. The native CLI, commands, and literal confirmation were exercised on this host. |
 | Linux x86-64 and arm64 | Upstream wheels exist for glibc and musl. The release workflow includes an Ubuntu runner. Linux execution awaits verification. |
 | Windows with WSL2 | A Linux environment is a candidate installation target. WSL2 execution awaits verification. |
-| Native Windows and Intel macOS | No compatible upstream wheel. Keep the legacy Networka environment for these hosts. |
+| Native Windows and Intel macOS | No compatible upstream wheel for the current driver. |
 
-The package requires Python 3.11 or later. The configured CI matrix covers Python 3.11 through 3.15. Install OpenSSH to use the system transport and tmux for multi-pane sessions. [Scrapli 2.0.4 release files](https://pypi.org/project/scrapli2/2.0.4/#files) · [Transport selection](transport.md)
+The package requires Python 3.15 or later. CI uses Python 3.15. Install OpenSSH to use the system transport and tmux for multi-pane sessions. [Scrapli 2.0.4 release files](https://pypi.org/project/scrapli2/2.0.4/#files) · [Transport selection](transport.md)

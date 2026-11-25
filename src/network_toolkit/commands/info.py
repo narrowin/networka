@@ -15,8 +15,11 @@ from network_toolkit.common.credentials import (
     prompt_for_credentials,
 )
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
-from network_toolkit.common.logging import setup_logging
-from network_toolkit.common.output import OutputMode
+from network_toolkit.common.output import (
+    OutputManager,
+    OutputMode,
+    get_output_mode_from_config,
+)
 from network_toolkit.common.table_generator import BaseTableProvider
 from network_toolkit.common.table_providers import (
     DeviceInfoTableProvider,
@@ -26,7 +29,7 @@ from network_toolkit.common.table_providers import (
     TransportTypesTableProvider,
     VendorSequenceInfoTableProvider,
 )
-from network_toolkit.config import NetworkConfig, load_config
+from network_toolkit.config import NetworkConfig
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.sequence_manager import SequenceManager
 
@@ -34,7 +37,6 @@ from network_toolkit.sequence_manager import SequenceManager
 def register(app: typer.Typer) -> None:
     @app.command(
         rich_help_panel="Info & Configuration",
-        context_settings={"help_option_names": ["-h", "--help"]},
     )
     def info(
         targets: Annotated[
@@ -97,8 +99,6 @@ def register(app: typer.Typer) -> None:
         - nw info system_info --vendor cisco_iosxe  # Show vendor-specific commands
         - nw info sw-acc1,access_switches,health_check  # Mixed types
         """
-        setup_logging("DEBUG" if verbose else "WARNING")
-
         # Resolve default config path: if user passed the literal default 'config'
         # and it doesn't exist, fall back to the OS default config dir.
         cfg_path = Path(config_file)
@@ -107,15 +107,16 @@ def register(app: typer.Typer) -> None:
 
             cfg_path = default_modular_config_dir()
 
-        # Use CommandContext for consistent output management
-        ctx = CommandContext(
-            config_file=cfg_path,
-            verbose=verbose,
-            output_mode=output_mode,
-        )
-
+        ctx = None
         try:
-            config = load_config(cfg_path)
+            ctx = CommandContext(
+                config_file=cfg_path,
+                verbose=verbose,
+                output_mode=output_mode,
+                require_config=True,
+            )
+            config = ctx.config
+            assert config is not None
 
             # Handle interactive authentication if requested
             interactive_creds = None
@@ -184,16 +185,21 @@ def register(app: typer.Typer) -> None:
                     if len(target_list) == 1 and not target_list[0].endswith("s"):
                         raise typer.Exit(1) from None
 
-        except NetworkToolkitError as e:
-            ctx.print_error(f"Error: {e.message}")
-            if verbose and e.details:
-                ctx.print_error(f"Details: {e.details}")
-            raise typer.Exit(1) from None
         except typer.Exit:
             # Allow clean exits (e.g., user cancellation) to pass through
             raise
         except Exception as e:  # pragma: no cover - unexpected
-            ctx.print_error(f"Unexpected error: {e}")
+            output = (
+                ctx.output_manager
+                if ctx is not None
+                else OutputManager(output_mode or get_output_mode_from_config())
+            )
+            if isinstance(e, NetworkToolkitError):
+                output.print_error(f"Error: {e.message}")
+                if verbose and e.details:
+                    output.print_error(f"Details: {e.details}")
+            else:
+                output.print_error(f"Unexpected error: {e}")
             raise typer.Exit(1) from None
 
 

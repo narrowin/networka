@@ -21,30 +21,30 @@ echo "✅ uv version: $(uv --version)"
 
 # Clean previous builds
 echo "🧹 Cleaning previous builds..."
-rm -rf dist/ build/ *.egg-info/
+rm -rf -- dist/ build/ *.egg-info/
 
 # Install dependencies
 echo "📦 Installing dependencies..."
-uv sync --all-extras
+uv sync --locked --group dev --extra docs
 
 # Run quality checks
 echo "🔍 Running quality checks..."
 echo "  - Linting with ruff..."
-uv run ruff check .
+uv run --locked --extra docs ruff check .
 
 echo "  - Formatting check with ruff..."
-uv run ruff format --check .
+uv run --locked --extra docs ruff format --check .
 
 echo "  - Type checking with mypy..."
-uv run mypy src/
+uv run --locked --extra docs mypy src/
 
 # Run tests
 echo "🧪 Running tests..."
-uv run pytest --cov=network_toolkit --cov-report=term-missing
+uv run --locked --extra docs pytest --cov=network_toolkit --cov-report=term-missing
 
 # Build the package
 echo "🏗️  Building package..."
-uv build
+uv build --no-sources
 
 # Check the build
 echo "🔍 Checking build artifacts..."
@@ -55,10 +55,10 @@ echo ""
 # Validate package structure
 echo "📋 Package validation:"
 echo "Source distribution contents:"
-tar -tzf dist/*.tar.gz | head -10
+tar -tzf dist/*.tar.gz | sed -n '1,10p'
 echo ""
 echo "Wheel contents:"
-unzip -l dist/*.whl | head -10
+unzip -l dist/*.whl | sed -n '1,10p'
 echo ""
 
 echo "✅ Build completed successfully!"

@@ -34,9 +34,8 @@ class TestListCommand:
         result = runner.invoke(app, ["list", "devices", "--config", str(config_file)])
 
         assert result.exit_code == 0
-        assert (
-            "test_device1" in result.output or "No devices configured" in result.output
-        )
+        assert "test_device1" in result.output
+        assert "test_device2" in result.output
 
     def test_list_devices_verbose(self, config_file: Path) -> None:
         """Test list devices with verbose output."""
@@ -45,7 +44,9 @@ class TestListCommand:
             app, ["list", "devices", "--config", str(config_file), "--verbose"]
         )
 
-        assert result.exit_code == 0
+        assert result.exit_code == 0, result.output
+        assert "test_device1" in result.output
+        assert "192.168.1.10" in result.output
 
     def test_list_devices_output_modes(self, config_file: Path) -> None:
         """Test list devices with different output modes."""
@@ -78,10 +79,8 @@ class TestListCommand:
         result = runner.invoke(app, ["list", "groups", "--config", str(config_file)])
 
         assert result.exit_code == 0
-        assert (
-            "all_switches" in result.output
-            or "No device groups configured" in result.output
-        )
+        assert "all_switches" in result.output
+        assert "lab_devices" in result.output
 
     def test_list_groups_verbose(self, config_file: Path) -> None:
         """Test list groups with verbose output."""

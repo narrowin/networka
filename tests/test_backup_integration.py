@@ -281,24 +281,6 @@ class TestBackupCommandIntegration:
         backup_dir.mkdir()
         return backup_dir
 
-    @pytest.mark.skip(reason="Requires full command flow mocking - see issue #42")
-    def test_backup_command_creates_timestamped_directory(
-        self, temp_backup_dir: Path
-    ) -> None:
-        """Verify backup command creates device_timestamp directory."""
-        # This would be an integration test that:
-        # 1. Mocks config with temp_backup_dir
-        # 2. Runs backup command
-        # 3. Verifies directory exists with format {device}_{timestamp}
-
-        # Mock pattern: device_YYYYMMDD_HHMMSS
-
-        # After running backup, check directory exists
-        backup_dirs = list(temp_backup_dir.glob("test-device_*"))
-
-        # This assertion would verify directory was created
-        assert len(backup_dirs) == 1
-
     def test_backup_saves_text_outputs_to_files(self, temp_backup_dir: Path) -> None:
         """Verify text outputs from BackupResult are saved as files."""
         # Simulate saving text outputs

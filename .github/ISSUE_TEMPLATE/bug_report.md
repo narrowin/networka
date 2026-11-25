@@ -26,7 +26,7 @@ A clear description of what actually happened.
 ## Environment
 
 - OS: [e.g. Ubuntu 22.04]
-- Python version: [e.g. 3.11.5]
+- Python version: [e.g. 3.15.2]
 - networka version: [e.g. 1.0.0]
 
 ## Additional Context

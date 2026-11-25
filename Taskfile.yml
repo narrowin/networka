@@ -1,13 +1,7 @@
 version: '3'
 
 vars:
-  PROJECT_NAME: networka
   PACKAGE_NAME: network_toolkit
-  PYTHON_VERSION: "3.11"
-
-env:
-  FORCE_COLOR: "1"
-  PYTHONPATH: "./src"
 
 tasks:
   default:
@@ -19,7 +13,7 @@ tasks:
     desc: Install development dependencies
     cmds:
       - echo "Installing development dependencies..."
-      - uv sync --locked --all-extras --group dev
+      - uv sync --locked --group dev --extra docs
     sources:
       - pyproject.toml
       - uv.lock
@@ -30,7 +24,7 @@ tasks:
     desc: Format code with ruff
     cmds:
       - echo "Formatting code..."
-      - uv run ruff format .
+      - uv run --locked ruff format .
     sources:
       - src/**/*.py
       - tests/**/*.py
@@ -39,7 +33,7 @@ tasks:
     desc: Check code formatting with ruff
     cmds:
       - echo "Checking code formatting..."
-      - uv run ruff format --check .
+      - uv run --locked ruff format --check .
     sources:
       - src/**/*.py
       - tests/**/*.py
@@ -48,7 +42,7 @@ tasks:
     desc: Lint code with ruff
     cmds:
       - echo "Linting code..."
-      - uv run ruff check .
+      - uv run --locked ruff check .
     sources:
       - src/**/*.py
       - tests/**/*.py
@@ -57,7 +51,7 @@ tasks:
     desc: Lint and fix code with ruff
     cmds:
       - echo "Linting and fixing code..."
-      - uv run ruff check --fix .
+      - uv run --locked ruff check --fix .
     sources:
       - src/**/*.py
       - tests/**/*.py
@@ -66,7 +60,7 @@ tasks:
     desc: Type check with mypy
     cmds:
       - echo "Type checking..."
-      - uv run mypy src/
+      - uv run --locked mypy src/
     sources:
       - src/**/*.py
       - pyproject.toml
@@ -75,29 +69,22 @@ tasks:
     desc: Run tests (local development)
     cmds:
       - echo "Running tests (local development mode)..."
-      - uv run pytest -v
+      - uv run --locked pytest -v
     sources:
       - src/**/*.py
       - tests/**/*.py
       - pyproject.toml
 
   test:ci:
-    desc: Run tests with CI-exact environment (MANDATORY for CI parity)
+    desc: Run the CI test command on the local interpreter
     env:
       FORCE_COLOR: "1"
       PYTHONUNBUFFERED: "1"
       CI: "true"
       COLUMNS: "150"
-      UV_FROZEN: "true"
     cmds:
-      - echo "Running tests with CI-exact environment..."
-      - echo "Environment variables:"
-      - echo "  FORCE_COLOR=$FORCE_COLOR"
-      - echo "  PYTHONUNBUFFERED=$PYTHONUNBUFFERED"
-      - echo "  CI=$CI"
-      - echo "  COLUMNS=$COLUMNS"
-      - echo "  UV_FROZEN=$UV_FROZEN"
-      - uv run pytest --cov={{.PACKAGE_NAME}} --cov-report=xml --cov-report=term-missing --tb=short --color=yes
+      - uv run --locked python --version
+      - uv run --locked pytest --cov={{.PACKAGE_NAME}} --cov-report=xml --cov-report=term-missing
     sources:
       - src/**/*.py
       - tests/**/*.py
@@ -110,7 +97,7 @@ tasks:
     desc: Run tests with coverage (local HTML report)
     cmds:
       - echo "Running tests with HTML coverage..."
-      - uv run pytest --cov={{.PACKAGE_NAME}} --cov-report=term-missing --cov-report=html
+      - uv run --locked pytest --cov={{.PACKAGE_NAME}} --cov-report=term-missing --cov-report=html
     sources:
       - src/**/*.py
       - tests/**/*.py
@@ -122,7 +109,7 @@ tasks:
     desc: Run tests in parallel (no coverage)
     cmds:
       - echo "Running tests in parallel..."
-      - uv run pytest -n auto
+      - uv run --locked pytest -n auto
     sources:
       - src/**/*.py
       - tests/**/*.py
@@ -131,7 +118,7 @@ tasks:
     desc: Run security checks
     cmds:
       - echo "Running security checks..."
-      - uv run bandit -r src/ -f json -o bandit-report.json || true
+      - uv run --locked bandit -r src/ -f json -o bandit-report.json || true
       - echo "Security report saved to bandit-report.json"
     sources:
       - src/**/*.py
@@ -142,7 +129,7 @@ tasks:
     desc: Scan for secrets
     cmds:
       - echo "Scanning for secrets..."
-      - uv run detect-secrets scan --all-files --baseline .secrets.baseline
+      - uv run --locked detect-secrets scan --all-files --baseline .secrets.baseline
     sources:
       - "**/*.py"
       - "**/*.yml"
@@ -163,7 +150,7 @@ tasks:
     cmds:
       - echo "Building package for GitHub distribution..."
       - rm -rf dist/
-      - uv build
+      - uv build --no-sources
       - echo "Built files:"
       - ls -la dist/
     sources:
@@ -175,26 +162,15 @@ tasks:
       - dist/**
 
   build:check:
-    desc: Build and validate package structure
+    desc: Build and verify the wheel and source distribution in fresh environments
     cmds:
-      - echo "Building and validating package..."
-      - uv build
-      - echo "Package structure check:"
-      - tar -tzf dist/*.tar.gz | head -20
-      - unzip -l dist/*.whl | head -20
-    sources:
-      - src/**/*.py
-      - pyproject.toml
-      - README.md
-      - CHANGELOG.md
-    generates:
-      - dist/**
+      - bash scripts/test-local-install.sh
 
   docs:generate:
     desc: Generate CLI documentation from Typer source
     cmds:
       - echo "Generating CLI documentation..."
-      - uv run python scripts/generate_cli_docs.py
+      - uv run --locked python scripts/generate_cli_docs.py
     sources:
       - src/network_toolkit/**/*.py
       - scripts/generate_cli_docs.py
@@ -207,7 +183,7 @@ tasks:
       - docs:generate
     cmds:
       - echo "Building MkDocs site..."
-      - uv run --extra docs mkdocs build --clean --strict
+      - uv run --locked --extra docs mkdocs build --clean --strict
 
   clean:
     desc: Clean build artifacts
@@ -229,7 +205,7 @@ tasks:
     desc: Generate platform documentation from registry
     cmds:
       - echo "Generating platform documentation from registry..."
-      - uv run python scripts/generate_platform_docs.py
+      - uv run --locked python scripts/generate_platform_docs.py
 
   docs:
     desc: Build documentation (regenerates CLI docs first)
@@ -246,7 +222,7 @@ tasks:
       - docs:generate
     cmds:
       - echo "Serving documentation on http://0.0.0.0:8000 ..."
-      - uv run --extra docs mkdocs serve -a 0.0.0.0:8000
+      - uv run --locked --extra docs mkdocs serve -a 0.0.0.0:8000
 
   docs:check-links:
     desc: Check documentation links locally (requires docs server to be running)
@@ -259,7 +235,7 @@ tasks:
     cmds:
       - task: docs
       - echo "Starting docs server in background..."
-      - nohup uv run mkdocs serve -a 0.0.0.0:8000 > /dev/null 2>&1 &
+      - nohup uv run --locked --extra docs mkdocs serve -a 0.0.0.0:8000 > /dev/null 2>&1 &
       - sleep 3
       - task: docs:check-links
       - pkill -f "mkdocs serve" || true
@@ -299,14 +275,15 @@ tasks:
       - echo "Development environment ready!"
 
   ci:
-    desc: Run CI checks locally (matches GitHub Actions exactly)
+    desc: Run local quality checks and the CI test command
     deps:
       - lint
+      - format:check
       - typecheck
       - test:ci
       - security
     cmds:
-      - echo "CI checks completed - matches GitHub Actions environment!"
+      - echo "Local CI checks completed"
 
   publish:test:
     desc: Publish to TestPyPI for testing
@@ -314,7 +291,7 @@ tasks:
       - build
     cmds:
       - echo "Publishing to TestPyPI..."
-      - uv run twine upload --repository testpypi dist/*
+      - uv run --locked twine upload --repository testpypi dist/*
       - echo "Published to TestPyPI - https://test.pypi.org/project/networka/"
 
   publish:pypi:
@@ -328,7 +305,7 @@ tasks:
       - |
         read -p "Are you sure you want to publish to PyPI? (y/N): " confirm
         if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
-          uv run twine upload dist/*
+          uv run --locked twine upload dist/*
           echo "Published to PyPI - https://pypi.org/project/networka/"
         else
           echo "Publish cancelled"
@@ -352,19 +329,19 @@ tasks:
     desc: Run the CLI tool (nw --help)
     cmds:
       - echo "Running networka CLI..."
-      - uv run nw --help
+      - uv run --locked nw --help
 
   run:info:
     desc: Show CLI info command
     cmds:
       - echo "Running nw info..."
-      - uv run nw info || echo "No devices configured yet"
+      - uv run --locked nw info || echo "No devices configured yet"
 
   run:version:
     desc: Show CLI version
     cmds:
       - echo "Showing version..."
-      - uv run nw --version
+      - uv run --locked nw --version
 
   install:task:
     desc: Install go-task if not present

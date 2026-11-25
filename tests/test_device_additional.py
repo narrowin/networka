@@ -305,6 +305,7 @@ class TestDeviceSessionAdditional:
         """Test connection retry logic."""
         from scrapli.exceptions import ScrapliException
 
+        sample_config.general.retry_delay = 0
         with patch("network_toolkit.transport.scrapli_sync.Cli") as mock_scrapli:
             mock_driver = MagicMock()
             mock_driver.open.side_effect = [
@@ -323,6 +324,7 @@ class TestDeviceSessionAdditional:
         """Test connection when all retries are exhausted."""
         from scrapli.exceptions import ScrapliException
 
+        sample_config.general.retry_delay = 0
         with patch("network_toolkit.transport.scrapli_sync.Cli") as mock_scrapli:
             mock_driver = MagicMock()
             mock_driver.open.side_effect = ScrapliException("Connection failed")
@@ -330,8 +332,13 @@ class TestDeviceSessionAdditional:
 
             session = DeviceSession("test_device1", sample_config)
 
-            with pytest.raises(DeviceConnectionError):
+            with pytest.raises(
+                DeviceConnectionError, match="Connection failed for test_device1"
+            ) as exc_info:
                 session.connect()
+        assert exc_info.value.details["original_error"] == "Connection failed"
+        assert mock_driver.open.call_count == 3
+        assert not session.is_connected
 
     def test_command_execution_scrapli_error(
         self, sample_config: NetworkConfig

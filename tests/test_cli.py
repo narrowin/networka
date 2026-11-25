@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -30,15 +31,15 @@ class TestCLI:
         assert "Networka" in result.output
         assert "nw" in result.output
 
-    @pytest.mark.skip(reason="CLI test has exit code issues, needs investigation")
     def test_info_command_success(self, config_file: Path) -> None:
         """Test info command with valid device."""
         runner = CliRunner()
         result = runner.invoke(
             app, ["info", "--config", str(config_file), "test_device1"]
         )
-        assert result.exit_code == 0
-        assert "test_device1" in result.output
+        assert result.exit_code == 0, result.output
+        assert "Device: test_device1" in result.output
+        assert "192.168.1.10" in result.output
 
     def test_info_command_invalid_device(self, config_file: Path) -> None:
         """Test info command with invalid device."""
@@ -47,24 +48,7 @@ class TestCLI:
             app, ["info", "--config", str(config_file), "nonexistent_device"]
         )
         assert result.exit_code == 1
-
-    @pytest.mark.skip(reason="CLI test has exit code issues, needs investigation")
-    def test_list_devices_command(self, config_file: Path) -> None:
-        """Test list devices command."""
-        runner = CliRunner()
-        result = runner.invoke(app, ["list", "devices", "--config", str(config_file)])
-        assert result.exit_code == 0
-        assert "test_device1" in result.output
-        assert "test_device2" in result.output
-
-    @pytest.mark.skip(reason="CLI test has exit code issues, needs investigation")
-    def test_list_groups_command(self, config_file: Path) -> None:
-        """Test list groups command."""
-        runner = CliRunner()
-        result = runner.invoke(app, ["list", "groups", "--config", str(config_file)])
-        assert result.exit_code == 0
-        # Should show configured groups
-        assert "all_switches" in result.output or "lab_devices" in result.output
+        assert "Unknown target: nonexistent_device" in result.output
 
     @patch("network_toolkit.device.DeviceSession")
     def test_run_command_success(
@@ -370,23 +354,14 @@ class TestCLI:
         )
         assert result.exit_code == 1
 
-    @pytest.mark.skip(reason="CLI test has exit code issues, needs investigation")
-    def test_verbose_output(self, config_file: Path) -> None:
-        """Test verbose output mode."""
-        runner = CliRunner()
-        result = runner.invoke(
-            app, ["list", "devices", "--config", str(config_file), "--verbose"]
-        )
-        assert result.exit_code == 0
-
-    @pytest.mark.skip(reason="CLI test has exit code issues, needs investigation")
     def test_info_verbose_output(self, config_file: Path) -> None:
         """Test info command with verbose output."""
         runner = CliRunner()
         result = runner.invoke(
             app, ["info", "--config", str(config_file), "--verbose", "test_device1"]
         )
-        assert result.exit_code == 0
+        assert result.exit_code == 0, result.output
+        assert "Detailed information for device: test_device1" in result.output
 
     @patch("network_toolkit.device.DeviceSession")
     def test_group_run_basic(
@@ -525,9 +500,15 @@ class TestCLI:
     @patch("network_toolkit.api.run.SequenceManager")
     @patch("network_toolkit.device.DeviceSession")
     def test_run_sequence_raw_single_device(
-        self, mock_device_session: MagicMock, mock_sm: MagicMock, config_file: Path
+        self,
+        mock_device_session: MagicMock,
+        mock_sm: MagicMock,
+        config_file: Path,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         """Raw output mode prints only command outputs for single-device sequence."""
+        # CliRunner shares logging state with earlier tests; a new CLI starts at WARNING.
+        caplog.set_level(logging.WARNING)
         # Force sequence resolution to a deterministic set
         sm_instance = mock_sm.return_value
         sm_instance.exists.return_value = True
@@ -551,19 +532,20 @@ class TestCLI:
                 "txt",
             ],
         )
-        assert result.exit_code == 0
-        # Expect device/cmd header lines preceding each output (with === delimiters)
-        lines = [line for line in result.output.splitlines() if line.strip() != ""]
-        # Two commands => 2 lines: output, output
-        assert lines[0] == "out1"
-        assert lines[1] == "out2"
+        assert result.exit_code == 0, result.output
+        assert result.stdout == "out1\nout2\n"
 
     @patch("network_toolkit.api.run.SequenceManager")
     @patch("network_toolkit.device.DeviceSession")
     def test_run_sequence_raw_group(
-        self, mock_device_session: MagicMock, mock_sm: MagicMock, config_file: Path
+        self,
+        mock_device_session: MagicMock,
+        mock_sm: MagicMock,
+        config_file: Path,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         """Raw output mode for group sequence prints only outputs in member order."""
+        caplog.set_level(logging.WARNING)
         sm_instance = mock_sm.return_value
         sm_instance.exists.return_value = True
         sm_instance.resolve.return_value = ["c1", "c2"]
@@ -592,20 +574,18 @@ class TestCLI:
                 "txt",
             ],
         )
-        assert result.exit_code == 0
-        lines = [line for line in result.output.splitlines() if line.strip() != ""]
-        # Expect headers and outputs interleaved in device order (with === delimiters)
-        # d1c1, d1c2, d2c1, d2c2
-        assert lines[0] == "d1c1"
-        assert lines[1] == "d1c2"
-        assert lines[2] == "d2c1"
-        assert lines[3] == "d2c2"
+        assert result.exit_code == 0, result.output
+        assert result.stdout == "d1c1\nd1c2\nd2c1\nd2c2\n"
 
     @patch("network_toolkit.device.DeviceSession")
     def test_run_single_command_raw_json(
-        self, mock_device_session: MagicMock, config_file: Path
+        self,
+        mock_device_session: MagicMock,
+        config_file: Path,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         """Single command raw JSON lines contains device, cmd, and output."""
+        caplog.set_level(logging.WARNING)
         mock_session = MagicMock()
         mock_session.execute_command.return_value = "ok"
         mock_session.__enter__ = MagicMock(return_value=mock_session)
@@ -625,19 +605,34 @@ class TestCLI:
                 "json",
             ],
         )
-        assert result.exit_code == 0
-        line = result.output.strip().splitlines()[0]
-        obj = json.loads(line)
-        assert obj["device"] == "test_device1"
-        assert obj["cmd"] == "/cmd"
-        assert obj["output"] == "ok"
+        assert result.exit_code == 0, result.output
+        result_event, summary = map(json.loads, result.stdout.splitlines())
+        assert result_event == {
+            "event": "result",
+            "device": "test_device1",
+            "cmd": "/cmd",
+            "output": "ok",
+        }
+        assert summary.pop("duration") >= 0
+        assert summary == {
+            "event": "summary",
+            "target": "test_device1",
+            "type": "Command",
+            "name": "/cmd",
+            "succeeded": True,
+        }
 
     @patch("network_toolkit.api.run.SequenceManager")
     @patch("network_toolkit.device.DeviceSession")
     def test_run_sequence_raw_json(
-        self, mock_device_session: MagicMock, mock_sm: MagicMock, config_file: Path
+        self,
+        mock_device_session: MagicMock,
+        mock_sm: MagicMock,
+        config_file: Path,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         """Sequence raw JSON emits one JSON object per command in order."""
+        caplog.set_level(logging.WARNING)
         sm_instance = mock_sm.return_value
         sm_instance.exists.return_value = True
         sm_instance.resolve.return_value = ["c1", "c2"]
@@ -662,15 +657,25 @@ class TestCLI:
             ],
         )
 
-        assert result.exit_code == 0
-        lines = result.output.strip().splitlines()
-        # First two entries are results; a trailing summary event may be present
-        obj1 = json.loads(lines[0])
-        obj2 = json.loads(lines[1])
-        # Only assert fields we care about to allow additional keys (e.g., event)
-        assert obj1["device"] == "test_device1"
-        assert obj1["cmd"] == "c1"
-        assert obj1["output"] == "o1"
-        assert obj2["device"] == "test_device1"
-        assert obj2["cmd"] == "c2"
-        assert obj2["output"] == "o2"
+        assert result.exit_code == 0, result.output
+        first, second, summary = map(json.loads, result.stdout.splitlines())
+        assert first == {
+            "event": "result",
+            "device": "test_device1",
+            "cmd": "c1",
+            "output": "o1",
+        }
+        assert second == {
+            "event": "result",
+            "device": "test_device1",
+            "cmd": "c2",
+            "output": "o2",
+        }
+        assert summary.pop("duration") >= 0
+        assert summary == {
+            "event": "summary",
+            "target": "test_device1",
+            "type": "Sequence",
+            "name": "health_check",
+            "succeeded": True,
+        }

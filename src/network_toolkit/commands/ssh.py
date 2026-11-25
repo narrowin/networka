@@ -41,7 +41,7 @@ from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.ip_device import (
     create_ip_based_config,
     extract_ips_from_target,
-    get_supported_platforms,
+    get_supported_device_types,
     is_ip_list,
 )
 
@@ -292,7 +292,6 @@ def register(app: typer.Typer) -> None:
         "cli",
         help=app_help,
         rich_help_panel="Remote Operations",
-        context_settings={"help_option_names": ["-h", "--help"]},
     )
     def cli(
         target: Annotated[
@@ -426,7 +425,7 @@ def register(app: typer.Typer) -> None:
             # Handle IP addresses if platform is provided
             if is_ip_list(target):
                 if device_type is None:
-                    supported_platforms = get_supported_platforms()
+                    supported_platforms = get_supported_device_types()
                     platform_list = "\n".join(
                         [f"  {k}: {v}" for k, v in supported_platforms.items()]
                     )

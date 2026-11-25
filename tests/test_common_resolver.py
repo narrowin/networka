@@ -14,6 +14,7 @@ class TestDeviceResolver:
         resolver = DeviceResolver(config)
 
         assert resolver.config is config
+        assert resolver.effective_config is config
 
     def test_is_device_true(self) -> None:
         """Test is_device returns True for valid device."""

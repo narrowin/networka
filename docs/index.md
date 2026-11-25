@@ -66,4 +66,4 @@ Networka is built for network engineers who want to run commands now. Ansible ex
 
 Start with the [Installation Guide](getting-started.md#installation), then explore the User guide for config, environment variables, output modes, results, and more.
 
-Python 3.11+ is required.
+Python 3.15 or later is required.

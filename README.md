@@ -12,7 +12,7 @@ Originally developed at [narrowin](https://narrowin.ch/en/about.html), now commu
 
 **Networka: `Eierlegende Wollmilchsau` of network operations — optimized for your daily workflows.**
 
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.15+](https://img.shields.io/badge/python-3.15%2B-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20arm64-lightgrey.svg)](https://github.com/narrowin/networka)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
@@ -104,13 +104,14 @@ Networka is built for network engineers who want to run commands now. Ansible ex
 ### System Requirements
 
 - **Operating System**: Linux x86-64/arm64 or macOS arm64
+- **Python**: 3.15 or later
 - **Network Access**: SSH connectivity to target devices
 - **Package Manager**: uv (recommended) or pip
 - **tmux for `nw cli`**: Install tmux to use the multi-pane CLI command (`brew install tmux` on macOS, `apt install tmux` on Debian/Ubuntu). libtmux is installed automatically with Networka.
 
 ### Install from the checkout
 
-With uv 0.13.9 in this checkout, use a project environment to keep the native driver isolated.
+With uv 0.13.10 in this checkout, use a project environment to keep the native driver isolated.
 
 ```bash
 uv sync --locked
