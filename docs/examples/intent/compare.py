@@ -16,6 +16,13 @@ BOND_CASE = Path("results/2026-11-24-small-search/mstp-default-l2/01-bond-member
 PROBE_CASES = Path("results/2026-11-24-forwarding-checks/small-mstp-reboots")
 ROUTEROS_LINK = "/interface ethernet monitor ether2 once"
 ROUTEROS_MLAG = "/interface bridge monitor bridge once"
+ROUTEROS_JSON = ":put [:serialize to=json options=json.no-string-conversion {}]"
+ROUTEROS_PORTS = ROUTEROS_JSON.format("[/interface/bridge/port/print stats as-value]")
+ROUTEROS_PORT_MONITOR = ROUTEROS_JSON.format(
+    "[/interface/bridge/port/monitor {port_id} once as-value]"
+)
+CUMULUS_INTERFACES = "nv show interface --output json"
+CUMULUS_BRIDGE_PORT = "bridge -j link show dev {interface}"
 CIST_ROOT = "0x1000.52:54:00:d7:0b:01"
 JUNOS_COMMAND = "show interfaces terse | display json"
 JUNOS_SOURCE = (
@@ -37,6 +44,7 @@ JUNOS_EXCERPT = """
 """
 ROUTEROS_LINK_STATES = {"link-ok": "up", "no-link": "down"}
 JUNOS_LINK_STATES = {"up": "up", "down": "down"}
+IntentValue = str | bool
 
 
 def archived_router(case: Path, peer: str, line: int, heading: str) -> str | None:
@@ -73,7 +81,7 @@ def junos_physical_row(raw: str, name: str):
     return row
 
 
-def show_intent(path: str, expected: str, actual: str | None) -> None:
+def show_intent(path: str, expected: IntentValue, actual: IntentValue | None) -> None:
     if actual is None:
         verdict = "unavailable"
     else:
@@ -157,6 +165,100 @@ def compare_published_link() -> None:
         print(f"  Junos extraction failed: {error!r}")
         oper = None
     show_link("up", oper, JUNOS_LINK_STATES)
+    print()
+
+
+def check_routeros_port_json(
+    bridge: str, interface: str, ports_path: Path, monitor_path: Path
+) -> None:
+    print(f"RouterOS native JSON, {bridge}/{interface}")
+    print(f"  source: {ports_path}\n  command: {ROUTEROS_PORTS}")
+    print(f"  monitor source: {monitor_path}")
+    forwarding = None
+    try:
+        ports = json.loads(ports_path.read_text(encoding="utf-8"))
+        if not isinstance(ports, list) or any(
+            not isinstance(row, dict) for row in ports
+        ):
+            msg = "expected an array of bridge port records"
+            raise ValueError(msg)
+        selected = [
+            row
+            for row in ports
+            if row.get("bridge") == bridge and row.get("interface") == interface
+        ]
+        if len(selected) != 1:
+            msg = "expected exactly one port with this bridge and interface name"
+            raise ValueError(msg)
+        port_id = selected[0].get(".id")
+        if not isinstance(port_id, str) or not port_id:
+            msg = "selected port has no .id"
+            raise ValueError(msg)
+        if sum(row.get(".id") == port_id for row in ports) != 1:
+            msg = "selected port .id is ambiguous"
+            raise ValueError(msg)
+        print(f"  command: {ROUTEROS_PORT_MONITOR.format(port_id=port_id)}")
+        monitor = json.loads(monitor_path.read_text(encoding="utf-8"))
+        if not isinstance(monitor, dict) or monitor.get(".id") != port_id:
+            msg = "monitor object does not identify the selected port"
+            raise ValueError(msg)
+        observed = monitor.get("forwarding")
+        if not isinstance(observed, bool):
+            msg = "monitor forwarding is missing or is not a JSON boolean"
+            raise ValueError(msg)
+        forwarding = observed
+    except (OSError, ValueError) as error:
+        print(f"  extraction failed: {error}")
+    show_intent("STP forwarding", True, forwarding)
+    print()
+
+
+def check_cumulus_interface_json(interface: str, path: Path) -> None:
+    print(f"Cumulus NVUE JSON (provisional), {interface}")
+    print(f"  source: {path}\n  command: {CUMULUS_INTERFACES}")
+    status = None
+    try:
+        interfaces = json.loads(path.read_text(encoding="utf-8"))
+        observed = interfaces[interface]["link"]["oper-status"]
+        if observed in ("up", "down"):
+            status = observed
+        else:
+            print(f"  unsupported operational status: {observed!r}")
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        print(f"  extraction failed: {error}")
+    show_intent("Operational status", "up", status)
+    print()
+
+
+def check_cumulus_bridge_port_json(bridge: str, interface: str, path: Path) -> None:
+    print(f"Cumulus Linux bridge JSON (provisional), {bridge}/{interface}")
+    print(
+        f"  source: {path}\n  command: {CUMULUS_BRIDGE_PORT.format(interface=interface)}"
+    )
+    forwarding = None
+    try:
+        ports = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(ports, list) or any(
+            not isinstance(row, dict) for row in ports
+        ):
+            msg = "expected an array of bridge port records"
+            raise ValueError(msg)
+        selected = [
+            row
+            for row in ports
+            if row.get("master") == bridge and row.get("ifname") == interface
+        ]
+        if len(selected) != 1:
+            msg = "expected exactly one port with this bridge and interface name"
+            raise ValueError(msg)
+        state = selected[0].get("state")
+        if state in ("forwarding", "blocking", "learning", "listening", "disabled"):
+            forwarding = state == "forwarding"
+        else:
+            print(f"  unsupported bridge port state: {state!r}")
+    except (OSError, ValueError) as error:
+        print(f"  extraction failed: {error}")
+    show_intent("Bridge-port forwarding", True, forwarding)
     print()
 
 
@@ -327,7 +429,28 @@ def show_interrupted_reachability(path: Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mlag_checkout", type=Path, help="pinned MLAG lab checkout")
-    root = parser.parse_args().mlag_checkout
+    parser.add_argument(
+        "--routeros-stp-port",
+        nargs=4,
+        metavar=("BRIDGE", "INTERFACE", "PORTS_JSON", "MONITOR_JSON"),
+        help="also check spanning-tree forwarding from two saved RouterOS JSON replies",
+    )
+    parser.add_argument(
+        "--cumulus-interface",
+        action="append",
+        nargs=2,
+        metavar=("INTERFACE", "NVUE_JSON"),
+        help="also check operational status from saved Cumulus NVUE interface JSON (provisional)",
+    )
+    parser.add_argument(
+        "--cumulus-stp-port",
+        action="append",
+        nargs=3,
+        metavar=("BRIDGE", "INTERFACE", "BRIDGE_JSON"),
+        help="also check bridge-port forwarding from saved Cumulus Linux bridge JSON (provisional)",
+    )
+    args = parser.parse_args()
+    root = args.mlag_checkout
     compare_mlag(root / POWER_CASE)
     compare_published_link()
     check_bonds_and_tree(root / BOND_CASE)
@@ -335,6 +458,13 @@ def main() -> None:
     show_interrupted_reachability(
         root / PROBE_CASES / "01-secondary-reboot" / "result.json"
     )
+    if args.routeros_stp_port:
+        bridge, interface, ports, monitor = args.routeros_stp_port
+        check_routeros_port_json(bridge, interface, Path(ports), Path(monitor))
+    for interface, path in args.cumulus_interface or ():
+        check_cumulus_interface_json(interface, Path(path))
+    for bridge, interface, path in args.cumulus_stp_port or ():
+        check_cumulus_bridge_port_json(bridge, interface, Path(path))
 
 
 if __name__ == "__main__":

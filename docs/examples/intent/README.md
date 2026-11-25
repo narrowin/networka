@@ -28,6 +28,72 @@ The embedded projection preserves the wrapping arrays and `data` fields for
 the physical interface `ge-0/0/0`. The printed sample is truncated and
 contains one observation for this example. [Published Junos sample, pp. 58–59][juniper].
 
+## Native JSON for spanning-tree intent
+
+To check whether a RouterOS bridge port is forwarding, collect these two
+read-only replies from the same device in one collection window. Save each
+command's JSON output separately. For a single target, `nw run` with
+`--output-mode raw` prints the device reply. With SDK results, use the
+successful command's `output` string. [Networka command collection][networka-run].
+
+```routeros
+:put [:serialize to=json options=json.no-string-conversion [/interface/bridge/port/print stats as-value]]
+:put [:serialize to=json options=json.no-string-conversion [/interface/bridge/port/monitor *4 once as-value]]
+```
+
+In the first reply, find the row whose `bridge` and `interface` match your
+target. Replace `*4` in the second command with that row's `.id`. This ID is
+only used to join the two replies from this device and collection window.
+`json.loads` decodes both replies. The example requires the same `.id` in the
+monitor object and compares its `forwarding` Boolean with the expected `true`.
+The example declares that expectation in Python, equivalent to writing
+`forwarding: true` in YAML. [Example implementation](compare.py) ·
+[RouterOS scripting reference][routeros-scripting].
+
+```bash
+PYTHONPATH="$MLAG/src" uv run --offline --no-project python docs/examples/intent/compare.py "$MLAG" \
+  --routeros-stp-port bridge ether2 ports.json monitor-ether2.json
+```
+
+In CHR 7.20.6 and 7.24.5 evidence, `ether2` supplied `false` (mismatch),
+a forwarding bond supplied `true` (match), and a disabled `ether3` omitted
+the field (unavailable). A command error, invalid JSON, ambiguous port, or
+wrong monitor ID also makes the check unavailable.
+
+### Cumulus Linux (provisional)
+
+The offline example accepts two Cumulus JSON sources and reuses the same
+expected/actual comparison. These selectors come from NVIDIA documentation
+and the iproute2 source. The exact commands and response shapes still need
+qualification on a Cumulus lab switch.
+
+| Read-only command | Selector | Expectation |
+| --- | --- | --- |
+| `nv show interface --output json` | Interface or bond name, then `link.oper-status` | `up` matches and `down` mismatches. |
+| `bridge -j link show dev swp1` | One row with `master=br_default` and `ifname=swp1`, then `state` | `forwarding` matches. `blocking`, `learning`, `listening`, and `disabled` mismatch. |
+
+Save each successful command's raw JSON reply and run the example with one
+or both options. Repeat `--cumulus-interface` to check individual interfaces
+or bonds from the same NVUE reply.
+
+```bash
+PYTHONPATH="$MLAG/src" uv run --offline --no-project python docs/examples/intent/compare.py "$MLAG" \
+  --cumulus-interface bond1 interfaces.json \
+  --cumulus-stp-port br_default swp1 bridge-swp1.json
+```
+
+Missing or unrecognized fields, invalid JSON, and ambiguous bridge-port rows
+are unavailable. NVUE omits unset fields. The bond check uses operational
+status. LACP collecting and distributing require separate evidence.
+[NVUE JSON output][nvue-cli] · [Published interface JSON][nvue-api] ·
+[Bonding commands][nvue-bond] · [iproute2 bridge JSON implementation][iproute2-bridge].
+
+For lab qualification, compare the bridge-port result with the switch's
+spanning-tree mode and daemon view. VLAN-specific PVRST requires a separate
+reply. Use `nv show bridge domain br_default stp vlan 110` to find the
+VLAN and port state, and verify the JSON form on the target release before
+adding its selector. [Cumulus PVRST command reference][nvue-stp].
+
 ## Intent verdicts
 
 The shared intent expects physical link status `up`. RouterOS supplies
@@ -214,4 +280,10 @@ Both fields matched in the live sample. A different reported value produces
 [probe-score]: https://github.com/narrowin/mikrotik-mlag-testsuite/blob/59299681efd9089e6bba5a008cb1e220bb94d19e/src/mlag_lab/measure.py#L23-L49
 [juniper]: https://www.juniper.net/documentation/en_US/day-one-books/DO_Automating_SALT.pdf#page=58
 [networka-run]: ../../running-commands.md
+[routeros-scripting]: https://manual.mikrotik.com/docs/developer-guides/scripting/
+[nvue-cli]: https://docs.nvidia.com/networking-ethernet-software/cumulus-linux-519/System-Configuration/NVIDIA-User-Experience-NVUE/NVUE-CLI/
+[nvue-api]: https://docs.nvidia.com/networking-ethernet-software/cumulus-linux-519/System-Configuration/NVIDIA-User-Experience-NVUE/NVUE-API/#use-filters-in-a-query
+[nvue-bond]: https://docs.nvidia.com/networking-ethernet-software/cumulus-linux-519/Layer-2/Bonding-Link-Aggregation/
+[nvue-stp]: https://docs.nvidia.com/networking-ethernet-software/nvue-reference/Show-Commands/Bridge/#nv-show-bridge-domain-domain-id-stp-vlan-vid
+[iproute2-bridge]: https://github.com/iproute2/iproute2/blob/main/bridge/link.c
 [medium-startup]: https://github.com/narrowin/mikrotik-mlag-testsuite/blob/59299681efd9089e6bba5a008cb1e220bb94d19e/labs/medium/medium.rsc#L2-L16
