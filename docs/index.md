@@ -20,8 +20,8 @@ nw run 192.0.2.10 system_info --platform mikrotik_routeros --interactive-auth
 ```
 
 See how to [run a reusable sequence](running-commands.md),
-[save the output](results.md), and
-[compare it with a baseline](reference/cli.md#nw-diff).
+[save the output](results.md), [compare it with a baseline](reference/cli.md#nw-diff),
+and [check intended operating state](intent.md).
 
 <div align="center">
   <img src="assets/gifs/networka-setup.gif" alt="Networka Setup Demo" width="100%"/>

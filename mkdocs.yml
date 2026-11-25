@@ -17,6 +17,7 @@ nav:
     - Environment variables: environment-variables.md
     - Running commands: running-commands.md
     - Results: results.md
+    - Intent verification: intent.md
     - Output modes: output-modes.md
     - Backups: backups.md
     - File upload: file_upload.md

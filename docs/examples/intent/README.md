@@ -1,5 +1,9 @@
 # Experimental operational intent comparison
 
+Start with the [intent verification guide](../../intent.md) for the workflow
+and the Cumulus lab instructions. This example provides the replay and
+supporting evidence.
+
 Run this offline example from the Networka repository root. It reads selected
 records from the MLAG lab checkout and uses the lab's existing RouterOS parser.
 It also reads a projection of one published Junos interface row embedded in
