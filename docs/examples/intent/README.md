@@ -28,6 +28,71 @@ The embedded projection preserves the wrapping arrays and `data` fields for
 the physical interface `ge-0/0/0`. The printed sample is truncated and
 contains one observation for this example. [Published Junos sample, pp. 58–59][juniper].
 
+## Native JSON for spanning-tree intent
+
+To check whether a RouterOS bridge port is forwarding, collect these two
+read-only replies from the same device in one collection window. Save each
+command's JSON output separately. For a single target, `nw run` with
+`--output-mode raw` prints the device reply. With SDK results, use the
+successful command's `output` string. [Networka command collection][networka-run].
+
+```routeros
+:put [:serialize to=json options=json.no-string-conversion [/interface/bridge/port/print stats as-value]]
+:put [:serialize to=json options=json.no-string-conversion [/interface/bridge/port/monitor *4 once as-value]]
+```
+
+In the first reply, find the row whose `bridge` and `interface` match your
+target. Replace `*4` in the second command with that row's `.id`. This ID is
+only used to join the two replies from this device and collection window.
+`json.loads` decodes both replies. The example requires the same `.id` in the
+monitor object and compares its `forwarding` Boolean with the expected `true`.
+The example declares that expectation in Python, equivalent to writing
+`forwarding: true` in YAML. [Example implementation](compare.py) ·
+[RouterOS scripting reference][routeros-scripting].
+
+```bash
+PYTHONPATH="$MLAG/src" uv run --offline --no-project python docs/examples/intent/compare.py "$MLAG" \
+  --routeros-stp-port bridge ether2 ports.json monitor-ether2.json
+```
+
+In CHR 7.20.6 and 7.24.5 evidence, `ether2` supplied `false` (mismatch),
+a forwarding bond supplied `true` (match), and a disabled `ether3` omitted
+the field (unavailable). A command error, invalid JSON, ambiguous port, or
+wrong monitor ID also makes the check unavailable.
+
+### Medium MikroTik lab replay
+
+On 2026-11-25 the two Medium cores and the access switch ran RouterOS CHR
+7.26beta7. This read-only SSH capture used the commands above. Each core's
+`access-uplink` resolved to `*1` and the access switch's `uplink` to `*0`.
+The check ran on the saved device replies.
+
+On `dc1-core-mlag1`, the port statistics contained this row with unrelated
+fields omitted. The `monitor *1 once as-value` reply carried the same `.id`
+and the native Boolean shown below.
+
+```json
+{".id":"*1","bridge":"bridge","interface":"access-uplink"}
+```
+
+```json
+{".id":"*1","interface":"access-uplink","forwarding":true,"status":"in-bridge"}
+```
+
+| Device | Selected bridge port | Expected forwarding | Observed forwarding | Verdict |
+| --- | --- | --- | --- | --- |
+| `dc1-core-mlag1` | `access-uplink` (`*1`) | `true` | `true` | Match |
+| `dc1-core-mlag2` | `access-uplink` (`*1`) | `true` | `true` | Match |
+| `dc1-access-switch1` | `uplink` (`*0`) | `true` | `true` | Match |
+
+As an offline negative control, the comparator expected `false` against
+the unchanged core-1 reply and reported a mismatch. A separate native JSON
+read with `:put [:serialize to=json options=json.no-string-conversion
+[/interface/bridge/print as-value]]` returned `protocol-mode: "none"` on all
+three bridges. That differs from the checked-in `rstp` startup profile.
+The forwarding verdict describes the bridge-port flag. The live snapshot had
+no active STP election. [Medium startup reference][medium-startup].
+
 ## Intent verdicts
 
 The shared intent expects physical link status `up`. RouterOS supplies
@@ -214,4 +279,5 @@ Both fields matched in the live sample. A different reported value produces
 [probe-score]: https://github.com/narrowin/mikrotik-mlag-testsuite/blob/59299681efd9089e6bba5a008cb1e220bb94d19e/src/mlag_lab/measure.py#L23-L49
 [juniper]: https://www.juniper.net/documentation/en_US/day-one-books/DO_Automating_SALT.pdf#page=58
 [networka-run]: ../../running-commands.md
+[routeros-scripting]: https://manual.mikrotik.com/docs/developer-guides/scripting/
 [medium-startup]: https://github.com/narrowin/mikrotik-mlag-testsuite/blob/59299681efd9089e6bba5a008cb1e220bb94d19e/labs/medium/medium.rsc#L2-L16
