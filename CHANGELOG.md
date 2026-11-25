@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-25
+
+### Added
+
+- Replay native RouterOS JSON in the experimental offline intent example. Verify bridge-port forwarding from saved statistics and monitor replies, including results from the read-only Medium lab check on RouterOS CHR 7.26beta7.
+
 ## [0.4.0] - 2026-11-25
 
 ### Added
