@@ -105,3 +105,20 @@ def test_client_replaces_session_after_lost_transport(
     assert result.command_results[0].output == "output"
     assert mock_device_session_cls.call_count == 2
     fresh.execute_command.assert_called_once_with("cmd2")
+
+
+@patch("network_toolkit.client.load_config")
+@patch("network_toolkit.device.DeviceSession")
+def test_client_reuses_sequence_manager(
+    mock_device_session_cls, mock_load_config, mock_config
+):
+    mock_load_config.return_value = mock_config
+    mock_device_session_cls.return_value = MagicMock()
+
+    client = NetworkaClient()
+    with patch("network_toolkit.api.run.SequenceManager") as run_manager_cls:
+        client.run("router1", "cmd1")
+        client.run("router1", "cmd2")
+
+    run_manager_cls.assert_not_called()
+    assert client.sequence_manager.config is mock_config

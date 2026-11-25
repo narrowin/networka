@@ -125,6 +125,7 @@ class NetworkaClient:
             results_dir=results_dir,
             no_strict_host_key_checking=no_strict_host_key_checking,
             session_pool=self._session_pool,
+            sequence_manager=self.sequence_manager,
         )
         return run_commands(options)
 
