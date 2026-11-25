@@ -579,6 +579,7 @@ def _map_platform(platform: str) -> str:
         "cisco_xr": "cisco_iosxr",
         # Containerlab often uses Netmiko-ish schema names; map to Networka keys
         "mikrotik_ros": "mikrotik_routeros",
+        "mikrotik_chr": "mikrotik_routeros",
         "nokia_srl": "nokia_srlinux",
     }
     return mapping.get(platform, platform)
