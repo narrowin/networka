@@ -23,7 +23,9 @@ if TYPE_CHECKING:
 POLL_S = 5
 
 
-def validate_target(client: NetworkaClient, topology: lab.Lab, switch: str) -> None:
+def validate_target(
+    client: NetworkaClient, topology: lab.Lab, switch: str, operation: str = "Reboot"
+) -> None:
     node = topology.node(switch)
     targets = resolve_named_targets(client.config, switch)
     if (
@@ -32,7 +34,7 @@ def validate_target(client: NetworkaClient, topology: lab.Lab, switch: str) -> N
         or switch in client.groups
         or switch not in client.devices
     ):
-        msg = f"Reboot target {switch!r} must identify one lab device."
+        msg = f"{operation} target {switch!r} must identify one lab device."
         raise lab.LabError(msg)
     device = client.devices[switch]
     networks = json.loads(
@@ -53,7 +55,7 @@ def validate_target(client: NetworkaClient, topology: lab.Lab, switch: str) -> N
         or device.host != node.address
         or node.address not in live_addresses
     ):
-        msg = f"Reboot target {switch!r} must be the RouterOS switch at its topology management address."
+        msg = f"{operation} target {switch!r} must be the RouterOS switch at its topology management address."
         raise lab.LabError(msg)
 
 
@@ -62,7 +64,7 @@ class _Deadline(BaseException):
 
 
 @contextmanager
-def _deadline(seconds: float) -> Iterator[None]:
+def _deadline(seconds: float, operation: str = "Switch recovery") -> Iterator[None]:
     # Local live runs execute on the Linux lab host. A blocked SSH read must also
     # respect the recovery deadline, including during a full set of state checks.
     def expired(_number: int, _frame: object) -> None:
@@ -74,7 +76,7 @@ def _deadline(seconds: float) -> Iterator[None]:
     try:
         yield
     except _Deadline:
-        msg = f"Switch recovery exceeded {seconds:g} s."
+        msg = f"{operation} exceeded {seconds:g} s."
         raise lab.LabError(msg) from None
     finally:
         signal.setitimer(signal.ITIMER_REAL, 0)
@@ -117,42 +119,113 @@ def run(
         msg = f"Cannot prove a lower uptime after reboot of {switch}."
         raise lab.LabError(msg)
     dispatch = session.mark("reboot_start", switch=switch, number=number, uptime=before)
-    port = client.devices[switch].port or client.config.general.port
     with _deadline(wait_s):
         command = routeros.reboot(client, switch, **options)
         session.mark("reboot_command", switch=switch, number=number, reply=command)
-        proven = False
-        attempt = 0
-        while True:
-            time.sleep(POLL_S)
-            if not proven:
-                if not _ssh_ready(session.lab.node(switch).address, port):
-                    continue
-                reading = routeros.collect_uptime(client, switch, **options)
-                observed = session.mark(
-                    "reboot_uptime", switch=switch, number=number, uptime=reading
-                )
-                try:
-                    after_ns = routeros.uptime_ns(reading)
-                except ValueError:
-                    continue
-                proven = _restarted(
-                    before_ns, after_ns, observed["mono_ns"] - dispatch["mono_ns"]
-                )
-                if not proven:
-                    continue
-            attempt += 1
-            directory = session.directory / "recovery" / str(number) / str(attempt)
-            health = intent.run_intent(client, items, directory, **options)
-            session.mark(
-                "reboot_health",
-                switch=switch,
-                number=number,
-                attempt=attempt,
-                verdict=health.verdict,
-            )
-            if health.verdict == "pass":
-                return
+        wait_uptime(
+            client, session, switch, number, before_ns, dispatch, options, "reboot"
+        )
+        wait_healthy(client, session, switch, number, items, options, "reboot")
+
+
+def wait_uptime(
+    client: NetworkaClient,
+    session: lab.Session,
+    switch: str,
+    number: int,
+    before_ns: int,
+    dispatch: Mapping[str, Any],
+    options: Mapping[str, Any],
+    operation: str,
+) -> None:
+    port = client.devices[switch].port or client.config.general.port
+    while True:
+        time.sleep(POLL_S)
+        if not _ssh_ready(session.lab.node(switch).address, port):
+            continue
+        reading = routeros.collect_uptime(client, switch, **options)
+        observed = session.mark(
+            f"{operation}_uptime", switch=switch, number=number, uptime=reading
+        )
+        try:
+            after_ns = routeros.uptime_ns(reading)
+        except ValueError:
+            continue
+        if _restarted(before_ns, after_ns, observed["mono_ns"] - dispatch["mono_ns"]):
+            return
+
+
+def wait_healthy(
+    client: NetworkaClient,
+    session: lab.Session,
+    target: str,
+    number: int,
+    items: list[intent.IntentItem],
+    options: Mapping[str, Any],
+    operation: str,
+) -> None:
+    attempt = 0
+    while True:
+        attempt += 1
+        directory = session.directory / "recovery" / str(number) / str(attempt)
+        health = intent.run_intent(client, items, directory, **options)
+        session.mark(
+            f"{operation}_health",
+            switch=target,
+            number=number,
+            attempt=attempt,
+            verdict=health.verdict,
+        )
+        if health.verdict == "pass":
+            return
+        time.sleep(POLL_S)
+
+
+def uptime_proof(
+    events: Sequence[Mapping[str, Any]],
+    before: int,
+    start: Mapping[str, Any],
+    switch: str,
+    number: int,
+    operation: str,
+) -> tuple[int, int]:
+    for probe in events:
+        if (
+            probe["name"] != f"{operation}_uptime"
+            or probe.get("number") != number
+            or probe.get("switch") != switch
+        ):
+            continue
+        try:
+            after = routeros.uptime_ns(probe["uptime"])
+        except ValueError:
+            continue
+        elapsed = probe["mono_ns"] - start["mono_ns"]
+        if _restarted(before, after, elapsed):
+            return after, elapsed
+    msg = "The recorded uptime does not prove a new boot."
+    raise ValueError(msg)
+
+
+def health_proof(
+    folder: Path,
+    events: Sequence[Mapping[str, Any]],
+    target: str,
+    number: int,
+    items: list[intent.IntentItem],
+    operation: str,
+) -> Mapping[str, Any]:
+    health = [
+        e
+        for e in events
+        if e["name"] == f"{operation}_health"
+        and e.get("number") == number
+        and e.get("switch") == target
+    ][-1]
+    attempt = int(health["attempt"])
+    path = folder / "recovery" / str(number) / str(attempt) / intent.EVIDENCE_FILE
+    recovered = intent.replay_intent(items, intent.load_json(path.read_text()))
+    return {**health, "verdict": recovered.verdict}
 
 
 def proof(
@@ -174,25 +247,12 @@ def proof(
             raise ValueError(msg)
         before = routeros.uptime_ns(start["uptime"])
         result["before_uptime_s"] = before / NS
-        for probe in (e for e in own if e["name"] == "reboot_uptime"):
-            try:
-                after = routeros.uptime_ns(probe["uptime"])
-            except ValueError:
-                continue
-            elapsed = probe["mono_ns"] - start["mono_ns"]
-            if _restarted(before, after, elapsed):
-                result.update(after_uptime_s=after / NS, elapsed_s=elapsed / NS)
-                break
-        else:
-            msg = "The recorded uptime does not prove a new boot."
-            raise ValueError(msg)
-        health = [e for e in own if e["name"] == "reboot_health"][-1]
-        attempt = int(health["attempt"])
-        path = folder / "recovery" / str(number) / str(attempt) / intent.EVIDENCE_FILE
-        recovered = intent.replay_intent(items, intent.load_json(path.read_text()))
+        after, elapsed_ns = uptime_proof(own, before, start, switch, number, "reboot")
+        result.update(after_uptime_s=after / NS, elapsed_s=elapsed_ns / NS)
+        health = health_proof(folder, own, switch, number, items, "reboot")
         elapsed = (health["mono_ns"] - start["mono_ns"]) / NS
-        result.update(healthy_s=elapsed, state=recovered.verdict)
-        if not result["elapsed_s"] <= elapsed <= wait_s or recovered.verdict != "pass":
+        result.update(healthy_s=elapsed, state=health["verdict"])
+        if not result["elapsed_s"] <= elapsed <= wait_s or health["verdict"] != "pass":
             msg = "The full lab state did not recover within the deadline."
             raise ValueError(msg)
         if command["reply"].get("error"):

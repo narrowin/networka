@@ -206,6 +206,7 @@ Neutral checks compare only the fields named in `expected`.
 | `stp_mode` | `bridge` | Spanning-tree protocol, `none` when off | Yes | No |
 | `mlag` | `bridge` | `connected`, `role` (`primary`, `secondary`), `state` (the platform's own word) | Yes | No |
 | `lacp_member` | `bond`, `member` | LACP flags of actor and partner: `activity`, `timeout`, `aggregation`, `synchronization`, `collecting`, `distributing`, `defaulted`, `expired` | Yes | Yes |
+| `lacp_actor` | `bond`, `member` | The named flags of the member’s local LACP actor | Yes | Yes |
 | `lacp_partner_system` | `bond`, `member` | LACP system `priority` and `mac` the partner sends | Yes | Yes |
 | `bond_members` | `bond` | Member ports of the bond, as a sorted list (like ANTA's VerifyPortChannels); every member row must name its port | Yes | Yes |
 | `host_entry` | `bridge`, `mac` | Port of the bridge host entry, `null` without one; an entry for the MAC on another bridge is `error` | Yes | No |
@@ -225,7 +226,7 @@ Linux the `count` probes must finish within the device's `command_timeout`.
 
 `lacp_member` passes when both the actor and the partner side equal
 `expected`. A member without an LACP partner, such as a member that is
-down, gives `fail` with the partner side observed as `null`. The partner MAC is compared in lower case. Both MLAG peers present one LACP system ID, so
+down, gives `fail` with the partner side observed as `null`. Use `lacp_actor` to check the local flags while a partner is absent. The partner MAC is compared in lower case. Both MLAG peers present one LACP system ID, so
 `lacp_partner_system` gives the same value for each member of an MLAG bond
 when read on the partner.
 

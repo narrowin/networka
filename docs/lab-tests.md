@@ -1,10 +1,10 @@
 # Lab tests
 
-`nw test run` checks a containerlab lab before and after a sequence of cable changes or RouterOS switch reboots. It measures IPv4 ping streams and checks switch logs against the test’s rules. `nw test replay` judges the saved evidence again with the lab offline.
+`nw test run` checks a containerlab lab before, during, and after a sequence of typed actions. It measures IPv4 ping streams and checks switch logs against the test’s rules. `nw test replay` judges the saved evidence again with the lab offline.
 
 ## Run and replay
 
-Start the lab using its own startup instructions. Run `nw test run` as root on the Linux host running its Docker containers. The host needs `docker`, `ip`, `nsenter`, `tcpdump`, `tshark`, and `ping` from iputils for explicit ICMP identifiers. Pass the directory containing the generated `topology-data.json` to `--lab`. All nodes must be running, and the Networka inventory must supply SSH access for state checks, reboots, and log markers. An inventory device named after a lab node can omit its host to use the node's management address.
+Start the lab using its own startup instructions. Run `nw test run` as root on the Linux host running its Docker containers. The host needs `docker`, `ip`, `nsenter`, `tcpdump`, `tshark`, and `ping` from iputils for explicit ICMP identifiers. Traffic shaping and filtering also need `tc` from iproute2 in the root runner’s `PATH`, commonly under `/usr/sbin`. Pass the directory containing the generated `topology-data.json` to `--lab`. All nodes must be running, and the Networka inventory must supply SSH access for state checks, switch recovery, and log markers. An inventory device named after a lab node can omit its host to use the node's management address.
 
 Follow the [Small lab README](https://github.com/narrowin/mikrotik-mlag-testsuite/blob/main/tests/small/README.md) to start its qualified native CHR lab. With an installed `nw` available to `sudo`, run these commands from the Small lab repository root. For a reboot run, change the first line to `case_name=switch-reboot`. The README also shows how to run the same tests with `uv` from a Networka checkout.
 
@@ -34,24 +34,47 @@ A test file gives its `name`, `purpose`, `lab` file path relative to the test an
 | --- | --- |
 | `name`, `expected` | Step title and expected behaviour. |
 | `cable`, `state` | For a cable change, supply one endpoint and its required state, `down` or `up`. |
-| `action.reboot`, `wait_healthy_s` | For a reboot, name one RouterOS CHR switch in the `action` mapping and set a positive deadline in seconds to prove a new boot and recover the lab state. |
-| `hold_s` | Seconds to observe after carrier confirmation or proven reboot recovery. |
+| `action` | One of the typed actions below. |
+| `wait_healthy_s` | A positive recovery deadline in seconds for reboot and power restoration. Optional when clearing a traffic fault. |
+| `hold_s` | Seconds to observe after the action and any recovery wait. |
+| `check_state` | Optional statements and device checks in the lab file’s `state` format. Sampled after the hold and judged again on replay. |
 | `max_outage_s` | Longest allowed traffic stop in seconds. Give a nonnegative limit for every named stream. |
 | `log` | Optional step-specific log rules. |
 
 If the final state requires a cable to be up, add an explicit `up` step to measure its return before the final state check. The Small lab's [cable YAML](https://github.com/narrowin/mikrotik-mlag-testsuite/blob/main/tests/small/bond-member-loss.yaml) and [reboot YAML](https://github.com/narrowin/mikrotik-mlag-testsuite/blob/main/tests/small/switch-reboot.yaml) show complete steps and explain the holds and limits.
+
+### Typed actions
+
+Use one action per step. Installations and changes that need a return step must be paired within the test.
+
+| Keys inside `action` | Effect and evidence |
+| --- | --- |
+| `observe: true` | Measure traffic and any step checks in the current state. |
+| `reboot: switch1` | Request a RouterOS reboot over SSH and verify a fresh boot and full lab health. |
+| `power_off: switch1`, then `power_on: switch1` | Pause the named RouterOS CHR guest and withdraw carrier on its data cables. On return, reset and resume the guest, restore carrier, and verify a fresh boot and full lab health. |
+| `impair: client1:eth1` with `loss_percent`, `delay_ms`, or both | Apply netem in `direction: out` from the given endpoint by default. Use `in` for egress from the far end or `both` for both ends. Set optional `jitter_ms` with delay. Verify the installed values and read its counters. Repeat `impair` with `clear: true` to restore the default queue. |
+| `cut_ping: stream-name` with `at: client2:eth3` | Drop the named stream’s IPv4 echo requests at the cable ingress. Repeat `cut_ping` with `clear: true`. Replay checks the filter counters and whether the capture brackets the cut as one continuous gap. |
+| `silence_lacp: client1:eth1` with `bond: bond0` | Drop outbound LACP slow-protocol frames at the named Linux bond member. Repeat `silence_lacp` with `clear: true`. Verify drops, loss of member eligibility with carrier still present, and restored eligibility. |
+| `active_member: client3:bond0` with `member: eth2` | Select a member of an active-backup Linux bond. Repeat the action with the original member. Replay uses the bond state and switch TAP captures to verify movement. |
+| `silence_host: client3:bond0` with `relearn_s: 1` | Suppress egress from both members of an active-backup Linux bond. Repeat `silence_host` with `clear: true`. Replay checks wire silence, flooding and resumed delivery against the stated relearn deadline. |
+
+A netem readback proves the queue settings. For a ping-level delay assertion, add `delay_stream: stream-name` to the action that sets `delay_ms`. Replay compares the median round-trip time in the source capture before, during, and after the delay.
+
+Use the test's optional `flood` mapping to verify that broadcast and unknown-unicast frames do not return to their sender. It names `from` (the Linux LACP bond), `to` (a baseline receiver point), the IPv4 `broadcast` and `unicast` destinations, and the reserved `unicast_mac`. The source must start with a permanent neighbor for the unicast destination. The engine verifies the baseline at the receiver and counts repeats across the source's two physical bond members through the sender cutoff.
+
+The optional `watch_host_entries` mapping names an `interval_s`, RouterOS `bridge`, `devices` and `macs`. Networka samples those bridge entries during the steps and reports the observed sampling interval. Each step needs an in-window sample and each watched entry must remain present in every sample used to judge that step.
 
 A `log` contains `must` or `must_not` lists. Each rule names a `switch` or `every` and matches its `text` as a case-insensitive substring of a device message. A whole-test rule covers each switch's start-to-end marker interval. A step rule requires marker coverage of the entire step. Marker records themselves are excluded. A required message must appear on every targeted switch and a forbidden message must be absent from each.
 
 ## What the run measures
 
 1. For a lab with switch logging, Networka records the collector offset and sends each switch a start marker. Switches are identified by marker-capable devices in the lab, the inventory's `switches` group, and individual rule targets. Unrecognised senders or a missing marker invalidate log coverage. The collector may create its file on the first message.
-2. All device preconditions must pass before Networka starts the traffic or takes an action. It captures both ends of each stream and each action cable. Pings run every 100 ms to resolve stops smaller than a second. Each stream must show a first reply within 5 s.
+2. All device preconditions must pass before Networka starts the traffic or takes an action. It captures both ends of every stream, each action cable and the extra points used by the configured proofs. Pings run every 100 ms to resolve stops smaller than a second. Each stream must show a first reply within 5 s.
 3. The quiet window starts at the last stream's first reply. Networka checks 3 s of clean traffic before the first action, allowing three fast LACP messages for bonds to settle. A clean window has no outage or duplicate and at least `floor(window duration / 110 ms) − 1` delivered pings per stream. The count allows 10% scheduling variation and one boundary ping. An unclean quiet window yields `error` before any action.
 4. Networka changes the cable in its network namespace and, for QEMU endpoints, through the guest's QEMU monitor. It waits up to 1 s for carrier confirmation on an end it did not set directly, because a virtual cable normally changes carrier within milliseconds.
-5. For a reboot, Networka verifies that the target is one `mikrotik_chr` node with a `mikrotik_routeros` inventory entry at its live topology management address. It reads native RouterOS uptime and sends `:execute {/system reboot}` once over pooled SSH. After dispatch it checks for the SSH banner before trying an authenticated uptime read. The 5 s wait between attempts gives RouterOS time to accept returning sessions. The step must prove a lower uptime that fits within the monotonic time since dispatch and pass every lab state check within `wait_healthy_s`. A recovery timeout stops the remaining steps with `error`. The stream limits cover dispatch, recovery, and the hold after recovery.
+5. For a reboot, Networka verifies that the target is one `mikrotik_chr` node with a `mikrotik_routeros` inventory entry at its live topology management address. It reads native RouterOS uptime and sends `:execute {/system reboot}` once over pooled SSH. After dispatch it checks for the SSH banner before trying an authenticated uptime read. The 5 s wait between attempts gives RouterOS time to accept returning sessions. The step must prove a lower uptime that fits within the monotonic time since dispatch and pass every lab state check within `wait_healthy_s`. A recovery timeout stops the remaining steps with `error`. On a traffic fault or power restoration, if all steps started, the report still measures them through the sender cutoff. The final state and closing window remain unverified. The stream limits cover dispatch, recovery, and the hold after recovery.
 6. The closing window starts when the last hold ends and runs through the final device state check to the sender cutoff. The state check begins after 0.6 s, one ping interval plus the reply allowance. Closing uses the same clean-traffic rule as the quiet window. Loss or duplicates here give `fail`. Too few deliveries to verify continuity give `error`. After stopping the senders, Networka keeps the captures open for the final 500 ms reply allowance.
-7. On completion, error, or interruption, Networka attempts to restore cables it took down and stops the senders and captures. When a cleanup repair has a corresponding `up` step with required log rules, Networka waits up to that step's `hold_s` for those messages before it writes the end markers. It allows 1 s for the collector to receive the end markers on the local management network. The lab stays deployed for inspection or teardown using the lab's startup instructions.
+7. On completion, error, or interruption, Networka attempts to undo outstanding cable, queue, filter, bond and guest changes, then stops the senders and captures. When a cleanup repair has a corresponding `up` step with required log rules, Networka waits up to that step's `hold_s` for those messages before it writes the end markers. It allows 1 s for the collector to receive the end markers on the local management network. The lab stays deployed for inspection or teardown using the lab's startup instructions.
 
 ## Verdict
 
@@ -59,7 +82,7 @@ The request and reply must appear in captures at both stream endpoints. Networka
 
 | Step verdict | Condition |
 | --- | --- |
-| `pass` | Every stream's upper bound is within its limit and all log rules pass. |
+| `pass` | Every stream’s upper bound is within its limit and the applicable state, action and log checks pass. |
 | `fail` | A lower bound exceeds its limit, or reaches it with a lost ping, because traffic stopped for longer than that lower bound. A zero limit allows no lost or late ping. A duplicate ping or broken log rule also fails the step. |
 | `error` | The bounds cannot decide the limit or the required evidence is unusable. |
 
@@ -67,7 +90,7 @@ A send pause longer than 450 ms leaves too much of the 500 ms reply deadline uno
 
 | Exit | Meaning |
 | --- | --- |
-| `0` | `pass`. The evidence verifies the state, traffic, and applicable reboot and log checks. |
+| `0` | `pass`. The evidence verifies the applicable state, traffic, action and log checks. |
 | `1` | `fail`. A check found an actual violation, such as a failed device precondition, excessive outage, or broken log rule. |
 | `2` | `error`. A run stopped, evidence could not verify a check, the input or lab was unusable, or replay found a result mismatch. |
 
@@ -80,11 +103,13 @@ A preflight error can exit before creating a case directory. For example, a stop
 | Entry | Content |
 | --- | --- |
 | `test.yaml`, `lab.yaml` | Inputs used for this run. |
-| `state-before/`, `state-after/` | Saved device observations for the state checks that ran. |
-| `recovery/<step-number>/<attempt>/` | Device observations from each full-state check during reboot recovery. The native uptime readings and the reboot command's reply are in `events.jsonl`. |
+| `state-before/`, `state-after/`, `step-state/<step-number>/` | Saved device observations for the state checks that ran. |
+| `recovery/<step-number>/<attempt>/` | Device observations from each full-state recovery check. |
+| `topology-data.json` | Topology snapshot used to verify data links in power-loss replay. |
+| `host-entries/<switch>.jsonl` | Timed raw observations for a configured bridge host-entry watch. |
 | `captures/`, `streams/` | Per-point pcaps, tcpdump diagnostics and per-stream ping output. |
 | `events.jsonl`, `syslog.log` | Timed actions and the collector lines for this run. |
 | `result.json` | Machine-readable verdict, checks, measured stops, limits and matching log lines. |
-| `report.md` | Verdict, traffic limits and measured stops, reboot proof, matching switch log lines, and the chronology of state checks, actions and observations. |
+| `report.md` | Verdict, traffic limits and measured stops, action proof, matching switch log lines, and the chronology of state checks, actions and observations. |
 
 Replay uses the saved YAML and observations, regenerates `report.md`, and compares the freshly judged result byte for byte with the saved `result.json`. It leaves `result.json` and the raw evidence unchanged. A matching result keeps the saved verdict and its exit code. A difference exits 2 even if the verdict word is the same. For older runs without a sender cutoff, the report marks the end of traffic coverage at the last step.

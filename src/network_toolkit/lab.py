@@ -446,14 +446,22 @@ class Session:
         return {where: pcap for where, (_, pcap) in started.items()}
 
     def start_stream(
-        self, ident: int, name: str, source: str, destination: str, interval_s: float
+        self,
+        ident: int,
+        name: str,
+        source: str,
+        destination: str,
+        interval_s: float,
+        *,
+        address: str | None = None,
+        broadcast: bool = False,
     ) -> Path:
         """Start a ping from `source` to the IPv4 address of `destination`; return its log.
 
         `ident` is the ICMP identifier that tells the pings of this stream apart.
         """
-        start, end = point(source), point(destination)
-        target = self.lab.ipv4(end)
+        start = point(source)
+        target = address or self.lab.ipv4(point(destination))
         log = self.directory / "streams" / f"{name}.log"
         command = self.lab.ns(
             start.node,
@@ -461,6 +469,7 @@ class Session:
             "-n",
             "-D",
             "-O",
+            *(("-b",) if broadcast else ()),
             "-i",
             str(interval_s),
             "-e",
@@ -475,7 +484,7 @@ class Session:
             stream=name,
             ident=ident,
             source=str(start),
-            destination=str(end),
+            destination=destination,
             address=target,
             log=str(log.relative_to(self.directory)),
         )

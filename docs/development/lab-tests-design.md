@@ -17,6 +17,19 @@ and command usage.
   calls the RouterOS intent adapter over the pooled SSH connection. Replay
   checks the command record, verifies native uptime against dispatch time, and
   rejudges the successful recovery attempt from its saved intent evidence.
+- `lab_power.py` withdraws topology data links and pauses the named CHR guest.
+  It proves recovery with QEMU responses, carrier reads, a fresh RouterOS
+  uptime and the same full-state recovery checks as a reboot.
+- `lab_faults.py` owns netem queues and typed calibration and LACP filters. It
+  checks command reads and counters and uses stream captures to verify a
+  calibration gap or a configured round-trip delay check.
+- `lab_mobile.py` moves or silences an active-backup Linux bond. Replay checks
+  the selected member and available forwarding evidence from TAP and client
+  captures.
+- `lab_flood.py` watches broadcast and unknown-unicast probes for repeat
+  sightings across the sender's physical bond members.
+- `lab_watch.py` samples RouterOS bridge host entries during timed steps and
+  rechecks the samples against the confirmed cable and step boundaries.
 - `traffic.py` matches each ping across both captures by identifier, sequence
   and echoed payload. The send timestamp in the payload distinguishes retries
   that reuse a sequence. Observed send times bound each stop.

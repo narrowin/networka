@@ -383,6 +383,23 @@ def check_lacp_member(
     return compare({"actor": wanted, "partner": wanted}, observe)
 
 
+def check_lacp_actor(
+    evidence: Mapping[str, Any],
+    device_type: str,
+    bond: str,
+    member: str,
+    expected: Mapping[str, bool],
+) -> IntentResult:
+    """Compare local LACP flags after the partner has timed out or while active."""
+    expect(CHECKS["lacp_actor"].expected, expected, "lacp_actor")
+    wanted = _known(expected, LACP_FLAGS)
+    normalize = _normalizer(device_type, "lacp_member")
+    what = f"{bond} member {member} actor"
+    return compare(
+        wanted, lambda: _pick(normalize(evidence, bond, member)["actor"], wanted, what)
+    )
+
+
 def check_lacp_partner_system(
     evidence: Mapping[str, Any],
     device_type: str,
@@ -657,6 +674,13 @@ CHECKS: dict[str, Check] = {
         ("bond", "member"),
         "collect_bond",
         lambda ev, dt, p, e: check_lacp_member(ev, dt, p["bond"], p["member"], e),
+        "lacp_member",
+        dict.fromkeys(LACP_FLAGS, _BOOL),
+    ),
+    "lacp_actor": Check(
+        ("bond", "member"),
+        "collect_bond",
+        lambda ev, dt, p, e: check_lacp_actor(ev, dt, p["bond"], p["member"], e),
         "lacp_member",
         dict.fromkeys(LACP_FLAGS, _BOOL),
     ),
