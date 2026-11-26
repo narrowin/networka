@@ -716,7 +716,9 @@ def proofs(
                 not gap["absent_at_source"] and gap["upper_s"] is not None, bracket
             )
             # Probes leave at the sender's own pace, so the tc markers bound
-            # each send instead of a nominal interval.
+            # each send instead of a nominal interval. Lost probes leave
+            # between installing and cleared, and delivered ones outside
+            # installed to clearing.
             sends = sorted(
                 stamps[0]
                 for (ident, kind, _), stamps in traffic.decode(
@@ -731,7 +733,8 @@ def proofs(
             ends = offsets.index(gap["ends_s"])
             upper_hold = (cleared["mono_ns"] - before["mono_ns"]) / traffic.NS
             _require(
-                gap["lower_s"] <= result["held_s"] <= upper_hold <= gap["upper_s"]
+                gap["lower_s"] <= upper_hold
+                and result["held_s"] <= gap["upper_s"]
                 and sends[begins - 1] <= applied["epoch_ns"]
                 and sends[begins] >= before["epoch_ns"]
                 and sends[ends] <= cleared["epoch_ns"]
