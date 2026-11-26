@@ -16,7 +16,8 @@ from network_toolkit.platforms.linux.intent import bonding, check_bond_member
 from network_toolkit.platforms.linux.intent import ping_command as lx_ping_command
 from network_toolkit.platforms.mikrotik_routeros import intent as ros
 
-BOND = """Active Aggregator Info:
+BOND = """Bonding Mode: IEEE 802.3ad Dynamic link aggregation
+Active Aggregator Info:
 \tAggregator ID: 2
 
 Slave Interface: eth1
@@ -230,3 +231,15 @@ def test_linux_bond_members() -> None:
     }
     result = intent.check_bond_members(evidence, "linux", "bond0", ["eth1"])
     assert (result.observed, result.verdict) == (["eth1", "eth2"], "fail")
+
+
+def test_linux_lacp_without_root() -> None:
+    text = "Bonding Mode: IEEE 802.3ad Dynamic link aggregation\nSlave Interface: eth1\nMII Status: up\n"
+    evidence = {
+        bonding("bond0"): {"command": bonding("bond0"), "output": text, "error": None}
+    }
+    scd = {"synchronization": True}
+    result = intent.check_lacp_member(evidence, "linux", "bond0", "eth1", scd)
+    assert result.reason == (
+        "LACP details missing from /proc/net/bonding/bond0; read it as root (CAP_NET_ADMIN)"
+    )

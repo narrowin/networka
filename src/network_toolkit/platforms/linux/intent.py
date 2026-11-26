@@ -52,9 +52,21 @@ def _one(values: list[Any], what: str) -> Any:
     return values[0]
 
 
+def _root_message(bond: str) -> str:
+    return (
+        f"LACP details missing from /proc/net/bonding/{bond}; "
+        "read it as root (CAP_NET_ADMIN)"
+    )
+
+
 def _member(evidence: Mapping[str, Any], bond: str, member: str) -> dict[str, Any]:
     command = bonding(bond)
     text = intent.reply_output(evidence, command)
+    if "Bonding Mode: IEEE 802.3ad" not in text:
+        msg = f"{bond} is not an 802.3ad (LACP) bond"
+        raise ValueError(msg)
+    if "details actor lacp pdu:" not in text:
+        raise ValueError(_root_message(bond))
     section = _one(
         re.findall(
             rf"(?m)^Slave Interface: {re.escape(member)}\n([\s\S]*?)(?=^Slave Interface: |\Z)",
@@ -62,10 +74,8 @@ def _member(evidence: Mapping[str, Any], bond: str, member: str) -> dict[str, An
         ),
         f"section for {member}",
     )
-    active = _one(
-        re.findall(r"(?m)^Active Aggregator Info:\n\s*Aggregator ID: (\d+)$", text),
-        "active aggregator",
-    )
+    found = re.findall(r"(?m)^Active Aggregator Info:\n\s*Aggregator ID: (\d+)$", text)
+    active = _one(found, "active aggregator") if found else None
     blocks = {
         side: _one(
             re.findall(
@@ -155,6 +165,8 @@ def check_bond_member(
 
     def observe() -> dict[str, bool]:
         found = _member(evidence, bond, member)
+        if found["active"] is None and "eligible" in expected:
+            raise ValueError(_root_message(bond))
         state = {
             "carrier": found["carrier"],
             "eligible": found["aggregator"] == found["active"]
@@ -249,10 +261,11 @@ def ping(
     }
 
 
-# Linux-only checks an intent file can name.
-# Param combinations Linux cannot run, checked before any device is read.
+# Param combinations Linux cannot run, keyed by check name. `intent._resolve`
+# calls each rule with the item's params before any device is read.
 PARAM_RULES = {"ping": _ping_device}
 
+# Linux-only checks an intent file can name.
 CHECKS = {
     "bond_member": Check(
         ("bond", "member"),
@@ -261,3 +274,4 @@ CHECKS = {
         expected={"carrier": (bool,), "eligible": (bool,)},
     ),
 }
+intent.claim("linux", CHECKS)

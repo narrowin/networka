@@ -607,3 +607,4 @@ CHECKS = {
         expected=(str,),
     ),
 }
+intent.claim("mikrotik_routeros", CHECKS)

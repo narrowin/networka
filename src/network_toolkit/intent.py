@@ -751,6 +751,35 @@ class IntentReport:
         return {"verdict": self.verdict, "items": items}
 
 
+_CLAIMED: dict[str, tuple[str, Check]] = {}
+
+
+def claim(platform_name: str, checks: Mapping[str, Check]) -> None:
+    """Record a platform's own checks; called at the end of each platform module.
+
+    Check names share one namespace across platforms. A name may appear on
+    several platforms only with the same params, optional params and
+    expected shape, and never as a neutral check name, so an intent file
+    means the same thing on every platform. A conflict fails at import.
+    """
+    for check_name, check in checks.items():
+        if check_name in CHECKS:
+            msg = f"{platform_name} check {check_name!r} reuses a neutral check name"
+            raise IntentError(msg)
+        owner = _CLAIMED.get(check_name)
+        contract = (check.params, check.optional, check.expected)
+        if (
+            owner is not None
+            and (owner[1].params, owner[1].optional, owner[1].expected) != contract
+        ):
+            msg = (
+                f"{platform_name} check {check_name!r} differs from the "
+                f"{owner[0]} check of that name"
+            )
+            raise IntentError(msg)
+        _CLAIMED.setdefault(check_name, (platform_name, check))
+
+
 def _platform_checks() -> dict[str, dict[str, Check]]:
     return {name: platform(name).CHECKS for name in PLATFORMS}
 

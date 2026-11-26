@@ -263,13 +263,13 @@ in time but not one instant.
 | `collect_version` | `/system/resource/print as-value` | Yes, 7.26beta7 |
 | `collect_uptime` | `:tonsec [/system/resource/get uptime]` | Yes, 7.26beta7 |
 | `collect_ping` | `/ping address=<dest> count=<count> [interface="<interface>"] [vrf="<vrf>"] as-value` | Yes, 7.26beta7, without `vrf` |
+| `collect_print` (params `menu`, `where`, `name`) | `<menu>/print detail as-value` | Yes, 7.26beta7 |
 
 RouterOS returns one row per probe and no totals row: an answered probe
 has `host`, `seq`, `size`, `time` and `ttl`; a lost one has a `status`
 (`timeout` with `host`, `no route to host` without it). The normalizer needs
 exactly `count` rows with `seq` 0 to `count - 1`, any `host` equal to
 `dest`, and counts rows with `ttl` and `time` and no `status` as received.
-| `collect_print` (params `menu`, `where`, `name`) | `<menu>/print detail as-value` | Yes, 7.26beta7 |
 
 All of these, including the quoted names such as `monitor "bridge" once`
 and the joined host print and bridge print, were read on RouterOS CHR
@@ -303,39 +303,90 @@ What the JSON returns, as seen on 7.26beta7:
 
 ## Add a platform
 
-This section is written for adding Cumulus Linux. No Cumulus module exists
-yet. The sources below come from the NVIDIA guides and
+This section is written for adding Cumulus Linux; no Cumulus module exists
+yet. Read `src/network_toolkit/platforms/linux/intent.py` as the smallest
+complete platform module: collectors, normalizers, one platform-specific
+check, `PARAM_RULES` and the `claim` call. The Cumulus sources below come
+from the NVIDIA guides and
 [draft PR #47](https://github.com/narrowin/networka/pull/47) and have not
 been checked on a switch.
 
-### Device type
+### Dispatch and registry
 
-Networka selects platform code by the inventory's `device_type`. Register
-Cumulus in `src/network_toolkit/platforms/registry.py` as `cumulus_linux`,
-the name the Scrapli definitions already use, with its vendor, status and
-description like the other entries. The `linux` intent module stays for
-plain Linux hosts. The Cumulus module imports the Linux bonding normalizers
-(`lacp_member`, and the `bond_member` check if it wants it) because Cumulus
-bonds use the Linux bonding driver:
+Intent checks find a platform only through `intent.PLATFORMS`, which maps a
+`device_type` to its module, for example
+`"cumulus_linux": "network_toolkit.platforms.cumulus_linux.intent"`.
+
+The entry in `src/network_toolkit/platforms/registry.py` is separate. It
+feeds `nw platforms`, the generated platform docs, the vendor-operations
+factory and the device types accepted for IP targets, not intent dispatch.
+Add `cumulus_linux` there with `status=PlatformStatus.EXPERIMENTAL`,
+`has_operations_class=False` and `has_builtin_sequences=False`, like the
+`linux` entry. Two existing tests then change:
+`tests/test_platforms_cli.py` uses `cumulus_linux` as an example of an
+unregistered definition, and `tests/test_intent.py`
+(`test_platform_lookup_names_supported_platforms`) lists the supported
+intent platforms.
+
+### Reuse the Linux module
+
+Cumulus bonds use the Linux bonding driver and Cumulus runs iputils, so the
+Cumulus module imports and re-exports the Linux pieces:
 
 ```python
-from network_toolkit.platforms.linux.intent import collect_bond, lacp_member
+from network_toolkit.platforms.linux.intent import (
+    PARAM_RULES,
+    bond_members,
+    collect_bond,
+    collect_ping,
+    lacp_member,
+    ping,
+)
 ```
+
+`PARAM_RULES` maps a check name to a function that receives the item's
+params and raises `ValueError` for a combination the platform cannot run;
+`intent._resolve` calls it before any device is read. The Linux rule
+rejects `interface` together with `vrf` for `ping`.
+
+The Linux LACP checks (`lacp_member`, `lacp_partner_system`,
+`bond_member`) need the device login to read `/proc/net/bonding/<bond>` as
+root (CAP_NET_ADMIN): without it the file has no "Active Aggregator Info"
+or "details actor/partner lacp pdu" blocks, and the checks give `error`
+with reason "LACP details missing from /proc/net/bonding/<bond>; read it as
+root (CAP_NET_ADMIN)". `bond_members` needs no root.
+
+On Linux, Networka runs a command in the login shell and does not see its
+exit status: stderr and a non-zero exit arrive in the reply `output` with
+`error` null, as `ping: connect: Network is unreachable` with exit status 2
+did in a live read (see `send_command` in
+`transport/scrapli_sync.py`). `error` is set only when Networka itself
+fails, for example on a connection or timeout failure, or when the
+platform's Scrapli definition marks the output as failed. Normalizers must therefore
+recognise failure text in the output.
 
 ### Collectors
 
-A collector reads one concept from one device:
-
 ```python
-def collect_host_entry(client, device, bridge, mac, **run_options) -> dict[str, Reply]
+from network_toolkit import intent
+from network_toolkit.intent import Reply
+
+
+def collect_bridge(client, device, bridge, **run_options) -> dict[str, Reply]:
+    command = f"bridge -j link show master {intent.name(bridge, 'bridge')}"
+    return {command: intent.read(client, device, command, run_options)}
 ```
 
-A collector receives every param of the check, in the order `intent.CHECKS`
-lists them, and ignores those it does not need. Items with the same
-collector and params on one device share one reading. Validate params with
-`intent.name` or `intent.mac` before they reach a command. Read through `intent.read(client, device, command, run_options)`,
-which records a read failure in the reply instead of raising, and return
-the replies keyed by their command. Read JSON where the platform has it.
+The contract is `(client, device, *collect_args, **run_options) ->
+dict[str, Reply]`. A collector receives every param of its check, in the
+order the check lists them (optional ones may be left off), and ignores
+those it does not need. Validate each param with `intent.name`,
+`intent.mac` or `intent.address` before it reaches a command. Read through
+`intent.read(client, device, command, run_options)`, passing
+`run_options` on so that options such as `interactive_creds` reach
+`NetworkaClient.run`; `intent.read` records a read failure in the reply
+instead of raising. Return the replies keyed by their command. Read JSON
+where the platform has it, with `intent.load_json`.
 
 | Collector and args | Normalizers it feeds |
 | --- | --- |
@@ -350,14 +401,17 @@ the replies keyed by their command. Read JSON where the platform has it.
 ### Normalizers
 
 A normalizer takes the collector's evidence and the params and returns the
-neutral fields. It raises `ValueError` with a short reason when the evidence
-cannot decide, which becomes the item's `error`. It leaves out a field the
-platform does not report, so a check on that field gives `error`, never a
-pass. A normalizer that can return `None` or an empty list first shows from
-a successful reply that the requested object exists: `host_entry` needs the
-bridge print to contain the bridge and every host row to be for the
-requested MAC, and `bridge_ports` needs the bridge print to contain the
-bridge.
+neutral fields. It raises `ValueError` with a short reason when the
+evidence cannot decide, which becomes the item's `error`, and leaves out a
+field the platform does not report, so a check on that field gives
+`error`, never a pass. Read replies with `intent.reply_output(evidence,
+command)`, which raises unless the reply's `error` is exactly null.
+
+Identity rule: before reading a value, check that the reply names the
+requested object by its key field. For a global object with no name, such
+as Cumulus MLAG, require a field only that object has, for example
+`local-role` in `nv show mlag`. A normalizer that can return `None` or an
+empty list must first show from a successful reply that the object exists.
 
 | Normalizer | Returns |
 | --- | --- |
@@ -366,7 +420,7 @@ bridge.
 | `stp_bridge(evidence, bridge)` | `{"bridge_id": "0x8000.mac", "root_bridge_id": ..., "root_bridge": bool, "root_port": str or None, "topology_changes": int}` |
 | `stp_mode(evidence, bridge)` | `"rstp"`, `"mstp"`, `"none"` |
 | `mlag(evidence, bridge)` | `{"connected": bool, "role": "primary" or "secondary", "state": str}` |
-| `bond_members(evidence, bond)` | `["ether3", "ether4"]`; a successful bond read proves the bond exists |
+| `bond_members(evidence, bond)` | `["swp1", "swp2"]`; a successful bond read proves the bond exists |
 | `lacp_member(evidence, bond, member)` | `{"actor": {flag: bool}, "partner": {flag: bool}, "partner_system": {"priority": int, "mac": lower-case str}}`, with `partner` and `partner_system` left out when there is no partner |
 | `host_entry(evidence, bridge, mac)` | The port name, or `None` when the bridge has no entry |
 | `interface_up(evidence, interface)` | `bool` |
@@ -378,43 +432,63 @@ For Cumulus:
 | --- | --- | --- |
 | `bridge_port` `forwarding` | `bridge -j link show dev <port>`, `state` is `forwarding` | Yes |
 | `bridge_port` `role`, `edge` | `mstpctl showportdetail <bridge> <port>`, role and oper edge port; a JSON form is still to be confirmed | Yes |
-| `bridge_ports` | `bridge -j link show`, ports whose `master` is the bridge | Yes |
+| `bridge_ports` | `bridge -j link show`, ports whose `master` is the bridge | Yes, with an existence read of the bridge |
 | `stp_bridge` | `mstpctl showbridge <bridge>`: bridge ID, designated root, root port, topology change count | Partly: bridge IDs print as `8.000.mac` and need converting to `0xPPPP.mac` |
 | `stp_mode` | `nv show bridge domain <bridge> stp --output json`, mode | Partly: `pvrst` has no RouterOS counterpart |
-| `mlag` `connected`, `role` | `nv show mlag --output json`, peer alive and role | Partly: MLAG is not bridge-scoped on Cumulus, so `bridge` selects nothing |
+| `mlag` `connected`, `role` | `nv show mlag --output json`, peer alive and role | Partly: MLAG is not bridge-scoped on Cumulus, so `bridge` selects nothing; identify the reply by `local-role` |
 | `mlag` `state` | none | No: the state word is each platform's own |
-| `lacp_member`, `lacp_partner_system`, `bond_members` | `/proc/net/bonding/<bond>`, the Linux normalizer | Yes |
+| `lacp_member`, `lacp_partner_system`, `bond_members` | `/proc/net/bonding/<bond>`, the Linux normalizers (root for LACP) | Yes |
 | `host_entry` | `bridge -j fdb show br <bridge>`, `ifname` of the MAC | Yes, with an existence read of the bridge |
 | `interface_up` | `nv show interface --output json`, `link.oper-status` | Yes |
 | `ping` | `ping -n -c <count> -W 1 [-I <interface or vrf>] <dest>`, the Linux collector | Yes |
 
-The member and FDB queries above return no rows both for an empty bridge
-and for a bridge that does not exist. A Cumulus collector for `bridge_ports`
-or `host_entry` must therefore also read the bridge itself, for example
-`ip -j link show dev <bridge>`, and its normalizer must find the bridge
-there before it returns `[]` or `None`. Each normalizer also checks the
+The member and FDB queries return no rows both for an empty bridge and for
+a bridge that does not exist, so those collectors also read the bridge
+itself, for example `ip -j link show dev <bridge>`, and the normalizers find
+it there before returning `[]` or `None`. Each normalizer also checks the
 reply's key fields, `ifname` and `master` for ports and `mac` for FDB rows.
 
-A CLAG setting with no neutral field becomes a Cumulus-only check.
+### Platform-specific checks
+
+A check with no neutral field, such as a CLAG setting, goes in the
+module's `CHECKS` dictionary. Each entry is
+
+```python
+intent.Check(params, collector, evaluate, normalizer=None, expected=..., optional=())
+```
+
+- `params`: the required param names, each registered in `intent.PARAMS`
+  with its validator (add new ones such as `peer` there).
+- `collector`: the name of the module's collector function.
+- `evaluate(evidence, device_type, params, expected) -> IntentResult`,
+  usually built with `intent.compare(expected, observe)`.
+- `normalizer`: `None` for a platform check.
+- `expected`: the shape `expected` must have: a tuple of types, a mapping
+  of field to types, or `[types]` for a list.
+- `optional`: param names that may be left out.
+
+The `bond_member` entry at the end of `platforms/linux/intent.py` is a
+complete example. End the module with `intent.claim("<device_type>",
+CHECKS)`. Check names share one namespace across platforms: a name may
+appear on several platforms only with the same params, optional params and
+expected shape, never as a neutral check name, and `claim` fails at import
+otherwise. A Cumulus module that re-exports the Linux `bond_member` check
+keeps the same contract.
 
 ### Checklist
 
-1. Register `cumulus_linux` in `platforms/registry.py`.
+1. Add `cumulus_linux` to `intent.PLATFORMS`, and register it in
+   `platforms/registry.py` as experimental; update the two tests named
+   above.
 2. Create `src/network_toolkit/platforms/cumulus_linux/intent.py` with the
-   collectors and normalizers above, importing the Linux bonding ones.
-3. Add a `CHECKS` dictionary of `intent.Check` entries for Cumulus-only
-   checks, empty when there are none. Each entry declares the shape of
-   `expected` (for example `expected=(bool,)` or a mapping of field to
-   types), and every new param name, such as `peer`, is added to
-   `intent.PARAMS` with its validator; otherwise items with it are rejected.
-4. Add `"cumulus_linux": "network_toolkit.platforms.cumulus_linux.intent"`
-   to `intent.PLATFORMS`. An item whose collector or normalizer is missing
-   on the platform is then an error naming the item.
-5. Read each collector's commands once on a lab switch, save the replies,
-   and add a test that feeds them to the checks, as
-   `tests/test_platforms_mikrotik.py` does with RouterOS replies. Include a
-   down port and a bond member without a partner.
-6. Run an intent file against the lab with `nw intent run FILE --save DIR`
+   collectors and normalizers, importing the Linux bonding and ping ones.
+3. Add `CHECKS` (empty when there are none), `PARAM_RULES` if needed, and
+   `intent.claim("cumulus_linux", CHECKS)`.
+4. Read each collector's commands once on a lab switch, as root for the
+   LACP checks, save the replies, and add a test that feeds them to the
+   checks, as `tests/test_platforms_mikrotik.py` does with RouterOS replies.
+   Include a down port and a bond member without a partner.
+5. Run an intent file against the lab with `nw intent run FILE --save DIR`
    and check that `nw intent replay DIR` prints the same results.
 
 The development setup needs uv 0.13.10, as pinned in `pyproject.toml`. The
