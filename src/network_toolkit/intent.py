@@ -408,6 +408,15 @@ def check_lacp_partner_system(
     return compare(wanted, observe)
 
 
+def check_bond_members(
+    evidence: Mapping[str, Any], device_type: str, bond: str, expected: list[str]
+) -> IntentResult:
+    """Compare the member ports of a bond. Both sides are sorted lists."""
+    expect(CHECKS["bond_members"].expected, expected, "bond_members")
+    normalize = _normalizer(device_type, "bond_members")
+    return compare(sorted(expected), lambda: sorted(normalize(evidence, bond)))
+
+
 def check_host_entry(
     evidence: Mapping[str, Any],
     device_type: str,
@@ -657,6 +666,13 @@ CHECKS: dict[str, Check] = {
         ),
         "lacp_member",
         {"priority": (int,), "mac": _STR},
+    ),
+    "bond_members": Check(
+        ("bond",),
+        "collect_bond",
+        lambda ev, dt, p, e: check_bond_members(ev, dt, p["bond"], e),
+        "bond_members",
+        [_STR],
     ),
     "host_entry": Check(
         ("bridge", "mac"),

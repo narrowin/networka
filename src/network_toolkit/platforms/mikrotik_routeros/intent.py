@@ -125,7 +125,11 @@ def collect_bridge(
 
 
 def collect_bond(
-    client: NetworkaClient, device: str, bond: str, member: str, **run_options: Any
+    client: NetworkaClient,
+    device: str,
+    bond: str,
+    member: str | None = None,
+    **run_options: Any,
 ) -> dict[str, Reply]:
     """The bonding monitor of `bond`; it lists every member, so `member` is not needed."""
     return collect(client, device, bond_monitor(bond), **run_options)
@@ -434,6 +438,18 @@ def stp_mode(evidence: Mapping[str, Any], bridge: str) -> str:
     """`protocol-mode` of the bridge."""
     row = _bridge_row(evidence, bridge)
     return _field(row, "protocol-mode", str, f"bridge {bridge}")
+
+
+def bond_members(evidence: Mapping[str, Any], bond: str) -> list[str]:
+    """The `port` of every row of the bonding monitor of `bond`.
+
+    A successful reply proves the bond exists; every row must carry a port.
+    """
+    rows = _rows(evidence, bond_monitor(bond), f"{bond} monitor")
+    if any(not isinstance(r.get("port"), str) or not r["port"] for r in rows):
+        msg = f"a {bond} monitor row has no port"
+        raise ValueError(msg)
+    return [row["port"] for row in rows]
 
 
 def lacp_member(evidence: Mapping[str, Any], bond: str, member: str) -> dict:

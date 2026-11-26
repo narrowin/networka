@@ -529,3 +529,8 @@ def test_ping() -> None:
     }
     result = intent.check_ping(evidence, ROS, "10.0.0.1", 3, None, {"received": 1})
     assert (result.observed, result.verdict) == ({"received": 1}, "pass")
+
+
+def test_bond_members() -> None:
+    result = intent.check_bond_members(STATE, ROS, "client2", ["ether4", "ether3"])
+    assert (result.observed, result.verdict) == (["ether3", "ether4"], "pass")

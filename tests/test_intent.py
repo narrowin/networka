@@ -221,3 +221,12 @@ def test_linux_ping() -> None:
     assert intent.check_ping(
         wrong, "linux", "10.0.0.2", 3, None, {"received": 2}
     ).verdict == ("error")
+
+
+def test_linux_bond_members() -> None:
+    text = "Ethernet Channel Bonding Driver: v6.1\n\n" + BOND
+    evidence = {
+        bonding("bond0"): {"command": bonding("bond0"), "output": text, "error": None}
+    }
+    result = intent.check_bond_members(evidence, "linux", "bond0", ["eth1"])
+    assert (result.observed, result.verdict) == (["eth1", "eth2"], "fail")

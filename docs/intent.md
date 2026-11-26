@@ -207,6 +207,7 @@ Neutral checks compare only the fields named in `expected`.
 | `mlag` | `bridge` | `connected`, `role` (`primary`, `secondary`), `state` (the platform's own word) | Yes | No |
 | `lacp_member` | `bond`, `member` | LACP flags of actor and partner: `activity`, `timeout`, `aggregation`, `synchronization`, `collecting`, `distributing`, `defaulted`, `expired` | Yes | Yes |
 | `lacp_partner_system` | `bond`, `member` | LACP system `priority` and `mac` the partner sends | Yes | Yes |
+| `bond_members` | `bond` | Member ports of the bond, as a sorted list (like ANTA's VerifyPortChannels); every member row must name its port | Yes | Yes |
 | `host_entry` | `bridge`, `mac` | Port of the bridge host entry, `null` without one; an entry for the MAC on another bridge is `error` | Yes | No |
 | `interface_up` | `interface` | Carrier | Yes | No |
 | `ping` | `dest`, `count` (1 to 100), optional `interface` and `vrf` (on Linux one of the two) | `sent`, `received`, `reachable` (every probe answered) | Yes | Yes |
@@ -341,7 +342,7 @@ the replies keyed by their command. Read JSON where the platform has it.
 | `collect_bridge(bridge)` | `stp_bridge`, `mlag`, `bridge_ports` |
 | `collect_bridge_port(bridge, port)` | `bridge_port` |
 | `collect_stp_mode(bridge)` | `stp_mode` |
-| `collect_bond(bond, member)` | `lacp_member` |
+| `collect_bond(bond, member)` | `lacp_member`, `bond_members` (without `member`) |
 | `collect_host_entry(bridge, mac)` | `host_entry` |
 | `collect_interface(interface)` | `interface_up` |
 | `collect_ping(dest, count, interface, vrf)` | `ping` |
@@ -365,6 +366,7 @@ bridge.
 | `stp_bridge(evidence, bridge)` | `{"bridge_id": "0x8000.mac", "root_bridge_id": ..., "root_bridge": bool, "root_port": str or None, "topology_changes": int}` |
 | `stp_mode(evidence, bridge)` | `"rstp"`, `"mstp"`, `"none"` |
 | `mlag(evidence, bridge)` | `{"connected": bool, "role": "primary" or "secondary", "state": str}` |
+| `bond_members(evidence, bond)` | `["ether3", "ether4"]`; a successful bond read proves the bond exists |
 | `lacp_member(evidence, bond, member)` | `{"actor": {flag: bool}, "partner": {flag: bool}, "partner_system": {"priority": int, "mac": lower-case str}}`, with `partner` and `partner_system` left out when there is no partner |
 | `host_entry(evidence, bridge, mac)` | The port name, or `None` when the bridge has no entry |
 | `interface_up(evidence, interface)` | `bool` |
@@ -381,7 +383,7 @@ For Cumulus:
 | `stp_mode` | `nv show bridge domain <bridge> stp --output json`, mode | Partly: `pvrst` has no RouterOS counterpart |
 | `mlag` `connected`, `role` | `nv show mlag --output json`, peer alive and role | Partly: MLAG is not bridge-scoped on Cumulus, so `bridge` selects nothing |
 | `mlag` `state` | none | No: the state word is each platform's own |
-| `lacp_member`, `lacp_partner_system` | `/proc/net/bonding/<bond>`, the Linux normalizer | Yes |
+| `lacp_member`, `lacp_partner_system`, `bond_members` | `/proc/net/bonding/<bond>`, the Linux normalizer | Yes |
 | `host_entry` | `bridge -j fdb show br <bridge>`, `ifname` of the MAC | Yes, with an existence read of the bridge |
 | `interface_up` | `nv show interface --output json`, `link.oper-status` | Yes |
 | `ping` | `ping -n -c <count> -W 1 [-I <interface or vrf>] <dest>`, the Linux collector | Yes |

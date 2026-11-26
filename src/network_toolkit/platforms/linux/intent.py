@@ -34,7 +34,11 @@ def bonding(bond: str) -> str:
 
 
 def collect_bond(
-    client: NetworkaClient, device: str, bond: str, member: str, **run_options: Any
+    client: NetworkaClient,
+    device: str,
+    bond: str,
+    member: str | None = None,
+    **run_options: Any,
 ) -> dict[str, Reply]:
     """`/proc/net/bonding/<bond>`; it lists every member, so `member` is not needed."""
     command = bonding(bond)
@@ -89,6 +93,21 @@ def _member(evidence: Mapping[str, Any], bond: str, member: str) -> dict[str, An
         "active": active,
         "partner": partner,
     }
+
+
+def bond_members(evidence: Mapping[str, Any], bond: str) -> list[str]:
+    """The `Slave Interface:` names of `/proc/net/bonding/<bond>`.
+
+    A successful read of the file proves the bond exists.
+    """
+    text = intent.reply_output(evidence, bonding(bond))
+    if (
+        not text.startswith("Ethernet Channel Bonding Driver:")
+        and "Bonding Mode:" not in text
+    ):
+        msg = f"the reply for {bond} is not a bonding status file"
+        raise ValueError(msg)
+    return re.findall(r"(?m)^Slave Interface: (\S+)$", text)
 
 
 def lacp_member(evidence: Mapping[str, Any], bond: str, member: str) -> dict:
