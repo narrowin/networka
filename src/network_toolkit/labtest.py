@@ -1471,9 +1471,34 @@ def _traffic(
     result["traffic"] = measured
     if not completed:
         measured["complete"] = False
+    step_limits = {step.name: dict(step.limits) for step in test.steps}
+
+    def covered(name: str, pause: Mapping[str, Any], window: str) -> bool:
+        """A pause no longer than the step's loss limit cannot hide an outage above it."""
+        limit = step_limits.get(window, {}).get(name)
+        return bool(limit) and pause["gap_s"] <= limit
+
+    def overlaps(pause: Mapping[str, Any], window: Mapping[str, Any]) -> bool:
+        return bool(
+            pause["from_s"] < window["end_s"] and window["start_s"] < pause["to_s"]
+        )
+
     for name, flow in measured["streams"].items():
         limit_ms = round(flow["send_gap_limit_s"] * 1000)
-        check(flow["cadence_ok"], f"{name} sent a ping at least every {limit_ms} ms")
+        pauses = flow["send_pauses"]
+        uncovered = []
+        for pause in pauses:
+            hit = [
+                window
+                for window, w in measured["windows"].items()
+                if overlaps(pause, w)
+            ]
+            if not hit or not all(covered(name, pause, window) for window in hit):
+                uncovered.append(pause)
+        if pauses and not uncovered:
+            check(True, f"{name} paused sending only within the loss limit of its step")
+        else:
+            check(not uncovered, f"{name} sent a ping at least every {limit_ms} ms")
         check(
             not flow["capture_mismatches"],
             f"{name} shows the same replies at both capture points",
@@ -1571,7 +1596,7 @@ def _traffic(
             if not counts["sent"]:
                 diagnostic_reason = "No sender pings were captured in this step."
             elif any(
-                pause["from_s"] < window["end_s"] and window["start_s"] < pause["to_s"]
+                overlaps(pause, window) and not covered(name, pause, step.name)
                 for pause in flow["send_pauses"]
             ):
                 diagnostic_reason = "Sender cadence was invalid in this step."

@@ -86,7 +86,7 @@ The request and reply must appear in captures at both stream endpoints. Networka
 | `fail` | A lower bound exceeds its limit, or reaches it with a lost ping, because traffic stopped for longer than that lower bound. A zero limit allows no lost or late ping. A duplicate ping or broken log rule also fails the step. |
 | `error` | The bounds cannot decide the limit or the required evidence is unusable. |
 
-A send pause longer than 450 ms leaves too much of the 500 ms reply deadline unobserved, allowing half a ping interval as margin. A wall-clock change of 50 ms against the monotonic clock makes packet and event times unreliable. A missing stream capture or kernel-reported capture drops, a sender or stream capture that exits early, inconsistent endpoint observations and failed cable restoration also invalidate the measurement. Additional captures of action cables are diagnostic.
+A send pause longer than 450 ms leaves too much of the 500 ms reply deadline unobserved, allowing half a ping interval as margin. A longer pause inside a step is allowed when it is no longer than that step's loss limit for the stream, because an outage hidden by the pause cannot exceed the limit. A step with a 0 s limit, the quiet window and the closing window keep the 450 ms rule. A wall-clock change of 50 ms against the monotonic clock makes packet and event times unreliable. A missing stream capture or kernel-reported capture drops, a sender or stream capture that exits early, inconsistent endpoint observations and failed cable restoration also invalidate the measurement. Additional captures of action cables are diagnostic.
 
 | Exit | Meaning |
 | --- | --- |
