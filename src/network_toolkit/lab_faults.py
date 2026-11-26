@@ -711,9 +711,11 @@ def proofs(
                 f"Expected one contiguous cut of {fault.stream}, found {len(gaps)}",
             )
             [gap] = gaps
-            bracket = "The captured one-way ping gap does not bracket the applied cut"
+            unbracketed = (
+                "The captured one-way ping gap does not bracket the applied cut"
+            )
             _require(
-                not gap["absent_at_source"] and gap["upper_s"] is not None, bracket
+                not gap["absent_at_source"] and gap["upper_s"] is not None, unbracketed
             )
             # Probes leave at the sender's own pace, so the tc markers bound
             # each send instead of a nominal interval. Lost probes leave
@@ -731,6 +733,10 @@ def proofs(
             offsets = [traffic.seconds(send - start) for send in sends]
             begins = offsets.index(gap["begins_s"])
             ends = offsets.index(gap["ends_s"])
+            _require(
+                begins > 0 and ends + 1 < len(sends),
+                "The cut has no delivered ping before or after it in the capture",
+            )
             upper_hold = (cleared["mono_ns"] - before["mono_ns"]) / traffic.NS
             _require(
                 gap["lower_s"] <= upper_hold
@@ -739,7 +745,7 @@ def proofs(
                 and sends[begins] >= before["epoch_ns"]
                 and sends[ends] <= cleared["epoch_ns"]
                 and sends[ends + 1] >= clearing["epoch_ns"],
-                bracket,
+                unbracketed,
             )
     except (
         OSError,
