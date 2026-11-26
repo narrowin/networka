@@ -5,14 +5,24 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from network_toolkit import intent
 from network_toolkit.api.run import DeviceCommandResult
 from network_toolkit.exceptions import DeviceConnectionError, DeviceExecutionError
 from network_toolkit.platforms.base import BackupResult
 from network_toolkit.platforms.mikrotik_routeros.intent import (
     PORT_MONITOR,
     PORT_STATS,
+    UPTIME,
+    bond_monitor,
+    bridge_monitor,
     check_bridge_port_forwarding,
+    check_property,
+    check_version,
+    collect,
     collect_bridge_port,
+    ethernet_monitor,
+    host_print,
+    port_monitor,
 )
 from network_toolkit.platforms.mikrotik_routeros.operations import (
     MikroTikRouterOSOperations,
@@ -296,3 +306,175 @@ def test_bridge_port_forwarding_collects_and_replays() -> None:
     assert missing.reason == "expected one bridge port bridge/ether2, found 0"
     failed = {"stats": {"command": PORT_STATS, "output": None, "error": "timeout"}}
     assert check_bridge_port_forwarding(failed, "bridge", "ether1").reason == "timeout"
+
+
+# One joined read as the MLAG lab saves it; client1 is inactive, so its cells are blank.
+STATE_COMMAND = ";".join(
+    (
+        UPTIME,
+        ethernet_monitor("ether2"),
+        bridge_monitor("bridge"),
+        port_monitor("bridge").replace(" ", "/", 3),
+        host_print("02:00:00:11:00:12"),
+        bond_monitor("client2"),
+    )
+)
+STATE_OUTPUT = """uptime-ns=75000000000
+         name: ether2
+       status: no-link
+              bridge-id: 0x1000.52:54:00:E1:0B:01
+            root-bridge: yes
+         root-bridge-id: 0x1000.52:54:00:E1:0B:01
+              root-port: none
+       topology-changes: 2
+             mlag-state: connected
+       mlag-active-role: primary
+            interface: ether2          client1  client2
+               status: in-bridge       inactive in-bridge
+                 role: designated-port          root-port
+            edge-port: no                       yes
+     topology-changes: 1                      1
+           forwarding: yes                      yes
+Flags: D - DYNAMIC
+3 D mac-address=02:00:00:11:00:12 vid=110 interface=client2 bridge=bridge
+    on-interface=client2
+
+Flags: A - ACTIVE; P - PARTNER
+AP port=ether4 key=15 flags="ATGSCD--" partner-sys-id=02:00:00:11:00:12
+   partner-sys-priority=65535 partner-key=15 partner-flags="ATG---F-"
+"""
+STATE = {
+    STATE_COMMAND: {"command": STATE_COMMAND, "output": STATE_OUTPUT, "error": None}
+}
+ROS = "mikrotik_routeros"
+
+
+def test_collect_joins_commands_into_one_read() -> None:
+    client = MagicMock()
+    client.run.return_value = MagicMock(
+        command_results=[DeviceCommandResult("r1", "x", STATE_OUTPUT)]
+    )
+    evidence = collect(client, "r1", UPTIME, bridge_monitor("bridge"))
+    line = f"{UPTIME};{bridge_monitor('bridge')}"
+    assert evidence == {line: {"command": line, "output": STATE_OUTPUT, "error": None}}
+
+
+def test_bridge_port_reads_cells_by_column() -> None:
+    result = intent.check_bridge_port(
+        STATE, ROS, "bridge", "client2", {"role": "root", "edge": True}
+    )
+    assert (result.observed, result.verdict) == (
+        {"role": "root", "edge": True},
+        "match",
+    )
+    blank = intent.check_bridge_port_forwarding(STATE, ROS, "bridge", "client1")
+    assert (blank.verdict, blank.reason) == (
+        "unavailable",
+        "bridge port bridge/client1 has no forwarding",
+    )
+
+
+def test_bridge_ports() -> None:
+    result = intent.check_bridge_ports(STATE, ROS, "bridge", {"client1", "ether2"})
+    assert (result.observed, result.verdict) == (
+        ["client1", "client2", "ether2"],
+        "mismatch",
+    )
+
+
+def test_stp_bridge_ignores_the_port_table() -> None:
+    expected = {
+        "root_bridge_id": "0x1000.52:54:00:e1:0b:01",
+        "root_bridge": True,
+        "root_port": None,
+        "topology_changes": 2,
+    }
+    assert intent.check_stp_bridge(STATE, ROS, "bridge", expected).verdict == "match"
+
+
+def test_mlag() -> None:
+    result = intent.check_mlag(
+        STATE, ROS, "bridge", {"connected": True, "role": "secondary"}
+    )
+    assert (result.observed, result.verdict) == (
+        {"connected": True, "role": "primary"},
+        "mismatch",
+    )
+
+
+def test_lacp_member_and_partner_system() -> None:
+    scd = {"synchronization": True, "collecting": True, "distributing": True}
+    result = intent.check_lacp_member(STATE, ROS, "client2", "ether4", scd)
+    assert result.verdict == "mismatch"
+    assert result.observed["partner"] == {
+        "synchronization": False,
+        "collecting": False,
+        "distributing": False,
+    }
+    system = {"priority": 65535, "mac": "02:00:00:11:00:12"}
+    partner = intent.check_lacp_partner_system(STATE, ROS, "client2", "ether4", system)
+    assert partner.verdict == "match"
+
+
+def test_host_entry() -> None:
+    mac = "02:00:00:11:00:12"
+    assert intent.check_host_entry(STATE, ROS, "bridge", mac, "client2").verdict == (
+        "match"
+    )
+    missing = intent.check_host_entry(STATE, ROS, "bridge", "02:00:00:11:00:11", None)
+    assert missing.verdict == "unavailable"
+
+
+def test_interface_up() -> None:
+    result = intent.check_interface_up(STATE, ROS, "ether2", expected=False)
+    assert (result.observed, result.verdict) == (False, "match")
+
+
+def test_rebooted() -> None:
+    after = {
+        "u": {"command": UPTIME, "output": "uptime-ns=1000000000\n", "error": None}
+    }
+    assert intent.check_rebooted(STATE, after, ROS).verdict == "match"
+    assert intent.check_rebooted(after, STATE, ROS).observed is False
+
+
+BRIDGES = "/interface bridge print detail without-paging"
+CONFIG = {
+    "c": {
+        "command": f"{BRIDGES};/interface bridge port print detail without-paging",
+        "output": """Flags: R - RUNNING
+0 R name="bridge" mtu=auto protocol-mode=none vlan-filtering=yes mlag-peer-port=ether2
+    mlag-init-delay=1m mlag-lacp-fallback=yes
+
+0  interface=client2 bridge=bridge priority=0x80 edge=yes pvid=110 bpdu-guard=no
+""",
+        "error": None,
+    }
+}
+
+
+def test_stp_mode() -> None:
+    result = intent.check_stp_mode(CONFIG, ROS, "bridge", "rstp")
+    assert (result.observed, result.verdict) == ("none", "mismatch")
+
+
+def test_property() -> None:
+    port = "/interface bridge port"
+    assert check_property(
+        CONFIG, port, {"interface": "client2"}, "pvid", "110"
+    ).verdict == ("match")
+    wrapped = check_property(
+        CONFIG, "/interface bridge", {"name": "bridge"}, "mlag-lacp-fallback", "yes"
+    )
+    assert wrapped.verdict == "match"
+    assert check_property(
+        CONFIG, port, {"interface": "ether9"}, "pvid", "1"
+    ).reason == ("expected one entry with interface=ether9, found 0")
+
+
+def test_version() -> None:
+    output = "      uptime: 4m19s\n     version: 7.26beta7 (testing)\n"
+    evidence = {
+        "r": {"command": "/system/resource/print", "output": output, "error": None}
+    }
+    assert check_version(evidence, "7.26beta7").verdict == "match"

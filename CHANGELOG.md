@@ -10,9 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Check RouterOS bridge-port forwarding with `network_toolkit.platforms.mikrotik_routeros.intent`. `collect_bridge_port` reads the port statistics and monitor replies through `NetworkaClient` and keeps each command with its output or error. `check_bridge_port_forwarding` replays that evidence offline to `match`, `mismatch`, or `unavailable` with a reason.
+- Check device state with vendor-neutral checks in `network_toolkit.intent`: bridge port forwarding, STP role and edge, bridge ports, STP bridge and root, STP mode, MLAG peer state and role, LACP member flags, LACP partner system ID, bridge host entry, carrier and reboot. Each check takes the device type, and `intent.platform(device_type)` selects the platform's collectors and normalizers.
+- Collect and normalize RouterOS state from the bridge, port, host, bonding and Ethernet monitors and the uptime, with `check_property` and `check_version` as RouterOS-only checks. The port monitor table is read by column, so the blank cell of an inactive port does not shift the values after it.
+- Normalize Linux bonding state from `/proc/net/bonding/<bond>`, with `check_bond_member` as a Linux-only check of carrier and active-aggregator eligibility.
 
 ### Changed
 
+- `IntentResult` and `Reply` move to `network_toolkit.intent`, and `IntentResult.expected` and `observed` hold any value. The RouterOS bridge-port check keeps its signature and verdicts.
 - The offline intent example uses the library check and replays one saved evidence file per port: `--routeros-stp-port BRIDGE INTERFACE EVIDENCE_JSON`. It now runs in the Networka project environment.
 - The intent guide marks the Cumulus checks as available only from draft PR #47.
 

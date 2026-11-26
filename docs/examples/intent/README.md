@@ -37,7 +37,7 @@ contains one observation for this example. [Published Junos sample, pp. 58–59]
 
 To check whether a RouterOS bridge port is forwarding, save the evidence
 from `collect_bridge_port` as JSON, as shown in the
-[intent guide](../../intent.md#check-a-routeros-bridge-port). It reads these two
+[intent guide](../../intent.md#routeros-evidence). It reads these two
 read-only replies from the same device in one collection window. The `.id`
 in the monitor command comes from the statistics row whose `bridge` and
 `interface` match, and only joins the two replies.
