@@ -12,7 +12,7 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from network_toolkit import intent
-from network_toolkit.intent import IntentResult, Reply, Verdict
+from network_toolkit.intent import Check, IntentResult, Reply, Verdict
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -126,3 +126,14 @@ def check_bond_member(
     observed = {field: state[field] for field in wanted}
     verdict: Verdict = "match" if observed == wanted else "mismatch"
     return IntentResult(wanted, observed, verdict)
+
+
+# Linux-only checks an intent file can name.
+CHECKS = {
+    "bond_member": Check(
+        ("bond", "member"),
+        "collect_bond",
+        ("bond",),
+        lambda ev, _dt, p, e: check_bond_member(ev, p["bond"], p["member"], e),
+    ),
+}

@@ -13,13 +13,19 @@ evidence replays to the same verdict without the device.
 from __future__ import annotations
 
 import importlib
+import json
+import shutil
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, TypedDict
+
+import yaml
 
 from network_toolkit.exceptions import NetworkToolkitError
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Collection, Mapping
+    from collections.abc import Collection
     from types import ModuleType
 
     from network_toolkit.client import NetworkaClient
@@ -334,3 +340,314 @@ def check_rebooted(
     """Compare whether the uptime went down between two readings."""
     normalize = _normalizer(device_type, "uptime_ns")
     return _compare(expected, lambda: normalize(after) < normalize(before))
+
+
+# Intent files: run every item against the devices, save the evidence, replay it.
+
+Rollup = Literal["pass", "fail", "unverified"]
+ITEM_KEYS = {"name", "device", "check", "params", "expected", "source"}
+INTENT_FILE = "intent.yaml"
+EVIDENCE_FILE = "evidence.json"
+
+
+class IntentError(NetworkToolkitError):
+    """An intent file, its evidence, or an item cannot be used."""
+
+
+@dataclass(frozen=True, slots=True)
+class Check:
+    """How to collect and evaluate one named check.
+
+    `collector` names a function of the platform module, called with the
+    client, the device and the `collect_args` params. `normalizer` names the
+    platform normalizer a neutral check needs, `None` for a platform check.
+    """
+
+    params: tuple[str, ...]
+    collector: str
+    collect_args: tuple[str, ...]
+    evaluate: Callable[[Mapping[str, Any], str, Mapping[str, Any], Any], IntentResult]
+    normalizer: str | None = None
+
+
+CHECKS: dict[str, Check] = {
+    "bridge_port": Check(
+        ("bridge", "port"),
+        "collect_bridge_port",
+        ("bridge", "port"),
+        lambda ev, dt, p, e: check_bridge_port(ev, dt, p["bridge"], p["port"], e),
+        "bridge_port",
+    ),
+    "bridge_port_forwarding": Check(
+        ("bridge", "port"),
+        "collect_bridge_port",
+        ("bridge", "port"),
+        lambda ev, dt, p, e: check_bridge_port_forwarding(
+            ev, dt, p["bridge"], p["port"], expected=e
+        ),
+        "bridge_port",
+    ),
+    "bridge_ports": Check(
+        ("bridge",),
+        "collect_bridge",
+        ("bridge",),
+        lambda ev, dt, p, e: check_bridge_ports(ev, dt, p["bridge"], e),
+        "bridge_ports",
+    ),
+    "stp_bridge": Check(
+        ("bridge",),
+        "collect_bridge",
+        ("bridge",),
+        lambda ev, dt, p, e: check_stp_bridge(ev, dt, p["bridge"], e),
+        "stp_bridge",
+    ),
+    "stp_mode": Check(
+        ("bridge",),
+        "collect_stp_mode",
+        ("bridge",),
+        lambda ev, dt, p, e: check_stp_mode(ev, dt, p["bridge"], e),
+        "stp_mode",
+    ),
+    "mlag": Check(
+        ("bridge",),
+        "collect_bridge",
+        ("bridge",),
+        lambda ev, dt, p, e: check_mlag(ev, dt, p["bridge"], e),
+        "mlag",
+    ),
+    "lacp_member": Check(
+        ("bond", "member"),
+        "collect_bond",
+        ("bond",),
+        lambda ev, dt, p, e: check_lacp_member(ev, dt, p["bond"], p["member"], e),
+        "lacp_member",
+    ),
+    "lacp_partner_system": Check(
+        ("bond", "member"),
+        "collect_bond",
+        ("bond",),
+        lambda ev, dt, p, e: check_lacp_partner_system(
+            ev, dt, p["bond"], p["member"], e
+        ),
+        "lacp_member",
+    ),
+    "host_entry": Check(
+        ("bridge", "mac"),
+        "collect_host_entry",
+        ("mac",),
+        lambda ev, dt, p, e: check_host_entry(ev, dt, p["bridge"], p["mac"], e),
+        "host_interface",
+    ),
+    "interface_up": Check(
+        ("interface",),
+        "collect_interface",
+        ("interface",),
+        lambda ev, dt, p, e: check_interface_up(ev, dt, p["interface"], expected=e),
+        "interface_up",
+    ),
+}
+
+
+@dataclass(frozen=True, slots=True)
+class IntentItem:
+    """One line of an intent file. `where` names the file and item for errors."""
+
+    device: str
+    check: str
+    params: dict[str, Any]
+    expected: Any
+    name: str | None = None
+    source: str | None = None
+    where: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class IntentReport:
+    """Results in item order, the roll-up verdict and the evidence they came from."""
+
+    verdict: Rollup
+    results: list[tuple[IntentItem, IntentResult]]
+    evidence: dict[str, Any]
+
+
+def _platform_checks() -> dict[str, dict[str, Check]]:
+    return {name: platform(name).CHECKS for name in PLATFORMS}
+
+
+def load_intent(path: str | Path) -> list[IntentItem]:
+    """Read and strictly validate an intent file: a YAML list of items."""
+    path = Path(path)
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as error:
+        msg = f"{path}: cannot read the intent file: {error}"
+        raise IntentError(msg) from None
+    if not isinstance(data, list) or not data:
+        msg = f"{path}: the intent file must be a non-empty list of items"
+        raise IntentError(msg)
+    known = set(CHECKS) | {
+        check for checks in _platform_checks().values() for check in checks
+    }
+    items = []
+    for number, raw in enumerate(data, 1):
+        where = f"{path} item {number}"
+        if not isinstance(raw, dict):
+            msg = f"{where}: an item must be a mapping"
+            raise IntentError(msg)
+        if isinstance(raw.get("name"), str):
+            where += f" ({raw['name']})"
+        if unknown := set(raw) - ITEM_KEYS:
+            msg = (
+                f"{where}: unknown keys {sorted(unknown)}; allowed: {sorted(ITEM_KEYS)}"
+            )
+            raise IntentError(msg)
+        if missing := {"device", "check", "params", "expected"} - set(raw):
+            msg = f"{where}: missing keys {sorted(missing)}"
+            raise IntentError(msg)
+        if not isinstance(raw["device"], str) or not isinstance(raw["check"], str):
+            msg = f"{where}: device and check must be strings"
+            raise IntentError(msg)
+        if raw["check"] not in known:
+            msg = f"{where}: unknown check {raw['check']!r}; known: {', '.join(sorted(known))}"
+            raise IntentError(msg)
+        if not isinstance(raw["params"], dict):
+            msg = f"{where}: params must be a mapping"
+            raise IntentError(msg)
+        for key in ("name", "source"):
+            if raw.get(key) is not None and not isinstance(raw[key], str):
+                msg = f"{where}: {key} must be a string"
+                raise IntentError(msg)
+        items.append(
+            IntentItem(
+                raw["device"],
+                raw["check"],
+                dict(raw["params"]),
+                raw["expected"],
+                raw.get("name"),
+                raw.get("source"),
+                where,
+            )
+        )
+    return items
+
+
+def _resolve(item: IntentItem, device_type: str) -> Check:
+    """The check for this item on this platform, or an error naming the item."""
+    try:
+        module = platform(device_type)
+    except NetworkToolkitError as error:
+        msg = f"{item.where}: device {item.device}: {error.message}"
+        raise IntentError(msg) from None
+    check = CHECKS.get(item.check) or module.CHECKS.get(item.check)
+    if check is None:
+        owners = [
+            name for name, checks in _platform_checks().items() if item.check in checks
+        ]
+        msg = f"{item.where}: check {item.check!r} is only for {', '.join(owners)}, not {device_type}"
+        raise IntentError(msg)
+    if set(item.params) != set(check.params):
+        msg = f"{item.where}: {item.check} takes params {list(check.params)}, not {sorted(item.params)}"
+        raise IntentError(msg)
+    for name in (check.collector, check.normalizer):
+        if name is not None and not hasattr(module, name):
+            msg = (
+                f"{item.where}: {device_type} does not support {item.check} (no {name})"
+            )
+            raise IntentError(msg)
+    return check
+
+
+def _rollup(results: list[IntentResult]) -> Rollup:
+    verdicts = {result.verdict for result in results}
+    if "mismatch" in verdicts:
+        return "fail"
+    return "unverified" if "unavailable" in verdicts else "pass"
+
+
+def replay_intent(
+    intent: list[IntentItem], evidence: Mapping[str, Any]
+) -> IntentReport:
+    """Evaluate every item from saved evidence, without devices.
+
+    `evidence` is the content of the evidence file written by `run_intent`.
+    """
+    saved = evidence.get("items") if isinstance(evidence, Mapping) else None
+    if not isinstance(saved, list) or len(saved) != len(intent):
+        msg = f"the evidence must hold one entry per intent item ({len(intent)})"
+        raise IntentError(msg)
+    results = []
+    for item, entry in zip(intent, saved, strict=True):
+        if not isinstance(entry, dict) or (entry.get("device"), entry.get("check")) != (
+            item.device,
+            item.check,
+        ):
+            msg = f"{item.where}: the evidence entry is for another device or check"
+            raise IntentError(msg)
+        device_type = entry.get("device_type")
+        replies = entry.get("evidence")
+        if not isinstance(device_type, str) or not isinstance(replies, dict):
+            msg = f"{item.where}: the evidence entry has no device_type or evidence"
+            raise IntentError(msg)
+        check = _resolve(item, device_type)
+        results.append(
+            (item, check.evaluate(replies, device_type, item.params, item.expected))
+        )
+    return IntentReport(
+        _rollup([result for _, result in results]), results, dict(evidence)
+    )
+
+
+def run_intent(
+    client: NetworkaClient,
+    intent: list[IntentItem],
+    save_dir: str | Path | None = None,
+    source: str | Path | None = None,
+    **run_options: Any,
+) -> IntentReport:
+    """Collect every item from its device, then evaluate it as `replay_intent` does.
+
+    The device type comes from the client's inventory. Every item is checked
+    before any device is read. With `save_dir`, the directory receives
+    `evidence.json` and, when `source` names the intent file, a copy of it as
+    `intent.yaml`. `run_options` are passed to `NetworkaClient.run`.
+    """
+    plans = []
+    for item in intent:
+        config = client.devices.get(item.device)
+        if config is None or not config.device_type:
+            msg = f"{item.where}: device {item.device!r} is not in the inventory"
+            raise IntentError(msg)
+        plans.append((item, config.device_type, _resolve(item, config.device_type)))
+    entries = []
+    for item, device_type, check in plans:
+        collect = getattr(platform(device_type), check.collector)
+        args = [item.params[name] for name in check.collect_args]
+        replies = collect(client, item.device, *args, **run_options)
+        entries.append(
+            {
+                "device": item.device,
+                "device_type": device_type,
+                "check": item.check,
+                "evidence": replies,
+            }
+        )
+    evidence = {"items": entries}
+    if save_dir is not None:
+        folder = Path(save_dir)
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / EVIDENCE_FILE).write_text(json.dumps(evidence, indent=2) + "\n")
+        if source is not None:
+            shutil.copyfile(source, folder / INTENT_FILE)
+    return replay_intent(intent, evidence)
+
+
+def replay_directory(folder: str | Path) -> IntentReport:
+    """Replay a directory written by `run_intent`: `intent.yaml` and `evidence.json`."""
+    folder = Path(folder)
+    intent = load_intent(folder / INTENT_FILE)
+    try:
+        evidence = json.loads((folder / EVIDENCE_FILE).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        msg = f"{folder / EVIDENCE_FILE}: cannot read the evidence: {error}"
+        raise IntentError(msg) from None
+    return replay_intent(intent, evidence)

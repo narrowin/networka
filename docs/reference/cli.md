@@ -46,6 +46,7 @@ $ nw [OPTIONS] COMMAND [ARGS]...
 * `schema`: JSON schema management commands
 * `sync`: Sync inventory from external sources
 * `platforms`: Inspect Scrapli definitions and registered...
+* `intent`: Check device state against an intent file...
 
 ## `nw info`
 
@@ -782,6 +783,68 @@ $ nw platforms info [OPTIONS] {platform}
 **Arguments**:
 
 * `platform <str>`: Platform or definition name (e.g., mikrotik_routeros, cumulus_linux)  [required]
+
+**Options**:
+
+* `--help`: Show this message and exit.
+
+## `nw intent`
+
+Check device state against an intent file and replay saved evidence
+
+**Usage**:
+
+```console
+$ nw intent [OPTIONS] COMMAND [ARGS]...
+```
+
+**Options**:
+
+* `--help`: Show this message and exit.
+
+**Commands**:
+
+* `run`: Read every item from its device, check it,...
+* `replay`: Check saved evidence again without devices.
+
+### `nw intent run`
+
+Read every item from its device, check it, and print the verdicts.
+
+Exit status: 0 pass, 1 fail, 2 unverified or an unusable intent file.
+
+**Usage**:
+
+```console
+$ nw intent run [OPTIONS] {file}
+```
+
+**Arguments**:
+
+* `file <path>`: Intent file (YAML list of items)  [required]
+
+**Options**:
+
+* `-s, --save <path>`: Directory for intent.yaml and evidence.json
+* `-c, --config <path>`: Configuration directory or file path  [default: /Users/md/Library/Application Support/networka]
+* `-i, --interactive-auth`: Prompt for username and password interactively
+* `--help`: Show this message and exit.
+
+### `nw intent replay`
+
+Check saved evidence again without devices.
+
+Exit status: 0 pass, 1 fail, 2 unverified or unusable evidence.
+
+**Usage**:
+
+```console
+$ nw intent replay [OPTIONS] {directory}
+```
+
+**Arguments**:
+
+* `directory <path>`: Directory written by &#x27;nw intent run --save&#x27;  [required]
 
 **Options**:
 

@@ -1,5 +1,6 @@
 """Tests for MikroTik RouterOS platform operations."""
 
+import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -12,9 +13,11 @@ from network_toolkit.platforms.base import BackupResult
 from network_toolkit.platforms.mikrotik_routeros.intent import (
     PORT_MONITOR,
     PORT_STATS,
+    RESOURCE,
     UPTIME,
     bond_monitor,
     bridge_monitor,
+    bridge_print,
     check_bridge_port_forwarding,
     check_property,
     check_version,
@@ -22,7 +25,7 @@ from network_toolkit.platforms.mikrotik_routeros.intent import (
     collect_bridge_port,
     ethernet_monitor,
     host_print,
-    port_monitor,
+    menu_print,
 )
 from network_toolkit.platforms.mikrotik_routeros.operations import (
     MikroTikRouterOSOperations,
@@ -308,81 +311,100 @@ def test_bridge_port_forwarding_collects_and_replays() -> None:
     assert check_bridge_port_forwarding(failed, "bridge", "ether1").reason == "timeout"
 
 
-# One joined read as the MLAG lab saves it; client1 is inactive, so its cells are blank.
-STATE_COMMAND = ";".join(
-    (
-        UPTIME,
-        ethernet_monitor("ether2"),
-        bridge_monitor("bridge"),
-        port_monitor("bridge").replace(" ", "/", 3),
-        host_print("02:00:00:11:00:12"),
-        bond_monitor("client2"),
-    )
-)
-STATE_OUTPUT = """uptime-ns=75000000000
-         name: ether2
-       status: no-link
-              bridge-id: 0x1000.52:54:00:E1:0B:01
-            root-bridge: yes
-         root-bridge-id: 0x1000.52:54:00:E1:0B:01
-              root-port: none
-       topology-changes: 2
-             mlag-state: connected
-       mlag-active-role: primary
-            interface: ether2          client1  client2
-               status: in-bridge       inactive in-bridge
-                 role: designated-port          root-port
-            edge-port: no                       yes
-     topology-changes: 1                      1
-           forwarding: yes                      yes
-Flags: D - DYNAMIC
-3 D mac-address=02:00:00:11:00:12 vid=110 interface=client2 bridge=bridge
-    on-interface=client2
-
-Flags: A - ACTIVE; P - PARTNER
-AP port=ether4 key=15 flags="ATGSCD--" partner-sys-id=02:00:00:11:00:12
-   partner-sys-priority=65535 partner-key=15 partner-flags="ATG---F-"
-"""
-STATE = {
-    STATE_COMMAND: {"command": STATE_COMMAND, "output": STATE_OUTPUT, "error": None}
+# RouterOS JSON replies of a Small lab MLAG peer, one per command.
+BRIDGE = {
+    "bridge-id": "0x1000.52:54:00:E1:0B:01",
+    "root-bridge": True,
+    "root-bridge-id": "0x1000.52:54:00:E1:0B:01",
+    "root-port": "none",
+    "topology-changes": 2,
+    "mlag-state": "connected",
+    "mlag-active-role": "primary",
 }
+BOND = [
+    {
+        "port": "ether4",
+        "flags": "ATGSCD--",
+        "partner-sys-id": "02:00:00:11:00:12",
+        "partner-sys-priority": 65535,
+        "partner-flags": "ATG---F-",
+    }
+]
+HOST = [
+    {
+        "mac-address": "02:00:00:11:00:12",
+        "bridge": "bridge",
+        "interface": "client2",
+        "on-interface": "client2",
+    }
+]
+REPLIES = {
+    bridge_monitor("bridge"): BRIDGE,
+    PORT_STATS: json.loads(PORTS),
+    bond_monitor("client2"): BOND,
+    host_print("02:00:00:11:00:12"): HOST,
+    ethernet_monitor("ether2"): {"name": "ether2", "status": "no-link"},
+    UPTIME: 75000000000,
+}
+
+
+def routeros_evidence(*commands: str) -> dict:
+    return {
+        c: {"command": c, "output": json.dumps(REPLIES[c]), "error": None}
+        for c in commands
+    }
+
+
 ROS = "mikrotik_routeros"
+STATE = routeros_evidence(*REPLIES)
 
 
-def test_collect_joins_commands_into_one_read() -> None:
+def test_collect_splits_one_read_into_replies() -> None:
+    commands = (UPTIME, bridge_monitor("bridge"))
     client = MagicMock()
+    output = "\n".join(json.dumps(REPLIES[c]) for c in commands)
     client.run.return_value = MagicMock(
-        command_results=[DeviceCommandResult("r1", "x", STATE_OUTPUT)]
+        command_results=[DeviceCommandResult("r1", "x", output)]
     )
-    evidence = collect(client, "r1", UPTIME, bridge_monitor("bridge"))
-    line = f"{UPTIME};{bridge_monitor('bridge')}"
-    assert evidence == {line: {"command": line, "output": STATE_OUTPUT, "error": None}}
+    assert collect(client, "r1", *commands) == routeros_evidence(*commands)
+    client.run.return_value = MagicMock(
+        command_results=[DeviceCommandResult("r1", "x", "1")]
+    )
+    short = collect(client, "r1", *commands)
+    assert short[UPTIME]["error"] == "the joined read returned 1 lines for 2 commands"
 
 
-def test_bridge_port_reads_cells_by_column() -> None:
+def test_bridge_port() -> None:
+    replies = {
+        PORT_STATS: PORTS,
+        PORT_MONITOR.format(port_id="*1"): (
+            '{".id":"*1","forwarding":true,"role":"root-port","edge-port":false}'
+        ),
+    }
+    evidence = {
+        "stats": {"command": PORT_STATS, "output": replies[PORT_STATS], "error": None},
+        "monitor": {
+            "command": PORT_MONITOR.format(port_id="*1"),
+            "output": replies[PORT_MONITOR.format(port_id="*1")],
+            "error": None,
+        },
+    }
     result = intent.check_bridge_port(
-        STATE, ROS, "bridge", "client2", {"role": "root", "edge": True}
+        evidence, ROS, "bridge", "ether1", {"role": "root", "edge": False}
     )
     assert (result.observed, result.verdict) == (
-        {"role": "root", "edge": True},
+        {"role": "root", "edge": False},
         "match",
-    )
-    blank = intent.check_bridge_port_forwarding(STATE, ROS, "bridge", "client1")
-    assert (blank.verdict, blank.reason) == (
-        "unavailable",
-        "bridge port bridge/client1 has no forwarding",
     )
 
 
 def test_bridge_ports() -> None:
-    result = intent.check_bridge_ports(STATE, ROS, "bridge", {"client1", "ether2"})
-    assert (result.observed, result.verdict) == (
-        ["client1", "client2", "ether2"],
-        "mismatch",
-    )
+    evidence = {"stats": STATE[PORT_STATS]}
+    result = intent.check_bridge_ports(evidence, ROS, "bridge", {"ether2"})
+    assert (result.observed, result.verdict) == (["ether1"], "mismatch")
 
 
-def test_stp_bridge_ignores_the_port_table() -> None:
+def test_stp_bridge() -> None:
     expected = {
         "root_bridge_id": "0x1000.52:54:00:e1:0b:01",
         "root_bridge": True,
@@ -431,25 +453,24 @@ def test_interface_up() -> None:
 
 
 def test_rebooted() -> None:
-    after = {
-        "u": {"command": UPTIME, "output": "uptime-ns=1000000000\n", "error": None}
-    }
+    after = {UPTIME: {"command": UPTIME, "output": "1000000000", "error": None}}
     assert intent.check_rebooted(STATE, after, ROS).verdict == "match"
     assert intent.check_rebooted(after, STATE, ROS).observed is False
 
 
-BRIDGES = "/interface bridge print detail without-paging"
+BRIDGE_PRINT = '[{"name":"bridge","protocol-mode":"none","mlag-lacp-fallback":true}]'
+PORT_PRINT = '[{"interface":"client2","bridge":"bridge","pvid":110,"bpdu-guard":false}]'
 CONFIG = {
-    "c": {
-        "command": f"{BRIDGES};/interface bridge port print detail without-paging",
-        "output": """Flags: R - RUNNING
-0 R name="bridge" mtu=auto protocol-mode=none vlan-filtering=yes mlag-peer-port=ether2
-    mlag-init-delay=1m mlag-lacp-fallback=yes
-
-0  interface=client2 bridge=bridge priority=0x80 edge=yes pvid=110 bpdu-guard=no
-""",
+    bridge_print("bridge"): {
+        "command": bridge_print("bridge"),
+        "output": BRIDGE_PRINT,
         "error": None,
-    }
+    },
+    menu_print("/interface/bridge/port"): {
+        "command": menu_print("/interface/bridge/port"),
+        "output": PORT_PRINT,
+        "error": None,
+    },
 }
 
 
@@ -459,22 +480,16 @@ def test_stp_mode() -> None:
 
 
 def test_property() -> None:
-    port = "/interface bridge port"
-    assert check_property(
-        CONFIG, port, {"interface": "client2"}, "pvid", "110"
-    ).verdict == ("match")
-    wrapped = check_property(
-        CONFIG, "/interface bridge", {"name": "bridge"}, "mlag-lacp-fallback", "yes"
+    port = "/interface/bridge/port"
+    where = {"interface": "client2"}
+    assert check_property(CONFIG, port, where, "pvid", 110).verdict == "match"
+    assert check_property(CONFIG, port, where, "bpdu-guard", False).verdict == "match"
+    assert check_property(CONFIG, port, {"interface": "x"}, "pvid", 1).reason == (
+        "expected one entry with interface=x, found 0"
     )
-    assert wrapped.verdict == "match"
-    assert check_property(
-        CONFIG, port, {"interface": "ether9"}, "pvid", "1"
-    ).reason == ("expected one entry with interface=ether9, found 0")
 
 
 def test_version() -> None:
-    output = "      uptime: 4m19s\n     version: 7.26beta7 (testing)\n"
-    evidence = {
-        "r": {"command": "/system/resource/print", "output": output, "error": None}
-    }
+    output = '{"uptime":"4m19s","version":"7.26beta7 (testing)"}'
+    evidence = {RESOURCE: {"command": RESOURCE, "output": output, "error": None}}
     assert check_version(evidence, "7.26beta7").verdict == "match"
