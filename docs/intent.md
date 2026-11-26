@@ -213,7 +213,12 @@ Neutral checks compare only the fields named in `expected`.
 
 `ping` is the production counterpart of the MLAG lab's reachability
 probes. The lab's 100 ms outage probes with per-port captures stay in that
-lab. A tolerance for partial loss is out of scope, as there are no
+lab. A reply that says the destination is unreachable, such as Linux
+`ping: connect: Network is unreachable`, "Destination Host Unreachable", or
+a RouterOS last row whose `status` reports it unreachable, counts as no
+probe answered and fails; only an unparseable reply or one for another
+address is `error`, as in ANTA's VerifyReachability. A tolerance for
+partial loss is out of scope, as there are no
 operators: expect `reachable: true`, or the exact `received` count. On
 Linux the `count` probes must finish within the device's `command_timeout`.
 

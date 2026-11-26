@@ -178,9 +178,14 @@ def ping(
 
     The `PING <dest>` header and the `--- <dest> ping statistics ---` line
     identify the reply, the header names the interface when one was given,
-    and the number sent must be `count`.
+    and the number sent must be `count`. A reply that is only
+    `ping: connect: Network is unreachable` means no route to `dest`: none of
+    the `count` probes is answered. A "Destination Host Unreachable" reply
+    carries the statistics line and is read from it.
     """
     text = intent.reply_output(evidence, ping_command(dest, count, interface))
+    if text.strip() == "ping: connect: Network is unreachable":
+        return {"sent": count, "received": 0, "reachable": False}
     header = _one(
         re.findall(rf"(?m)^PING {re.escape(dest)} \(.*$", text), f"PING {dest} header"
     )

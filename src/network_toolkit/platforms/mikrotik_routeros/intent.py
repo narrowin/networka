@@ -199,7 +199,9 @@ def ping(
 ) -> dict[str, Any]:
     """`sent`, `received` and `reachable` from the last row of the ping reply.
 
-    The last row must name `dest` as its `host` and report `count` sent.
+    The last row must name `dest` as its `host` and report `count` sent. A
+    last row without totals whose `status` reports the destination
+    unreachable means none of the `count` probes is answered.
     """
     rows = _rows(evidence, ping_command(dest, count, interface), "ping")
     if not rows:
@@ -209,6 +211,14 @@ def ping(
     if last.get("host") != dest:
         msg = f"the ping reply is not for {dest}: host is {last.get('host')!r}"
         raise ValueError(msg)
+    status = last.get("status")
+    if (
+        "sent" not in last
+        and "received" not in last
+        and isinstance(status, str)
+        and "unreachable" in status
+    ):
+        return {"sent": count, "received": 0, "reachable": False}
     sent = _field(last, "sent", int, f"ping {dest}")
     received = _field(last, "received", int, f"ping {dest}")
     if sent != count:
