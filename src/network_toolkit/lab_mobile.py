@@ -15,8 +15,6 @@ from typing import Any
 from network_toolkit import lab, lab_faults, traffic
 
 MAC = re.compile(r"(?:[0-9a-f]{2}:){5}[0-9a-f]{2}")
-# Allow a frame already on a cable to reach the switch TAP after installing a filter.
-FILTER_SETTLE_NS = 50_000_000
 
 
 @dataclass(frozen=True)
@@ -679,7 +677,7 @@ def _silence_proof(
     )
     _require(
         any(stamp < applied for stamp in frames)
-        and not any(applied + FILTER_SETTLE_NS <= stamp < cleared for stamp in frames),
+        and not any(applied <= stamp < cleared for stamp in frames),
         "The switch TAPs did not prove the host sent before the cut and was silent during it",
     )
     first = next((stamp for stamp in frames if cleared <= stamp < end), None)
