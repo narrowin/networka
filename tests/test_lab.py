@@ -64,7 +64,10 @@ def test_parse_topology_reads_nodes_and_links() -> None:
     parsed = lab.parse_topology(TOPOLOGY)
     assert parsed.name == "mlag-small"
     assert parsed.nodes["dc1-traffic-host1"] == lab.Node(
-        "dc1-traffic-host1", "linux", "clab-mlag-small-dc1-traffic-host1"
+        "dc1-traffic-host1",
+        "linux",
+        "clab-mlag-small-dc1-traffic-host1",
+        "172.30.215.16",
     )
     end = lab.point("dc1-traffic-host1:eth1")
     assert parsed.peer(end) == lab.Point("dc1-core-mlag1", "eth2")
@@ -92,9 +95,3 @@ def test_qemu_layout_maps_taps_to_nics_and_finds_the_monitor() -> None:
     assert netdevs == {"mgmt": "tap0", "d2": "tap2"}
     assert devices == {"d2": "nic2"}
     assert qmp == ("127.0.0.1", 5001)
-
-
-def test_kernel_drops_reads_the_tcpdump_summary() -> None:
-    log = "listening on bond0\n120 packets captured\n120 packets received by filter\n0 packets dropped by kernel\n"
-    assert lab.kernel_drops(log) == 0
-    assert lab.kernel_drops("listening on bond0\n") is None

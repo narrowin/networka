@@ -1,8 +1,8 @@
 """Access to a deployed containerlab lab from the lab host.
 
 The module reads the lab directory that containerlab writes, runs commands in a
-node's network namespace, starts packet captures and numbered ping streams, and
-sets a link down or up at both ends. It needs root on the lab host, next to
+node's network namespace, starts packet captures and ping streams, and sets a
+cable down or up. It needs root on the lab host, next to
 containerlab. It knows nothing about the devices in the lab.
 
 A capture point is written `node:interface`. `node` is the containerlab node
@@ -14,11 +14,9 @@ Every action is written to `events.jsonl` with its epoch and monotonic time.
 
 from __future__ import annotations
 
-import hashlib
 import itertools
 import json
 import os
-import re
 import signal
 import socket
 import subprocess
@@ -33,10 +31,16 @@ from typing import Any, NamedTuple
 from network_toolkit.exceptions import NetworkToolkitError
 
 TOPOLOGY_DATA = "topology-data.json"
+# tcpdump listens within a few hundred milliseconds, so 5 s only catches one that cannot start.
 LISTEN_TIMEOUT_S = 5.0
-CONFIRM_TIMEOUT_S = 2.0
+# A veth changes carrier within milliseconds, so 1 s is ample to see the far end follow.
+CONFIRM_TIMEOUT_S = 1.0
+# ping and tcpdump stop within milliseconds of SIGINT, so 5 s only catches a hung process.
 STOP_TIMEOUT_S = 5.0
+# ip and nsenter answer within milliseconds, so 12 s only catches a hung command.
 COMMAND_TIMEOUT_S = 12.0
+# The QEMU monitor answers on the loopback within milliseconds, so 3 s only catches a hung one.
+QMP_TIMEOUT_S = 3.0
 
 
 class LabError(NetworkToolkitError):
@@ -55,11 +59,12 @@ class Point(NamedTuple):
 
 @dataclass(frozen=True)
 class Node:
-    """One containerlab node: its name, kind and container name."""
+    """One containerlab node: its name, kind, container name and management address."""
 
     name: str
     kind: str
     container: str
+    address: str
 
 
 @dataclass(frozen=True)
@@ -184,7 +189,12 @@ def parse_topology(data: Mapping[str, Any]) -> Lab:
     """The nodes and links of a containerlab `topology-data.json`."""
     try:
         nodes = {
-            name: Node(name, str(node["kind"]), str(node["longname"]))
+            name: Node(
+                name,
+                str(node["kind"]),
+                str(node["longname"]),
+                str(node.get("mgmt-ipv4-address", "")),
+            )
             for name, node in data["nodes"].items()
         }
         links = tuple(
@@ -306,7 +316,7 @@ def qmp_exchange(
     host: str, port: int, command: str, arguments: Mapping[str, Any]
 ) -> dict[str, Any]:
     with (
-        socket.create_connection((host, port), timeout=3) as conn,
+        socket.create_connection((host, port), timeout=QMP_TIMEOUT_S) as conn,
         conn.makefile("rwb") as stream,
     ):
         if "QMP" not in json.loads(stream.readline()):
@@ -332,12 +342,6 @@ def qmp_exchange(
     }
 
 
-def kernel_drops(log: str) -> int | None:
-    """The kernel drop count that tcpdump prints when it stops, or None."""
-    found = re.search(r"^(\d+) packets? dropped by kernel$", log, re.MULTILINE)
-    return int(found.group(1)) if found else None
-
-
 def file_name(end: Point) -> str:
     return f"{end.node}-{end.interface}"
 
@@ -351,12 +355,12 @@ class Process:
 
 
 class Session:
-    """Captures, streams and link actions of one test run, saved in one directory.
+    """Captures, streams and cable changes of one test run, saved in one directory.
 
-    The directory gets `captures/` with one pcap and log per capture point and
-    `pcap.sha256`, `streams/` with one ping log per stream, and `events.jsonl`.
-    Use it as a context manager: on leaving, also after an error or Ctrl-C,
-    every process is stopped and every link it set down is set up again.
+    The directory gets `captures/` with one pcap and tcpdump log per capture
+    point, `streams/` with one ping log per stream, and `events.jsonl`. Use it
+    as a context manager: on leaving, also after an error or Ctrl-C, every
+    process is stopped and every cable it set down is set up again.
     """
 
     def __init__(self, lab: Lab, directory: Path) -> None:
@@ -400,56 +404,57 @@ class Session:
         self.processes.append(process)
         return process
 
-    def start_capture(self, where: str) -> Path:
-        """Start tcpdump at a capture point and wait until it listens; return the pcap path."""
-        end = point(where)
-        pcap = self.directory / "captures" / f"{file_name(end)}.pcap"
-        command = self.lab.ns(
-            end.node,
-            "tcpdump",
-            "-n",
-            "-U",
-            "-s",
-            "0",
-            "-B",
-            "4096",
-            "-Z",
-            "root",
-            "-i",
-            end.interface,
-            "-w",
-            str(pcap),
-        )
-        process = self.launch("capture", str(end), command, pcap.with_suffix(".log"))
+    def start_captures(self, points: list[str]) -> dict[str, Path]:
+        """Start tcpdump at every capture point, then wait once until all listen.
+
+        `-U --immediate-mode` writes each packet when it arrives, so a stop
+        loses no buffered tail and a pcap can be read while it is written.
+        Returns the pcap path per capture point.
+        """
+        started: dict[str, tuple[Process, Path]] = {}
+        for where in points:
+            end = point(where)
+            pcap = self.directory / "captures" / f"{file_name(end)}.pcap"
+            command = self.lab.ns(
+                end.node,
+                "tcpdump",
+                "-U",
+                "--immediate-mode",
+                "-i",
+                end.interface,
+                "-w",
+                str(pcap),
+            )
+            log = pcap.with_suffix(".log")
+            started[str(end)] = (self.launch("capture", str(end), command, log), pcap)
         deadline = time.monotonic() + LISTEN_TIMEOUT_S
-        while "listening on" not in process.log.read_text(errors="replace"):
-            if process.child.poll() is not None or time.monotonic() > deadline:
-                msg = f"capture at {end} did not start: {process.log.read_text(errors='replace').strip()}"
-                raise LabError(msg)
+        waiting = dict(started)
+        while waiting:
+            for where, (process, pcap) in list(waiting.items()):
+                if "listening on" in process.log.read_text(errors="replace"):
+                    del waiting[where]
+                    self.mark(
+                        "capture_started",
+                        point=where,
+                        pcap=str(pcap.relative_to(self.directory)),
+                    )
+                elif process.child.poll() is not None or time.monotonic() > deadline:
+                    text = process.log.read_text(errors="replace").strip()
+                    msg = f"capture at {where} did not start: {text}"
+                    raise LabError(msg)
             time.sleep(0.05)
-        self.mark(
-            "capture_started",
-            point=str(end),
-            pcap=str(pcap.relative_to(self.directory)),
-        )
-        return pcap
+        return {where: pcap for where, (_, pcap) in started.items()}
 
     def start_stream(
-        self,
-        ident: int,
-        source: str,
-        destination: str,
-        address: str | None = None,
-        interval: float = 0.1,
+        self, ident: int, name: str, source: str, destination: str, interval_s: float
     ) -> Path:
-        """Start a numbered ping from `source` to `destination`; return the ping log path.
+        """Start a ping from `source` to the IPv4 address of `destination`; return its log.
 
-        `ident` is the ICMP identifier. The destination address is the IPv4
-        address of the destination interface unless `address` is given.
+        `ident` is the ICMP identifier that tells the pings of this stream apart.
         """
         start, end = point(source), point(destination)
-        target = address or self.lab.ipv4(end)
-        log = self.directory / "streams" / f"{ident}.log"
+        target = self.lab.ipv4(end)
+        log = self.directory / "streams" / f"{name}.log"
         command = self.lab.ns(
             start.node,
             "ping",
@@ -457,45 +462,47 @@ class Session:
             "-D",
             "-O",
             "-i",
-            str(interval),
+            str(interval_s),
             "-e",
             str(ident),
             "-I",
             start.interface,
             target,
         )
-        self.launch("stream", str(ident), command, log)
+        self.launch("stream", name, command, log)
         self.mark(
             "stream_started",
-            id=ident,
+            stream=name,
+            ident=ident,
             source=str(start),
             destination=str(end),
             address=target,
-            interval_s=interval,
             log=str(log.relative_to(self.directory)),
         )
         return log
 
     def set_link(self, where: str, state: str) -> dict[str, Any]:
-        """Set the link with endpoint `where` down or up at both ends.
+        """Set the cable with endpoint `where` down or up.
 
         An end on a node that runs in QEMU gets the change on its container
         interface and on its QEMU NIC through the QEMU monitor, because the guest
         sees a carrier change only that way. When no end runs in QEMU, both
-        container interfaces change. The carrier is then confirmed at both
-        container interfaces. Returns the `link_observed` event.
+        container interfaces change. The carrier is then confirmed at each end
+        the engine did not set itself, the far end. Returns the `link_observed`
+        event.
         """
         if state not in ("down", "up"):
-            msg = f"a link state is down or up, not {state!r}"
+            msg = f"a cable state is down or up, not {state!r}"
             raise LabError(msg)
         up = state == "up"
         first = point(where)
         ends = (first, self.lab.peer(first))
         qemu = {end: nic for end in ends if (nic := self.lab.qemu(end)) is not None}
         changed = [end for end in ends if end in qemu] or list(ends)
+        far = [end for end in ends if end not in changed]
         if not up:
             self.down.add(first)
-        start = self.mark(
+        self.mark(
             "link_start", point=str(first), state=state, ends=[str(e) for e in ends]
         )
         with ThreadPoolExecutor(max_workers=len(changed) + len(qemu)) as jobs:
@@ -525,7 +532,7 @@ class Session:
                 for end, job in guest.items()
                 if not job.exception()
             }
-        self.mark(
+        applied = self.mark(
             "link_applied",
             point=str(first),
             state=state,
@@ -538,35 +545,34 @@ class Session:
         seen: dict[str, int] = {}
         flags: dict[str, list[str]] = {}
         deadline = time.monotonic() + CONFIRM_TIMEOUT_S
-        while len(seen) < len(ends) and time.monotonic() < deadline:
-            for end in ends:
+        while len(seen) < len(far) and time.monotonic() < deadline:
+            for end in far:
                 flags[str(end)] = self.lab.link_state(end)["flags"]
                 if ("LOWER_UP" in flags[str(end)]) == up:
                     seen.setdefault(str(end), time.monotonic_ns())
-            if len(seen) < len(ends):
+            if len(seen) < len(far):
                 time.sleep(0.03)
-        latency = (
-            (max(seen.values()) - start["mono_ns"]) / 1e9
-            if len(seen) == len(ends)
-            else None
-        )
+        confirmed = len(seen) == len(far)
         observed = self.mark(
             "link_observed",
             point=str(first),
             state=state,
+            far=[str(e) for e in far],
             flags=flags,
-            confirmed=sorted(seen),
-            max_latency_s=latency,
+            latency_s=(max(seen.values()) - applied["mono_ns"]) / 1e9
+            if seen and confirmed
+            else None,
+            confirmed=confirmed,
         )
-        if latency is None:
-            msg = f"carrier of {first} is not {state} at both ends after {CONFIRM_TIMEOUT_S} s: {flags}"
+        if not confirmed:
+            msg = f"carrier of {first} is not {state} at the far end after {CONFIRM_TIMEOUT_S:g} s: {flags}"
             raise LabError(msg)
         if up:
             self.down.discard(first)
         return observed
 
     def stop(self) -> dict[str, Any]:
-        """Set links up again, stop every process, write pcap.sha256; return drops and early exits.
+        """Set cables up again and stop every process; return early exits and restore errors.
 
         A second call returns the first result.
         """
@@ -590,24 +596,10 @@ class Session:
                 except subprocess.TimeoutExpired:
                     process.child.kill()
                     process.child.wait()
-        captures = [p for p in self.processes if p.kind == "capture"]
-        drops = {
-            p.name: kernel_drops(p.log.read_text(errors="replace")) for p in captures
-        }
-        sums = []
-        for process in captures:
-            pcap = process.log.with_suffix(".pcap")
-            if pcap.exists():
-                with pcap.open("rb") as stream:
-                    sums.append(
-                        f"{hashlib.file_digest(stream, 'sha256').hexdigest()}  {pcap.name}\n"
-                    )
-        (self.directory / "captures" / "pcap.sha256").write_text("".join(sums))
         epoch, mono = self.start_clock
         self.stopped = self.mark(
             "stopped",
             early_exits=early,
-            kernel_drops=drops,
             restore_errors=restore_errors,
             clock_delta_ns=(time.time_ns() - epoch) - (time.monotonic_ns() - mono),
         )

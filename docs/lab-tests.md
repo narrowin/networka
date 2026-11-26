@@ -1,250 +1,164 @@
 # Lab tests
 
-A lab test applies a fault in a containerlab lab and measures how long traffic stopped. Networka checks the device state before and after, sends numbered ping streams, captures packets at both ends of each stream and judges each step against the limits in the test file. Every run saves its evidence, and `nw test replay` computes the same result again without the lab.
+A lab test takes cables of a containerlab lab down and back and measures how long traffic stopped. Networka checks the device state before and after, sends ping streams, captures packets, reads the switch logs and judges each step against the limits and log rules of the test file. Every run saves its evidence, and `nw test replay` computes the same result again without the lab.
 
 The lab repository holds the topology, one lab file per lab and one test file per test. Networka holds the engine.
 
 ## What it needs
 
-- A deployed containerlab lab and its lab directory, the `clab-<name>/` folder that containerlab writes.
-- Root on the lab host, next to containerlab. Entering a node's network namespace and capturing packets need root.
+- A deployed containerlab lab and its lab folder, the `clab-<name>/` folder that containerlab writes.
+- Root on the lab host, because Networka enters node namespaces and captures packets.
 - `tcpdump`, `tshark`, `ping` and `nsenter` on the lab host.
-- A Networka inventory that reaches every device of the lab file's state over SSH, Linux lab nodes included.
+- A Networka device list with the lab's node names, platforms and credentials. A device without `host` gets the management address of its node from the lab's `topology-data.json`.
 
-Streams and captures run as processes on the lab host inside the network namespace of a node. All times come from the clock of the lab host.
-
-## Capture points
-
-A capture point is written `node:interface`. `node` is the containerlab node name. `interface` is the interface name inside the network namespace of that node's container, for example `dc1-traffic-host1:bond0`. A node that runs in QEMU, such as a MikroTik CHR, has a tap interface per NIC in its container, for example `dc1-core-mlag1:tap2`.
+A point is written `node:interface`, with the containerlab node name and the interface name inside that node's network namespace.
 
 ## Lab file
 
-A lab file holds what all tests of one lab share. Each test file names it.
-
 | Field | Required | Meaning |
 | --- | --- | --- |
-| `state` | Yes | Statements about the healthy lab. Networka checks them before the first step and after the last step of every test. |
-| `streams` | Yes | Numbered ping streams. Every test of the lab runs all of them. |
-| `captures` | No | Extra capture points. The endpoints of every stream are always captured. |
+| `streams` | Yes | Ping streams, each with `name`, `from` and `to` as points. Every test of the lab runs all of them. |
+| `state` | Yes | Statements, each with `statement`, an optional `source` and `checks` in the format of [intent verification](intent.md). Networka checks them before the first step and after the last step. |
+| `switch_log` | No | The file the switches log to, relative to the lab folder. Log rules need it. |
 
-A statement has these fields.
-
-| Field | Required | Meaning |
-| --- | --- | --- |
-| `statement` | Yes | One sentence that the checks prove. |
-| `source` | No | A URL or text that the statement comes from. |
-| `checks` | Yes | Intent items in the format of [intent verification](intent.md): `device`, `check`, `params`, `expected` and an optional `name`. |
-
-Networka runs all checks of all statements in one intent run and groups the results per statement. A statement passes when all its checks pass. It fails when one check fails. It is `error` when one check is `error` and none fails.
-
-A stream has these fields.
-
-| Field | Required | Meaning |
-| --- | --- | --- |
-| `id` | Yes | A number from 1 to 65535. It becomes the ICMP identifier of the pings. |
-| `from` | Yes | The capture point that sends. It sees the requests leave and the replies return. |
-| `to` | Yes | The capture point that answers. |
-| `address` | No | The IPv4 address to ping. Without it, Networka pings the first IPv4 address of `to`. |
-| `interval_ms` | No | Time between two pings, from 10 to 1000 ms. The default is 100 ms. |
-
-The interval sets the resolution of the measured outage, so the result states it for each stream.
+A stream pings the IPv4 address of its `to` interface once every 100 ms. Its ICMP identifier is its position in the file.
 
 ## Test file
 
-A test file describes one test. It holds only what is specific to the test.
-
 | Field | Required | Meaning |
 | --- | --- | --- |
-| `name` | Yes | Title shown in the result. |
-| `purpose` | Yes | One or two sentences on what the test checks and why it is needed. |
-| `source` | No | A URL or text that the test is based on. |
+| `name` | Yes | Title shown in the result and written in the log markers. |
+| `purpose` | Yes | What the test checks and why. |
+| `source` | No | Where the expected behaviour comes from. |
 | `lab` | Yes | The lab file, relative to the test file. |
+| `log` | No | Log rules for the whole test. |
 | `steps` | Yes | Ordered steps. |
 
-A step has these fields.
+A step has `name`, `cable` (one end as a point), `state` (`down` or `up`), `hold_s`, `max_outage_s` (a limit in seconds for every stream), `expected` and an optional `log`.
 
-| Field | Required | Meaning |
-| --- | --- | --- |
-| `name` | Yes | Name of the step. Each step needs its own name, and `baseline` is taken. |
-| `action` | No | `link` names one end of a link, and `state` is `down` or `up`. A step without an action only observes. |
-| `hold_s` | Yes | Seconds to wait after the action. |
-| `expected` | No | What should happen in the network during this step, in plain words. |
-| `source` | No | A URL or text that the expected behaviour comes from. |
-| `expect` | Yes | Entries with `streams`, a list of stream IDs from the lab file, and `max_outage_s`, the longest allowed outage of each listed stream in this step. |
-
-Every test starts with a baseline window, so a test file needs no step for it.
-
-A link action sets the carrier at both ends of the link. A Linux end changes with `ip link`. An end on a node that runs in QEMU also changes through the QEMU monitor, because only then does the guest see the carrier change. Networka confirms the carrier at both ends within 2 s before the hold starts.
-
-Loading checks every field of both files. An unknown field, a missing field, a missing lab file, a stream ID in `expect` that the lab file does not define or a malformed capture point gives one error that names the file and the field.
+A `log` holds `must` and `must_not`, each a list of `switch` (a node name or `every`) and `text`. The text matches part of a line, ignoring case. A step's rules cover the step. The test's rules cover the time between the two markers of each switch.
 
 ## How a test runs
 
-```mermaid
-flowchart TB
-  A[Read the test file and the lab] --> B[Check state]
-  B --> C[Start captures and streams]
-  C --> D[Baseline window]
-  D --> E[Each step: action, hold]
-  E --> F[Check state again]
-  F --> G[Stop, measure, judge, save]
-```
-
-1. Networka checks the state of the lab file. If it does not pass, Networka applies no action.
-2. Networka starts the captures and the streams and waits 2 s for neighbour discovery.
-3. The baseline window lasts 5 s. Each stream needs 60 percent of the probes its interval allows, 30 at 100 ms, with no unanswered probe and no duplicate. Otherwise Networka applies no action.
-4. Each step runs its action and waits `hold_s`.
-5. After 2 s for late replies, Networka checks the state again and stops every process. A link that a step set down is set up again, also after an error or Ctrl-C.
-6. Networka measures the streams from the captures, judges the steps and saves the result.
-
-Each step's window starts with its action and ends when the next step starts. The last step ends after its hold. An outage counts for the step in which its first lost probe was sent.
+1. Networka notes the size of the switch log and has every RouterOS device log `networka <name> start`.
+2. It checks the state. If the state does not pass, it changes no cable.
+3. It captures at both ends of every stream and of every cable that a step changes, and starts the streams.
+4. The quiet window starts at the first reply of every stream and lasts 3 s. A lost or duplicated ping there stops the test before any cable changes.
+5. Each step sets its cable and waits `hold_s`. A change at a node that runs in QEMU also goes through the QEMU monitor, because only then does the guest see it. Networka confirms the carrier at the far end within 1 s.
+6. After 0.6 s for the last replies, Networka checks the state again and has every RouterOS device log `networka <name> end`. It waits up to 1 s for the end markers and saves what the log gained as `syslog.log`.
+7. It stops every process and sets every cable that is still down up again, also after an error or Ctrl-C. Then it judges and saves the result.
 
 ## Verdict
 
-A probe is delivered when its request and its reply appear at both capture points of the stream and the reply leaves within 0.5 s. A run of probes that were not delivered is an outage with a lower and an upper bound. The lower bound is the time from the first to the last lost request. The upper bound is the time from the last delivered request before the outage to the first delivered request after it.
+A ping is delivered when its request and reply appear at both ends of the stream and the reply comes within 0.5 s. A run of pings that were not delivered is an outage. Its lower bound is the time from the first to the last lost request. Its upper bound is the time from the last delivered request before it to the first delivered request after it. An outage counts in every step it overlaps.
 
-Each listed stream in each step gets a verdict.
+Each stream in each step gets a verdict.
 
-- `pass` when the upper bound is at most `max_outage_s`.
-- `fail` when the lower bound is above `max_outage_s`. A lost probe makes the outage longer than its lower bound, so a lower bound equal to the limit also fails. A limit of 0 therefore fails on any lost probe.
+- A 0 s limit allows no lost and no late ping.
+- `pass` when the upper bound is at most the limit.
+- `fail` when the lower bound is above the limit, or equals it with a lost ping.
 - `error` when the bounds straddle the limit.
-- `fail` when a probe arrived twice.
+- `fail` when a ping arrived twice.
 
-These validity checks give `error` and never `pass`.
+A `must` rule fails when its text is missing, and a `must_not` rule fails when its text appears. A switch whose start or end marker is missing from `syslog.log` makes the test `error`, because a rule over a silent log would pass wrongly. The result lists the log lines per switch without judging them.
 
-- A capture is missing, changed since the run, or the kernel dropped packets.
-- A capture or stream process ended early.
-- A link could not be set up again.
+These checks give `error` and never `pass`.
+
+- A stream end capture is missing, or the kernel dropped packets.
+- A stream or its captures ended early.
+- A cable could not be set up again.
 - The wall clock and the monotonic clock of the lab host differ by 50 ms or more.
-- A stream paused between two sends for more than its interval plus 350 ms, 450 ms at 100 ms.
-- The two capture points of a stream saw different replies.
-- The baseline window in the captures has too few delivered probes for a stream, a lost probe or a duplicate. The minimum is the same as in the live baseline.
+- A stream paused for more than 450 ms between two pings.
+- The two ends of a stream saw different replies.
+- The quiet window holds a lost or duplicated ping, or fewer pings than one per 110 ms less one.
 
-The pause allowance is a fixed 350 ms on top of the interval, not a multiple of it. A pause comes from a stall of the lab host, and a stall lasts the same time whatever the interval. A multiple would allow 4.5 s at 1000 ms and only 45 ms at 10 ms. A pause also never hides an outage, because the upper bound of an outage spans the pause.
+Cable captures are diagnostics and never change the verdict. The test verdict is `fail` if anything fails, else `error` if anything is `error`, else `pass`. The exit status is 0, 1 or 2.
 
-The test verdict is `fail` if anything fails, else `error` if anything is `error`, else `pass`. The exit status is 0, 1 or 2.
+Every count of lost pings comes with its interval and the time it stands for, for example `24 pings lost at one ping every 100 ms, traffic stopped for 2.4 to 2.6 s`.
 
 ## Example
 
-This test cuts client 1's cable to the first MLAG peer for 8 s. It comes from the MikroTik MLAG test suite.
-
-The lab file `tests/small/lab.yaml` holds the state, the streams and the extra capture points of the Small lab. This example is short.
+`lab.yaml`:
 
 ```yaml
-state:
-  - statement: Both MLAG peers show mlag-state connected.
-    source: https://manual.mikrotik.com/docs/high-availability-solutions/multi-chassis-link-aggregation-group/
-    checks:
-      - name: mlag1 MLAG connected
-        device: dc1-core-mlag1
-        check: mlag
-        params:
-          bridge: bridge
-        expected:
-          connected: true
-      - name: mlag2 MLAG connected
-        device: dc1-core-mlag2
-        check: mlag
-        params:
-          bridge: bridge
-        expected:
-          connected: true
 streams:
-  - id: 101
-    from: dc1-traffic-host1:bond0
-    to: dc1-mac-move-host:bond0
-    address: 10.110.0.50
-  - id: 102
-    from: dc1-traffic-host2:bond0
-    to: dc1-mac-move-host:bond0
-    address: 10.110.0.50
-    interval_ms: 100
-captures:
-  - dc1-core-mlag1:tap2
+  - name: client1-to-client2
+    from: client1:bond0
+    to: client2:bond0
+state:
+  - statement: Both switches show MLAG connected.
+    checks:
+      - name: switch1 MLAG connected
+        device: switch1
+        check: mlag
+        params:
+          bridge: bridge
+        expected:
+          connected: true
+switch_log: syslog/switches.log
 ```
 
-The test file `tests/small/bond-member-loss.yaml` names the lab file and holds the steps.
+`bond-member-loss.yaml`:
 
 ```yaml
-name: MLAG bond member loss and return
-purpose: >-
-  Client 1's cable to CHR 1 goes down for 8 s and then comes back.
-  The test checks that client 1's traffic moves to its other cable and back with at most 3 s of loss.
-source: https://manual.mikrotik.com/docs/high-availability-solutions/multi-chassis-link-aggregation-group/
+name: bond-member-loss
+purpose: Client 1's cable to switch1 goes down and comes back, and client 1's traffic recovers.
 lab: lab.yaml
+log:
+  must_not:
+    - switch: every
+      text: heartbeat timeout
 steps:
-  - name: Member down
-    action:
-      link: dc1-traffic-host1:eth1
-      state: down
-    hold_s: 8
-    expected: >-
-      The cable goes down at both ends.
-      CHR 1 sends traffic for client 1 over the peer link to CHR 2.
-    source: https://manual.mikrotik.com/docs/high-availability-solutions/multi-chassis-link-aggregation-group/
-    expect:
-      - streams:
-          - 101
-        max_outage_s: 3
-      - streams:
-          - 102
-        max_outage_s: 0
-  - name: Member back
-    action:
-      link: dc1-traffic-host1:eth1
-      state: up
-    hold_s: 11
-    expected: >-
-      The cable comes back at both ends.
-      Each end sends traffic on the cable once LACP shows it as collecting and distributing.
-    source: https://manual.mikrotik.com/docs/cli-reference/interface/bonding/monitor-slaves/
-    expect:
-      - streams:
-          - 101
-        max_outage_s: 3
-      - streams:
-          - 102
-        max_outage_s: 0
+  - name: Cable client1 to switch1 down
+    cable: client1:eth1
+    state: down
+    hold_s: 5
+    max_outage_s:
+      client1-to-client2: 1
+    expected: The cable goes down at both ends.
+    log:
+      must:
+        - switch: switch1
+          text: ether3 link down
+  - name: Cable client1 to switch1 back
+    cable: client1:eth1
+    state: up
+    hold_s: 7
+    max_outage_s:
+      client1-to-client2: 4
+    expected: The cable comes back at both ends.
+    log:
+      must:
+        - switch: switch1
+          text: ether3 link up
 ```
-
-Run it as root on the lab host.
 
 ```bash
-sudo nw test run tests/small/bond-member-loss.yaml \
-  --lab /path/to/clab-mlag-small --save out --config labs/networka/small.yml
-```
-
-`nw test run` takes several test files and runs them in order. It also takes `--interactive-auth`, as `nw intent run` does. The output starts with the purpose of the test. It lists each statement with its verdict. It shows what is expected in each step, then each step with each stream's outage, limit and verdict, and the test verdict.
-
-## Evidence
-
-Each test gets one folder under `--save`, named after the test file. The folder must not hold evidence yet.
-
-```text
-out/bond-member-loss/
-  test.yaml        the test file as it ran
-  lab.yaml         the lab file as it ran
-  state-before/    intent.yaml, evidence.json and results.json of the first state check
-  state-after/     the same for the second state check
-  captures/        one pcap and tcpdump log per capture point, and pcap.sha256
-  streams/         one ping log per stream
-  events.jsonl     every action with its epoch and monotonic time
-  result.json      the verdict with every statement, step and validity check
-  timeline.tsv     the events and the outages in time order
-```
-
-`result.json` holds the purpose and source of the test. It lists each statement with its checks, expected and observed values. It lists each step with its expected text and source, and with each stream's interval, outage bounds, lost probes, limit and verdict. It also lists the validity checks, the baseline and the full measurement of every stream.
-
-## Replay
-
-```bash
+sudo nw test run bond-member-loss.yaml --lab clab-small-mlag --config devices.yml --save out
 nw test replay out/bond-member-loss
 ```
 
-Replay computes `result.json` again from the saved files only. It reads the test file and the lab file from `test.yaml` and `lab.yaml` in the evidence folder. It needs `tshark` and no lab. It prints the same tables as the run. It exits 2 when the computed result differs from the saved `result.json`.
+`nw test run` takes several test files and also `--interactive-auth`. It prints each statement, each step with each stream's lost pings and limit, each log rule and the test verdict.
+
+## Evidence
+
+Each test gets one folder under `--save`, named after the test file, which must not hold evidence yet.
+
+| Entry | Content |
+| --- | --- |
+| `test.yaml`, `lab.yaml` | The files as they ran. |
+| `state-before/`, `state-after/` | The two intent runs. |
+| `captures/` | One pcap and tcpdump log per point. |
+| `streams/` | One ping log per stream. |
+| `events.jsonl` | Every action with its epoch and monotonic time. |
+| `syslog.log` | The switch log lines of the test. |
+| `result.json` | The verdict with every statement, step, log rule and validity check. |
+| `timeline.tsv` | Seconds from the start of the quiet window, what happened, and a detail in words, with the switch log lines in time order. |
+
+`nw test replay` computes `result.json` again from these files and writes `timeline.tsv` again. It needs `tshark` and no lab. It exits 2 when the result differs from the saved `result.json`.
 
 ## Limits of this version
 
-- The only action is a link down or up.
+- The only action is a cable down or up.
 - A step cannot wait for a state, such as a rebooted node.
-- Streams are unicast pings. Floods, duplicates per capture point and the observed path are not checked yet.
+- Streams are unicast pings over IPv4.

@@ -868,7 +868,7 @@ $ nw test [OPTIONS] COMMAND [ARGS]...
 **Commands**:
 
 * `run`: Run each test in the lab, save its...
-* `replay`: Compute the result again from the saved...
+* `replay`: Compute the result and the timeline again...
 
 ### `nw test run`
 
@@ -897,7 +897,7 @@ $ nw test run [OPTIONS] {files}...
 
 ### `nw test replay`
 
-Compute the result again from the saved evidence, without the lab.
+Compute the result and the timeline again from the saved evidence, without the lab.
 
 Exit status: 0 pass, 1 fail, 2 error (not verified, unusable evidence,
 or a result that differs from the saved result.json).

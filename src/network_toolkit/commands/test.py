@@ -17,13 +17,6 @@ from network_toolkit.common.credentials import prompt_for_credentials
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 
 
-def _bounds(stream: dict[str, Any]) -> str:
-    if not stream["lost"] and not stream["upper_s"]:
-        return "none"
-    upper = "?" if stream["upper_s"] is None else f"{stream['upper_s']:.3f}"
-    return f"{stream['lower_s']:.3f} to {upper} s ({stream['lost']} lost)"
-
-
 def _print_result(ctx: CommandContext, result: dict[str, Any]) -> None:
     ctx.console.print(f"Test: {result['name']}", markup=False)
     ctx.console.print(f"Purpose: {result['purpose']}", markup=False)
@@ -47,26 +40,41 @@ def _print_result(ctx: CommandContext, result: dict[str, Any]) -> None:
         ctx.console.print(table)
     if result["steps"]:
         for step in result["steps"]:
-            if step["expected"]:
-                ctx.console.print(
-                    f"Expected in step {step['name']}: {step['expected']}",
-                    markup=False,
-                )
+            ctx.console.print(
+                f"Expected in step {step['name']}: {step['expected']}", markup=False
+            )
         table = Table(title="Steps", show_header=True, header_style="bold")
-        for column in ("Step", "Stream", "Outage", "Limit", "Verdict"):
+        for column in ("Step", "Stream or log rule", "Measured", "Limit", "Verdict"):
             table.add_column(column, overflow="fold")
         for step in result["steps"]:
-            for ident, stream in step["streams"].items():
+            for name, stream in step["streams"].items():
                 table.add_row(
                     step["name"],
-                    ident,
-                    _bounds(stream),
+                    name,
+                    stream["summary"],
                     f"{stream['limit_s']:g} s",
                     stream["verdict"]
                     if stream["verdict"] == "pass"
                     else f"{stream['verdict']}: {stream['reason']}",
                 )
+            for rule in step["log"]:
+                table.add_row(
+                    step["name"],
+                    f"{rule['switch']} {rule['kind']} {rule['text']!r}",
+                    rule["reason"],
+                    "",
+                    rule["verdict"],
+                )
         ctx.console.print(table)
+    for rule in result["log"]:
+        ctx.console.print(
+            f"Whole test: {rule['switch']} {rule['kind']} {rule['text']!r}: "
+            f"{rule['verdict']} ({rule['reason']})",
+            markup=False,
+        )
+    if result["switch_log"] and result["switch_log"].get("lines") is not None:
+        counts = ", ".join(f"{s} {n}" for s, n in result["switch_log"]["lines"].items())
+        ctx.console.print(f"Switch log lines: {counts or 'none'}", markup=False)
     for reason in result["reasons"]:
         ctx.console.print(reason, markup=False)
     ctx.console.print(f"Test verdict: {result['verdict']}", markup=False)
@@ -141,7 +149,7 @@ def register(app: typer.Typer) -> None:
             Path, typer.Argument(help="Evidence folder written by 'nw test run'")
         ],
     ) -> None:
-        """Compute the result again from the saved evidence, without the lab.
+        """Compute the result and the timeline again from the saved evidence, without the lab.
 
         Exit status: 0 pass, 1 fail, 2 error (not verified, unusable evidence,
         or a result that differs from the saved result.json).

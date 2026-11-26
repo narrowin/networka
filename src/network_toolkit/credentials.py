@@ -412,6 +412,9 @@ class ConnectionParameterBuilder:
             raise ValueError(msg)
 
         device = self.config.devices[device_name]
+        if not device.host:
+            msg = f"Device '{device_name}' has no host address"
+            raise ValueError(msg)
 
         # Resolve credentials
         username, password = self.credential_resolver.resolve_credentials(
