@@ -460,7 +460,7 @@ def test_lacp_member_and_partner_system() -> None:
     partner = intent.check_lacp_partner_system(STATE, ROS, "client2", "ether4", system)
     assert partner.verdict == "pass"
     alone = intent.check_lacp_member(STATE, ROS, "client2", "ether3", scd)
-    assert (alone.verdict, alone.reason) == ("error", "no LACP partner")
+    assert (alone.verdict, alone.observed["partner"]) == ("fail", None)
 
 
 def test_host_entry() -> None:
