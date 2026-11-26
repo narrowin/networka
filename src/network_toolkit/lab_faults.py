@@ -695,13 +695,14 @@ def proofs(
                 len(points),
             )
         if isinstance(fault, CutPing):
-            low = (applied["epoch_ns"] - measured["start_ns"]) / traffic.NS
-            high = (clearing["epoch_ns"] - measured["start_ns"]) / traffic.NS
-            cadence = traffic.INTERVAL_NS / traffic.NS
+            stream = measured["streams"][fault.stream]
+            start = measured["start_ns"]
+            low = (before["epoch_ns"] - start) / traffic.NS
+            high = (cleared["epoch_ns"] - start) / traffic.NS
             gaps = [
                 gap
-                for gap in measured["streams"][fault.stream]["gaps"]
-                if gap["begins_s"] <= high + cadence and gap["ends_s"] >= low - cadence
+                for gap in stream["gaps"]
+                if gap["begins_s"] <= high and gap["ends_s"] >= low
             ]
             # The first and last missed probes bound the minimum gap. The
             # surrounding successful probes bound its maximum length.
@@ -710,14 +711,32 @@ def proofs(
                 f"Expected one contiguous cut of {fault.stream}, found {len(gaps)}",
             )
             [gap] = gaps
+            bracket = "The captured one-way ping gap does not bracket the applied cut"
+            _require(
+                not gap["absent_at_source"] and gap["upper_s"] is not None, bracket
+            )
+            # Probes leave at the sender's own pace, so the tc markers bound
+            # each send instead of a nominal interval.
+            sends = sorted(
+                stamps[0]
+                for (ident, kind, _), stamps in traffic.decode(
+                    pcaps[stream["source"]]
+                ).items()
+                if ident == stream["ident"]
+                and kind == traffic.REQUEST
+                and start <= stamps[0] < measured["end_ns"]
+            )
+            offsets = [traffic.seconds(send - start) for send in sends]
+            begins = offsets.index(gap["begins_s"])
+            ends = offsets.index(gap["ends_s"])
             upper_hold = (cleared["mono_ns"] - before["mono_ns"]) / traffic.NS
             _require(
-                not gap["absent_at_source"]
-                and gap["upper_s"] is not None
-                and gap["lower_s"] <= result["held_s"] <= upper_hold <= gap["upper_s"]
-                and low - cadence <= gap["begins_s"] <= low + cadence
-                and high - cadence <= gap["ends_s"] <= high + cadence,
-                "The captured one-way ping gap does not bracket the applied cut",
+                gap["lower_s"] <= result["held_s"] <= upper_hold <= gap["upper_s"]
+                and sends[begins - 1] <= applied["epoch_ns"]
+                and sends[begins] >= before["epoch_ns"]
+                and sends[ends] <= cleared["epoch_ns"]
+                and sends[ends + 1] >= clearing["epoch_ns"],
+                bracket,
             )
     except (
         OSError,
