@@ -422,7 +422,7 @@ def test_bridge_ports() -> None:
         "stats": STATE[PORT_STATS],
         **routeros_evidence(bridge_print("bridge")),
     }
-    result = intent.check_bridge_ports(evidence, ROS, "bridge", {"ether2"})
+    result = intent.check_bridge_ports(evidence, ROS, "bridge", ["ether2"])
     assert (result.observed, result.verdict) == (["ether1"], "fail")
 
 
@@ -476,7 +476,9 @@ def test_interface_up() -> None:
     assert (result.observed, result.verdict) == (False, "pass")
 
 
-BRIDGE_PRINT = '[{"name":"bridge","protocol-mode":"none","mlag-lacp-fallback":true}]'
+BRIDGE_PRINT = (
+    '[{".id":"*A","name":"bridge","protocol-mode":"none","mlag-lacp-fallback":true}]'
+)
 PORT_PRINT = '[{"interface":"client2","bridge":"bridge","pvid":110,"bpdu-guard":false}]'
 CONFIG = {
     bridge_print("bridge"): {

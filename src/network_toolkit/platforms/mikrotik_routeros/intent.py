@@ -11,7 +11,6 @@ cannot decide. `check_property` and `check_version` are RouterOS-only checks.
 
 from __future__ import annotations
 
-import json
 import re
 from typing import TYPE_CHECKING, Any
 
@@ -28,6 +27,14 @@ PORT_STATS = _JSON.format("/interface/bridge/port/print stats as-value")
 PORT_MONITOR = _JSON.format("/interface/bridge/port/monitor {port_id} once as-value")
 RESOURCE = _JSON.format("/system/resource/print as-value")
 UPTIME = ":put [:serialize to=json [:tonsec [/system/resource/get uptime]]]"
+# The mlag-state words RouterOS 7.26 reports.
+MLAG_STATES = {
+    "connected",
+    "connecting",
+    "disconnected",
+    "disabled",
+    "peer port not running",
+}
 # RouterOS prints LACP flags in this order, with `-` for a cleared flag.
 LACP_LETTERS = "ATGSCDFE"
 
@@ -169,7 +176,7 @@ def collect_version(
 
 def _rows(evidence: Mapping[str, Any], command: str, what: str) -> list[dict]:
     """The reply saved under `command`, a JSON object or array, as a list of objects."""
-    value = json.loads(intent.reply_output(evidence, command, command))
+    value = intent.load_json(intent.reply_output(evidence, command, command))
     rows = [value] if isinstance(value, dict) else value
     if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
         msg = f"{what} must be a JSON object or an array of objects"
@@ -202,9 +209,12 @@ def _bridge_id(value: str) -> str:
 
 
 def _statistics(evidence: Mapping[str, Any]) -> list[dict[str, Any]]:
-    rows = json.loads(intent.reply_output(evidence, "stats", PORT_STATS))
+    rows = intent.load_json(intent.reply_output(evidence, "stats", PORT_STATS))
     if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
         msg = "bridge-port statistics must be a JSON array of objects"
+        raise ValueError(msg)
+    if any(not isinstance(row.get("bridge"), str) or not row["bridge"] for row in rows):
+        msg = "a bridge-port statistics row has no bridge"
         raise ValueError(msg)
     return rows
 
@@ -259,7 +269,7 @@ def bridge_port(evidence: Mapping[str, Any], bridge: str, interface: str) -> dic
     """
     port_id = _port_id(_statistics(evidence), bridge, interface)
     command = PORT_MONITOR.format(port_id=port_id)
-    port = json.loads(intent.reply_output(evidence, "monitor", command))
+    port = intent.load_json(intent.reply_output(evidence, "monitor", command))
     if (
         not isinstance(port, dict)
         or port.get(".id") != port_id
@@ -268,7 +278,7 @@ def bridge_port(evidence: Mapping[str, Any], bridge: str, interface: str) -> dic
         msg = "monitor reply does not identify the selected port"
         raise ValueError(msg)
     forwarding = port.get("forwarding")
-    if forwarding is None and port.get("status") == "inactive":
+    if "forwarding" not in port and port.get("status") == "inactive":
         # An inactive port reports only its .id, interface and status.
         forwarding = False
     if not isinstance(forwarding, bool):
@@ -343,6 +353,9 @@ def mlag(evidence: Mapping[str, Any], bridge: str) -> dict:
     """`mlag-state` and `mlag-active-role` from the bridge monitor, in lower case."""
     row = _bridge(evidence, bridge)
     value = _field(row, "mlag-state", str, f"the {bridge} monitor").lower()
+    if value not in MLAG_STATES:
+        msg = f"the {bridge} monitor mlag-state {value!r} is not a known state"
+        raise ValueError(msg)
     state = {"state": value, "connected": value == "connected"}
     if row.get("mlag-active-role"):
         state["role"] = _field(row, "mlag-active-role", str, bridge).lower()
@@ -352,7 +365,14 @@ def mlag(evidence: Mapping[str, Any], bridge: str) -> dict:
 def _bridge_row(evidence: Mapping[str, Any], bridge: str) -> dict[str, Any]:
     """The one row of the bridge print for `bridge`, which proves it exists."""
     rows = _rows(evidence, bridge_print(bridge), "bridge print")
-    return _one([row for row in rows if row.get("name") == bridge], f"bridge {bridge}")
+    if any(row.get("name") != bridge for row in rows):
+        msg = f"the bridge print for {bridge} holds another bridge"
+        raise ValueError(msg)
+    row = _one(rows, f"bridge {bridge}")
+    if not isinstance(row.get(".id"), str) or not row[".id"]:
+        msg = f"bridge {bridge} has no .id"
+        raise ValueError(msg)
+    return row
 
 
 def stp_mode(evidence: Mapping[str, Any], bridge: str) -> str:
@@ -444,7 +464,7 @@ def interface_up(evidence: Mapping[str, Any], interface: str) -> bool:
 
 def uptime_ns(evidence: Mapping[str, Any]) -> int:
     """Uptime in nanoseconds from the `UPTIME` command."""
-    value = json.loads(intent.reply_output(evidence, UPTIME, UPTIME))
+    value = intent.load_json(intent.reply_output(evidence, UPTIME, UPTIME))
     if not isinstance(value, int) or isinstance(value, bool):
         msg = "uptime is not a JSON number"
         raise ValueError(msg)
@@ -467,6 +487,7 @@ def check_property(
     `"yes"` or `"auto"`, `bpdu-guard` a Boolean, `pvid` a number, and
     `vlan-ids` an array of strings.
     """
+    intent.expect(CHECKS["property"].expected, expected, "property")
 
     def observe() -> Any:
         rows = _rows(evidence, menu_print(menu), f"{menu} print")
@@ -487,6 +508,7 @@ def check_property(
 
 def check_version(evidence: Mapping[str, Any], expected: str) -> IntentResult:
     """Compare the `version` of the system resource, without the channel."""
+    intent.expect(CHECKS["version"].expected, expected, "version")
 
     def observe() -> str:
         row = _one(_rows(evidence, RESOURCE, "system resource"), "system resource")

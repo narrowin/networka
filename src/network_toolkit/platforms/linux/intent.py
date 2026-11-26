@@ -75,6 +75,9 @@ def _member(evidence: Mapping[str, Any], bond: str, member: str) -> dict[str, An
         _one(re.findall(r"(?m)^\s*port state: (\d+)$", block), f"{side} port state")
         for side, block in blocks.items()
     ]
+    if any(int(state) > 255 for state in states):
+        msg = f"{member} port state is not a byte: {states}"
+        raise ValueError(msg)
     partner = blocks["partner"]
     mii = _one(re.findall(r"(?m)^MII Status: (up|down)$", section), "MII Status")
     return {
@@ -129,9 +132,7 @@ def check_bond_member(
     `eligible` means the member is in the active aggregator and both its actor
     and partner port state are synchronized, collecting and distributing.
     """
-    if not expected or set(expected) - set(MEMBER_FIELDS):
-        msg = f"expected must name some of {', '.join(MEMBER_FIELDS)}"
-        raise ValueError(msg)
+    intent.expect(CHECKS["bond_member"].expected, expected, "bond_member")
 
     def observe() -> dict[str, bool]:
         found = _member(evidence, bond, member)

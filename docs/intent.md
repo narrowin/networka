@@ -21,7 +21,16 @@ evidence the same way live and offline.
 | Every result is `pass`, `fail` or `error`, and `error` is never a pass. | Treat missing evidence as a pass or skip it. | A check that could not see the state has not verified it. ANTA (success, failure, error), pyATS (passed, failed, errored) and nornir-salt (PASS, FAIL, ERROR) use the same three outcomes. |
 | Absence needs positive proof, and every reply must identify its object. | Read an empty reply as "not there", and trust a reply to be about what was asked. | Before reading a value, a normalizer checks that the reply names the requested object by its key: the bridge print row `name` and the bridge monitor `.id` that matches it, the Ethernet monitor `name`, the bond row `port`, the host row `mac-address` and `bridge`, the port monitor `interface`. It reports `null` or an empty list only from such a reply that shows the object exists, for example a bridge print that contains the bridge. A missing or mismatched key, `{}`, or a failed or missing reply is `error`. |
 | Items on one device share a reading when they use the same collector with identical params. | Read once per item. | Those items then see the same moment, as a JSNAPy snapshot or the ANTA per-device cache does. Items whose params differ read separately, even on the same command: two `property` items on the same menu read it twice. |
+| The overall verdict is fail-first: any `fail` makes the run `fail` (exit 1), even when other items are `error`. | Error-first, where one unverifiable item hides a confirmed failure. | A confirmed wrong state is the more urgent finding; the `error` items stay listed with their reasons. ANTA and pyATS report a failed run the same way. |
 | The intent file states exact expected values. No operators, tags, skip rules or OpenConfig paths. | Expressions such as `is-gt`, tag filtering, or an OpenConfig model. | The checks compare normalized fields for equality, which covers device-state intent and keeps the file readable. Selection and arithmetic belong to the caller. NUTS uses the same plain expected-value form. |
+
+Evidence trust: replay trusts that `evidence.json` was written by Networka
+for the devices it names. Replies are identified by device and exact
+command; RouterOS `monitor-slaves` does not echo the bond name, so the
+command is the bond's identity. Hand-edited evidence, or replies swapped
+between devices, is out of scope, as it is for JSNAPy and Genie snapshots.
+Duplicate keys and NaN or Infinity in the evidence or a reply, and duplicate
+keys in an intent file, are rejected.
 
 ## Intent file
 
@@ -84,6 +93,9 @@ nw intent replay saved
 - `results.json` with the overall verdict and, per item, its name, source,
   device, check, expected and observed value, verdict and reason.
 
+The evidence of the first item, as saved; with that item it replays to
+`pass`:
+
 ```json
 {
   "networka_version": "0.4.1",
@@ -93,18 +105,30 @@ nw intent replay saved
       "readings": [
         {
           "collector": "collect_bridge",
-          "args": ["bridge"],
+          "args": [
+            "bridge"
+          ],
           "replies": {
+            ":put [:serialize to=json options=json.no-string-conversion [/interface/bridge/print as-value where name=\"bridge\"]]": {
+              "command": ":put [:serialize to=json options=json.no-string-conversion [/interface/bridge/print as-value where name=\"bridge\"]]",
+              "output": "[{\".id\":\"*A\",\"name\":\"bridge\",\"protocol-mode\":\"none\"}]",
+              "error": null
+            },
             ":put [:serialize to=json options=json.no-string-conversion [/interface/bridge/monitor \"bridge\" once as-value]]": {
               "command": ":put [:serialize to=json options=json.no-string-conversion [/interface/bridge/monitor \"bridge\" once as-value]]",
-              "output": "{\"mlag-state\":\"connected\",\"mlag-active-role\":\"primary\"}",
+              "output": "{\".id\":\"*A\",\"mlag-state\":\"connected\",\"mlag-active-role\":\"primary\"}",
+              "error": null
+            },
+            "stats": {
+              "command": ":put [:serialize to=json options=json.no-string-conversion [/interface/bridge/port/print stats as-value]]",
+              "output": "[{\".id\":\"*1\",\"bridge\":\"bridge\",\"interface\":\"ether4\"}]",
               "error": null
             }
           }
         }
       ],
-      "started": "2026-11-26T06:46:27.247089+00:00",
-      "finished": "2026-11-26T06:46:27.247435+00:00"
+      "started": "2026-11-26T07:28:15.246775+00:00",
+      "finished": "2026-11-26T07:28:15.247179+00:00"
     }
   }
 }

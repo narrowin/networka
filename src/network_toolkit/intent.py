@@ -148,7 +148,8 @@ def same(expected: Any, observed: Any) -> bool:
     if type(expected) is not type(observed):
         return False
     if isinstance(expected, dict):
-        return expected.keys() == observed.keys() and all(
+        keys = {(type(key), key) for key in expected}
+        return keys == {(type(key), key) for key in observed} and all(
             same(value, observed[key]) for key, value in expected.items()
         )
     if isinstance(expected, list | tuple):
@@ -156,6 +157,40 @@ def same(expected: Any, observed: Any) -> bool:
             same(a, b) for a, b in zip(expected, observed, strict=True)
         )
     return bool(expected == observed)
+
+
+def _unique(pairs: list[tuple[Any, Any]]) -> dict[Any, Any]:
+    keys = [key for key, _ in pairs]
+    if duplicates := sorted({repr(key) for key in keys if keys.count(key) > 1}):
+        msg = f"duplicate keys {', '.join(duplicates)}"
+        raise ValueError(msg)
+    return dict(pairs)
+
+
+def _no_constant(name: str) -> Any:
+    msg = f"{name} is not a JSON number"
+    raise ValueError(msg)
+
+
+def load_json(text: str) -> Any:
+    """`json.loads` that rejects duplicate keys and NaN or Infinity."""
+    return json.loads(text, object_pairs_hook=_unique, parse_constant=_no_constant)
+
+
+class _UniqueKeyLoader(yaml.SafeLoader):
+    """A safe YAML loader that rejects duplicate mapping keys."""
+
+    def construct_mapping(self, node: Any, deep: bool = False) -> dict[Any, Any]:  # noqa: FBT001, FBT002 - PyYAML signature
+        seen: list[Any] = []
+        for key_node, _ in node.value:
+            key = self.construct_object(key_node, deep=deep)
+            if key in seen:
+                msg = f"duplicate key {key!r}"
+                raise yaml.constructor.ConstructorError(
+                    None, None, msg, key_node.start_mark
+                )
+            seen.append(key)
+        return super().construct_mapping(node, deep=deep)
 
 
 def compare(expected: Any, observe: Callable[[], Any]) -> IntentResult:
@@ -233,6 +268,7 @@ def check_bridge_port(
     `role` is `root`, `designated`, `alternate`, `backup` or `disabled`.
     Only the fields named in `expected` are compared.
     """
+    expect(CHECKS["bridge_port"].expected, expected, "bridge_port")
     wanted = _known(expected, BRIDGE_PORT)
     normalize = _normalizer(device_type, "bridge_port")
     what = f"bridge port {bridge}/{port}"
@@ -245,9 +281,10 @@ def check_bridge_ports(
     evidence: Mapping[str, Any],
     device_type: str,
     bridge: str,
-    expected: Collection[str],
+    expected: list[str],
 ) -> IntentResult:
     """Compare the set of ports of a bridge. Both sides are sorted lists."""
+    expect(CHECKS["bridge_ports"].expected, expected, "bridge_ports")
     normalize = _normalizer(device_type, "bridge_ports")
     return compare(sorted(expected), lambda: sorted(normalize(evidence, bridge)))
 
@@ -263,6 +300,7 @@ def check_stp_bridge(
     Bridge IDs read `0xPPPP.mac` in lower case. `root_port` is `None` on the
     root bridge. Only the fields named in `expected` are compared.
     """
+    expect(CHECKS["stp_bridge"].expected, expected, "stp_bridge")
     wanted = _known(expected, STP_BRIDGE)
     normalize = _normalizer(device_type, "stp_bridge")
     what = f"bridge {bridge}"
@@ -273,6 +311,7 @@ def check_stp_mode(
     evidence: Mapping[str, Any], device_type: str, bridge: str, expected: str
 ) -> IntentResult:
     """Compare the spanning-tree protocol of a bridge, `none` when it is off."""
+    expect(CHECKS["stp_mode"].expected, expected, "stp_mode")
     normalize = _normalizer(device_type, "stp_mode")
     return compare(expected, lambda: normalize(evidence, bridge))
 
@@ -288,6 +327,7 @@ def check_mlag(
     `role` is `primary` or `secondary`. Only the fields named in `expected`
     are compared.
     """
+    expect(CHECKS["mlag"].expected, expected, "mlag")
     wanted = _known(expected, MLAG)
     normalize = _normalizer(device_type, "mlag")
     what = f"MLAG on {bridge}"
@@ -306,6 +346,7 @@ def check_lacp_member(
     For example `{"synchronization": True, "collecting": True,
     "distributing": True}`. The result holds `{"actor": ..., "partner": ...}`.
     """
+    expect(CHECKS["lacp_member"].expected, expected, "lacp_member")
     wanted = _known(expected, LACP_FLAGS)
     normalize = _normalizer(device_type, "lacp_member")
     what = f"{bond} member {member}"
@@ -332,6 +373,7 @@ def check_lacp_partner_system(
     MLAG peers must present one system ID, so the partner of every member of
     an MLAG bond reports the same value.
     """
+    expect(CHECKS["lacp_partner_system"].expected, expected, "lacp_partner_system")
     wanted = _known(expected, LACP_SYSTEM)
     normalize = _normalizer(device_type, "lacp_member")
     what = f"{bond} member {member} partner"
@@ -354,6 +396,7 @@ def check_host_entry(
     expected: str | None,
 ) -> IntentResult:
     """Compare the port a bridge host table entry points to, `None` for no entry."""
+    expect(CHECKS["host_entry"].expected, expected, "host_entry")
     normalize = _normalizer(device_type, "host_entry")
     return compare(expected, lambda: normalize(evidence, bridge, mac))
 
@@ -366,6 +409,7 @@ def check_interface_up(
     expected: bool = True,
 ) -> IntentResult:
     """Compare whether an interface has carrier."""
+    expect(CHECKS["interface_up"].expected, expected, "interface_up")
     normalize = _normalizer(device_type, "interface_up")
     return compare(expected, lambda: normalize(evidence, interface))
 
@@ -472,6 +516,17 @@ def _expected(spec: Any, value: Any) -> None:
             if type(item) not in spec[key]:
                 msg = f"expected {key} must be {_type_names(spec[key])}, not {item!r}"
                 raise ValueError(msg)
+
+
+def expect(spec: Any, value: Any, check: str) -> None:
+    """Validate `expected` of a direct check call as an intent file item is."""
+    try:
+        _expected(spec, value)
+    except IntentError:
+        raise
+    except Exception as error:  # malformed input is the caller's error, named
+        msg = f"{check}: {error}"
+        raise IntentError(msg) from None
 
 
 @dataclass(frozen=True, slots=True)
@@ -670,6 +725,10 @@ def validate(item: IntentItem) -> Check:
     if not isinstance(item.device, str) or not item.device:
         msg = f"{item.where}: device must be a name"
         raise IntentError(msg)
+    for key in ("name", "source"):
+        if getattr(item, key) is not None and not isinstance(getattr(item, key), str):
+            msg = f"{item.where}: {key} must be a string"
+            raise IntentError(msg)
     if not isinstance(item.params, dict):
         msg = f"{item.where}: params must be a mapping, not {item.params!r}"
         raise IntentError(msg)
@@ -694,7 +753,7 @@ def load_intent(path: str | Path) -> list[IntentItem]:
     """
     path = Path(path)
     try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        data = yaml.load(path.read_text(encoding="utf-8"), Loader=_UniqueKeyLoader)  # noqa: S506 - a SafeLoader subclass
     except (OSError, yaml.YAMLError) as error:
         msg = f"{path}: cannot read the intent file: {error}"
         raise IntentError(msg) from None
@@ -719,11 +778,7 @@ def load_intent(path: str | Path) -> list[IntentItem]:
         if not isinstance(raw["device"], str) or not isinstance(raw["check"], str):
             msg = f"{where}: device and check must be strings"
             raise IntentError(msg)
-        params = raw["params"] if "params" in raw and raw["params"] is not None else {}
-        for key in ("name", "source"):
-            if raw.get(key) is not None and not isinstance(raw[key], str):
-                msg = f"{where}: {key} must be a string"
-                raise IntentError(msg)
+        params = raw.get("params", {})
         item = IntentItem(
             raw["device"],
             raw["check"],
@@ -787,7 +842,9 @@ def _evaluate(item: IntentItem, saved: Any) -> IntentResult:
     if not isinstance(readings, list):
         return error(f"the evidence of {item.device} has no list of readings")
     matching = [
-        r for r in readings if isinstance(r, dict) and {k: r.get(k) for k in key} == key
+        r
+        for r in readings
+        if isinstance(r, dict) and same(key, {k: r.get(k) for k in key})
     ]
     if len(matching) == 1 and "error" in matching[0]:
         # A reading whose collection recorded any error decides no item that
@@ -885,7 +942,7 @@ def run_intent(
         device = plan.setdefault(
             item.device, {"device_type": device_type, "readings": []}
         )
-        if key not in device["readings"]:
+        if not any(same(key, {k: r[k] for k in key}) for r in device["readings"]):
             device["readings"].append(key)
     folder = Path(save_dir) if save_dir is not None else None
     if folder is not None:
@@ -927,7 +984,7 @@ def replay_directory(folder: str | Path) -> IntentReport:
     folder = Path(folder)
     intent = load_intent(folder / INTENT_FILE)
     try:
-        evidence = json.loads((folder / EVIDENCE_FILE).read_text(encoding="utf-8"))
+        evidence = load_json((folder / EVIDENCE_FILE).read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
         msg = f"{folder / EVIDENCE_FILE}: cannot read the evidence: {error}"
         raise IntentError(msg) from None
