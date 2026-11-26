@@ -27,6 +27,7 @@ PORT_STATS = _JSON.format("/interface/bridge/port/print stats as-value")
 PORT_MONITOR = _JSON.format("/interface/bridge/port/monitor {port_id} once as-value")
 RESOURCE = _JSON.format("/system/resource/print as-value")
 UPTIME = ":put [:serialize to=json [:tonsec [/system/resource/get uptime]]]"
+REBOOT = ":execute {/system reboot}"
 # The mlag-state words RouterOS 7.26 reports.
 MLAG_STATES = {
     "connected",
@@ -118,6 +119,14 @@ def log_marker(
     """
     quoted = "".join(f"\\{c}" if c in '"\\$' else c for c in text)
     return intent.read(client, device, f':log info "{quoted}"', run_options)["error"]
+
+
+def reboot(client: NetworkaClient, device: str, **run_options: Any) -> Reply:
+    """Dispatch a background reboot once using the existing device session.
+
+    RouterOS asks for confirmation on a foreground reboot.
+    """
+    return intent.read(client, device, REBOOT, run_options)
 
 
 def collect_bridge(
