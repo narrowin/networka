@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-26
+
+### Added
+
+- Extend `nw test run` and `nw test replay` for the Small MLAG lab. Lab plans can exercise traffic delay and loss, one-way calibration, silent LACP, abrupt CHR power loss, and active-backup host movement and silence. Saved action, recovery, capture, and host-table evidence lets replay evaluate these steps offline.
+
+### Fixed
+
+- Record how to restore lab state before starting fault actions so cleanup can recover from an interruption. Report cleanup failures in the run result.
+- Mark traffic rows as unverified when a step stops early or the evidence cannot support a verdict. Keep measured bounds visible as diagnostics when available.
+
 ## [0.5.0] - 2026-11-26
 
 ### Added
