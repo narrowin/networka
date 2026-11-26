@@ -1331,6 +1331,8 @@ def evaluate(folder: str | Path) -> dict[str, Any]:
     for event in events:
         if event["name"] == "run_error":
             part("error", f"The run stopped: {event['reason']}")
+    for error in marks.get("stopped", {}).get("restore_errors", []):
+        part("error", f"Cleanup failed: {error}")
     if marks.get("quiet_checked", {}).get("problems"):
         problems = "; ".join(marks["quiet_checked"]["problems"])
         part(
@@ -1564,23 +1566,47 @@ def _traffic(
         for name, limit in step.limits:
             counts = window["streams"][name]
             outage = counts["outage"]
-            summary = counts["summary"] if outage is None or cutoff else None
-            verdict, reason = judge(outage, limit, summary=summary)
-            if counts["duplicates"] and verdict != "fail":
-                verdict, reason = "fail", f"{counts['duplicates']} duplicated pings"
+            flow = measured["streams"][name]
+            diagnostic_reason = None
+            if not counts["sent"]:
+                diagnostic_reason = "No sender pings were captured in this step."
+            elif any(
+                pause["from_s"] < window["end_s"] and window["start_s"] < pause["to_s"]
+                for pause in flow["send_pauses"]
+            ):
+                diagnostic_reason = "Sender cadence was invalid in this step."
+            elif not completed and n == len(starts) - 1:
+                diagnostic_reason = "The step stopped before it completed."
+            if diagnostic_reason:
+                verdict, reason = "error", diagnostic_reason
+                summary = (
+                    f"Diagnostic only: {counts['lost']} pings recorded lost, "
+                    f"{counts['sent']} sent in this step "
+                    f"(configured interval {traffic.INTERVAL_NS // 1_000_000} ms)"
+                )
+            else:
+                summary = counts["summary"]
+                verdict, reason = judge(
+                    outage, limit, summary=summary if outage is None or cutoff else None
+                )
+                if counts["duplicates"] and verdict != "fail":
+                    verdict, reason = "fail", f"{counts['duplicates']} duplicated pings"
+            empty_stop = None if diagnostic_reason else 0.0
             streams[name] = {
                 "interval_s": measured["interval_s"],
                 "limit_s": limit,
-                "lower_s": outage["lower_s"] if outage else 0.0,
-                "upper_s": outage["upper_s"] if outage else 0.0,
+                "lower_s": outage["lower_s"] if outage else empty_stop,
+                "upper_s": outage["upper_s"] if outage else empty_stop,
                 "lost": counts["lost"],
-                "summary": counts["summary"],
+                "summary": summary,
                 "duplicates": counts["duplicates"],
                 "sent": counts["sent"],
                 "delivered": counts["delivered"],
                 "verdict": verdict,
                 "reason": reason,
             }
+            if diagnostic_reason:
+                streams[name]["diagnostic_only"] = True
         span = (edges[n], edges[n + 1] - 1)
         spans = (
             {
@@ -1737,7 +1763,17 @@ def _event_row(event: Mapping[str, Any]) -> tuple[str, str] | None:
     if name == "fault_installed":
         return "fault", f"read back the rule for {event['target']}"
     if name == "fault_cleared":
-        drops = sum(lab_faults._drop_count(raw) for raw in event["counters"].values())
+        counters = event.get("counters")
+        if (
+            not isinstance(counters, Mapping)
+            or not counters
+            or not all(isinstance(raw, str) for raw in counters.values())
+        ):
+            return (
+                "fault",
+                f"removal readback for {event['target']} has unusable counters",
+            )
+        drops = sum(lab_faults._drop_count(raw) for raw in counters.values())
         return (
             "fault",
             f"removed the rule for {event['target']}, {drops} packets dropped",
@@ -1869,15 +1905,17 @@ def _report_traffic(
                 )
                 continue
             lower, upper = counts["lower_s"], counts["upper_s"]
+            stop = "unverified" if lower is None else _stop_text(lower, upper)
+            if counts.get("diagnostic_only"):
+                loss = counts["summary"]
+                if lower is not None:
+                    stop += " (diagnostic)"
+                verdict = f"unverified. {counts['reason']}"
+            else:
+                loss = f"{counts['lost']} at one ping every {traffic.INTERVAL_NS // 1_000_000} ms"
+                verdict = counts["verdict"]
             output.append(
-                _row(
-                    step.name,
-                    points[name],
-                    f"{limit:g} s",
-                    f"{counts['lost']} at one ping every {traffic.INTERVAL_NS // 1_000_000} ms",
-                    _stop_text(lower, upper),
-                    counts["verdict"],
-                )
+                _row(step.name, points[name], f"{limit:g} s", loss, stop, verdict)
             )
     for step in test.steps:
         measured = measured_steps.get(step.name, {})
@@ -2115,11 +2153,21 @@ def _report_events(
             )
         )
     for name, flow in ((result.get("traffic") or {}).get("streams") or {}).items():
+        diagnostic_steps = {
+            step["name"]
+            for step in result["steps"]
+            if step["streams"][name].get("diagnostic_only")
+        }
         for gap in flow.get("outages", flow.get("gaps", ())):
             where = ", ".join(gap["where"]) or "not sent"
-            rows.append(
-                (round(gap["begins_s"] * NS), name, f"{gap['summary']}, {where}")
-            )
+            summary = gap["summary"]
+            if diagnostic_steps.intersection(gap["windows"]):
+                summary = (
+                    f"Diagnostic only: {gap['lost']} pings recorded lost "
+                    f"(configured interval {traffic.INTERVAL_NS // 1_000_000} ms), "
+                    f"observed stop bounds {_stop_text(gap['lower_s'], gap['upper_s'])}"
+                )
+            rows.append((round(gap["begins_s"] * NS), name, f"{summary}, {where}"))
     for line in log_lines:
         rows.append((line.epoch_ns - zero, f"{line.switch} log", line.text))
     output.extend(

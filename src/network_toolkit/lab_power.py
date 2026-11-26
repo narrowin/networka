@@ -157,17 +157,20 @@ class PowerActions:
     def __enter__(self) -> PowerActions:
         return self
 
-    def __exit__(self, *exc: object) -> None:
+    def __exit__(
+        self, _kind: object, original: BaseException | None, _traceback: object
+    ) -> None:
         errors = []
-        for switch, outage in list(self.active.items()):
+        for switch, outage in self.active.items():
             try:
                 self.restore(outage)
+                status = lab.qmp_command(outage.layout.guest, "query-status", {})
+                _need(_status(status, running=True), f"{switch} did not resume")
+                self._observe(outage.layout, up=True)
                 self.session.mark("power_cleanup", switch=switch)
-            except lab.LabError as error:
+            except Exception as error:
                 errors.append(f"{switch} power cleanup: {error}")
-        if errors:
-            msg = "; ".join(errors)
-            raise lab.LabError(msg)
+        self.session.record_restore_errors(errors, original)
 
     def _link(self, end: lab.Point, *, up: bool) -> None:
         state = "up" if up else "down"

@@ -141,12 +141,21 @@ def collect(
             )
             for device in spec.devices
         }
+        original: BaseException | None = None
         try:
             yield
+        except BaseException as error:
+            original = error
+            raise
         finally:
             stop.set()
-            counts = {device: future.result() for device, future in futures.items()}
-            session.mark("host_watch_stopped", samples=counts)
+            try:
+                counts = {device: future.result() for device, future in futures.items()}
+                session.mark("host_watch_stopped", samples=counts)
+            except Exception as error:
+                session.record_restore_errors(
+                    [f"host-entry watch shutdown: {error}"], original
+                )
 
 
 def proof(

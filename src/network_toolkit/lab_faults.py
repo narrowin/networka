@@ -235,7 +235,9 @@ class TrafficActions:
     def __enter__(self) -> TrafficActions:
         return self
 
-    def __exit__(self, *exc: object) -> None:
+    def __exit__(
+        self, _kind: object, original: BaseException | None, _traceback: object
+    ) -> None:
         errors = []
         for active in reversed(list(self.installed.values())):
             try:
@@ -245,11 +247,9 @@ class TrafficActions:
                     f"{name(active.fault)} cleanup did not restore its qdisc",
                 )
                 self.session.mark("fault_cleanup", target=name(active.fault))
-            except (ValueError, lab.LabError) as error:
-                errors.append(str(error))
-        if errors:
-            msg = "; ".join(errors)
-            raise lab.LabError(msg)
+            except Exception as error:
+                errors.append(f"{name(active.fault)} fault cleanup: {error}")
+        self.session.record_restore_errors(errors, original)
 
     def tc(self, end: lab.Point, *command: str) -> str:
         return self.topology.run(end.node, "tc", *command)
@@ -437,7 +437,11 @@ def _member(fault: SilenceLacp, evidence: Mapping[str, Any], *, eligible: bool) 
 
 
 def _matches(active: Installed, readings: Mapping[str, str]) -> bool:
-    if set(readings) != {str(end) for end in active.points}:
+    if (
+        not isinstance(readings, Mapping)
+        or set(readings) != {str(end) for end in active.points}
+        or not all(isinstance(reading, str) for reading in readings.values())
+    ):
         return False
     fault = active.fault
     if isinstance(fault, Impair):
@@ -449,10 +453,16 @@ def _matches(active: Installed, readings: Mapping[str, str]) -> bool:
 
 
 def _restored(active: Installed, readings: Mapping[str, str]) -> bool:
-    return set(readings) == set(active.baseline) and all(
-        _has_classifier(reading) == _has_classifier(active.baseline[point])
-        and _root(reading)[1:3] == _root(active.baseline[point])[1:3]
-        for point, reading in readings.items()
+    return (
+        isinstance(readings, Mapping)
+        and set(readings) == set(active.baseline)
+        and all(
+            isinstance(reading, str)
+            and isinstance(active.baseline[point], str)
+            and _has_classifier(reading) == _has_classifier(active.baseline[point])
+            and _root(reading)[1:3] == _root(active.baseline[point])[1:3]
+            for point, reading in readings.items()
+        )
     )
 
 
@@ -501,6 +511,7 @@ def _rtt(
 def _delay_proof(
     result: dict[str, Any],
     fault: Impair,
+    events: Sequence[Mapping[str, Any]],
     measured: Mapping[str, Any],
     pcaps: Mapping[str, Path],
     before: Mapping[str, Any],
@@ -511,13 +522,44 @@ def _delay_proof(
 ) -> None:
     assert fault.delay_stream is not None
     stream = measured["streams"][fault.delay_stream]
+    neighboring = [
+        event
+        for event in events
+        if event["name"] == "fault_installing"
+        and isinstance(event.get("fault"), Mapping)
+        and (
+            event["target"] == name(fault)
+            or event["fault"].get("delay_stream") == fault.delay_stream
+        )
+    ]
+    earlier = {
+        event["number"] for event in neighboring if event["number"] < before["number"]
+    }
+    baseline_start = max(
+        (
+            event["epoch_ns"]
+            for event in events
+            if event["name"] == "fault_cleared"
+            and event.get("opening") in earlier
+            and event["number"] < before["number"]
+        ),
+        default=measured["start_ns"],
+    )
+    restored_end = min(
+        (
+            event["epoch_ns"]
+            for event in neighboring
+            if event["number"] > cleared["number"]
+        ),
+        default=measured["end_ns"],
+    )
     medians, samples = _rtt(
         pcaps[stream["source"]],
         stream["ident"],
         [
-            (measured["start_ns"], before["epoch_ns"]),
+            (baseline_start, before["epoch_ns"]),
             (applied["epoch_ns"], clearing["epoch_ns"]),
-            (cleared["epoch_ns"], measured["end_ns"]),
+            (cleared["epoch_ns"], restored_end),
         ],
     )
     baseline, impaired, restored = medians
@@ -643,6 +685,7 @@ def proofs(
             _delay_proof(
                 result,
                 fault,
+                events,
                 measured,
                 pcaps,
                 before,
@@ -652,7 +695,14 @@ def proofs(
                 len(points),
             )
         if isinstance(fault, CutPing):
-            gaps = measured["streams"][fault.stream]["gaps"]
+            low = (applied["epoch_ns"] - measured["start_ns"]) / traffic.NS
+            high = (clearing["epoch_ns"] - measured["start_ns"]) / traffic.NS
+            cadence = traffic.INTERVAL_NS / traffic.NS
+            gaps = [
+                gap
+                for gap in measured["streams"][fault.stream]["gaps"]
+                if gap["begins_s"] <= high + cadence and gap["ends_s"] >= low - cadence
+            ]
             # The first and last missed probes bound the minimum gap. The
             # surrounding successful probes bound its maximum length.
             _require(
@@ -661,9 +711,6 @@ def proofs(
             )
             [gap] = gaps
             upper_hold = (cleared["mono_ns"] - before["mono_ns"]) / traffic.NS
-            low = (applied["epoch_ns"] - measured["start_ns"]) / traffic.NS
-            high = (clearing["epoch_ns"] - measured["start_ns"]) / traffic.NS
-            cadence = traffic.INTERVAL_NS / traffic.NS
             _require(
                 not gap["absent_at_source"]
                 and gap["upper_s"] is not None

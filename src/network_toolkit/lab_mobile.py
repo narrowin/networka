@@ -130,20 +130,22 @@ class Actions:
     def __enter__(self) -> Actions:
         return self
 
-    def __exit__(self, *exc: object) -> None:
+    def __exit__(
+        self, _kind: object, original: BaseException | None, _traceback: object
+    ) -> None:
         errors = []
         for bond, member in list(self.moves.items()):
             try:
                 self.select(lab.point(bond), member)
                 self.session.mark("mobile_move_restored", bond=bond, member=member)
-            except lab.LabError as error:
-                errors.append(str(error))
+            except Exception as error:
+                errors.append(f"{bond} member restoration: {error}")
         for bond in list(self.silences):
             try:
                 self._remove(bond)
-            except lab.LabError as error:
-                errors.append(str(error))
-        _require(not errors, "; ".join(errors))
+            except Exception as error:
+                errors.append(f"{bond} silence cleanup: {error}")
+        self.session.record_restore_errors(errors, original)
 
     def points(self, actions: Sequence[Action]) -> set[str]:
         """Read the topology and select the switch TAPs and affected witness ports."""
@@ -494,12 +496,13 @@ def _affected(
     applied: int,
     cleared: int,
     first: int,
+    end: int,
     limit: float,
 ) -> tuple[dict[str, Any], list[str]]:
     """Verify the loss and the first recovered reply on every stream using the host."""
     details: dict[str, Any] = {}
     failures = []
-    zero, end = measured["start_ns"], measured["end_ns"]
+    zero = measured["start_ns"]
     for name, flow in measured["streams"].items():
         if bond not in (flow["source"], flow["destination"]):
             continue
@@ -531,7 +534,10 @@ def _affected(
                 f"{name} did not deliver again within {limit:g} s of the first host frame"
             )
         elif any(
-            gap["begins_s"] >= traffic.seconds(reply - zero) for gap in flow["gaps"]
+            traffic.seconds(reply - zero)
+            <= gap["begins_s"]
+            < traffic.seconds(end - zero)
+            for gap in flow["gaps"]
         ):
             failures.append(f"{name} lost another ping after delivery resumed")
     _require(details, f"No measured stream uses {bond}")
@@ -548,12 +554,13 @@ def _flooding(
     applied: int,
     cleared: int,
     first: int,
+    window: tuple[int, int],
     limit: float,
 ) -> tuple[dict[str, Any], list[str]]:
     """Count mobile-bound requests received at the other clients' switch-facing ports."""
     details: dict[str, Any] = {}
     failures = []
-    zero, end = measured["start_ns"], measured["end_ns"]
+    begin, end = window
     for name, flow in measured["streams"].items():
         if flow["destination"] != bond:
             continue
@@ -570,7 +577,7 @@ def _flooding(
             stamp
             for point in witnesses
             for stamp in _stamps(_pcap(folder, events, point), display)
-            if zero <= stamp < end
+            if begin <= stamp < end
         ]
         after = [stamp for stamp in seen if stamp >= first]
         delay = traffic.seconds(max(after) - first) if after else 0.0
@@ -650,14 +657,32 @@ def _silence_proof(
         for stamp in _stamps(_pcap(folder, events, tap), f"eth.src == {mac}")
     )
     applied, cleared = silent["epoch_ns"], clear["epoch_ns"]
+    previous_resume = max(
+        (
+            event["epoch_ns"]
+            for event in events
+            if event["name"] == "mobile_resumed"
+            and event["bond"] == action.bond
+            and event["number"] < opening
+        ),
+        default=measured["start_ns"],
+    )
+    end = min(
+        (
+            event["epoch_ns"]
+            for event in events
+            if event["name"] in ("mobile_move_start", "mobile_silence_start")
+            and event["bond"] == action.bond
+            and event["number"] > closing
+        ),
+        default=measured["end_ns"],
+    )
     _require(
         any(stamp < applied for stamp in frames)
         and not any(applied + FILTER_SETTLE_NS <= stamp < cleared for stamp in frames),
         "The switch TAPs did not prove the host sent before the cut and was silent during it",
     )
-    first = next(
-        (stamp for stamp in frames if cleared <= stamp < measured["end_ns"]), None
-    )
+    first = next((stamp for stamp in frames if cleared <= stamp < end), None)
     _require(
         first is not None,
         f"No frame from {bond} reached a switch TAP after the silence",
@@ -671,6 +696,7 @@ def _silence_proof(
         applied,
         cleared,
         first,
+        end,
         original.relearn_s,
     )
     flooding, failed_flooding = _flooding(
@@ -683,6 +709,7 @@ def _silence_proof(
         applied,
         cleared,
         first,
+        (previous_resume, end),
         original.relearn_s,
     )
     problems = failed_delivery + failed_flooding

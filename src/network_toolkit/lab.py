@@ -24,6 +24,7 @@ import threading
 import time
 from collections.abc import Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
+from contextlib import suppress
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, NamedTuple
@@ -288,25 +289,35 @@ def qmp_command(
 
     A new thread enters the namespace, so the caller's namespace stays the same.
     """
-    outcome: dict[str, Any] = {}
+    reply: Future[dict[str, Any]] = Future()
 
     def exchange() -> None:
+        if not reply.set_running_or_notify_cancel():
+            return
         try:
             with open(f"/proc/{qemu.pid}/ns/net") as netns:
                 os.setns(netns.fileno(), os.CLONE_NEWNET)  # type: ignore[attr-defined]
-            outcome["done"] = qmp_exchange(
-                qemu.qmp_host, qemu.qmp_port, command, arguments
-            )
-        except Exception as error:  # raised again in the caller's thread
-            outcome["error"] = error
+            result = qmp_exchange(qemu.qmp_host, qemu.qmp_port, command, arguments)
+        except BaseException as error:
+            reply.set_exception(error)
+        else:
+            reply.set_result(result)
 
     worker = threading.Thread(target=exchange)
-    worker.start()
-    worker.join()
-    if "error" in outcome:
-        msg = f"QEMU monitor {command} on NIC {qemu.nic} failed: {outcome['error']}"
-        raise LabError(msg) from outcome["error"]
-    return outcome["done"]
+    try:
+        worker.start()
+        return reply.result()
+    except BaseException as error:
+        if not reply.cancel():
+            # A deadline or Ctrl-C interrupts the caller, not the QMP worker.
+            # Drain the command before cleanup can send an inverse operation.
+            while not reply.done():
+                with suppress(BaseException):
+                    reply.exception()
+        if isinstance(error, Exception):
+            msg = f"QEMU monitor {command} on NIC {qemu.nic} failed: {error}"
+            raise LabError(msg) from error
+        raise
 
 
 def qmp_exchange(
@@ -368,14 +379,28 @@ class Session:
         self.processes: list[Process] = []
         self.down: set[Point] = set()
         self.repairs: dict[Point, int] = {}
+        self.restore_errors: list[str] = []
         self.stopped: dict[str, Any] | None = None
         self.start_clock = (time.time_ns(), time.monotonic_ns())
 
     def __enter__(self) -> Session:
         return self
 
-    def __exit__(self, *exc: object) -> None:
-        self.stop()
+    def __exit__(
+        self, _kind: object, original: BaseException | None, _traceback: object
+    ) -> None:
+        try:
+            self.stop()
+        except Exception as error:
+            self.record_restore_errors([f"stopping lab session: {error}"], original)
+
+    def record_restore_errors(
+        self, errors: list[str], original: BaseException | None
+    ) -> None:
+        """Retain cleanup failures while allowing the first action error to propagate."""
+        self.restore_errors.extend(errors)
+        if errors and original is None:
+            raise LabError("; ".join(errors))
 
     def mark(self, name: str, **data: Any) -> dict[str, Any]:
         """Append one event with its epoch and monotonic time to events.jsonl."""
@@ -588,14 +613,13 @@ class Session:
         """
         if self.stopped is not None:
             return self.stopped
-        restore_errors = []
         for end in sorted(self.down):
             try:
                 started = self.mark("repair_start", point=str(end))
                 self.set_link(str(end), "up")
                 self.repairs[end] = started["epoch_ns"]
             except Exception as error:
-                restore_errors.append(f"{end}: {error}")
+                self.restore_errors.append(f"{end}: {error}")
         early = [p.name for p in self.processes if p.child.poll() is not None]
         for kind in ("stream", "capture"):
             group = [p for p in self.processes if p.kind == kind]
@@ -617,7 +641,7 @@ class Session:
         self.stopped = self.mark(
             "stopped",
             early_exits=early,
-            restore_errors=restore_errors,
+            restore_errors=list(self.restore_errors),
             clock_delta_ns=(time.time_ns() - epoch) - (time.monotonic_ns() - mono),
         )
         return self.stopped
