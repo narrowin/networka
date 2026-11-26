@@ -15,7 +15,7 @@ evidence the same way live and offline.
 | Decision | Alternative considered | Why |
 | --- | --- | --- |
 | Collection and evaluation are separate. Collectors only read and save replies; checks only compare saved evidence. | Check while reading, as a script does. | Saved evidence replays to the same verdict without devices, and a check can be tested without a lab. JSNAPy (snapshot, then check) and SuzieQ (poll, then assert) split the work the same way. |
-| Device output is read as JSON only. | Parse CLI text with regular expressions or TextFSM templates. | Text parsers break on column layout, line wrapping and blank cells. JSON keeps field names and types. ANTA reads EOS JSON, and pyATS/Genie and NAPALM prefer structured output where the platform has it. Two sources have no JSON form and are read as text: Linux bonding (`/proc/net/bonding`, which alone gives the partner system per member) and the Linux `ping` summary line. |
+| Device output is read as JSON only. | Parse CLI text with regular expressions or TextFSM templates. | Text parsers break on column layout, line wrapping and blank cells. JSON keeps field names and types. ANTA reads EOS JSON, and pyATS/Genie and NAPALM prefer structured output where the platform has it. Linux bonds are read as iproute2 JSON. One source has no JSON form and is read as text: the Linux `ping` summary line. |
 | A neutral model with one folder per platform. `network_toolkit/intent.py` holds the checks; `platforms/<platform>/intent.py` holds collectors and normalizers. | One check per vendor and command. | A check written once applies to every platform that can normalize the fields. NAPALM getters and Genie models put vendor output behind common fields in the same way. |
 | Platform-specific checks where no neutral field exists. | Force every property into the neutral model. | RouterOS configuration properties and the Linux active aggregator have no counterpart elsewhere. Keeping them platform-specific avoids fields that mean different things on different platforms. |
 | Every result is `pass`, `fail` or `error`, and `error` is never a pass. | Treat missing evidence as a pass or skip it. | A check that could not see the state has not verified it. ANTA (success, failure, error), pyATS (passed, failed, errored) and nornir-salt (PASS, FAIL, ERROR) use the same three outcomes. |
@@ -225,18 +225,23 @@ Linux the `count` probes must finish within the device's `command_timeout`.
 
 `lacp_member` passes when both the actor and the partner side equal
 `expected`. A member without an LACP partner, such as a member that is
-down, gives `fail` on RouterOS with the partner side observed as `null`.
-This holds for every expectation, so `{collecting: false}` does not prove a
-down member on RouterOS. On Linux such a member still reports a partner side,
-as read from `/proc/net/bonding`. The partner MAC is compared in lower case. Both MLAG peers present one LACP system ID, so
+down, gives `fail` with the partner side observed as `null`. The partner MAC is compared in lower case. Both MLAG peers present one LACP system ID, so
 `lacp_partner_system` gives the same value for each member of an MLAG bond
 when read on the partner.
+
+On Linux, `lacp_partner_system` compares only `mac`. The iproute2 JSON
+carries the partner MAC of the bond's active aggregator and no partner
+system priority. An expected `priority` therefore gives `error` with reason
+"<bond> member <member> partner has no priority". A member outside the
+active aggregator gives `error` with reason "<bond> member <member>
+partner has no mac", because the JSON does not say which system that
+member's partner is.
 
 | Platform | `check` | `params` | Why it is platform-specific |
 | --- | --- | --- | --- |
 | RouterOS | `property` | `menu` in slash form, `where`, `name` | Compares one property of a menu entry; an absent property is `error`, not `null`. For example `pvid`, `edge`, `bpdu-guard`, `loop-protect`, `lacp-strict` or `mlag-priority`. These are RouterOS configuration names. |
 | RouterOS | `version` | none | Compares the version without the channel. The expected value comes from a RouterOS image name. |
-| Linux | `bond_member` | `bond`, `member` | Compares the bonding driver's `carrier` (MII Status) and `eligible`: in the active aggregator, and both port states synchronized, collecting and distributing. Aggregator selection is a Linux bonding concept. |
+| Linux | `bond_member` | `bond`, `member` | Compares the bonding driver's `carrier` (`mii_status`) and `eligible`: in the active aggregator, and both port states synchronized, collecting and distributing. Aggregator selection is a Linux bonding concept. |
 
 ## RouterOS commands
 
@@ -276,9 +281,7 @@ exactly `count` rows with `seq` 0 to `count - 1`, any `host` equal to
 
 All of these, including the quoted names such as `monitor "bridge" once`
 and the joined host print and bridge print, were read on RouterOS CHR
-7.26beta7. The Linux bonding normalizer has been checked only against saved
-`/proc/net/bonding` text from lab hosts, not through a Networka `linux`
-device.
+7.26beta7.
 
 What the JSON returns, as seen on 7.26beta7:
 
@@ -303,6 +306,26 @@ What the JSON returns, as seen on 7.26beta7:
   "port": "ether3"}`. `lacp_member` then gives `fail` and `lacp_partner_system` gives `error`.
 - The bonding monitor returns one object for one member and an array for
   several.
+
+## Linux commands
+
+| Collector | Command | Checked live |
+| --- | --- | --- |
+| `collect_bond` | `ip -j -d link show dev <bond>` and `ip -j -d link show master <bond>`, as two reads | Yes, iproute2 6.15, without a Networka `linux` device |
+| `collect_ping` | `ping -n -c <count> -W 1 [-I <interface or vrf>] <dest>` | Yes |
+
+The bond read gives `linkinfo.info_data` with `mode` and, while the bond
+has an active aggregator, `ad_info` with `aggregator` and `partner_mac`.
+The member read gives one row per member with `ifname`, `master` and
+`linkinfo.info_slave_data`: `mii_status`, `ad_aggregator_id` and the
+numeric `ad_actor_oper_port_state` and `ad_partner_oper_port_state`. The
+normalizers read the numeric port states, not the
+`ad_actor_oper_port_state_str` lists, which older iproute2 may not print.
+Both reads give the same fields to a login without root. The bond row must
+name the bond and have `info_kind` `bond`, and each member row must name
+the bond as its `master`. A bond whose `mode` is not `802.3ad` gives `error`
+on the LACP checks. A member whose partner is gone keeps a partner port
+state of 0, so `lacp_member` fails.
 
 ## Add a platform
 
@@ -333,7 +356,8 @@ intent platforms.
 ### Reuse the Linux module
 
 Cumulus bonds use the Linux bonding driver and Cumulus runs iputils, so the
-Cumulus module imports and re-exports the Linux pieces:
+Cumulus module imports and re-exports the Linux pieces. The same iproute2
+JSON commands read the bonds there:
 
 ```python
 from network_toolkit.platforms.linux.intent import (
@@ -350,13 +374,6 @@ from network_toolkit.platforms.linux.intent import (
 params and raises `ValueError` for a combination the platform cannot run;
 `intent._resolve` calls it before any device is read. The Linux rule
 rejects `interface` together with `vrf` for `ping`.
-
-The Linux LACP checks (`lacp_member`, `lacp_partner_system`,
-`bond_member`) need the device login to read `/proc/net/bonding/<bond>` as
-root (CAP_NET_ADMIN): without it the file has no "Active Aggregator Info"
-or "details actor/partner lacp pdu" blocks, and the checks give `error`
-with reason "LACP details missing from /proc/net/bonding/<bond>; read it as
-root (CAP_NET_ADMIN)". `bond_members` needs no root.
 
 On Linux, Networka runs a command in the login shell and does not see its
 exit status: stderr and a non-zero exit arrive in the reply `output` with
@@ -423,7 +440,7 @@ empty list must first show from a successful reply that the object exists.
 | `stp_mode(evidence, bridge)` | `"rstp"`, `"mstp"`, `"none"` |
 | `mlag(evidence, bridge)` | `{"connected": bool, "role": "primary" or "secondary", "state": str}` |
 | `bond_members(evidence, bond)` | `["swp1", "swp2"]`; a successful bond read proves the bond exists |
-| `lacp_member(evidence, bond, member)` | `{"actor": {flag: bool}, "partner": {flag: bool}, "partner_system": {"priority": int, "mac": lower-case str}}`, with `partner` and `partner_system` left out when there is no partner |
+| `lacp_member(evidence, bond, member)` | `{"actor": {flag: bool}, "partner": {flag: bool}, "partner_system": {"priority": int, "mac": lower-case str}}`, with `partner` and `partner_system` left out when there is no partner. Linux leaves out `priority`, and also `mac` for a member outside the active aggregator. |
 | `host_entry(evidence, bridge, mac)` | The port name, or `None` when the bridge has no entry |
 | `interface_up(evidence, interface)` | `bool` |
 | `ping(evidence, dest, count, interface, vrf)` | `{"sent": int, "received": int, "reachable": bool}`; the reply must name `dest` and account for `count` probes |
@@ -439,7 +456,7 @@ For Cumulus:
 | `stp_mode` | `nv show bridge domain <bridge> stp --output json`, mode | Partly: `pvrst` has no RouterOS counterpart |
 | `mlag` `connected`, `role` | `nv show mlag --output json`, peer alive and role | Partly: MLAG is not bridge-scoped on Cumulus, so `bridge` selects nothing; identify the reply by `local-role` |
 | `mlag` `state` | none | No: the state word is each platform's own |
-| `lacp_member`, `lacp_partner_system`, `bond_members` | `/proc/net/bonding/<bond>`, the Linux normalizers (root for LACP) | Yes |
+| `lacp_member`, `lacp_partner_system`, `bond_members` | `ip -j -d link show dev <bond>` and `ip -j -d link show master <bond>`, the Linux collector and normalizers | Yes, `lacp_partner_system` with `mac` only |
 | `host_entry` | `bridge -j fdb show br <bridge>`, `ifname` of the MAC | Yes, with an existence read of the bridge |
 | `interface_up` | `nv show interface --output json`, `link.oper-status` | Yes |
 | `ping` | `ping -n -c <count> -W 1 [-I <interface or vrf>] <dest>`, the Linux collector | Yes |
@@ -486,8 +503,7 @@ keeps the same contract.
    collectors and normalizers, importing the Linux bonding and ping ones.
 3. Add `CHECKS` (empty when there are none), `PARAM_RULES` if needed, and
    `intent.claim("cumulus_linux", CHECKS)`.
-4. Read each collector's commands once on a lab switch, as root for the
-   LACP checks, save the replies, and add a test that feeds them to the
+4. Read each collector's commands once on a lab switch, save the replies, and add a test that feeds them to the
    checks, as `tests/test_platforms_mikrotik.py` does with RouterOS replies.
    Include a down port and a bond member without a partner.
 5. Run an intent file against the lab with `nw intent run FILE --save DIR`

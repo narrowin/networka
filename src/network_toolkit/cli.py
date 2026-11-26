@@ -32,6 +32,7 @@ from network_toolkit.commands.run import register as register_run
 from network_toolkit.commands.schema import register as register_schema
 from network_toolkit.commands.ssh import register as register_ssh
 from network_toolkit.commands.sync_ssh import register as register_sync
+from network_toolkit.commands.test import register as register_test
 from network_toolkit.commands.upload import register as register_upload
 from network_toolkit.common.command_helpers import CommandContext
 from network_toolkit.common.logging import setup_logging
@@ -226,6 +227,7 @@ register_ssh(app)
 register_sync(app)
 register_platforms(app)
 register_intent(app)
+register_test(app)
 
 # Expose a Click-compatible command for documentation tools (e.g., mkdocs-click)
 # Create this after all subcommands have been registered

@@ -306,7 +306,8 @@ class DeviceConfig(ConfigHistoryMixin, BaseModel):
     # Private: configuration history for introspection
     _history: ConfigHistory = PrivateAttr(default_factory=ConfigHistory)
 
-    host: str
+    # Empty until a lab test fills it from the containerlab lab.
+    host: str = ""
     description: str | None = None
     device_type: SupportedDeviceType = (
         "mikrotik_routeros"  # Default to most common type

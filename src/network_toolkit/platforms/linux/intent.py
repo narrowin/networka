@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: MIT
 """Collect and normalize Linux bonding evidence for the intent checks.
 
-The evidence is the text of `/proc/net/bonding/<bond>` from the Linux
-bonding driver, which Cumulus Linux also uses. `check_bond_member` is a
-Linux-only check of the driver's own view of a member.
+The evidence is the iproute2 JSON of the bond and its members from the
+Linux bonding driver, which Cumulus Linux also uses. `check_bond_member` is
+a Linux-only check of the driver's own view of a member.
 """
 
 from __future__ import annotations
@@ -22,15 +22,25 @@ if TYPE_CHECKING:
 MEMBER_FIELDS = ("carrier", "eligible")
 # Synchronization, collecting and distributing in the LACP port state.
 _IN_USE = 0x38
+_MII = {"UP": True, "DOWN": False}
 
 
-def bonding(bond: str) -> str:
-    """The read of one bond; `bond` must be a plain interface name."""
+def _bond_name(bond: str) -> str:
     bond = intent.name(bond, "bond")
     if "/" in bond:
         msg = f"bond must be an interface name without '/', not {bond!r}"
         raise ValueError(msg)
-    return f"cat /proc/net/bonding/{bond}"
+    return bond
+
+
+def bond_link(bond: str) -> str:
+    """The read of the bond itself; `bond` must be a plain interface name."""
+    return f"ip -j -d link show dev {_bond_name(bond)}"
+
+
+def bond_slaves(bond: str) -> str:
+    """The read of every member of the bond, with its bonding details."""
+    return f"ip -j -d link show master {_bond_name(bond)}"
 
 
 def collect_bond(
@@ -40,9 +50,11 @@ def collect_bond(
     member: str | None = None,
     **run_options: Any,
 ) -> dict[str, Reply]:
-    """`/proc/net/bonding/<bond>`; it lists every member, so `member` is not needed."""
-    command = bonding(bond)
-    return {command: intent.read(client, device, command, run_options)}
+    """The bond and all its members; the member read lists every member."""
+    return {
+        command: intent.read(client, device, command, run_options)
+        for command in (bond_link(bond), bond_slaves(bond))
+    }
 
 
 def _one(values: list[Any], what: str) -> Any:
@@ -52,89 +64,97 @@ def _one(values: list[Any], what: str) -> Any:
     return values[0]
 
 
-def _root_message(bond: str) -> str:
-    return (
-        f"LACP details missing from /proc/net/bonding/{bond}; "
-        "read it as root (CAP_NET_ADMIN)"
-    )
+def _rows(evidence: Mapping[str, Any], command: str) -> list[dict]:
+    rows = intent.load_json(intent.reply_output(evidence, command))
+    if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
+        msg = f"the reply to {command} is not a JSON array of objects"
+        raise ValueError(msg)
+    return rows
+
+
+def _int(data: Mapping[str, Any], key: str, what: str) -> int:
+    value = data.get(key)
+    if not isinstance(value, int) or isinstance(value, bool):
+        msg = f"{what} {key} is missing or is not a JSON number"
+        raise ValueError(msg)
+    return value
+
+
+def _bond(evidence: Mapping[str, Any], bond: str) -> dict[str, Any]:
+    """The `info_data` of the bond's own row, which must name the bond."""
+    row = _one(_rows(evidence, bond_link(bond)), f"link row for {bond}")
+    linkinfo = row.get("linkinfo")
+    if row.get("ifname") != bond:
+        msg = f"the link row names {row.get('ifname')!r}, not {bond}"
+        raise ValueError(msg)
+    if not isinstance(linkinfo, dict) or linkinfo.get("info_kind") != "bond":
+        msg = f"{bond} is not a bond"
+        raise ValueError(msg)
+    data = linkinfo.get("info_data")
+    if not isinstance(data, dict) or not isinstance(data.get("mode"), str):
+        msg = f"{bond} has no bond mode"
+        raise ValueError(msg)
+    return data
+
+
+def _slaves(evidence: Mapping[str, Any], bond: str) -> list[dict]:
+    """The member rows; each must name itself and the bond as its master."""
+    rows = _rows(evidence, bond_slaves(bond))
+    for row in rows:
+        if not isinstance(row.get("ifname"), str) or row.get("master") != bond:
+            msg = f"a member row does not name its port and master {bond}"
+            raise ValueError(msg)
+    return rows
 
 
 def _member(evidence: Mapping[str, Any], bond: str, member: str) -> dict[str, Any]:
-    command = bonding(bond)
-    text = intent.reply_output(evidence, command)
-    if "Bonding Mode: IEEE 802.3ad" not in text:
+    data = _bond(evidence, bond)
+    if data["mode"] != "802.3ad":
         msg = f"{bond} is not an 802.3ad (LACP) bond"
         raise ValueError(msg)
-    if "details actor lacp pdu:" not in text:
-        raise ValueError(_root_message(bond))
-    section = _one(
-        re.findall(
-            rf"(?m)^Slave Interface: {re.escape(member)}\n([\s\S]*?)(?=^Slave Interface: |\Z)",
-            text,
-        ),
-        f"section for {member}",
-    )
-    found = re.findall(r"(?m)^Active Aggregator Info:\n\s*Aggregator ID: (\d+)$", text)
-    active = _one(found, "active aggregator") if found else None
-    blocks = {
-        side: _one(
-            re.findall(
-                rf"(?m)^details {side} lacp pdu:\n((?:[ \t]+\S.*\n?)*)", section
-            ),
-            f"{side} lacp pdu block of {member}",
-        )
-        for side in ("actor", "partner")
-    }
+    rows = [r for r in _slaves(evidence, bond) if r["ifname"] == member]
+    row = _one(rows, f"member row for {member}")
+    linkinfo = row.get("linkinfo")
+    slave = linkinfo.get("info_slave_data") if isinstance(linkinfo, dict) else None
+    if not isinstance(slave, dict):
+        msg = f"{member} has no bonding details"
+        raise ValueError(msg)
+    mii = slave.get("mii_status")
+    if mii not in _MII:
+        msg = f"{member} mii_status is {mii!r}, not UP or DOWN"
+        raise ValueError(msg)
     states = [
-        _one(re.findall(r"(?m)^\s*port state: (\d+)$", block), f"{side} port state")
-        for side, block in blocks.items()
+        _int(slave, f"ad_{side}_oper_port_state", member)
+        for side in ("actor", "partner")
     ]
-    if any(int(state) > 255 for state in states):
+    if any(not 0 <= state <= 255 for state in states):
         msg = f"{member} port state is not a byte: {states}"
         raise ValueError(msg)
-    partner = blocks["partner"]
-    mii = _one(re.findall(r"(?m)^MII Status: (up|down)$", section), "MII Status")
+    info = data.get("ad_info")
     return {
-        "states": [int(state) for state in states],
-        "carrier": mii == "up",
-        "aggregator": _one(
-            re.findall(r"(?m)^Aggregator ID: (\d+)$", section), "Aggregator ID"
-        ),
-        "active": active,
-        "partner": partner,
+        "states": states,
+        "carrier": _MII[mii],
+        "aggregator": _int(slave, "ad_aggregator_id", member),
+        "active": info if isinstance(info, dict) else None,
     }
 
 
 def bond_members(evidence: Mapping[str, Any], bond: str) -> list[str]:
-    """The `Slave Interface:` names of `/proc/net/bonding/<bond>`.
-
-    A successful read of the file proves the bond exists.
-    """
-    text = intent.reply_output(evidence, bonding(bond))
-    if (
-        not text.startswith("Ethernet Channel Bonding Driver:")
-        and "Bonding Mode:" not in text
-    ):
-        msg = f"the reply for {bond} is not a bonding status file"
-        raise ValueError(msg)
-    return re.findall(r"(?m)^Slave Interface: (\S+)$", text)
+    """The `ifname` of every member row; the bond's own row proves it exists."""
+    _bond(evidence, bond)
+    return [row["ifname"] for row in _slaves(evidence, bond)]
 
 
 def lacp_member(evidence: Mapping[str, Any], bond: str, member: str) -> dict:
     """Actor and partner LACP port-state bits and the partner system of one member.
 
-    Each side is read from its own labelled block, `details actor lacp pdu`
-    and `details partner lacp pdu`; a missing block raises.
+    The bits are the numeric `ad_actor_oper_port_state` and
+    `ad_partner_oper_port_state`, which older iproute2 also prints. The JSON
+    has no partner system priority and only the partner MAC of the active
+    aggregator, so `partner_system` holds only `mac`, and only for a member
+    in the active aggregator.
     """
     found = _member(evidence, bond, member)
-    partner = found["partner"]
-    priority = _one(
-        re.findall(r"(?m)^\s*system priority: (\d+)$", partner),
-        "partner system priority",
-    )
-    mac = _one(
-        re.findall(r"(?m)^\s*system mac address: (\S+)$", partner), "partner system MAC"
-    )
     sides = dict(zip(("actor", "partner"), found["states"], strict=True))
     state: dict[str, Any] = {
         side: {
@@ -143,10 +163,16 @@ def lacp_member(evidence: Mapping[str, Any], bond: str, member: str) -> dict:
         }
         for side, bits in sides.items()
     }
-    state["partner_system"] = {
-        "priority": int(priority),
-        "mac": mac.lower(),
-    }
+    active = found["active"]
+    state["partner_system"] = {}
+    if active is not None and found["aggregator"] == _int(
+        active, "aggregator", f"{bond} ad_info"
+    ):
+        mac = active.get("partner_mac")
+        if not isinstance(mac, str):
+            msg = f"{bond} ad_info has no partner_mac"
+            raise ValueError(msg)
+        state["partner_system"]["mac"] = mac.lower()
     return state
 
 
@@ -156,7 +182,7 @@ def check_bond_member(
     member: str,
     expected: Mapping[str, bool],
 ) -> IntentResult:
-    """Compare the bonding driver's `carrier` (MII Status) and `eligible` of a member.
+    """Compare the bonding driver's `carrier` (`mii_status`) and `eligible` of a member.
 
     `eligible` means the member is in the active aggregator and both its actor
     and partner port state are synchronized, collecting and distributing.
@@ -165,13 +191,15 @@ def check_bond_member(
 
     def observe() -> dict[str, bool]:
         found = _member(evidence, bond, member)
-        if found["active"] is None and "eligible" in expected:
-            raise ValueError(_root_message(bond))
-        state = {
-            "carrier": found["carrier"],
-            "eligible": found["aggregator"] == found["active"]
-            and all(bits & _IN_USE == _IN_USE for bits in found["states"]),
-        }
+        active = found["active"]
+        if active is None and "eligible" in expected:
+            msg = f"{bond} has no active aggregator"
+            raise ValueError(msg)
+        state = {"carrier": found["carrier"]}
+        if active is not None:
+            state["eligible"] = found["aggregator"] == _int(
+                active, "aggregator", f"{bond} ad_info"
+            ) and all(bits & _IN_USE == _IN_USE for bits in found["states"])
         return {name: state[name] for name in expected}
 
     return intent.compare(dict(expected), observe)

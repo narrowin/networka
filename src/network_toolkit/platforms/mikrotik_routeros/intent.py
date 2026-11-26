@@ -108,6 +108,18 @@ def collect(
     }
 
 
+def log_marker(
+    client: NetworkaClient, device: str, text: str, **run_options: Any
+) -> str | None:
+    """Write `text` as one info line with topic script to the device's log.
+
+    Returns the error, or None. Quotes, backslashes and dollar signs are
+    escaped, so the text cannot change the command.
+    """
+    quoted = "".join(f"\\{c}" if c in '"\\$' else c for c in text)
+    return intent.read(client, device, f':log info "{quoted}"', run_options)["error"]
+
+
 def collect_bridge(
     client: NetworkaClient, device: str, bridge: str, **run_options: Any
 ) -> dict[str, Reply]:

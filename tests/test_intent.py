@@ -12,37 +12,55 @@ from network_toolkit.api.run import DeviceCommandResult
 from network_toolkit.cli import app
 from network_toolkit.config import DeviceConfig, NetworkConfig
 from network_toolkit.exceptions import NetworkToolkitError
-from network_toolkit.platforms.linux.intent import bonding, check_bond_member
+from network_toolkit.platforms.linux.intent import (
+    bond_link,
+    bond_slaves,
+    check_bond_member,
+)
 from network_toolkit.platforms.linux.intent import ping_command as lx_ping_command
 from network_toolkit.platforms.mikrotik_routeros import intent as ros
 
-BOND = """Bonding Mode: IEEE 802.3ad Dynamic link aggregation
-Active Aggregator Info:
-\tAggregator ID: 2
 
-Slave Interface: eth1
-MII Status: up
-Aggregator ID: 2
-details actor lacp pdu:
-    system priority: 65535
-    system mac address: 02:00:00:11:00:12
-    port state: 63
-details partner lacp pdu:
-    system priority: 65535
-    system mac address: 52:54:00:E1:0B:03
-    port state: 71
+def _bond_evidence(mode: str, info: dict | None, members: list) -> dict:
+    """Replies of `ip -j -d link show` for bond0 and its members.
 
-Slave Interface: eth2
-MII Status: down
-Aggregator ID: 1
-details actor lacp pdu:
-    port state: 63
-details partner lacp pdu:
-    port state: 63
-"""
-EVIDENCE = {
-    bonding("bond0"): {"command": bonding("bond0"), "output": BOND, "error": None}
-}
+    The values are from iproute2 6.15 JSON read on two 802.3ad bonds over veth
+    pairs, cut down to the fields the normalizers read.
+    """
+    data = {"mode": mode} | ({} if info is None else {"ad_info": info})
+    bond = [{"ifname": "bond0", "linkinfo": {"info_kind": "bond", "info_data": data}}]
+    rows = [
+        {
+            "ifname": name,
+            "master": "bond0",
+            "linkinfo": {
+                "info_slave_kind": "bond",
+                "info_slave_data": {"mii_status": mii}
+                | (
+                    {}
+                    if aggregator is None
+                    else {
+                        "ad_aggregator_id": aggregator,
+                        "ad_actor_oper_port_state": actor,
+                        "ad_partner_oper_port_state": partner,
+                    }
+                ),
+            },
+        }
+        for name, mii, aggregator, actor, partner in members
+    ]
+    return {
+        command: {"command": command, "output": json.dumps(value), "error": None}
+        for command, value in ((bond_link("bond0"), bond), (bond_slaves("bond0"), rows))
+    }
+
+
+# eth2 of a bond whose peer set eth2 down.
+EVIDENCE = _bond_evidence(
+    "802.3ad",
+    {"aggregator": 1, "partner_mac": "BE:37:7E:E0:AD:FE"},
+    [("eth1", "UP", 1, 63, 63), ("eth2", "DOWN", 1, 15, 55)],
+)
 
 
 def test_platform_lookup_names_supported_platforms() -> None:
@@ -54,25 +72,30 @@ def test_platform_lookup_names_supported_platforms() -> None:
 
 def test_linux_lacp_member_and_partner_system() -> None:
     scd = {"synchronization": True, "collecting": True, "distributing": True}
-    result = intent.check_lacp_member(EVIDENCE, "linux", "bond0", "eth1", scd)
+    result = intent.check_lacp_member(EVIDENCE, "linux", "bond0", "eth2", scd)
     assert result.verdict == "fail"
     assert result.observed["partner"] == {
         "synchronization": False,
-        "collecting": False,
-        "distributing": False,
+        "collecting": True,
+        "distributing": True,
     }
-    system = {"priority": 65535, "mac": "52:54:00:e1:0b:03"}
+    system = {"mac": "be:37:7e:e0:ad:fe"}
     assert intent.check_lacp_partner_system(
-        EVIDENCE, "linux", "bond0", "eth1", system
+        EVIDENCE, "linux", "bond0", "eth2", system
     ).verdict == ("pass")
+    priority = intent.check_lacp_partner_system(
+        EVIDENCE, "linux", "bond0", "eth2", {"priority": 65535}
+    )
+    assert priority.reason == "bond0 member eth2 partner has no priority"
 
 
 def test_linux_bond_member() -> None:
     expected = {"carrier": True, "eligible": True}
     result = check_bond_member(EVIDENCE, "bond0", "eth2", expected)
     assert result.observed == {"carrier": False, "eligible": False}
+    assert check_bond_member(EVIDENCE, "bond0", "eth1", expected).verdict == "pass"
     missing = check_bond_member(EVIDENCE, "bond0", "eth3", expected)
-    assert missing.reason == "expected one section for eth3, found 0"
+    assert missing.reason == "expected one member row for eth3, found 0"
 
 
 INTENT = """
@@ -225,21 +248,45 @@ def test_linux_ping() -> None:
 
 
 def test_linux_bond_members() -> None:
-    text = "Ethernet Channel Bonding Driver: v6.1\n\n" + BOND
-    evidence = {
-        bonding("bond0"): {"command": bonding("bond0"), "output": text, "error": None}
-    }
-    result = intent.check_bond_members(evidence, "linux", "bond0", ["eth1"])
+    result = intent.check_bond_members(EVIDENCE, "linux", "bond0", ["eth1"])
     assert (result.observed, result.verdict) == (["eth1", "eth2"], "fail")
-
-
-def test_linux_lacp_without_root() -> None:
-    text = "Bonding Mode: IEEE 802.3ad Dynamic link aggregation\nSlave Interface: eth1\nMII Status: up\n"
-    evidence = {
-        bonding("bond0"): {"command": bonding("bond0"), "output": text, "error": None}
+    other = json.loads(EVIDENCE[bond_slaves("bond0")]["output"])
+    other[0]["master"] = "bond1"
+    wrong = EVIDENCE | {
+        bond_slaves("bond0"): EVIDENCE[bond_slaves("bond0")]
+        | {"output": json.dumps(other)}
     }
+    assert intent.check_bond_members(wrong, "linux", "bond0", []).reason == (
+        "a member row does not name its port and master bond0"
+    )
+
+
+def test_linux_partner_gone_and_not_lacp() -> None:
+    # The peer's bond0 was deleted: eth1 left the active aggregator 1.
+    gone = _bond_evidence(
+        "802.3ad",
+        {"aggregator": 1, "partner_mac": "00:00:00:00:00:00"},
+        [("eth1", "UP", 2, 71, 0), ("eth2", "UP", 1, 79, 0)],
+    )
     scd = {"synchronization": True}
-    result = intent.check_lacp_member(evidence, "linux", "bond0", "eth1", scd)
-    assert result.reason == (
-        "LACP details missing from /proc/net/bonding/bond0; read it as root (CAP_NET_ADMIN)"
+    result = intent.check_lacp_member(gone, "linux", "bond0", "eth2", scd)
+    assert (result.verdict, result.observed["partner"]) == (
+        "fail",
+        {"synchronization": False},
+    )
+    mac = {"mac": "be:37:7e:e0:ad:fe"}
+    assert intent.check_lacp_partner_system(
+        gone, "linux", "bond0", "eth2", mac
+    ).observed == {"mac": "00:00:00:00:00:00"}
+    outside = intent.check_lacp_partner_system(gone, "linux", "bond0", "eth1", mac)
+    assert (outside.verdict, outside.reason) == (
+        "error",
+        "bond0 member eth1 partner has no mac",
+    )
+    backup = _bond_evidence("active-backup", None, [("eth1", "UP", None, 0, 0)])
+    assert intent.check_lacp_member(backup, "linux", "bond0", "eth1", scd).reason == (
+        "bond0 is not an 802.3ad (LACP) bond"
+    )
+    assert intent.check_bond_members(backup, "linux", "bond0", ["eth1"]).verdict == (
+        "pass"
     )
