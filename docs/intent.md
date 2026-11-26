@@ -307,9 +307,8 @@ This section is written for adding Cumulus Linux; no Cumulus module exists
 yet. Read `src/network_toolkit/platforms/linux/intent.py` as the smallest
 complete platform module: collectors, normalizers, one platform-specific
 check, `PARAM_RULES` and the `claim` call. The Cumulus sources below come
-from the NVIDIA guides and
-[draft PR #47](https://github.com/narrowin/networka/pull/47) and have not
-been checked on a switch.
+from the NVIDIA guides and the provisional Cumulus checks in
+`docs/examples/intent/compare.py`, and have not been checked on a switch.
 
 ### Dispatch and registry
 

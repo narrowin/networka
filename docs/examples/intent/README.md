@@ -94,6 +94,12 @@ three bridges. That differs from the checked-in `rstp` startup profile.
 The forwarding verdict describes the bridge-port flag. The live snapshot had
 no active STP election. [Medium startup reference][medium-startup].
 
+### Cumulus Linux (provisional)
+
+The Cumulus checks in `compare.py` read saved `nv show interface --output json`
+and `bridge -j link show` replies. They have not been checked on a switch. See
+[Add a platform](../../intent.md#add-a-platform) for the Cumulus field sources.
+
 ## Intent verdicts
 
 The shared intent expects physical link status `up`. RouterOS supplies
