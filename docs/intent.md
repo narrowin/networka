@@ -19,8 +19,8 @@ evidence the same way live and offline.
 | A neutral model with one folder per platform. `network_toolkit/intent.py` holds the checks; `platforms/<platform>/intent.py` holds collectors and normalizers. | One check per vendor and command. | A check written once applies to every platform that can normalize the fields. NAPALM getters and Genie models put vendor output behind common fields in the same way. |
 | Platform-specific checks where no neutral field exists. | Force every property into the neutral model. | RouterOS configuration properties and the Linux active aggregator have no counterpart elsewhere. Keeping them platform-specific avoids fields that mean different things on different platforms. |
 | Every result is `pass`, `fail` or `error`, and `error` is never a pass. | Treat missing evidence as a pass or skip it. | A check that could not see the state has not verified it. ANTA (success, failure, error), pyATS (passed, failed, errored) and nornir-salt (PASS, FAIL, ERROR) use the same three outcomes. |
-| Absence needs positive proof. | Read an empty reply as "not there". | A normalizer reports `null` or an empty list only from a well-formed reply that is shown to be about the requested object, for example a bridge print that contains the bridge; a failed, missing or foreign reply is `error`. |
-| Items on one device that need the same reading share it. | Read once per item. | Items then see the same moment, as a JSNAPy snapshot or the ANTA per-device cache does, and a run makes fewer reads. |
+| Absence needs positive proof, and every reply must identify its object. | Read an empty reply as "not there", and trust a reply to be about what was asked. | Before reading a value, a normalizer checks that the reply names the requested object by its key: the bridge print row `name` and the bridge monitor `.id` that matches it, the Ethernet monitor `name`, the bond row `port`, the host row `mac-address` and `bridge`, the port monitor `interface`. It reports `null` or an empty list only from such a reply that shows the object exists, for example a bridge print that contains the bridge. A missing or mismatched key, `{}`, or a failed or missing reply is `error`. |
+| Items on one device share a reading when they use the same collector with identical params. | Read once per item. | Those items then see the same moment, as a JSNAPy snapshot or the ANTA per-device cache does. Items whose params differ read separately, even on the same command: two `property` items on the same menu read it twice. |
 | The intent file states exact expected values. No operators, tags, skip rules or OpenConfig paths. | Expressions such as `is-gt`, tag filtering, or an OpenConfig model. | The checks compare normalized fields for equality, which covers device-state intent and keeps the file readable. Selection and arithmetic belong to the caller. NUTS uses the same plain expected-value form. |
 
 ## Intent file
@@ -128,10 +128,13 @@ but at least one could not be verified, and `pass` otherwise. The exit
 status is 0 for pass, 1 for fail and 2 for error, including an unusable
 intent file or evidence; the command then prints one `error:` line and no
 traceback. Values compare in value and type, also inside mappings and
-lists. Malformed evidence, such as a device without a list of readings, a
-reading whose collection recorded an error, a reply an item uses that
-carries an error, and any failure inside a check give that item `error`,
-in a run and in a replay alike.
+lists. A reply succeeded only when its `error` is exactly `null`, and a
+reading only when it has no `error` key; any other value, including `""`
+or `false`, is an error. Malformed evidence, such as a device without a
+list of readings, a reading or a used reply with an error, and any failure
+inside a check give that item `error`, in a run and in a replay alike.
+When a read finds that a device does not accept a connection, its remaining
+readings in that run are not attempted and carry the same error.
 
 In Python, `run_intent` collects and then evaluates the evidence through
 `replay_intent`, so a replay gives the same results:
@@ -185,9 +188,10 @@ when read on the partner.
 Each command runs inside
 `:put [:serialize to=json options=json.no-string-conversion [<command>]]`.
 Names are quoted in the command, and only validated names, MAC addresses and
-menu paths reach it. Each collector makes one read per command:
-`collect_bridge` reads the bridge monitor and the port statistics separately,
-so a failed statistics read leaves MLAG and STP checks usable, and
+menu paths reach it. `collect_bridge` reads the bridge print and the bridge
+monitor in one read and the port statistics in another, so a failed
+statistics read leaves MLAG and STP checks usable; `collect_host_entry`
+reads the host print and the bridge print in one read; and
 `collect_bridge_port` reads the statistics and then the monitor of the
 selected port. `collect` can join several commands with `;` into one read
 and splits the output into one reply per command, because each prints one
@@ -199,18 +203,20 @@ in time but not one instant.
 | --- | --- | --- |
 | `collect_bridge`, `collect_bridge_port` | `/interface/bridge/port/print stats as-value` | Yes, 7.20.6, 7.24.5, 7.26beta7 |
 | `collect_bridge_port` | `/interface/bridge/port/monitor <id> once as-value` | Yes, 7.20.6, 7.24.5, 7.26beta7 |
-| `collect_bridge` | `/interface/bridge/monitor <bridge> once as-value` | Yes, 7.26beta7 |
+| `collect_bridge` | `/interface/bridge/print as-value where name="<bridge>"` and `/interface/bridge/monitor "<bridge>" once as-value`, in one read | Yes, 7.26beta7 |
 | `collect_bond` | `/interface/bonding/monitor-slaves bond=<bond> once=yes as-value` | Yes, 7.26beta7 |
 | `collect_interface` | `/interface/ethernet/monitor <interface> once as-value` | Yes, 7.26beta7 |
-| `collect_host_entry` | `/interface/bridge/host/print as-value where mac-address=<mac>` and the bridge print, in one read | Yes, 7.26beta7, as separate reads |
+| `collect_host_entry` | `/interface/bridge/host/print as-value where mac-address=<mac>` and the bridge print, in one read | Yes, 7.26beta7 |
 | `collect_stp_mode` | `/interface/bridge/print as-value where name=<bridge>` | Yes, 7.26beta7 |
 | `collect_version` | `/system/resource/print as-value` | Yes, 7.26beta7 |
 | `collect_uptime` | `:tonsec [/system/resource/get uptime]` | Yes, 7.26beta7 |
 | `collect_print` (params `menu`, `where`, `name`) | `<menu>/print detail as-value` | Yes, 7.26beta7 |
 
-The live checks used unquoted names, for example `monitor bridge once`. The
-quoted form the collectors now send, for example `monitor "bridge" once`,
-has not been read live yet.
+All of these, including the quoted names such as `monitor "bridge" once`
+and the joined host print and bridge print, were read on RouterOS CHR
+7.26beta7. The Linux bonding normalizer has been checked only against saved
+`/proc/net/bonding` text from lab hosts, not through a Networka `linux`
+device.
 
 What the JSON returns, as seen on 7.26beta7:
 
@@ -290,7 +296,8 @@ platform does not report, so a check on that field gives `error`, never a
 pass. A normalizer that can return `None` or an empty list first shows from
 a successful reply that the requested object exists: `host_entry` needs the
 bridge print to contain the bridge and every host row to be for the
-requested MAC, and `bridge_ports` needs the bridge monitor of that bridge.
+requested MAC, and `bridge_ports` needs the bridge print to contain the
+bridge.
 
 | Normalizer | Returns |
 | --- | --- |
@@ -315,8 +322,15 @@ For Cumulus:
 | `mlag` `connected`, `role` | `nv show mlag --output json`, peer alive and role | Partly: MLAG is not bridge-scoped on Cumulus, so `bridge` selects nothing |
 | `mlag` `state` | none | No: the state word is each platform's own |
 | `lacp_member`, `lacp_partner_system` | `/proc/net/bonding/<bond>`, the Linux normalizer | Yes |
-| `host_entry` | `bridge -j fdb show br <bridge>`, `ifname` of the MAC | Yes |
+| `host_entry` | `bridge -j fdb show br <bridge>`, `ifname` of the MAC | Yes, with an existence read of the bridge |
 | `interface_up` | `nv show interface --output json`, `link.oper-status` | Yes |
+
+The member and FDB queries above return no rows both for an empty bridge
+and for a bridge that does not exist. A Cumulus collector for `bridge_ports`
+or `host_entry` must therefore also read the bridge itself, for example
+`ip -j link show dev <bridge>`, and its normalizer must find the bridge
+there before it returns `[]` or `None`. Each normalizer also checks the
+reply's key fields, `ifname` and `master` for ports and `mac` for FDB rows.
 
 A CLAG setting with no neutral field becomes a Cumulus-only check.
 
@@ -326,7 +340,10 @@ A CLAG setting with no neutral field becomes a Cumulus-only check.
 2. Create `src/network_toolkit/platforms/cumulus_linux/intent.py` with the
    collectors and normalizers above, importing the Linux bonding ones.
 3. Add a `CHECKS` dictionary of `intent.Check` entries for Cumulus-only
-   checks, empty when there are none.
+   checks, empty when there are none. Each entry declares the shape of
+   `expected` (for example `expected=(bool,)` or a mapping of field to
+   types), and every new param name, such as `peer`, is added to
+   `intent.PARAMS` with its validator; otherwise items with it are rejected.
 4. Add `"cumulus_linux": "network_toolkit.platforms.cumulus_linux.intent"`
    to `intent.PLATFORMS`. An item whose collector or normalizer is missing
    on the platform is then an error naming the item.

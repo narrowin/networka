@@ -97,7 +97,8 @@ def _routeros_client() -> MagicMock:
     replies = {
         ros.bridge_monitor(
             "bridge"
-        ): '{"mlag-state":"connected","mlag-active-role":"primary","root-bridge":true}',
+        ): '{".id":"*A","mlag-state":"connected","mlag-active-role":"primary","root-bridge":true}',
+        ros.bridge_print("bridge"): '[{".id":"*A","name":"bridge"}]',
         ros.PORT_STATS: "[]",
         ros.bond_monitor("client2"): (
             '[{"port":"ether4","flags":"ATGSCD--","partner-sys-id":"02:00:00:11:00:12",'

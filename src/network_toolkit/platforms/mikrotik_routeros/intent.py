@@ -104,12 +104,15 @@ def collect(
 def collect_bridge(
     client: NetworkaClient, device: str, bridge: str, **run_options: Any
 ) -> dict[str, Reply]:
-    """Bridge monitor and port statistics: STP bridge, MLAG and bridge ports.
+    """Bridge print, bridge monitor and port statistics.
 
-    They are two reads, so a failed statistics command leaves the bridge
-    monitor usable.
+    The bridge print names the bridge and gives the `.id` the monitor reply
+    must carry. The statistics are a second read, so a failed statistics
+    command leaves the bridge monitor usable.
     """
-    evidence = collect(client, device, bridge_monitor(bridge), **run_options)
+    evidence = collect(
+        client, device, bridge_print(bridge), bridge_monitor(bridge), **run_options
+    )
     evidence["stats"] = collect(client, device, PORT_STATS, **run_options)[PORT_STATS]
     return evidence
 
@@ -257,7 +260,11 @@ def bridge_port(evidence: Mapping[str, Any], bridge: str, interface: str) -> dic
     port_id = _port_id(_statistics(evidence), bridge, interface)
     command = PORT_MONITOR.format(port_id=port_id)
     port = json.loads(intent.reply_output(evidence, "monitor", command))
-    if not isinstance(port, dict) or port.get(".id") != port_id:
+    if (
+        not isinstance(port, dict)
+        or port.get(".id") != port_id
+        or port.get("interface") != interface
+    ):
         msg = "monitor reply does not identify the selected port"
         raise ValueError(msg)
     forwarding = port.get("forwarding")
@@ -279,10 +286,10 @@ def bridge_port(evidence: Mapping[str, Any], bridge: str, interface: str) -> dic
 def bridge_ports(evidence: Mapping[str, Any], bridge: str) -> list[str]:
     """Interfaces of the bridge in the port statistics.
 
-    The bridge monitor must show the bridge exists, so an empty list is about
+    The bridge print must show the bridge exists, so an empty list is about
     this bridge and not a failed or missing read.
     """
-    _bridge(evidence, bridge)
+    _bridge_row(evidence, bridge)
     ports = []
     for row in _statistics(evidence):
         if not isinstance(row.get("bridge"), str):
@@ -294,8 +301,19 @@ def bridge_ports(evidence: Mapping[str, Any], bridge: str) -> list[str]:
 
 
 def _bridge(evidence: Mapping[str, Any], bridge: str) -> dict[str, Any]:
-    rows = _rows(evidence, bridge_monitor(bridge), "bridge monitor")
-    return _one(rows, f"{bridge} monitor")
+    """The bridge monitor reply, which must carry the `.id` of the named bridge.
+
+    The monitor does not print the bridge name, so the bridge print row for
+    `bridge` gives the `.id` that identifies the reply.
+    """
+    bridge_id = _field(_bridge_row(evidence, bridge), ".id", str, f"bridge {bridge}")
+    row = _one(
+        _rows(evidence, bridge_monitor(bridge), "bridge monitor"), f"{bridge} monitor"
+    )
+    if row.get(".id") != bridge_id:
+        msg = f"the bridge monitor reply is not for bridge {bridge}"
+        raise ValueError(msg)
+    return row
 
 
 def stp_bridge(evidence: Mapping[str, Any], bridge: str) -> dict:
@@ -351,7 +369,10 @@ def lacp_member(evidence: Mapping[str, Any], bond: str, member: str) -> dict:
     the actor flags are returned. The partner MAC is lower-cased.
     """
     rows = _rows(evidence, bond_monitor(bond), f"{bond} monitor")
-    row = _one([r for r in rows if r.get("port") == member], f"{bond} member {member}")
+    if any(not isinstance(r.get("port"), str) for r in rows):
+        msg = f"a {bond} monitor row has no port"
+        raise ValueError(msg)
+    row = _one([r for r in rows if r["port"] == member], f"{bond} member {member}")
     partner = row.get("partner", False)
     if not isinstance(partner, bool):
         msg = f"{member} partner is not a JSON Boolean"
@@ -411,8 +432,8 @@ def interface_up(evidence: Mapping[str, Any], interface: str) -> bool:
     """`status` of the Ethernet monitor: `link-ok` is up, `no-link` is down."""
     rows = _rows(evidence, ethernet_monitor(interface), "Ethernet monitor")
     row = _one(rows, f"monitor of {interface}")
-    if row.get("name", interface) != interface:
-        msg = f"the monitor reply is for {row.get('name')!r}, not {interface}"
+    if row.get("name") != interface:
+        msg = f"the Ethernet monitor reply is not for {interface}: name is {row.get('name')!r}"
         raise ValueError(msg)
     status = _field(row, "status", str, interface)
     if status not in ("link-ok", "no-link"):

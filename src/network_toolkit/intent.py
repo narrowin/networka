@@ -124,8 +124,12 @@ def reply_output(
     if not isinstance(reply, dict):
         msg = f"no {key} reply in the evidence"
         raise ValueError(msg)
-    if reply.get("error"):
-        raise ValueError(str(reply["error"]))
+    if "error" not in reply or reply["error"] is not None:
+        # Only `error: null` marks a successful read.
+        error = reply.get("error", "no error field")
+        if not isinstance(error, str) or not error:
+            error = f"{key} reply error: {error!r}"
+        raise ValueError(error)
     if reply.get("command") != (key if command is None else command):
         msg = f"{key} reply is for a different command"
         raise ValueError(msg)
@@ -137,23 +141,20 @@ def reply_output(
 
 
 def same(expected: Any, observed: Any) -> bool:
-    """Equality that also requires the same JSON type: `True` is not `1`."""
-    if isinstance(expected, Mapping) or isinstance(observed, Mapping):
-        return (
-            isinstance(expected, Mapping)
-            and isinstance(observed, Mapping)
-            and expected.keys() == observed.keys()
-            and all(same(value, observed[key]) for key, value in expected.items())
+    """Equality that also requires the same type, recursively.
+
+    `True` is not `1` and `110` is not `110.0`.
+    """
+    if type(expected) is not type(observed):
+        return False
+    if isinstance(expected, dict):
+        return expected.keys() == observed.keys() and all(
+            same(value, observed[key]) for key, value in expected.items()
         )
-    if isinstance(expected, list | tuple) or isinstance(observed, list | tuple):
-        return (
-            isinstance(expected, list | tuple)
-            and isinstance(observed, list | tuple)
-            and len(expected) == len(observed)
-            and all(same(a, b) for a, b in zip(expected, observed, strict=True))
+    if isinstance(expected, list | tuple):
+        return len(expected) == len(observed) and all(
+            same(a, b) for a, b in zip(expected, observed, strict=True)
         )
-    if isinstance(expected, bool) or isinstance(observed, bool):
-        return type(expected) is type(observed) and expected == observed
     return bool(expected == observed)
 
 
@@ -630,12 +631,37 @@ def _definition(check: str) -> Check | None:
     return found[0] if found else None
 
 
-def validate(item: IntentItem) -> Check:
-    """Check one item's check name, params and expected; the one validation path.
+def validate_intent(intent: Any) -> list[Check]:
+    """Validate a whole intent; the one validation path for files and Python.
 
-    `load_intent`, `run_intent` and `replay_intent` all call it, so items built
-    in Python are held to the same rules as items read from a file.
+    `load_intent`, `run_intent` and `replay_intent` all call it. An intent
+    must be a non-empty list of items. Any failure, including one Python
+    raises on malformed input, is an `IntentError` that names the item.
     """
+    if not isinstance(intent, list) or not intent:
+        msg = "an intent must be a non-empty list of items"
+        raise IntentError(msg)
+    checks = []
+    for number, item in enumerate(intent, 1):
+        where = getattr(item, "where", "") or f"item {number}"
+        try:
+            checks.append(validate(item))
+        except IntentError:
+            raise
+        except Exception as error:  # malformed input: name the item, never a traceback
+            msg = f"{where}: invalid item: {type(error).__name__}: {error}"
+            raise IntentError(msg) from None
+    return checks
+
+
+def validate(item: IntentItem) -> Check:
+    """Check one item's check name, params and expected.
+
+    `params` must be a mapping; an absent `params` in a file is an empty one.
+    """
+    if not isinstance(item, IntentItem):
+        msg = f"an intent item must be an IntentItem, not {type(item).__name__}"
+        raise IntentError(msg)
     check = _definition(item.check) if isinstance(item.check, str) else None
     if check is None:
         known = set(CHECKS) | {c for cs in _platform_checks().values() for c in cs}
@@ -644,7 +670,10 @@ def validate(item: IntentItem) -> Check:
     if not isinstance(item.device, str) or not item.device:
         msg = f"{item.where}: device must be a name"
         raise IntentError(msg)
-    if not isinstance(item.params, dict) or set(item.params) != set(check.params):
+    if not isinstance(item.params, dict):
+        msg = f"{item.where}: params must be a mapping, not {item.params!r}"
+        raise IntentError(msg)
+    if set(item.params) != set(check.params):
         msg = f"{item.where}: {item.check} takes params {list(check.params)}, not {item.params!r}"
         raise IntentError(msg)
     try:
@@ -681,9 +710,8 @@ def load_intent(path: str | Path) -> list[IntentItem]:
         if isinstance(raw.get("name"), str):
             where += f" ({raw['name']})"
         if unknown := set(raw) - ITEM_KEYS:
-            msg = (
-                f"{where}: unknown keys {sorted(unknown)}; allowed: {sorted(ITEM_KEYS)}"
-            )
+            names = sorted(map(repr, unknown))
+            msg = f"{where}: unknown keys {', '.join(names)}; allowed: {sorted(ITEM_KEYS)}"
             raise IntentError(msg)
         if missing := {"device", "check", "expected"} - set(raw):
             msg = f"{where}: missing keys {sorted(missing)}"
@@ -691,7 +719,7 @@ def load_intent(path: str | Path) -> list[IntentItem]:
         if not isinstance(raw["device"], str) or not isinstance(raw["check"], str):
             msg = f"{where}: device and check must be strings"
             raise IntentError(msg)
-        params = raw.get("params") or {}
+        params = raw["params"] if "params" in raw and raw["params"] is not None else {}
         for key in ("name", "source"):
             if raw.get(key) is not None and not isinstance(raw[key], str):
                 msg = f"{where}: {key} must be a string"
@@ -705,8 +733,8 @@ def load_intent(path: str | Path) -> list[IntentItem]:
             raw.get("source"),
             where,
         )
-        validate(item)
         items.append(item)
+    validate_intent(items)
     return items
 
 
@@ -761,9 +789,15 @@ def _evaluate(item: IntentItem, saved: Any) -> IntentResult:
     matching = [
         r for r in readings if isinstance(r, dict) and {k: r.get(k) for k in key} == key
     ]
-    if len(matching) == 1 and matching[0].get("error"):
-        # A reading whose collection failed decides no item that uses it.
-        return error(str(matching[0]["error"]))
+    if len(matching) == 1 and "error" in matching[0]:
+        # A reading whose collection recorded any error decides no item that
+        # uses it; a successful reading has no error key.
+        failed = matching[0]["error"]
+        return error(
+            failed
+            if isinstance(failed, str) and failed
+            else f"reading error: {failed!r}"
+        )
     found = [r.get("replies") for r in matching]
     if len(found) != 1 or not isinstance(found[0], dict):
         return error(
@@ -783,14 +817,26 @@ def replay_intent(intent: list[IntentItem], evidence: Any) -> IntentReport:
     `evidence` is the content of `evidence.json` written by `run_intent`. An
     item whose device or reading is missing or malformed gives `error`.
     """
-    for item in intent:
-        validate(item)
+    validate_intent(intent)
     devices = evidence.get("devices") if isinstance(evidence, Mapping) else None
     if not isinstance(devices, dict):
         msg = "the evidence has no devices"
         raise IntentError(msg)
     results = [(item, _evaluate(item, devices.get(item.device))) for item in intent]
     return IntentReport(_rollup([r for _, r in results]), results, dict(evidence))
+
+
+def _connection_failure(device: str, replies: Mapping[str, Any]) -> str | None:
+    """The error of a reading whose device did not accept a connection, else `None`.
+
+    `DeviceSession` reports that as "Connection failed for <device>: ...".
+    """
+    prefix = f"Connection failed for {device}:"
+    for reply in replies.values():
+        error = reply.get("error") if isinstance(reply, dict) else None
+        if isinstance(error, str) and error.startswith(prefix):
+            return error
+    return None
 
 
 def _now() -> str:
@@ -832,8 +878,7 @@ def run_intent(
     after. `run_options` are passed to `NetworkaClient.run`.
     """
     plan: dict[str, dict[str, Any]] = {}
-    for item in intent:
-        validate(item)
+    validate_intent(intent)
     for item in intent:
         device_type = _device_type(client, item)
         key = _reading(_resolve(item, device_type), item)
@@ -850,7 +895,12 @@ def run_intent(
     for device_name, device in plan.items():
         module = platform(device["device_type"])
         device["started"] = _now()
+        unreachable = None
         for reading in device["readings"]:
+            if unreachable is not None:
+                # The device did not accept a connection: do not wait for it again.
+                reading["replies"], reading["error"] = {}, unreachable
+                continue
             collect = getattr(module, reading["collector"])
             try:
                 reading["replies"] = collect(
@@ -859,6 +909,8 @@ def run_intent(
             except Exception as failure:  # any collector failure is kept as evidence
                 reading["replies"] = {}
                 reading["error"] = f"{type(failure).__name__}: {failure}"
+                continue
+            unreachable = _connection_failure(device_name, reading["replies"])
         device["finished"] = _now()
     evidence = {"networka_version": __version__, "devices": plan}
     report = replay_intent(intent, evidence)

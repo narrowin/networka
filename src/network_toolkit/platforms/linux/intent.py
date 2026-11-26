@@ -62,11 +62,20 @@ def _member(evidence: Mapping[str, Any], bond: str, member: str) -> dict[str, An
         re.findall(r"(?m)^Active Aggregator Info:\n\s*Aggregator ID: (\d+)$", text),
         "active aggregator",
     )
-    _, _, partner = section.partition("details partner lacp pdu:")
-    states = re.findall(r"(?m)^\s*port state: (\d+)$", section)
-    if len(states) != 2 or not partner:
-        msg = f"{member} has no actor and partner port state"
-        raise ValueError(msg)
+    blocks = {
+        side: _one(
+            re.findall(
+                rf"(?m)^details {side} lacp pdu:\n((?:[ \t]+\S.*\n?)*)", section
+            ),
+            f"{side} lacp pdu block of {member}",
+        )
+        for side in ("actor", "partner")
+    }
+    states = [
+        _one(re.findall(r"(?m)^\s*port state: (\d+)$", block), f"{side} port state")
+        for side, block in blocks.items()
+    ]
+    partner = blocks["partner"]
     mii = _one(re.findall(r"(?m)^MII Status: (up|down)$", section), "MII Status")
     return {
         "states": [int(state) for state in states],
@@ -80,7 +89,11 @@ def _member(evidence: Mapping[str, Any], bond: str, member: str) -> dict[str, An
 
 
 def lacp_member(evidence: Mapping[str, Any], bond: str, member: str) -> dict:
-    """Actor and partner LACP port-state bits and the partner system of one member."""
+    """Actor and partner LACP port-state bits and the partner system of one member.
+
+    Each side is read from its own labelled block, `details actor lacp pdu`
+    and `details partner lacp pdu`; a missing block raises.
+    """
     found = _member(evidence, bond, member)
     partner = found["partner"]
     priority = _one(
