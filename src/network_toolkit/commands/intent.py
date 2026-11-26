@@ -17,8 +17,8 @@ from network_toolkit.common.credentials import prompt_for_credentials
 from network_toolkit.common.defaults import DEFAULT_CONFIG_PATH
 from network_toolkit.exceptions import NetworkToolkitError
 
-# Exit status per roll-up verdict. An unusable file or evidence also exits 2.
-EXIT_CODES = {"pass": 0, "fail": 1, "unverified": 2}
+# Exit status per overall verdict. An unusable file or evidence also exits 2.
+EXIT_CODES = {"pass": 0, "fail": 1, "error": 2}
 
 
 def _show(value: Any) -> str:
@@ -58,7 +58,9 @@ def register(app: typer.Typer) -> None:
         save: Annotated[
             Path | None,
             typer.Option(
-                "--save", "-s", help="Directory for intent.yaml and evidence.json"
+                "--save",
+                "-s",
+                help="Directory for intent.yaml, evidence.json and results.json",
             ),
         ] = None,
         config_file: Annotated[
@@ -76,7 +78,7 @@ def register(app: typer.Typer) -> None:
     ) -> None:
         """Read every item from its device, check it, and print the verdicts.
 
-        Exit status: 0 pass, 1 fail, 2 unverified or an unusable intent file.
+        Exit status: 0 pass, 1 fail, 2 error (not verified, or an unusable file).
         """
         ctx = CommandContext(config_file=config_file)
         run_options: dict[str, Any] = {}
@@ -104,7 +106,7 @@ def register(app: typer.Typer) -> None:
     ) -> None:
         """Check saved evidence again without devices.
 
-        Exit status: 0 pass, 1 fail, 2 unverified or unusable evidence.
+        Exit status: 0 pass, 1 fail, 2 error (not verified, or unusable evidence).
         """
         ctx = CommandContext()
         try:

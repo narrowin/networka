@@ -1,5 +1,6 @@
 """Tests for the vendor-neutral intent checks and the Linux bonding normalizer."""
 
+import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -36,7 +37,9 @@ details actor lacp pdu:
 details partner lacp pdu:
     port state: 63
 """
-EVIDENCE = {"bond": {"command": bonding("bond0"), "output": BOND, "error": None}}
+EVIDENCE = {
+    bonding("bond0"): {"command": bonding("bond0"), "output": BOND, "error": None}
+}
 
 
 def test_platform_lookup_names_supported_platforms() -> None:
@@ -49,7 +52,7 @@ def test_platform_lookup_names_supported_platforms() -> None:
 def test_linux_lacp_member_and_partner_system() -> None:
     scd = {"synchronization": True, "collecting": True, "distributing": True}
     result = intent.check_lacp_member(EVIDENCE, "linux", "bond0", "eth1", scd)
-    assert result.verdict == "mismatch"
+    assert result.verdict == "fail"
     assert result.observed["partner"] == {
         "synchronization": False,
         "collecting": False,
@@ -58,7 +61,7 @@ def test_linux_lacp_member_and_partner_system() -> None:
     system = {"priority": 65535, "mac": "52:54:00:e1:0b:03"}
     assert intent.check_lacp_partner_system(
         EVIDENCE, "linux", "bond0", "eth1", system
-    ).verdict == ("match")
+    ).verdict == ("pass")
 
 
 def test_linux_bond_member() -> None:
@@ -80,8 +83,11 @@ INTENT = """
   params: {bond: client2, member: ether4}
   expected: {synchronization: true, collecting: true, distributing: true}
 - device: r1
+  check: stp_bridge
+  params: {bridge: bridge}
+  expected: {root_bridge: true}
+- device: r1
   check: version
-  params: {}
   expected: 7.26beta7
 """
 
@@ -90,7 +96,7 @@ def _routeros_client() -> MagicMock:
     replies = {
         ros.bridge_monitor(
             "bridge"
-        ): '{"mlag-state":"connected","mlag-active-role":"primary"}',
+        ): '{"mlag-state":"connected","mlag-active-role":"primary","root-bridge":true}',
         ros.PORT_STATS: "[]",
         ros.bond_monitor("client2"): (
             '[{"port":"ether4","flags":"ATGSCD--","partner-sys-id":"02:00:00:11:00:12",'
@@ -123,7 +129,18 @@ def test_run_intent_saves_evidence_that_replays_to_the_same_results(
     assert sorted(p.name for p in (tmp_path / "out").iterdir()) == [
         "evidence.json",
         "intent.yaml",
+        "results.json",
     ]
+    evidence = json.loads((tmp_path / "out" / "evidence.json").read_text())
+    readings = evidence["devices"]["r1"]["readings"]
+    assert [r["collector"] for r in readings] == [
+        "collect_bridge",
+        "collect_bond",
+        "collect_version",
+    ]
+    results = json.loads((tmp_path / "out" / "results.json").read_text())
+    assert results["verdict"] == "pass"
+    assert results["items"][0]["name"] == "p1 MLAG primary"
     result = CliRunner().invoke(app, ["intent", "replay", str(tmp_path / "out")])
     assert result.exit_code == 0
     assert "Intent verdict: pass" in result.output

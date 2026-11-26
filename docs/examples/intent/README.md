@@ -1,7 +1,7 @@
 # Experimental operational intent comparison
 
 Start with the [intent verification guide](../../intent.md) for the workflow
-and the Cumulus lab instructions. This example provides the replay and
+and the Cumulus mapping. This example provides the replay and
 supporting evidence.
 
 Run this offline example from the Networka repository root. It reads selected
@@ -37,7 +37,7 @@ contains one observation for this example. [Published Junos sample, pp. 58–59]
 
 To check whether a RouterOS bridge port is forwarding, save the evidence
 from `collect_bridge_port` as JSON, as shown in the
-[intent guide](../../intent.md#routeros-evidence). It reads these two
+[intent guide](../../intent.md#routeros-commands). It reads these two
 read-only replies from the same device in one collection window. The `.id`
 in the monitor command comes from the statistics row whose `bridge` and
 `interface` match, and only joins the two replies.
@@ -48,7 +48,7 @@ in the monitor command comes from the statistics row whose `bridge` and
 ```
 
 Replay the saved evidence with the example. It calls
-`check_bridge_port_forwarding` with the expected `true`.
+`intent.check_bridge_port` with the expected `{"forwarding": true}`.
 [Example implementation](compare.py) · [RouterOS scripting reference][routeros-scripting].
 
 ```bash
@@ -56,10 +56,10 @@ PYTHONPATH="$MLAG/src" uv run --locked python docs/examples/intent/compare.py "$
   --routeros-stp-port bridge ether2 ether2-evidence.json
 ```
 
-In CHR 7.20.6 and 7.24.5 evidence, `ether2` supplied `false` (mismatch),
-a forwarding bond supplied `true` (match), and a disabled `ether3` omitted
-the field (unavailable). A command error, invalid JSON, ambiguous port, or
-wrong monitor ID also makes the check unavailable.
+In CHR 7.20.6 and 7.24.5 evidence, `ether2` supplied `false` (fail) and a
+forwarding bond supplied `true` (pass). A disabled `ether3` omitted the field
+and gave error at the time. An inactive port now reads as not forwarding. A
+command error, invalid JSON, ambiguous port, or wrong monitor ID gives error.
 
 ### Medium MikroTik lab replay
 

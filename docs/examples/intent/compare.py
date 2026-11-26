@@ -11,9 +11,7 @@ from pathlib import Path
 from mlag_lab.direct_topology import DIRECT_FLOWS
 from mlag_lab.root_evidence import summarize_router
 
-from network_toolkit.platforms.mikrotik_routeros.intent import (
-    check_bridge_port_forwarding,
-)
+from network_toolkit import intent
 
 POWER_CASE = Path("results/2026-11-24-power-loss/small-stp-off/01-primary-power-loss")
 BOND_CASE = Path("results/2026-11-24-small-search/mstp-default-l2/01-bond-member-loss")
@@ -178,10 +176,13 @@ def check_routeros_port_json(bridge: str, interface: str, evidence_path: Path) -
         reply = evidence.get(key)
         if isinstance(reply, dict):
             print(f"  command: {reply.get('command')}")
-    result = check_bridge_port_forwarding(evidence, bridge, interface)
+    result = intent.check_bridge_port(
+        evidence, "mikrotik_routeros", bridge, interface, {"forwarding": True}
+    )
     if result.reason:
         print(f"  extraction failed: {result.reason}")
-    show_intent("Bridge-port forwarding", result.expected, result.observed)
+    observed = result.observed["forwarding"] if result.observed else None
+    show_intent("Bridge-port forwarding", True, observed)
     print()
 
 

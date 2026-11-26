@@ -9,17 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Check RouterOS bridge-port forwarding with `network_toolkit.platforms.mikrotik_routeros.intent`. `collect_bridge_port` reads the port statistics and monitor replies through `NetworkaClient` and keeps each command with its output or error. `check_bridge_port_forwarding` replays that evidence offline to `match`, `mismatch`, or `unavailable` with a reason.
-- Check device state with vendor-neutral checks in `network_toolkit.intent`: bridge port forwarding, STP role and edge, bridge ports, STP bridge and root, STP mode, MLAG peer state and role, LACP member flags, LACP partner system ID, bridge host entry, carrier and reboot. Each check takes the device type, and `intent.platform(device_type)` selects the platform's collectors and normalizers.
-- Collect and normalize RouterOS state as native JSON (`:serialize to=json` of each command's `as-value` result) from the bridge monitor, port statistics and monitor, host table, bonding and Ethernet monitors, bridge print and uptime, with `check_property` and `check_version` as RouterOS-only checks.
-- Check a whole intent file: `load_intent`, `run_intent` and `replay_intent` in `network_toolkit.intent`, and `nw intent run FILE [--save DIR]` and `nw intent replay DIR`. Items are validated strictly, the saved directory holds `intent.yaml` and `evidence.json`, a replay gives the same results as the run, and the verdict rolls up to pass, fail or unverified with exit status 0, 1 or 2.
-- Normalize Linux bonding state from `/proc/net/bonding/<bond>`, with `check_bond_member` as a Linux-only check of carrier and active-aggregator eligibility.
+- Check device state against an intent file: `nw intent run FILE [--save DIR]` and `nw intent replay DIR`, and `load_intent`, `run_intent`, `replay_intent` and `replay_directory` in `network_toolkit.intent`. Items name a device, a check, optional params and the expected value, and are validated strictly. Items on one device share one reading per collector. `--save` writes `intent.yaml`, `evidence.json` (readings per device with start and end time and the Networka version) and `results.json`. A replay gives the same results as the run. Every result and the overall verdict is `pass`, `fail` or `error`, with exit status 0, 1 or 2.
+- Vendor-neutral checks: `bridge_port` (forwarding, STP role, edge), `bridge_ports`, `stp_bridge`, `stp_mode`, `mlag`, `lacp_member`, `lacp_partner_system`, `host_entry` and `interface_up`. `intent.platform(device_type)` selects the platform's collectors and normalizers.
+- RouterOS collectors and normalizers that read native JSON (`:serialize to=json` of each command's `as-value` result), with `property` and `version` as RouterOS-only checks. `collect_bridge_port` reads a port's statistics and monitor replies; an inactive port reads as not forwarding.
+- Linux bonding normalizers for `/proc/net/bonding/<bond>`, with `bond_member` as a Linux-only check of carrier and active-aggregator eligibility.
 
 ### Changed
 
-- `IntentResult` and `Reply` move to `network_toolkit.intent`, and `IntentResult.expected` and `observed` hold any value. The RouterOS bridge-port check keeps its signature and verdicts.
 - The offline intent example uses the library check and replays one saved evidence file per port: `--routeros-stp-port BRIDGE INTERFACE EVIDENCE_JSON`. It now runs in the Networka project environment.
-- The intent guide marks the Cumulus checks as available only from draft PR #47.
+- The intent guide describes the design, the intent file, the checks and how to add a platform, with Cumulus as the worked example.
 
 ## [0.4.1] - 2026-11-25
 

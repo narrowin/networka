@@ -811,7 +811,7 @@ $ nw intent [OPTIONS] COMMAND [ARGS]...
 
 Read every item from its device, check it, and print the verdicts.
 
-Exit status: 0 pass, 1 fail, 2 unverified or an unusable intent file.
+Exit status: 0 pass, 1 fail, 2 error (not verified, or an unusable file).
 
 **Usage**:
 
@@ -825,7 +825,7 @@ $ nw intent run [OPTIONS] {file}
 
 **Options**:
 
-* `-s, --save <path>`: Directory for intent.yaml and evidence.json
+* `-s, --save <path>`: Directory for intent.yaml, evidence.json and results.json
 * `-c, --config <path>`: Configuration directory or file path  [default: /Users/md/Library/Application Support/networka]
 * `-i, --interactive-auth`: Prompt for username and password interactively
 * `--help`: Show this message and exit.
@@ -834,7 +834,7 @@ $ nw intent run [OPTIONS] {file}
 
 Check saved evidence again without devices.
 
-Exit status: 0 pass, 1 fail, 2 unverified or unusable evidence.
+Exit status: 0 pass, 1 fail, 2 error (not verified, or unusable evidence).
 
 **Usage**:
 

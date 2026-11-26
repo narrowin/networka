@@ -12,7 +12,7 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from network_toolkit import intent
-from network_toolkit.intent import Check, IntentResult, Reply, Verdict
+from network_toolkit.intent import Check, IntentResult, Reply
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -44,7 +44,7 @@ def _one(values: list[str], what: str) -> str:
 
 def _member(evidence: Mapping[str, Any], bond: str, member: str) -> dict[str, Any]:
     command = bonding(bond)
-    text = intent.reply_output(evidence, lambda line: line.strip() == command, command)
+    text = intent.reply_output(evidence, command)
     section = _one(
         re.findall(
             rf"(?m)^Slave Interface: {re.escape(member)}\n([\s\S]*?)(?=^Slave Interface: |\Z)",
@@ -110,22 +110,20 @@ def check_bond_member(
     `eligible` means the member is in the active aggregator and both its actor
     and partner port state are synchronized, collecting and distributing.
     """
-    wanted = {field: expected[field] for field in MEMBER_FIELDS if field in expected}
-    if not wanted or set(expected) - set(MEMBER_FIELDS):
+    if not expected or set(expected) - set(MEMBER_FIELDS):
         msg = f"expected must name some of {', '.join(MEMBER_FIELDS)}"
         raise ValueError(msg)
-    try:
+
+    def observe() -> dict[str, bool]:
         found = _member(evidence, bond, member)
-    except ValueError as error:
-        return IntentResult(wanted, None, "unavailable", str(error))
-    state = {
-        "carrier": found["carrier"],
-        "eligible": found["aggregator"] == found["active"]
-        and all(bits & _IN_USE == _IN_USE for bits in found["states"]),
-    }
-    observed = {field: state[field] for field in wanted}
-    verdict: Verdict = "match" if observed == wanted else "mismatch"
-    return IntentResult(wanted, observed, verdict)
+        state = {
+            "carrier": found["carrier"],
+            "eligible": found["aggregator"] == found["active"]
+            and all(bits & _IN_USE == _IN_USE for bits in found["states"]),
+        }
+        return {name: state[name] for name in expected}
+
+    return intent.compare(dict(expected), observe)
 
 
 # Linux-only checks an intent file can name.

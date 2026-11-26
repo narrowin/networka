@@ -18,7 +18,6 @@ from network_toolkit.platforms.mikrotik_routeros.intent import (
     bond_monitor,
     bridge_monitor,
     bridge_print,
-    check_bridge_port_forwarding,
     check_property,
     check_version,
     collect,
@@ -299,16 +298,29 @@ def test_bridge_port_forwarding_collects_and_replays() -> None:
 
     evidence = collect_bridge_port(client, "r1", "bridge", "ether1")
 
-    assert check_bridge_port_forwarding(evidence, "bridge", "ether1").verdict == (
-        "mismatch"
+    def forwarding(port: str, *, expected: bool = True) -> intent.IntentResult:
+        return intent.check_bridge_port(
+            evidence, "mikrotik_routeros", "bridge", port, {"forwarding": expected}
+        )
+
+    assert forwarding("ether1").verdict == "fail"
+    assert (
+        forwarding("ether1", expected=False).observed,
+        forwarding("ether1", expected=False).verdict,
+    ) == (
+        {"forwarding": False},
+        "pass",
     )
-    match = check_bridge_port_forwarding(evidence, "bridge", "ether1", expected=False)
-    assert (match.observed, match.verdict) == (False, "match")
-    missing = check_bridge_port_forwarding(evidence, "bridge", "ether2")
-    assert missing.verdict == "unavailable"
+    missing = forwarding("ether2")
+    assert missing.verdict == "error"
     assert missing.reason == "expected one bridge port bridge/ether2, found 0"
     failed = {"stats": {"command": PORT_STATS, "output": None, "error": "timeout"}}
-    assert check_bridge_port_forwarding(failed, "bridge", "ether1").reason == "timeout"
+    assert (
+        intent.check_bridge_port(
+            failed, "mikrotik_routeros", "bridge", "ether1", {"forwarding": True}
+        ).reason
+        == "timeout"
+    )
 
 
 # RouterOS JSON replies of a Small lab MLAG peer, one per command.
@@ -394,14 +406,14 @@ def test_bridge_port() -> None:
     )
     assert (result.observed, result.verdict) == (
         {"role": "root", "edge": False},
-        "match",
+        "pass",
     )
 
 
 def test_bridge_ports() -> None:
     evidence = {"stats": STATE[PORT_STATS]}
     result = intent.check_bridge_ports(evidence, ROS, "bridge", {"ether2"})
-    assert (result.observed, result.verdict) == (["ether1"], "mismatch")
+    assert (result.observed, result.verdict) == (["ether1"], "fail")
 
 
 def test_stp_bridge() -> None:
@@ -411,7 +423,7 @@ def test_stp_bridge() -> None:
         "root_port": None,
         "topology_changes": 2,
     }
-    assert intent.check_stp_bridge(STATE, ROS, "bridge", expected).verdict == "match"
+    assert intent.check_stp_bridge(STATE, ROS, "bridge", expected).verdict == "pass"
 
 
 def test_mlag() -> None:
@@ -420,14 +432,14 @@ def test_mlag() -> None:
     )
     assert (result.observed, result.verdict) == (
         {"connected": True, "role": "primary"},
-        "mismatch",
+        "fail",
     )
 
 
 def test_lacp_member_and_partner_system() -> None:
     scd = {"synchronization": True, "collecting": True, "distributing": True}
     result = intent.check_lacp_member(STATE, ROS, "client2", "ether4", scd)
-    assert result.verdict == "mismatch"
+    assert result.verdict == "fail"
     assert result.observed["partner"] == {
         "synchronization": False,
         "collecting": False,
@@ -435,27 +447,21 @@ def test_lacp_member_and_partner_system() -> None:
     }
     system = {"priority": 65535, "mac": "02:00:00:11:00:12"}
     partner = intent.check_lacp_partner_system(STATE, ROS, "client2", "ether4", system)
-    assert partner.verdict == "match"
+    assert partner.verdict == "pass"
 
 
 def test_host_entry() -> None:
     mac = "02:00:00:11:00:12"
     assert intent.check_host_entry(STATE, ROS, "bridge", mac, "client2").verdict == (
-        "match"
+        "pass"
     )
     missing = intent.check_host_entry(STATE, ROS, "bridge", "02:00:00:11:00:11", None)
-    assert missing.verdict == "unavailable"
+    assert missing.verdict == "error"
 
 
 def test_interface_up() -> None:
     result = intent.check_interface_up(STATE, ROS, "ether2", expected=False)
-    assert (result.observed, result.verdict) == (False, "match")
-
-
-def test_rebooted() -> None:
-    after = {UPTIME: {"command": UPTIME, "output": "1000000000", "error": None}}
-    assert intent.check_rebooted(STATE, after, ROS).verdict == "match"
-    assert intent.check_rebooted(after, STATE, ROS).observed is False
+    assert (result.observed, result.verdict) == (False, "pass")
 
 
 BRIDGE_PRINT = '[{"name":"bridge","protocol-mode":"none","mlag-lacp-fallback":true}]'
@@ -476,14 +482,14 @@ CONFIG = {
 
 def test_stp_mode() -> None:
     result = intent.check_stp_mode(CONFIG, ROS, "bridge", "rstp")
-    assert (result.observed, result.verdict) == ("none", "mismatch")
+    assert (result.observed, result.verdict) == ("none", "fail")
 
 
 def test_property() -> None:
     port = "/interface/bridge/port"
     where = {"interface": "client2"}
-    assert check_property(CONFIG, port, where, "pvid", 110).verdict == "match"
-    assert check_property(CONFIG, port, where, "bpdu-guard", False).verdict == "match"
+    assert check_property(CONFIG, port, where, "pvid", 110).verdict == "pass"
+    assert check_property(CONFIG, port, where, "bpdu-guard", False).verdict == "pass"
     assert check_property(CONFIG, port, {"interface": "x"}, "pvid", 1).reason == (
         "expected one entry with interface=x, found 0"
     )
@@ -492,4 +498,4 @@ def test_property() -> None:
 def test_version() -> None:
     output = '{"uptime":"4m19s","version":"7.26beta7 (testing)"}'
     evidence = {RESOURCE: {"command": RESOURCE, "output": output, "error": None}}
-    assert check_version(evidence, "7.26beta7").verdict == "match"
+    assert check_version(evidence, "7.26beta7").verdict == "pass"

@@ -16,7 +16,7 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from network_toolkit import intent
-from network_toolkit.intent import Check, IntentResult, Reply, Verdict
+from network_toolkit.intent import Check, IntentResult, Reply
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -37,7 +37,9 @@ def bridge_monitor(bridge: str) -> str:
 
 
 def bond_monitor(bond: str) -> str:
-    return _JSON.format(f"/interface/bonding/monitor-slaves bond={bond} once as-value")
+    return _JSON.format(
+        f"/interface/bonding/monitor-slaves bond={bond} once=yes as-value"
+    )
 
 
 def ethernet_monitor(interface: str) -> str:
@@ -55,8 +57,11 @@ def bridge_print(bridge: str) -> str:
 
 
 def menu_print(menu: str) -> str:
-    """`print as-value` of a menu in slash form, for example `/interface/bridge/port`."""
-    return _JSON.format(f"{menu}/print as-value")
+    """`print detail as-value` of a menu in slash form, for example `/interface/bridge/port`.
+
+    Without `detail`, RouterOS leaves out properties that have their default value.
+    """
+    return _JSON.format(f"{menu}/print detail as-value")
 
 
 def collect(
@@ -140,26 +145,9 @@ def collect_version(
     return collect(client, device, RESOURCE, **run_options)
 
 
-def _output(evidence: Mapping[str, Any], key: str, command: str) -> str:
-    reply = evidence.get(key)
-    if not isinstance(reply, dict):
-        msg = f"no {key} reply in the evidence"
-        raise ValueError(msg)
-    if reply.get("error"):
-        raise ValueError(str(reply["error"]))
-    if reply.get("command") != command:
-        msg = f"{key} reply is for a different command"
-        raise ValueError(msg)
-    output = reply.get("output")
-    if not isinstance(output, str):
-        msg = f"{key} reply has no output"
-        raise ValueError(msg)
-    return output
-
-
 def _rows(evidence: Mapping[str, Any], command: str, what: str) -> list[dict]:
     """The reply saved under `command`, a JSON object or array, as a list of objects."""
-    value = json.loads(_output(evidence, command, command))
+    value = json.loads(intent.reply_output(evidence, command, command))
     rows = [value] if isinstance(value, dict) else value
     if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
         msg = f"{what} must be a JSON object or an array of objects"
@@ -192,7 +180,7 @@ def _bridge_id(value: str) -> str:
 
 
 def _statistics(evidence: Mapping[str, Any]) -> list[dict[str, Any]]:
-    rows = json.loads(_output(evidence, "stats", PORT_STATS))
+    rows = json.loads(intent.reply_output(evidence, "stats", PORT_STATS))
     if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
         msg = "bridge-port statistics must be a JSON array of objects"
         raise ValueError(msg)
@@ -249,11 +237,14 @@ def bridge_port(evidence: Mapping[str, Any], bridge: str, interface: str) -> dic
     """
     port_id = _port_id(_statistics(evidence), bridge, interface)
     command = PORT_MONITOR.format(port_id=port_id)
-    port = json.loads(_output(evidence, "monitor", command))
+    port = json.loads(intent.reply_output(evidence, "monitor", command))
     if not isinstance(port, dict) or port.get(".id") != port_id:
         msg = "monitor reply does not identify the selected port"
         raise ValueError(msg)
     forwarding = port.get("forwarding")
+    if forwarding is None and port.get("status") == "inactive":
+        # An inactive port reports only its .id, interface and status.
+        forwarding = False
     if not isinstance(forwarding, bool):
         msg = "monitor forwarding is missing or is not a JSON Boolean"
         raise ValueError(msg)
@@ -321,12 +312,19 @@ def stp_mode(evidence: Mapping[str, Any], bridge: str) -> str:
 
 
 def lacp_member(evidence: Mapping[str, Any], bond: str, member: str) -> dict:
-    """Actor and partner LACP flags and the partner system of one bond member."""
+    """Actor and partner LACP flags and the partner system of one bond member.
+
+    A member that has no partner reports no partner fields. Its partner flags
+    are then all cleared and `partner_system` is left out.
+    """
     rows = _rows(evidence, bond_monitor(bond), f"{bond} monitor")
     row = _one([r for r in rows if r.get("port") == member], f"{bond} member {member}")
+    partnered = "partner-flags" in row
     state: dict[str, Any] = {}
     for side, key in (("actor", "flags"), ("partner", "partner-flags")):
-        flags = _field(row, key, str, member)
+        flags = (
+            _field(row, key, str, member) if side == "actor" or partnered else "-" * 8
+        )
         if len(flags) != len(LACP_LETTERS) or any(
             flag not in (letter, "-")
             for flag, letter in zip(flags, LACP_LETTERS, strict=True)
@@ -337,10 +335,11 @@ def lacp_member(evidence: Mapping[str, Any], bond: str, member: str) -> dict:
             name: flag != "-"
             for name, flag in zip(intent.LACP_FLAGS, flags, strict=True)
         }
-    state["partner_system"] = {
-        "priority": _field(row, "partner-sys-priority", int, member),
-        "mac": _field(row, "partner-sys-id", str, member).lower(),
-    }
+    if partnered:
+        state["partner_system"] = {
+            "priority": _field(row, "partner-sys-priority", int, member),
+            "mac": _field(row, "partner-sys-id", str, member).lower(),
+        }
     return state
 
 
@@ -375,25 +374,11 @@ def interface_up(evidence: Mapping[str, Any], interface: str) -> bool:
 
 def uptime_ns(evidence: Mapping[str, Any]) -> int:
     """Uptime in nanoseconds from the `UPTIME` command."""
-    value = json.loads(_output(evidence, UPTIME, UPTIME))
+    value = json.loads(intent.reply_output(evidence, UPTIME, UPTIME))
     if not isinstance(value, int) or isinstance(value, bool):
         msg = "uptime is not a JSON number"
         raise ValueError(msg)
     return value
-
-
-def check_bridge_port_forwarding(
-    evidence: Mapping[str, Any], bridge: str, interface: str, expected: bool = True
-) -> IntentResult:
-    """Compare the forwarding Boolean of one bridge port.
-
-    The port is selected by bridge and interface name in the statistics, and
-    the monitor reply must carry the same `.id`. A read error, invalid JSON,
-    an ambiguous port, or a missing field gives `unavailable`.
-    """
-    return intent.check_bridge_port_forwarding(
-        evidence, "mikrotik_routeros", bridge, interface, expected=expected
-    )
 
 
 def check_property(
@@ -407,33 +392,33 @@ def check_property(
 
     `menu` is the path in slash form, for example `/interface/bridge/port`,
     as read by `collect_print`. `where` selects one entry by its JSON values,
-    for example `{"interface": "ether4"}`. Values compare as JSON: `yes` and
-    `no` are Booleans and numbers are numbers.
+    for example `{"interface": "ether4"}`. Values compare
+    exactly as RouterOS returns them: for example `edge` is the string
+    `"yes"` or `"auto"`, `bpdu-guard` a Boolean, `pvid` a number, and
+    `vlan-ids` an array of strings.
     """
-    try:
+
+    def observe() -> Any:
         rows = _rows(evidence, menu_print(menu), f"{menu} print")
         found = " ".join(f"{key}={value}" for key, value in where.items())
         selected = [r for r in rows if all(r.get(k) == v for k, v in where.items())]
-        observed = _one(selected, f"entry with {found}").get(name)
-    except ValueError as error:
-        return IntentResult(expected, None, "unavailable", str(error))
-    verdict: Verdict = "match" if observed == expected else "mismatch"
-    return IntentResult(expected, observed, verdict)
+        return _one(selected, f"entry with {found}").get(name)
+
+    return intent.compare(expected, observe)
 
 
 def check_version(evidence: Mapping[str, Any], expected: str) -> IntentResult:
     """Compare the `version` of the system resource, without the channel."""
-    try:
+
+    def observe() -> str:
         row = _one(_rows(evidence, RESOURCE, "system resource"), "system resource")
-        version = _field(row, "version", str, "system resource")
-        if not version.split():
+        words = _field(row, "version", str, "system resource").split()
+        if not words:
             msg = "system resource version is empty"
             raise ValueError(msg)
-    except ValueError as error:
-        return IntentResult(expected, None, "unavailable", str(error))
-    observed = version.split()[0]
-    verdict: Verdict = "match" if observed == expected else "mismatch"
-    return IntentResult(expected, observed, verdict)
+        return words[0]
+
+    return intent.compare(expected, observe)
 
 
 # RouterOS-only checks an intent file can name.
