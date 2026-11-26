@@ -1,15 +1,15 @@
 # Platform compatibility
 
-This table applies to Networka 0.2.0 with Scrapli 2.0.4.
+Networka uses the native Scrapli 2.0.4 driver. The host table summarizes available wheels and recorded checks.
 
-| Host | Candidate status |
+| Host | Compatibility and verification |
 | --- | --- |
 | macOS arm64 | Upstream wheel available. The native CLI, commands, and literal confirmation were exercised on this host. |
-| Linux x86-64 and arm64 | Upstream wheels exist for glibc and musl. The release workflow includes an Ubuntu runner. Linux execution awaits verification. |
+| Linux x86-64 and arm64 | Upstream wheels exist for glibc and musl. Clean installation and CLI startup were exercised on both architectures. Cable and reboot tests were exercised on Linux arm64 in the Small MLAG lab. |
 | Windows with WSL2 | A Linux environment is a candidate installation target. WSL2 execution awaits verification. |
 | Native Windows and Intel macOS | No compatible upstream wheel for the current driver. |
 
-The package requires Python 3.15 or later. CI uses Python 3.15. Install OpenSSH to use the system transport and tmux for multi-pane sessions. [Scrapli 2026.11.12 release files](https://pypi.org/project/scrapli/2026.11.12/#files) · [Transport selection](transport.md)
+The package requires Python 3.15 or later. CI uses Python 3.15. Install OpenSSH to use the system transport and tmux for multi-pane sessions. [Scrapli 2026.11.12 release files](https://pypi.org/project/scrapli/2026.11.12/#files) · [Transport selection](transport.md) · [Earlier release qualification](development/networka-release-qualification.md) · [Measured Small lab runs](https://github.com/narrowin/mikrotik-mlag-testsuite/blob/main/docs/walkthrough-networka-tests.md)
 
 ## Inspect connection definitions and capabilities
 

@@ -6,16 +6,17 @@
 
 Start the lab using its own startup instructions. Run `nw test run` as root on the Linux host running its Docker containers. The host needs `docker`, `ip`, `nsenter`, `tcpdump`, `tshark`, and `ping` from iputils for explicit ICMP identifiers. Pass the directory containing the generated `topology-data.json` to `--lab`. All nodes must be running, and the Networka inventory must supply SSH access for state checks, reboots, and log markers. An inventory device named after a lab node can omit its host to use the node's management address.
 
-The [qualified Small lab README](https://github.com/narrowin/mikrotik-mlag-testsuite/blob/main/tests/small/README.md) has the launcher requirements, startup command, and `uv` instructions for running from a Networka checkout. This example uses an installed `nw` available to `sudo`.
+Follow the [Small lab README](https://github.com/narrowin/mikrotik-mlag-testsuite/blob/main/tests/small/README.md) to start its qualified native CHR lab. With an installed `nw` available to `sudo`, run these commands from the Small lab repository root. For a reboot run, change the first line to `case_name=switch-reboot`. The README also shows how to run the same tests with `uv` from a Networka checkout.
 
 ```sh
-test_file=cable.yaml  # Set to switch-reboot.yaml for the reboot test.
+case_name=bond-member-loss
 out=$(mktemp -d)
-sudo nw test run "$test_file" --lab clab-example --config devices.yml --save "$out"
-sudo nw test replay "$out/${test_file%.yaml}"
+sudo nw test run "tests/small/$case_name.yaml" \
+  --lab tests/small/clab-small-mlag --config tests/small/devices.yml --save "$out"
+sudo nw test replay "$out/$case_name"
 ```
 
-Run the example from the directory containing the test files. Each input test gets a directory named after its filename without the extension under `--save`. An existing nonempty evidence directory is refused. Pass multiple test files to run them in order. Use `--interactive-auth` to prompt for SSH credentials. Replay needs `tshark` and permission to read the evidence and write the report. [CLI reference](reference/cli.md#nw-test)
+Each input test gets a directory named after its filename without the extension under `--save`. An existing nonempty evidence directory is refused. Pass multiple test files to run them in order. Use `--interactive-auth` to prompt for SSH credentials. Replay needs `tshark` and permission to read the evidence and write the report. [CLI reference](reference/cli.md#nw-test) · [Measured Small lab runs](https://github.com/narrowin/mikrotik-mlag-testsuite/blob/main/docs/walkthrough-networka-tests.md)
 
 ## Files that define a test
 

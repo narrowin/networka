@@ -1,4 +1,4 @@
-<div align="center"><img src="docs/assets/images/networka_readme.png" alt="Networka Logo" width="320"/>
+<div align="center"><img src="https://narrowin.github.io/networka/assets/images/networka_readme.png" alt="Networka Logo" width="320"/>
 
   <p><a href="https://narrowin.github.io/networka/">Full documentation →</a></p>
 </div>
@@ -27,9 +27,9 @@ with continuous monitoring for alerting, telemetry, and ongoing health checks.
 - CLI reference → https://narrowin.github.io/networka/reference/cli/
 - API reference → https://narrowin.github.io/networka/reference/api/
 
-See how to [run a reusable sequence](docs/running-commands.md),
-[save the output](docs/results.md), and
-[compare it with a baseline](docs/reference/cli.md#nw-diff).
+See how to [run a reusable sequence](https://narrowin.github.io/networka/running-commands/),
+[save the output](https://narrowin.github.io/networka/results/), and
+[compare it with a baseline](https://narrowin.github.io/networka/reference/cli/#nw-diff).
 
 <div align="center">
   <img src="https://narrowin.github.io/networka/assets/gifs/networka-setup.gif" alt="Networka Setup Demo" width="800"/>
@@ -64,7 +64,7 @@ Networka is built for network engineers who want to run commands now. Ansible ex
 - **Device backup**: Automated configuration and comprehensive backups with vendor-specific implementations
 - **Firmware management**: Upgrade, downgrade, and BIOS operations with platform validation
 - **CLI session management**: Direct CLI access with tmux integration for interactive sessions
-- [**Containerlab tests**](docs/lab-tests.md) measure traffic through cable changes and RouterOS CHR reboots, then replay the saved evidence offline.
+- [**Containerlab tests**](https://github.com/narrowin/networka/blob/main/docs/lab-tests.md) measure traffic through cable changes and RouterOS CHR reboots, then replay the saved evidence offline. The [Small MLAG lab](https://github.com/narrowin/mikrotik-mlag-testsuite/blob/main/tests/small/README.md) has runnable examples of both tests.
 
 ### **Advanced Features**
 
@@ -101,7 +101,7 @@ uv run --locked nw --version
 uv run --locked nw --help
 ```
 
-Networka 0.2.0 uses Scrapli 2 via the `scrapli==2026.11.12` distribution. An in-place upgrade replaces legacy Scrapli through pip or uv. Early candidate installations that included `scrapli2==2.0.4` should use a fresh environment. Networka 0.2.0 targets Linux and Apple Silicon macOS. RouterOS restart confirmation and Cisco enable-password escalation passed in disposable labs. WSL2 remains unverified. [Transport selection](docs/transport.md) · [Platform compatibility](docs/platform-compatibility.md)
+Networka uses Scrapli 2 via the `scrapli==2026.11.12` distribution. An in-place upgrade replaces legacy Scrapli through pip or uv. Early candidate installations that included `scrapli2==2.0.4` should use a fresh environment. [Transport selection](https://narrowin.github.io/networka/transport/) · [Platform compatibility](https://narrowin.github.io/networka/platform-compatibility/)
 
 ## Quick Start
 
@@ -114,7 +114,7 @@ nw run 192.0.2.10 system_info --platform mikrotik_routeros --interactive-auth
 ```
 
 For recurring work, use `nw config init` to create your
-[configuration](docs/configuration.md) and target devices by name.
+[configuration](https://narrowin.github.io/networka/configuration/) and target devices by name.
 
 ### Library API
 
@@ -156,7 +156,7 @@ nw run --platform cisco_iosxe 198.51.100.20 "show version" --interactive-auth
 - `device_type` is the logical platform used to select commands and the native connection definition.
 - The inventory `platform` field describes hardware architecture for firmware.
 - `--platform` names the logical platform for a raw IP target.
-- `--transport` selects the Scrapli driver family. The underlying connection backend defaults to OpenSSH. [Transport settings](docs/transport.md)
+- `--transport` selects the Scrapli driver family. The underlying connection backend defaults to OpenSSH. [Transport settings](https://narrowin.github.io/networka/transport/)
 
 ## Quick links
 
@@ -180,14 +180,14 @@ nw run --platform cisco_iosxe 198.51.100.20 "show version" --interactive-auth
 
 - Visit our [documentation](https://narrowin.github.io/networka/) for detailed guides and examples
 - Create [GitHub Issues](https://github.com/narrowin/networka/issues) for bug reports and feature requests
-- See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines
-- Check [SECURITY.md](SECURITY.md) for security policy and reporting vulnerabilities
+- See [CONTRIBUTING.md](https://github.com/narrowin/networka/blob/main/CONTRIBUTING.md) for contribution guidelines
+- Check [SECURITY.md](https://github.com/narrowin/networka/blob/main/SECURITY.md) for security policy and reporting vulnerabilities
 
 ## Contributing
 
 Have a look through existing [Issues](https://github.com/narrowin/networka/issues) and [Pull Requests](https://github.com/narrowin/networka/pulls) that you could help with. If you'd like to request a feature or report a bug, please create a GitHub Issue using one of the templates provided.
 
-[See contribution guide →](CONTRIBUTING.md)
+[See contribution guide →](https://github.com/narrowin/networka/blob/main/CONTRIBUTING.md)
 
 ## Documentation
 
@@ -207,7 +207,7 @@ Apache License 2.0 - Free for commercial and personal use.
 No paid tiers, no enterprise versions, no licensing restrictions.
 
 Community-driven project with contributions from [narrowin](https://narrowin.ch/en/about.html) and network engineers worldwide.
-See [GOVERNANCE.md](GOVERNANCE.md) for maintenance and decision-making model.
+See [GOVERNANCE.md](https://github.com/narrowin/networka/blob/main/GOVERNANCE.md) for maintenance and decision-making model.
 
 ## Acknowledgments
 
