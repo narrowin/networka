@@ -5,19 +5,22 @@ YAML tests. Networka runs the tests and judges their saved evidence. The
 [lab test guide](../lab-tests.md) describes the YAML, supported actions, output,
 and command usage.
 
-- `lab.py` reads the deployed topology, binds inventory devices to the lab, and
-  starts host-side processes in the node namespaces. Cable actions change and
-  confirm carrier at both ends.
-- `labtest.py` runs device preconditions, checks an initial quiet window, and
-  runs the steps in order. It checks device state again and measures traffic
-  through the final sender cutoff. Cleanup restores cables before the final
-  switch log markers.
-- `lab_reboot.py` uses the platform adapter to dispatch a typed reboot over the
-  pooled SSH connection. It records native uptime evidence of a new boot and
-  waits for the lab state to recover within the step deadline.
+- `lab.py` loads the deployed topology, verifies container ownership and
+  running state, and starts host-side traffic and capture processes in node
+  namespaces. Cable actions resolve the peer from the topology and use QEMU
+  monitor commands for guest-backed interfaces.
+- `labtest.py` validates the two YAML files and binds inventory names to lab
+  addresses. The live flow writes timed events, device observations, and switch
+  logs. It records the sender cutoff for closing-window judgment and collects
+  switch log markers after cable cleanup.
+- `lab_reboot.py` validates the named target against the live container and
+  calls the RouterOS intent adapter over the pooled SSH connection. Replay
+  checks the command record, verifies native uptime against dispatch time, and
+  rejudges the successful recovery attempt from its saved intent evidence.
 - `traffic.py` matches each ping across both captures by identifier, sequence
   and echoed payload. The send timestamp in the payload distinguishes retries
   that reuse a sequence. Observed send times bound each stop.
-- `commands/test.py` exposes run and replay. Both use the same verdict and
-  report functions. Replay rebuilds `report.md` and compares the recomputed
-  bytes of `result.json` with the original using the saved evidence alone.
+- `commands/test.py` exposes [run and replay](../reference/cli.md#nw-test).
+  Both call the same evidence evaluator and report renderer. The evaluator
+  reads the copied YAML, events, captures, and device and log observations from
+  the run directory.

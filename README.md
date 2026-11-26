@@ -64,6 +64,7 @@ Networka is built for network engineers who want to run commands now. Ansible ex
 - **Device backup**: Automated configuration and comprehensive backups with vendor-specific implementations
 - **Firmware management**: Upgrade, downgrade, and BIOS operations with platform validation
 - **CLI session management**: Direct CLI access with tmux integration for interactive sessions
+- [**Containerlab tests**](docs/lab-tests.md) measure traffic through cable changes and RouterOS CHR reboots, then replay the saved evidence offline.
 
 ### **Advanced Features**
 

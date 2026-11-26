@@ -49,6 +49,7 @@ nav:
     - API: reference/api.md
     - Config Introspection: reference/introspection.md
     - Project development: development.md
+    - Lab test engine: development/lab-tests-design.md
     - Adding platform support: adding-platforms.md
     - Documentation guidelines: documentation-guidelines.md
 

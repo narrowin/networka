@@ -33,6 +33,7 @@ and [check intended operating state](intent.md).
 - Multi-vendor automation (MikroTik, Cisco, Arista, Juniper, …)
 - Flexible configuration (YAML/CSV), tags and groups
 - Containerlab-friendly: consume generated `nornir-simple-inventory.yml` directly
+- [Lab tests](lab-tests.md) measure traffic through cable changes and RouterOS CHR reboots.
 - Vendor-aware sequences and backups
 - Rich CLI output with selectable output modes
 - Type-safe internals (mypy), clean CLI (Typer + Rich)

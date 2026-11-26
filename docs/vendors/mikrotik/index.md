@@ -60,6 +60,7 @@ Sequence completed successfully
 - Firmware downgrade: yes (`nw firmware downgrade`) — file extension: `.npk`
 - BIOS/RouterBOARD upgrade: yes (`nw firmware bios`)
 - Configuration backup: yes (`nw backup config`)
+- A named RouterOS CHR switch can be rebooted as a [containerlab test step](../../lab-tests.md#files-that-define-a-test).
 
 ## Firmware management
 
