@@ -26,12 +26,17 @@ _IN_USE = 0x38
 
 def bonding(bond: str) -> str:
     """The read of one bond; `bond` must be a plain interface name."""
-    return f"cat /proc/net/bonding/{intent.name(bond, 'bond')}"
+    bond = intent.name(bond, "bond")
+    if "/" in bond:
+        msg = f"bond must be an interface name without '/', not {bond!r}"
+        raise ValueError(msg)
+    return f"cat /proc/net/bonding/{bond}"
 
 
 def collect_bond(
-    client: NetworkaClient, device: str, bond: str, **run_options: Any
+    client: NetworkaClient, device: str, bond: str, member: str, **run_options: Any
 ) -> dict[str, Reply]:
+    """`/proc/net/bonding/<bond>`; it lists every member, so `member` is not needed."""
     command = bonding(bond)
     return {command: intent.read(client, device, command, run_options)}
 
@@ -132,7 +137,7 @@ CHECKS = {
     "bond_member": Check(
         ("bond", "member"),
         "collect_bond",
-        ("bond",),
         lambda ev, _dt, p, e: check_bond_member(ev, p["bond"], p["member"], e),
+        expected={"carrier": (bool,), "eligible": (bool,)},
     ),
 }

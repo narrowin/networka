@@ -171,7 +171,7 @@ def compare(expected: Any, observe: Callable[[], Any]) -> IntentResult:
 
 
 # Names and values that reach device commands.
-NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}")
+NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_./-]{0,63}")
 MAC = re.compile(r"[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}")
 MENU = re.compile(r"(/[a-z0-9-]+)+")
 PROPERTY = re.compile(r"\.?[a-z][a-z0-9-]*")
@@ -180,9 +180,7 @@ PROPERTY = re.compile(r"\.?[a-z][a-z0-9-]*")
 def name(value: Any, what: str = "name") -> str:
     """`value` if it is a plain device object name such as `bridge` or `ether4`."""
     if not isinstance(value, str) or not NAME.fullmatch(value):
-        msg = (
-            f"{what} must be a name of letters, digits, '_', '.' or '-', not {value!r}"
-        )
+        msg = f"{what} must be a name of letters, digits, '_', '.', '/' or '-', not {value!r}"
         raise ValueError(msg)
     return value
 
@@ -377,7 +375,7 @@ ITEM_KEYS = {"name", "device", "check", "params", "expected", "source"}
 INTENT_FILE = "intent.yaml"
 EVIDENCE_FILE = "evidence.json"
 RESULTS_FILE = "results.json"
-JSON_TYPES = (str, int, float, bool, type(None), list, dict)
+SCALARS = (str, int, bool, type(None))
 
 
 def _menu(value: Any) -> str:
@@ -420,22 +418,42 @@ PARAMS: dict[str, Callable[[Any], Any]] = {
 
 
 def _type_names(types: tuple[type, ...]) -> str:
-    return " or ".join("null" if t is type(None) else t.__name__ for t in types)
+    names = {type(None): "null", list: "a list of those"}
+    return " or ".join(names.get(t, t.__name__) for t in types)
+
+
+def _json_native(value: Any, what: str = "expected") -> None:
+    """Raise `ValueError` unless `value` is made of JSON strings, integers,
+    Booleans, nulls, lists and string-keyed mappings; YAML dates and floats
+    are not."""
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if not isinstance(key, str):
+                msg = f"{what} has a key that is not a string: {key!r}"
+                raise ValueError(msg)
+            _json_native(item, f"{what} {key}")
+    elif isinstance(value, list):
+        for item in value:
+            _json_native(item, what)
+    elif type(value) not in SCALARS:
+        msg = f"{what} must be a JSON string, integer, Boolean or null, not {value!r}"
+        raise ValueError(msg)
 
 
 def _expected(spec: Any, value: Any) -> None:
-    """Raise `ValueError` unless `value` fits the check's expected shape.
+    """Raise `ValueError` unless `value` is JSON-native and fits the check's shape.
 
-    `spec` is a tuple of allowed types, a mapping of field to allowed types
-    (some fields, each of its type), a one-element list for a list of such
-    values, or `None` for any JSON value.
+    `spec` is a tuple of allowed types (a list among them allows a list of
+    the other types), a mapping of field to allowed types (some fields, each
+    of its type), or a one-element list for a list of such values.
     """
-    if spec is None:
-        if not isinstance(value, JSON_TYPES):
-            msg = f"expected must be a JSON value, not {type(value).__name__}"
-            raise ValueError(msg)
-    elif isinstance(spec, tuple):
-        if type(value) not in spec:
+    _json_native(value)
+    if isinstance(spec, tuple):
+        if isinstance(value, list) and list in spec:
+            items, allowed = value, tuple(t for t in spec if t is not list)
+        else:
+            items, allowed = [value], spec
+        if any(type(v) not in allowed for v in items):
             msg = f"expected must be {_type_names(spec)}, not {value!r}"
             raise ValueError(msg)
     elif isinstance(spec, list):
@@ -460,14 +478,13 @@ class Check:
     """How to collect and evaluate one named check.
 
     `collector` names a function of the platform module, called with the
-    client, the device and the `collect_args` params. `normalizer` names the
+    client, the device and every param in `params` order. `normalizer` names the
     platform normalizer a neutral check needs, `None` for a platform check.
     `expected` is the shape `expected` must have, as `_expected` reads it.
     """
 
     params: tuple[str, ...]
     collector: str
-    collect_args: tuple[str, ...]
     evaluate: Callable[[Mapping[str, Any], str, Mapping[str, Any], Any], IntentResult]
     normalizer: str | None = None
     expected: Any = None
@@ -480,7 +497,6 @@ CHECKS: dict[str, Check] = {
     "bridge_port": Check(
         ("bridge", "port"),
         "collect_bridge_port",
-        ("bridge", "port"),
         lambda ev, dt, p, e: check_bridge_port(ev, dt, p["bridge"], p["port"], e),
         "bridge_port",
         {"forwarding": _BOOL, "role": _STR, "edge": _BOOL},
@@ -488,7 +504,6 @@ CHECKS: dict[str, Check] = {
     "bridge_ports": Check(
         ("bridge",),
         "collect_bridge",
-        ("bridge",),
         lambda ev, dt, p, e: check_bridge_ports(ev, dt, p["bridge"], e),
         "bridge_ports",
         [_STR],
@@ -496,7 +511,6 @@ CHECKS: dict[str, Check] = {
     "stp_bridge": Check(
         ("bridge",),
         "collect_bridge",
-        ("bridge",),
         lambda ev, dt, p, e: check_stp_bridge(ev, dt, p["bridge"], e),
         "stp_bridge",
         {
@@ -510,7 +524,6 @@ CHECKS: dict[str, Check] = {
     "stp_mode": Check(
         ("bridge",),
         "collect_stp_mode",
-        ("bridge",),
         lambda ev, dt, p, e: check_stp_mode(ev, dt, p["bridge"], e),
         "stp_mode",
         _STR,
@@ -518,7 +531,6 @@ CHECKS: dict[str, Check] = {
     "mlag": Check(
         ("bridge",),
         "collect_bridge",
-        ("bridge",),
         lambda ev, dt, p, e: check_mlag(ev, dt, p["bridge"], e),
         "mlag",
         {"connected": _BOOL, "role": _STR, "state": _STR},
@@ -526,7 +538,6 @@ CHECKS: dict[str, Check] = {
     "lacp_member": Check(
         ("bond", "member"),
         "collect_bond",
-        ("bond",),
         lambda ev, dt, p, e: check_lacp_member(ev, dt, p["bond"], p["member"], e),
         "lacp_member",
         dict.fromkeys(LACP_FLAGS, _BOOL),
@@ -534,7 +545,6 @@ CHECKS: dict[str, Check] = {
     "lacp_partner_system": Check(
         ("bond", "member"),
         "collect_bond",
-        ("bond",),
         lambda ev, dt, p, e: check_lacp_partner_system(
             ev, dt, p["bond"], p["member"], e
         ),
@@ -544,7 +554,6 @@ CHECKS: dict[str, Check] = {
     "host_entry": Check(
         ("bridge", "mac"),
         "collect_host_entry",
-        ("mac",),
         lambda ev, dt, p, e: check_host_entry(ev, dt, p["bridge"], p["mac"], e),
         "host_entry",
         (str, type(None)),
@@ -552,7 +561,6 @@ CHECKS: dict[str, Check] = {
     "interface_up": Check(
         ("interface",),
         "collect_interface",
-        ("interface",),
         lambda ev, dt, p, e: check_interface_up(ev, dt, p["interface"], expected=e),
         "interface_up",
         _BOOL,
@@ -622,6 +630,33 @@ def _definition(check: str) -> Check | None:
     return found[0] if found else None
 
 
+def validate(item: IntentItem) -> Check:
+    """Check one item's check name, params and expected; the one validation path.
+
+    `load_intent`, `run_intent` and `replay_intent` all call it, so items built
+    in Python are held to the same rules as items read from a file.
+    """
+    check = _definition(item.check) if isinstance(item.check, str) else None
+    if check is None:
+        known = set(CHECKS) | {c for cs in _platform_checks().values() for c in cs}
+        msg = f"{item.where}: unknown check {item.check!r}; known: {', '.join(sorted(known))}"
+        raise IntentError(msg)
+    if not isinstance(item.device, str) or not item.device:
+        msg = f"{item.where}: device must be a name"
+        raise IntentError(msg)
+    if not isinstance(item.params, dict) or set(item.params) != set(check.params):
+        msg = f"{item.where}: {item.check} takes params {list(check.params)}, not {item.params!r}"
+        raise IntentError(msg)
+    try:
+        for key, value in item.params.items():
+            PARAMS[key](value)
+        _expected(check.expected, item.expected)
+    except ValueError as error:
+        msg = f"{item.where}: {error}"
+        raise IntentError(msg) from None
+    return check
+
+
 def load_intent(path: str | Path) -> list[IntentItem]:
     """Read and strictly validate an intent file: a YAML list of items.
 
@@ -656,37 +691,22 @@ def load_intent(path: str | Path) -> list[IntentItem]:
         if not isinstance(raw["device"], str) or not isinstance(raw["check"], str):
             msg = f"{where}: device and check must be strings"
             raise IntentError(msg)
-        check = _definition(raw["check"])
-        if check is None:
-            known = set(CHECKS) | {c for cs in _platform_checks().values() for c in cs}
-            msg = f"{where}: unknown check {raw['check']!r}; known: {', '.join(sorted(known))}"
-            raise IntentError(msg)
         params = raw.get("params") or {}
-        if not isinstance(params, dict) or set(params) != set(check.params):
-            msg = f"{where}: {raw['check']} takes params {list(check.params)}, not {params!r}"
-            raise IntentError(msg)
         for key in ("name", "source"):
             if raw.get(key) is not None and not isinstance(raw[key], str):
                 msg = f"{where}: {key} must be a string"
                 raise IntentError(msg)
-        try:
-            for key, value in params.items():
-                PARAMS[key](value)
-            _expected(check.expected, raw["expected"])
-        except ValueError as error:
-            msg = f"{where}: {error}"
-            raise IntentError(msg) from None
-        items.append(
-            IntentItem(
-                raw["device"],
-                raw["check"],
-                raw["expected"],
-                dict(params),
-                raw.get("name"),
-                raw.get("source"),
-                where,
-            )
+        item = IntentItem(
+            raw["device"],
+            raw["check"],
+            raw["expected"],
+            params,
+            raw.get("name"),
+            raw.get("source"),
+            where,
         )
+        validate(item)
+        items.append(item)
     return items
 
 
@@ -713,7 +733,7 @@ def _reading(check: Check, item: IntentItem) -> dict[str, Any]:
     """The key of the one reading an item needs: collector and its arguments."""
     return {
         "collector": check.collector,
-        "args": [item.params[key] for key in check.collect_args],
+        "args": [item.params[key] for key in check.params],
     }
 
 
@@ -738,11 +758,13 @@ def _evaluate(item: IntentItem, saved: Any) -> IntentResult:
     readings = saved.get("readings")
     if not isinstance(readings, list):
         return error(f"the evidence of {item.device} has no list of readings")
-    found = [
-        r.get("replies")
-        for r in readings
-        if isinstance(r, dict) and {k: r.get(k) for k in key} == key
+    matching = [
+        r for r in readings if isinstance(r, dict) and {k: r.get(k) for k in key} == key
     ]
+    if len(matching) == 1 and matching[0].get("error"):
+        # A reading whose collection failed decides no item that uses it.
+        return error(str(matching[0]["error"]))
+    found = [r.get("replies") for r in matching]
     if len(found) != 1 or not isinstance(found[0], dict):
         return error(
             f"expected one {key['collector']} reading of {item.device}, found {len(found)}"
@@ -761,6 +783,8 @@ def replay_intent(intent: list[IntentItem], evidence: Any) -> IntentReport:
     `evidence` is the content of `evidence.json` written by `run_intent`. An
     item whose device or reading is missing or malformed gives `error`.
     """
+    for item in intent:
+        validate(item)
     devices = evidence.get("devices") if isinstance(evidence, Mapping) else None
     if not isinstance(devices, dict):
         msg = "the evidence has no devices"
@@ -808,6 +832,8 @@ def run_intent(
     after. `run_options` are passed to `NetworkaClient.run`.
     """
     plan: dict[str, dict[str, Any]] = {}
+    for item in intent:
+        validate(item)
     for item in intent:
         device_type = _device_type(client, item)
         key = _reading(_resolve(item, device_type), item)

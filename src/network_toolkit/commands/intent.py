@@ -99,11 +99,11 @@ def register(app: typer.Typer) -> None:
                 )
             with NetworkaClient(config_file) as client:
                 report = intent.run_intent(client, items, save, **run_options)
+            _print_report(ctx, report)
+            if save is not None:
+                ctx.print_info(f"Evidence saved in {save}")
         except Exception as error:  # no traceback for the operator: exit 2
             raise _error(error) from None
-        _print_report(ctx, report)
-        if save is not None:
-            ctx.print_info(f"Evidence saved in {save}")
         raise typer.Exit(EXIT_CODES[report.verdict])
 
     @intent_app.command("replay")
@@ -119,9 +119,9 @@ def register(app: typer.Typer) -> None:
         try:
             ctx = CommandContext()
             report = intent.replay_directory(directory)
+            _print_report(ctx, report)
         except Exception as error:  # no traceback for the operator: exit 2
             raise _error(error) from None
-        _print_report(ctx, report)
         raise typer.Exit(EXIT_CODES[report.verdict])
 
     app.add_typer(intent_app, rich_help_panel="Remote Operations")

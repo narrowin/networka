@@ -360,6 +360,7 @@ REPLIES = {
     host_print("02:00:00:11:00:12"): HOST,
     ethernet_monitor("ether2"): {"name": "ether2", "status": "no-link"},
     UPTIME: 75000000000,
+    bridge_print("bridge"): [{"name": "bridge", "protocol-mode": "rstp"}],
 }
 
 
@@ -414,7 +415,10 @@ def test_bridge_port() -> None:
 
 
 def test_bridge_ports() -> None:
-    evidence = {"stats": STATE[PORT_STATS]}
+    evidence = {
+        "stats": STATE[PORT_STATS],
+        **routeros_evidence(bridge_monitor("bridge")),
+    }
     result = intent.check_bridge_ports(evidence, ROS, "bridge", {"ether2"})
     assert (result.observed, result.verdict) == (["ether1"], "fail")
 

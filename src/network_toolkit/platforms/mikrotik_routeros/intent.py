@@ -115,15 +115,17 @@ def collect_bridge(
 
 
 def collect_bond(
-    client: NetworkaClient, device: str, bond: str, **run_options: Any
+    client: NetworkaClient, device: str, bond: str, member: str, **run_options: Any
 ) -> dict[str, Reply]:
+    """The bonding monitor of `bond`; it lists every member, so `member` is not needed."""
     return collect(client, device, bond_monitor(bond), **run_options)
 
 
 def collect_host_entry(
-    client: NetworkaClient, device: str, mac: str, **run_options: Any
+    client: NetworkaClient, device: str, bridge: str, mac: str, **run_options: Any
 ) -> dict[str, Reply]:
-    return collect(client, device, host_print(mac), **run_options)
+    """The host entries of `mac` and the bridge print that proves `bridge` exists."""
+    return collect(client, device, host_print(mac), bridge_print(bridge), **run_options)
 
 
 def collect_interface(
@@ -145,7 +147,12 @@ def collect_stp_mode(
 
 
 def collect_print(
-    client: NetworkaClient, device: str, menu: str, **run_options: Any
+    client: NetworkaClient,
+    device: str,
+    menu: str,
+    where: Mapping[str, Any],
+    name: str,
+    **run_options: Any,
 ) -> dict[str, Reply]:
     """`print detail as-value` of a menu, for `check_property`."""
     return collect(client, device, menu_print(menu), **run_options)
@@ -270,7 +277,12 @@ def bridge_port(evidence: Mapping[str, Any], bridge: str, interface: str) -> dic
 
 
 def bridge_ports(evidence: Mapping[str, Any], bridge: str) -> list[str]:
-    """Interfaces of the bridge in the port statistics."""
+    """Interfaces of the bridge in the port statistics.
+
+    The bridge monitor must show the bridge exists, so an empty list is about
+    this bridge and not a failed or missing read.
+    """
+    _bridge(evidence, bridge)
     ports = []
     for row in _statistics(evidence):
         if not isinstance(row.get("bridge"), str):
@@ -319,10 +331,15 @@ def mlag(evidence: Mapping[str, Any], bridge: str) -> dict:
     return state
 
 
+def _bridge_row(evidence: Mapping[str, Any], bridge: str) -> dict[str, Any]:
+    """The one row of the bridge print for `bridge`, which proves it exists."""
+    rows = _rows(evidence, bridge_print(bridge), "bridge print")
+    return _one([row for row in rows if row.get("name") == bridge], f"bridge {bridge}")
+
+
 def stp_mode(evidence: Mapping[str, Any], bridge: str) -> str:
     """`protocol-mode` of the bridge."""
-    rows = _rows(evidence, bridge_print(bridge), "bridge print")
-    row = _one([row for row in rows if row.get("name") == bridge], f"bridge {bridge}")
+    row = _bridge_row(evidence, bridge)
     return _field(row, "protocol-mode", str, f"bridge {bridge}")
 
 
@@ -368,15 +385,18 @@ def lacp_member(evidence: Mapping[str, Any], bond: str, member: str) -> dict:
 def host_entry(evidence: Mapping[str, Any], bridge: str, mac: str) -> str | None:
     """`on-interface` of the host entry for `mac` on `bridge`, `None` without one.
 
-    An entry for the MAC on another bridge, or a row without `mac-address`,
-    `bridge` or `on-interface`, cannot decide and raises.
+    `None` needs the bridge print to show the bridge exists. A row for another
+    MAC or another bridge, or a row without `mac-address`, `bridge` or
+    `on-interface`, cannot decide and raises.
     """
+    _bridge_row(evidence, bridge)
     ports = set()
     for row in _rows(evidence, host_print(mac), "bridge host print"):
         found = _field(row, "mac-address", str, "host entry")
-        on = _field(row, "bridge", str, f"host entry {found}")
         if found.lower() != mac.lower():
-            continue
+            msg = f"the reply is not for {mac}: it holds {found}"
+            raise ValueError(msg)
+        on = _field(row, "bridge", str, f"host entry {found}")
         if on != bridge:
             msg = f"the host entry for {mac} is on bridge {on}, not {bridge}"
             raise ValueError(msg)
@@ -463,10 +483,13 @@ CHECKS = {
     "property": Check(
         ("menu", "where", "name"),
         "collect_print",
-        ("menu",),
         lambda ev, _dt, p, e: check_property(ev, p["menu"], p["where"], p["name"], e),
+        expected=(str, int, bool, type(None), list),
     ),
     "version": Check(
-        (), "collect_version", (), lambda ev, _dt, _p, e: check_version(ev, e)
+        (),
+        "collect_version",
+        lambda ev, _dt, _p, e: check_version(ev, e),
+        expected=(str,),
     ),
 }

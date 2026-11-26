@@ -19,6 +19,7 @@ evidence the same way live and offline.
 | A neutral model with one folder per platform. `network_toolkit/intent.py` holds the checks; `platforms/<platform>/intent.py` holds collectors and normalizers. | One check per vendor and command. | A check written once applies to every platform that can normalize the fields. NAPALM getters and Genie models put vendor output behind common fields in the same way. |
 | Platform-specific checks where no neutral field exists. | Force every property into the neutral model. | RouterOS configuration properties and the Linux active aggregator have no counterpart elsewhere. Keeping them platform-specific avoids fields that mean different things on different platforms. |
 | Every result is `pass`, `fail` or `error`, and `error` is never a pass. | Treat missing evidence as a pass or skip it. | A check that could not see the state has not verified it. ANTA (success, failure, error), pyATS (passed, failed, errored) and nornir-salt (PASS, FAIL, ERROR) use the same three outcomes. |
+| Absence needs positive proof. | Read an empty reply as "not there". | A normalizer reports `null` or an empty list only from a well-formed reply that is shown to be about the requested object, for example a bridge print that contains the bridge; a failed, missing or foreign reply is `error`. |
 | Items on one device that need the same reading share it. | Read once per item. | Items then see the same moment, as a JSNAPy snapshot or the ANTA per-device cache does, and a run makes fewer reads. |
 | The intent file states exact expected values. No operators, tags, skip rules or OpenConfig paths. | Expressions such as `is-gt`, tag filtering, or an OpenConfig model. | The checks compare normalized fields for equality, which covers device-state intent and keeps the file readable. Selection and arithmetic belong to the caller. NUTS uses the same plain expected-value form. |
 
@@ -34,13 +35,16 @@ An intent file is a YAML list. Each item has these keys:
 | `params` | No | The check's parameters, for example `{bridge: bridge}`. |
 | `name`, `source` | No | Labels for reports. |
 
-Loading checks every item and names the file and the item on any error: an
-unknown key or check, missing or extra params, a param value that is not a
-plain name (`bridge`, `bond`, `member`, `port`, `interface`), a MAC address,
-a menu path such as `/interface/bridge/port`, or a `where` mapping of
-property names to scalars, and an `expected` of the wrong shape or type
-(`true` is not `1`). A MAC address must be quoted, or YAML may read it as a
-number. Before any device is read, each device is resolved in the inventory
+Every item goes through one validation, whether it comes from a file or is
+built in Python, and an error names the file or `where` label and the item:
+an unknown key or check, missing or extra params, a param value that is not
+a plain name (`bridge`, `bond`, `member`, `port`, `interface`: letters,
+digits, `_`, `.`, `/` and `-`, so `ether1/1` works), a MAC address, a menu
+path such as `/interface/bridge/port`, or a `where` mapping of property
+names to scalars, and an `expected` that is not JSON-native (strings,
+integers, Booleans, null, lists and mappings; YAML dates and floats are
+rejected) or does not fit the check's shape and types (`true` is not `1`).
+A MAC address must be quoted, or YAML may read it as a number. Before any device is read, each device is resolved in the inventory
 the same way `nw run` resolves it, and its `device_type` must support the
 check.
 
@@ -124,8 +128,10 @@ but at least one could not be verified, and `pass` otherwise. The exit
 status is 0 for pass, 1 for fail and 2 for error, including an unusable
 intent file or evidence; the command then prints one `error:` line and no
 traceback. Values compare in value and type, also inside mappings and
-lists. Malformed evidence, such as a device without a list of readings, and
-any failure inside a check give that item `error`.
+lists. Malformed evidence, such as a device without a list of readings, a
+reading whose collection recorded an error, a reply an item uses that
+carries an error, and any failure inside a check give that item `error`,
+in a run and in a replay alike.
 
 In Python, `run_intent` collects and then evaluates the evidence through
 `replay_intent`, so a replay gives the same results:
@@ -196,11 +202,11 @@ in time but not one instant.
 | `collect_bridge` | `/interface/bridge/monitor <bridge> once as-value` | Yes, 7.26beta7 |
 | `collect_bond` | `/interface/bonding/monitor-slaves bond=<bond> once=yes as-value` | Yes, 7.26beta7 |
 | `collect_interface` | `/interface/ethernet/monitor <interface> once as-value` | Yes, 7.26beta7 |
-| `collect_host_entry` | `/interface/bridge/host/print as-value where mac-address=<mac>` | Yes, 7.26beta7 |
+| `collect_host_entry` | `/interface/bridge/host/print as-value where mac-address=<mac>` and the bridge print, in one read | Yes, 7.26beta7, as separate reads |
 | `collect_stp_mode` | `/interface/bridge/print as-value where name=<bridge>` | Yes, 7.26beta7 |
 | `collect_version` | `/system/resource/print as-value` | Yes, 7.26beta7 |
 | `collect_uptime` | `:tonsec [/system/resource/get uptime]` | Yes, 7.26beta7 |
-| `collect_print` | `<menu>/print detail as-value` | Yes, 7.26beta7 |
+| `collect_print` (params `menu`, `where`, `name`) | `<menu>/print detail as-value` | Yes, 7.26beta7 |
 
 The live checks used unquoted names, for example `monitor bridge once`. The
 quoted form the collectors now send, for example `monitor "bridge" once`,
@@ -256,12 +262,13 @@ from network_toolkit.platforms.linux.intent import collect_bond, lacp_member
 A collector reads one concept from one device:
 
 ```python
-def collect_bridge(client, device, *collect_args, **run_options) -> dict[str, Reply]
+def collect_host_entry(client, device, bridge, mac, **run_options) -> dict[str, Reply]
 ```
 
-`collect_args` are the params the check lists in `intent.CHECKS`, in that
-order. Validate them with `intent.name` or `intent.mac` before they reach a
-command. Read through `intent.read(client, device, command, run_options)`,
+A collector receives every param of the check, in the order `intent.CHECKS`
+lists them, and ignores those it does not need. Items with the same
+collector and params on one device share one reading. Validate params with
+`intent.name` or `intent.mac` before they reach a command. Read through `intent.read(client, device, command, run_options)`,
 which records a read failure in the reply instead of raising, and return
 the replies keyed by their command. Read JSON where the platform has it.
 
@@ -270,8 +277,8 @@ the replies keyed by their command. Read JSON where the platform has it.
 | `collect_bridge(bridge)` | `stp_bridge`, `mlag`, `bridge_ports` |
 | `collect_bridge_port(bridge, port)` | `bridge_port` |
 | `collect_stp_mode(bridge)` | `stp_mode` |
-| `collect_bond(bond)` | `lacp_member` |
-| `collect_host_entry(mac)` | `host_entry` |
+| `collect_bond(bond, member)` | `lacp_member` |
+| `collect_host_entry(bridge, mac)` | `host_entry` |
 | `collect_interface(interface)` | `interface_up` |
 
 ### Normalizers
@@ -280,7 +287,10 @@ A normalizer takes the collector's evidence and the params and returns the
 neutral fields. It raises `ValueError` with a short reason when the evidence
 cannot decide, which becomes the item's `error`. It leaves out a field the
 platform does not report, so a check on that field gives `error`, never a
-pass.
+pass. A normalizer that can return `None` or an empty list first shows from
+a successful reply that the requested object exists: `host_entry` needs the
+bridge print to contain the bridge and every host row to be for the
+requested MAC, and `bridge_ports` needs the bridge monitor of that bridge.
 
 | Normalizer | Returns |
 | --- | --- |
