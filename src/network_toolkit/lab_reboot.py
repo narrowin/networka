@@ -64,14 +64,21 @@ class _Deadline(BaseException):
 
 
 @contextmanager
-def _deadline(seconds: float, operation: str = "Switch recovery") -> Iterator[None]:
+def _deadline(
+    seconds: float, operation: str = "Switch recovery", since_ns: int | None = None
+) -> Iterator[None]:
     # Local live runs execute on the Linux lab host. A blocked SSH read must also
     # respect the recovery deadline, including during a full set of state checks.
+    # since_ns starts the deadline at the dispatch mark that the proof measures from.
     def expired(_number: int, _frame: object) -> None:
         raise _Deadline
 
+    left = seconds
+    if since_ns is not None:
+        left -= (time.monotonic_ns() - since_ns) / NS
     previous = signal.signal(signal.SIGALRM, expired)
-    timer = signal.setitimer(signal.ITIMER_REAL, seconds)
+    # A zero timer would disable the alarm instead of expiring at once.
+    timer = signal.setitimer(signal.ITIMER_REAL, max(0.000001, left))
     start = time.monotonic()
     try:
         yield
@@ -119,7 +126,7 @@ def run(
         msg = f"Cannot prove a lower uptime after reboot of {switch}."
         raise lab.LabError(msg)
     dispatch = session.mark("reboot_start", switch=switch, number=number, uptime=before)
-    with _deadline(wait_s):
+    with _deadline(wait_s, since_ns=dispatch["mono_ns"]):
         command = routeros.reboot(client, switch, **options)
         session.mark("reboot_command", switch=switch, number=number, reply=command)
         wait_uptime(

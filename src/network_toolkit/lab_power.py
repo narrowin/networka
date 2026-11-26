@@ -300,7 +300,7 @@ class PowerActions:
             opening=active.opening,
             status=status,
         )
-        with lab_reboot._deadline(wait_s):
+        with lab_reboot._deadline(wait_s, since_ns=dispatch["mono_ns"]):
             replies = self.restore(active)
             status = lab.qmp_command(plan.guest, "query-status", {})
             _need(_status(status, running=True), f"{switch} did not resume")
