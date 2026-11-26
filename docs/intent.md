@@ -225,7 +225,10 @@ Linux the `count` probes must finish within the device's `command_timeout`.
 
 `lacp_member` passes when both the actor and the partner side equal
 `expected`. A member without an LACP partner, such as a member that is
-down, gives `fail` with the partner side observed as `null`. The partner MAC is compared in lower case. Both MLAG peers present one LACP system ID, so
+down, gives `fail` on RouterOS with the partner side observed as `null`.
+This holds for every expectation, so `{collecting: false}` does not prove a
+down member on RouterOS. On Linux such a member still reports a partner side,
+as read from `/proc/net/bonding`. The partner MAC is compared in lower case. Both MLAG peers present one LACP system ID, so
 `lacp_partner_system` gives the same value for each member of an MLAG bond
 when read on the partner.
 
@@ -297,7 +300,7 @@ What the JSON returns, as seen on 7.26beta7:
   seen once while a member came back, the row has no `partner`,
   `partner-flags`, `partner-key`, `partner-sys-id` or `partner-sys-priority`,
   for example `{"active": true, "flags": "ATG---FE", "key": 15,
-  "port": "ether3"}`. Checks on the partner side then give `error`.
+  "port": "ether3"}`. `lacp_member` then gives `fail` and `lacp_partner_system` gives `error`.
 - The bonding monitor returns one object for one member and an array for
   several.
 

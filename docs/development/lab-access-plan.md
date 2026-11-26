@@ -23,7 +23,6 @@ A first version of this step added a `docker exec` transport to Networka. It wor
 
 ### In Networka
 
-- The `docker` transport and its import rule are removed from the branch.
 - A bond member without an LACP partner gives `fail` for the `lacp_member` check on RouterOS. It gave `error` before. The first live run showed that one broken cable gave `fail` on the Linux side and `error` on the switch side.
 - `nw run` with one command prints the reason when the command fails. It printed nothing before.
 

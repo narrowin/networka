@@ -154,6 +154,8 @@ class DeviceSession:
                 try:
                     transport.open()
                 except Exception as exc:
+                    if attempt == attempts:
+                        raise
                     logger.warning(
                         "Connection attempt %d/%d failed for %s: %s",
                         attempt,
@@ -161,8 +163,6 @@ class DeviceSession:
                         self.device_name,
                         self._error_reason(exc),
                     )
-                    if attempt == attempts:
-                        raise
                     time.sleep(self.config.general.retry_delay)
                 else:
                     self._transport = transport

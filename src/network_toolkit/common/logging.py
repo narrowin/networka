@@ -59,6 +59,10 @@ def setup_logging(level: str = "WARNING") -> None:
         logger = logging.getLogger(logger_name)
         logger.disabled = False
         logger.setLevel(logging.NOTSET)
+    if level.upper() != "DEBUG":
+        # libscrapli logs a failed login as CRITICAL. The raised error carries
+        # the same reason, so Scrapli speaks only at DEBUG.
+        logging.getLogger("scrapli").setLevel(logging.CRITICAL + 1)
 
     logging.basicConfig(
         level=getattr(logging, level.upper(), logging.WARNING),
