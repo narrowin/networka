@@ -25,6 +25,7 @@ from network_toolkit.platforms.mikrotik_routeros.intent import (
     ethernet_monitor,
     host_print,
     menu_print,
+    ping_command,
 )
 from network_toolkit.platforms.mikrotik_routeros.operations import (
     MikroTikRouterOSOperations,
@@ -513,3 +514,16 @@ def test_version() -> None:
     output = '{"uptime":"4m19s","version":"7.26beta7 (testing)"}'
     evidence = {RESOURCE: {"command": RESOURCE, "output": output, "error": None}}
     assert check_version(evidence, "7.26beta7").verdict == "pass"
+
+
+def test_ping() -> None:
+    command = ping_command("10.0.0.1", 3)
+    rows = [
+        {"seq": 0, "host": "10.0.0.1", "sent": 1, "received": 1, "packet-loss": 0},
+        {"seq": 2, "host": "10.0.0.1", "sent": 3, "received": 3, "packet-loss": 0},
+    ]
+    evidence = {
+        command: {"command": command, "output": json.dumps(rows), "error": None}
+    }
+    result = intent.check_ping(evidence, ROS, "10.0.0.1", 3, None, {"reachable": True})
+    assert (result.observed, result.verdict) == ({"reachable": True}, "pass")

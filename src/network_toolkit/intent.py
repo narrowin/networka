@@ -14,6 +14,7 @@ means the state could not be verified and is never a pass.
 from __future__ import annotations
 
 import importlib
+import ipaddress
 import json
 import re
 from collections.abc import Callable, Mapping
@@ -62,6 +63,7 @@ LACP_FLAGS = (
     "expired",
 )
 LACP_SYSTEM = ("priority", "mac")
+PING = ("sent", "received", "reachable")
 
 
 class Reply(TypedDict):
@@ -219,6 +221,24 @@ def name(value: Any, what: str = "name") -> str:
         msg = f"{what} must be a name of letters, digits, '_', '.', '/' or '-', not {value!r}"
         raise ValueError(msg)
     return value
+
+
+def address(value: Any) -> str:
+    """`value` if it is an IPv4 or IPv6 address, as written."""
+    try:
+        ipaddress.ip_address(value if isinstance(value, str) else "")
+    except ValueError:
+        msg = f"dest must be an IP address, not {value!r}"
+        raise ValueError(msg) from None
+    return str(value)
+
+
+def probes(value: Any) -> int:
+    """`value` if it is a whole number of ping probes from 1 to 100."""
+    if type(value) is not int or not 1 <= value <= 100:
+        msg = f"count must be a whole number from 1 to 100, not {value!r}"
+        raise ValueError(msg)
+    return int(value)
 
 
 def mac(value: Any) -> str:
@@ -414,6 +434,28 @@ def check_interface_up(
     return compare(expected, lambda: normalize(evidence, interface))
 
 
+def check_ping(
+    evidence: Mapping[str, Any],
+    device_type: str,
+    dest: str,
+    count: int,
+    interface: str | None,
+    expected: Mapping[str, Any],
+) -> IntentResult:
+    """Compare a ping from the device: `sent`, `received` and `reachable`.
+
+    `reachable` means every probe was answered. Only the fields named in
+    `expected` are compared; a loss tolerance is not a field.
+    """
+    expect(CHECKS["ping"].expected, expected, "ping")
+    wanted = _known(expected, PING)
+    normalize = _normalizer(device_type, "ping")
+    what = f"ping {dest}"
+    return compare(
+        wanted, lambda: _pick(normalize(evidence, dest, count, interface), wanted, what)
+    )
+
+
 # Intent files: run every item against the devices, save the evidence, replay it.
 
 ITEM_KEYS = {"name", "device", "check", "params", "expected", "source"}
@@ -455,6 +497,8 @@ PARAMS: dict[str, Callable[[Any], Any]] = {
     "member": lambda v: name(v, "member"),
     "port": lambda v: name(v, "port"),
     "interface": lambda v: name(v, "interface"),
+    "dest": address,
+    "count": probes,
     "mac": mac,
     "menu": _menu,
     "where": _where,
@@ -537,6 +581,7 @@ class Check:
     client, the device and every param in `params` order. `normalizer` names the
     platform normalizer a neutral check needs, `None` for a platform check.
     `expected` is the shape `expected` must have, as `_expected` reads it.
+    `optional` params may be left out and reach the collector as `None`.
     """
 
     params: tuple[str, ...]
@@ -544,6 +589,7 @@ class Check:
     evaluate: Callable[[Mapping[str, Any], str, Mapping[str, Any], Any], IntentResult]
     normalizer: str | None = None
     expected: Any = None
+    optional: tuple[str, ...] = ()
 
 
 _BOOL = (bool,)
@@ -620,6 +666,16 @@ CHECKS: dict[str, Check] = {
         lambda ev, dt, p, e: check_interface_up(ev, dt, p["interface"], expected=e),
         "interface_up",
         _BOOL,
+    ),
+    "ping": Check(
+        ("dest", "count"),
+        "collect_ping",
+        lambda ev, dt, p, e: check_ping(
+            ev, dt, p["dest"], p["count"], p.get("interface"), e
+        ),
+        "ping",
+        {"reachable": _BOOL, "received": (int,)},
+        ("interface",),
     ),
 }
 
@@ -732,8 +788,9 @@ def validate(item: IntentItem) -> Check:
     if not isinstance(item.params, dict):
         msg = f"{item.where}: params must be a mapping, not {item.params!r}"
         raise IntentError(msg)
-    if set(item.params) != set(check.params):
-        msg = f"{item.where}: {item.check} takes params {list(check.params)}, not {item.params!r}"
+    if not set(check.params) <= set(item.params) <= {*check.params, *check.optional}:
+        takes = [*check.params, *(f"{key} (optional)" for key in check.optional)]
+        msg = f"{item.where}: {item.check} takes params {takes}, not {item.params!r}"
         raise IntentError(msg)
     try:
         for key, value in item.params.items():
@@ -816,7 +873,7 @@ def _reading(check: Check, item: IntentItem) -> dict[str, Any]:
     """The key of the one reading an item needs: collector and its arguments."""
     return {
         "collector": check.collector,
-        "args": [item.params[key] for key in check.params],
+        "args": [item.params.get(key) for key in (*check.params, *check.optional)],
     }
 
 

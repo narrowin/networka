@@ -13,6 +13,7 @@ from network_toolkit.cli import app
 from network_toolkit.config import DeviceConfig, NetworkConfig
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.platforms.linux.intent import bonding, check_bond_member
+from network_toolkit.platforms.linux.intent import ping_command as lx_ping_command
 from network_toolkit.platforms.mikrotik_routeros import intent as ros
 
 BOND = """Active Aggregator Info:
@@ -196,3 +197,27 @@ def test_replay_of_malformed_evidence_is_error_and_exit_2(tmp_path: Path) -> Non
     result = CliRunner().invoke(app, ["intent", "replay", str(tmp_path / "missing")])
     assert result.exit_code == 2
     assert "Traceback" not in result.output
+
+
+PING_TEXT = """PING 10.0.0.1 (10.0.0.1) 56(84) bytes of data.
+64 bytes from 10.0.0.1: icmp_seq=1 ttl=64 time=0.051 ms
+64 bytes from 10.0.0.1: icmp_seq=3 ttl=64 time=0.058 ms
+
+--- 10.0.0.1 ping statistics ---
+3 packets transmitted, 2 received, 33.3333% packet loss, time 2042ms
+rtt min/avg/max/mdev = 0.051/0.054/0.058/0.003 ms
+"""
+
+
+def test_linux_ping() -> None:
+    command = lx_ping_command("10.0.0.1", 3)
+    evidence = {command: {"command": command, "output": PING_TEXT, "error": None}}
+    result = intent.check_ping(
+        evidence, "linux", "10.0.0.1", 3, None, {"reachable": True}
+    )
+    assert (result.observed, result.verdict) == ({"reachable": False}, "fail")
+    other = lx_ping_command("10.0.0.2", 3)
+    wrong = {other: {"command": other, "output": PING_TEXT, "error": None}}
+    assert intent.check_ping(
+        wrong, "linux", "10.0.0.2", 3, None, {"received": 2}
+    ).verdict == ("error")

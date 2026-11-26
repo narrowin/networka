@@ -41,7 +41,7 @@ def collect_bond(
     return {command: intent.read(client, device, command, run_options)}
 
 
-def _one(values: list[str], what: str) -> str:
+def _one(values: list[Any], what: str) -> Any:
     if len(values) != 1:
         msg = f"expected one {what}, found {len(values)}"
         raise ValueError(msg)
@@ -144,6 +144,65 @@ def check_bond_member(
         return {name: state[name] for name in expected}
 
     return intent.compare(dict(expected), observe)
+
+
+def ping_command(dest: str, count: int, interface: str | None = None) -> str:
+    """`ping -n -c <count> -W 1 [-I <interface>] <dest>` with validated arguments."""
+    parts = ["ping", "-n", "-c", str(intent.probes(count)), "-W", "1"]
+    if interface is not None:
+        interface = intent.name(interface, "interface")
+        if "/" in interface:
+            msg = f"interface must be a name without '/', not {interface!r}"
+            raise ValueError(msg)
+        parts += ["-I", interface]
+    return " ".join([*parts, intent.address(dest)])
+
+
+def collect_ping(
+    client: NetworkaClient,
+    device: str,
+    dest: str,
+    count: int,
+    interface: str | None = None,
+    **run_options: Any,
+) -> dict[str, Reply]:
+    """Ping `dest` from the device. Ping has no JSON output, so this is text."""
+    command = ping_command(dest, count, interface)
+    return {command: intent.read(client, device, command, run_options)}
+
+
+def ping(
+    evidence: Mapping[str, Any], dest: str, count: int, interface: str | None = None
+) -> dict[str, Any]:
+    """`sent`, `received` and `reachable` from the iputils summary line.
+
+    The `PING <dest>` header and the `--- <dest> ping statistics ---` line
+    identify the reply, the header names the interface when one was given,
+    and the number sent must be `count`.
+    """
+    text = intent.reply_output(evidence, ping_command(dest, count, interface))
+    header = _one(
+        re.findall(rf"(?m)^PING {re.escape(dest)} \(.*$", text), f"PING {dest} header"
+    )
+    _one(
+        re.findall(rf"(?m)^--- {re.escape(dest)} ping statistics ---$", text),
+        f"{dest} ping statistics",
+    )
+    if interface is not None and f" {interface}:" not in header:
+        msg = f"the ping header does not name interface {interface}: {header}"
+        raise ValueError(msg)
+    sent, received = _one(
+        re.findall(r"(?m)^(\d+) packets transmitted, (\d+) received", text),
+        "ping summary line",
+    )
+    if int(sent) != count:
+        msg = f"the ping sent {sent} probes, not {count}"
+        raise ValueError(msg)
+    return {
+        "sent": int(sent),
+        "received": int(received),
+        "reachable": int(received) == int(sent),
+    }
 
 
 # Linux-only checks an intent file can name.

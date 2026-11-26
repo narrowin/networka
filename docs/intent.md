@@ -15,7 +15,7 @@ evidence the same way live and offline.
 | Decision | Alternative considered | Why |
 | --- | --- | --- |
 | Collection and evaluation are separate. Collectors only read and save replies; checks only compare saved evidence. | Check while reading, as a script does. | Saved evidence replays to the same verdict without devices, and a check can be tested without a lab. JSNAPy (snapshot, then check) and SuzieQ (poll, then assert) split the work the same way. |
-| Device output is read as JSON only. | Parse CLI text with regular expressions or TextFSM templates. | Text parsers break on column layout, line wrapping and blank cells. JSON keeps field names and types. ANTA reads EOS JSON, and pyATS/Genie and NAPALM prefer structured output where the platform has it. Linux bonding has no JSON source with the partner system per member, so its normalizer reads `/proc/net/bonding`. |
+| Device output is read as JSON only. | Parse CLI text with regular expressions or TextFSM templates. | Text parsers break on column layout, line wrapping and blank cells. JSON keeps field names and types. ANTA reads EOS JSON, and pyATS/Genie and NAPALM prefer structured output where the platform has it. Two sources have no JSON form and are read as text: Linux bonding (`/proc/net/bonding`, which alone gives the partner system per member) and the Linux `ping` summary line. |
 | A neutral model with one folder per platform. `network_toolkit/intent.py` holds the checks; `platforms/<platform>/intent.py` holds collectors and normalizers. | One check per vendor and command. | A check written once applies to every platform that can normalize the fields. NAPALM getters and Genie models put vendor output behind common fields in the same way. |
 | Platform-specific checks where no neutral field exists. | Force every property into the neutral model. | RouterOS configuration properties and the Linux active aggregator have no counterpart elsewhere. Keeping them platform-specific avoids fields that mean different things on different platforms. |
 | Every result is `pass`, `fail` or `error`, and `error` is never a pass. | Treat missing evidence as a pass or skip it. | A check that could not see the state has not verified it. ANTA (success, failure, error), pyATS (passed, failed, errored) and nornir-salt (PASS, FAIL, ERROR) use the same three outcomes. |
@@ -70,6 +70,11 @@ check.
   check: lacp_member
   params: {bond: client2, member: ether4}
   expected: {synchronization: true, collecting: true, distributing: true}
+- name: gateway answers every probe
+  device: dc1-core-mlag1
+  check: ping
+  params: {dest: 192.0.2.1, count: 3}
+  expected: {reachable: true}
 - name: host port has BPDU guard
   device: dc1-core-mlag1
   check: property
@@ -143,6 +148,7 @@ Item                        Check        Expected                        Observe
 mlag1 is MLAG primary       mlag         {"connected": true, ...}        {"connected": true, ...}         pass
 client2 bond member in use  lacp_member  {"actor": {...}, "partner":     {"actor": {...}, "partner":      fail
                                          {"collecting": true, ...}}      {"collecting": false, ...}}
+gateway answers every probe ping         {"reachable": true}             {"reachable": true}              pass
 host port has BPDU guard    property     true                            true                             pass
 Intent verdict: fail
 ```
@@ -179,6 +185,15 @@ the evidence of one collector, for example
 The normalizers are public for callers that record a value over time, such
 as `uptime_ns` for a before-and-after reboot comparison.
 
+Runner contract: collectors need only an object with
+`run(device, command, **options)` that returns Networka's result shape, an
+object whose `command_results` hold `device`, `output` and `error` per
+device; `run_intent` also reads `client.config` to resolve devices. In
+production that is `NetworkaClient` over SSH. A lab can pass its own runner
+with the same shape, for example one that runs the command in a container
+namespace, and the same check works with both transports. Networka itself
+knows nothing about namespaces.
+
 ## Checks
 
 Neutral checks compare only the fields named in `expected`.
@@ -194,6 +209,13 @@ Neutral checks compare only the fields named in `expected`.
 | `lacp_partner_system` | `bond`, `member` | LACP system `priority` and `mac` the partner sends | Yes | Yes |
 | `host_entry` | `bridge`, `mac` | Port of the bridge host entry, `null` without one; an entry for the MAC on another bridge is `error` | Yes | No |
 | `interface_up` | `interface` | Carrier | Yes | No |
+| `ping` | `dest`, `count` (1 to 100), optional `interface` | `sent`, `received`, `reachable` (every probe answered) | Yes, not yet read live | Yes |
+
+`ping` is the production counterpart of the MLAG lab's reachability
+probes. The lab's 100 ms outage probes with per-port captures stay in that
+lab. A tolerance for partial loss is out of scope, as there are no
+operators: expect `reachable: true`, or the exact `received` count. On
+Linux the `count` probes must finish within the device's `command_timeout`.
 
 `lacp_member` passes when both the actor and the partner side equal
 `expected`; a member without an LACP partner gives `error` with reason
@@ -234,6 +256,7 @@ in time but not one instant.
 | `collect_stp_mode` | `/interface/bridge/print as-value where name=<bridge>` | Yes, 7.26beta7 |
 | `collect_version` | `/system/resource/print as-value` | Yes, 7.26beta7 |
 | `collect_uptime` | `:tonsec [/system/resource/get uptime]` | Yes, 7.26beta7 |
+| `collect_ping` | `/ping address=<dest> count=<count> [interface="<interface>"] as-value`, totals in the last row | Not yet |
 | `collect_print` (params `menu`, `where`, `name`) | `<menu>/print detail as-value` | Yes, 7.26beta7 |
 
 All of these, including the quoted names such as `monitor "bridge" once`
@@ -310,6 +333,7 @@ the replies keyed by their command. Read JSON where the platform has it.
 | `collect_bond(bond, member)` | `lacp_member` |
 | `collect_host_entry(bridge, mac)` | `host_entry` |
 | `collect_interface(interface)` | `interface_up` |
+| `collect_ping(dest, count, interface)` | `ping` |
 
 ### Normalizers
 
@@ -333,6 +357,7 @@ bridge.
 | `lacp_member(evidence, bond, member)` | `{"actor": {flag: bool}, "partner": {flag: bool}, "partner_system": {"priority": int, "mac": lower-case str}}`, with `partner` and `partner_system` left out when there is no partner |
 | `host_entry(evidence, bridge, mac)` | The port name, or `None` when the bridge has no entry |
 | `interface_up(evidence, interface)` | `bool` |
+| `ping(evidence, dest, count, interface)` | `{"sent": int, "received": int, "reachable": bool}`; the reply must name `dest` and report `count` sent |
 
 For Cumulus:
 
@@ -348,6 +373,7 @@ For Cumulus:
 | `lacp_member`, `lacp_partner_system` | `/proc/net/bonding/<bond>`, the Linux normalizer | Yes |
 | `host_entry` | `bridge -j fdb show br <bridge>`, `ifname` of the MAC | Yes, with an existence read of the bridge |
 | `interface_up` | `nv show interface --output json`, `link.oper-status` | Yes |
+| `ping` | `ping -n -c <count> -W 1 [-I <interface>] <dest>`, the Linux collector | Yes |
 
 The member and FDB queries above return no rows both for an empty bridge
 and for a bridge that does not exist. A Cumulus collector for `bridge_ports`

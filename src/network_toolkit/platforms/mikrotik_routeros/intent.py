@@ -174,6 +174,49 @@ def collect_version(
     return collect(client, device, RESOURCE, **run_options)
 
 
+def ping_command(dest: str, count: int, interface: str | None = None) -> str:
+    """`/ping address=<dest> count=<count> [interface="<interface>"] as-value`."""
+    command = f"/ping address={intent.address(dest)} count={intent.probes(count)}"
+    if interface is not None:
+        command += f' interface="{intent.name(interface, "interface")}"'
+    return _JSON.format(f"{command} as-value")
+
+
+def collect_ping(
+    client: NetworkaClient,
+    device: str,
+    dest: str,
+    count: int,
+    interface: str | None = None,
+    **run_options: Any,
+) -> dict[str, Reply]:
+    """Ping `dest` from the router; one row per probe, the last with the totals."""
+    return collect(client, device, ping_command(dest, count, interface), **run_options)
+
+
+def ping(
+    evidence: Mapping[str, Any], dest: str, count: int, interface: str | None = None
+) -> dict[str, Any]:
+    """`sent`, `received` and `reachable` from the last row of the ping reply.
+
+    The last row must name `dest` as its `host` and report `count` sent.
+    """
+    rows = _rows(evidence, ping_command(dest, count, interface), "ping")
+    if not rows:
+        msg = f"the ping of {dest} returned no rows"
+        raise ValueError(msg)
+    last = rows[-1]
+    if last.get("host") != dest:
+        msg = f"the ping reply is not for {dest}: host is {last.get('host')!r}"
+        raise ValueError(msg)
+    sent = _field(last, "sent", int, f"ping {dest}")
+    received = _field(last, "received", int, f"ping {dest}")
+    if sent != count:
+        msg = f"the ping sent {sent} probes, not {count}"
+        raise ValueError(msg)
+    return {"sent": sent, "received": received, "reachable": received == sent}
+
+
 def _rows(evidence: Mapping[str, Any], command: str, what: str) -> list[dict]:
     """The reply saved under `command`, a JSON object or array, as a list of objects."""
     value = intent.load_json(intent.reply_output(evidence, command, command))
