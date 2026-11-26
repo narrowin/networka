@@ -7,7 +7,7 @@ containerlab. It knows nothing about the devices in the lab.
 
 A capture point is written `node:interface`. `node` is the containerlab node
 name and `interface` is the interface name inside the node's network
-namespace, for example `dc1-traffic-host1:bond0` or `dc1-core-mlag1:tap2`.
+namespace, for example `client1:bond0` or `switch1:tap2`.
 
 Every action is written to `events.jsonl` with its epoch and monotonic time.
 """
@@ -28,17 +28,14 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, NamedTuple
 
+from network_toolkit import traffic
 from network_toolkit.exceptions import NetworkToolkitError
 
 TOPOLOGY_DATA = "topology-data.json"
-# tcpdump listens within a few hundred milliseconds, so 5 s only catches one that cannot start.
-LISTEN_TIMEOUT_S = 5.0
+# Local namespace commands, tcpdump startup, and child shutdown normally take milliseconds.
+LOCAL_TIMEOUT_S = 5.0
 # A veth changes carrier within milliseconds, so 1 s is ample to see the far end follow.
 CONFIRM_TIMEOUT_S = 1.0
-# ping and tcpdump stop within milliseconds of SIGINT, so 5 s only catches a hung process.
-STOP_TIMEOUT_S = 5.0
-# ip and nsenter answer within milliseconds, so 12 s only catches a hung command.
-COMMAND_TIMEOUT_S = 12.0
 # The QEMU monitor answers on the loopback within milliseconds, so 3 s only catches a hung one.
 QMP_TIMEOUT_S = 3.0
 
@@ -87,7 +84,7 @@ def point(text: str) -> Point:
     return Point(node, interface)
 
 
-def run(command: list[str], timeout: float = COMMAND_TIMEOUT_S) -> str:
+def run(command: list[str], timeout: float = LOCAL_TIMEOUT_S) -> str:
     """Run one command and return its output; a failure raises LabError."""
     try:
         done = subprocess.run(
@@ -370,6 +367,7 @@ class Session:
             (self.directory / sub).mkdir(parents=True, exist_ok=True)
         self.processes: list[Process] = []
         self.down: set[Point] = set()
+        self.repairs: dict[Point, int] = {}
         self.stopped: dict[str, Any] | None = None
         self.start_clock = (time.time_ns(), time.monotonic_ns())
 
@@ -398,7 +396,8 @@ class Session:
                 stdout=output,
                 stderr=subprocess.STDOUT,
                 start_new_session=True,
-                env={**os.environ, "LC_ALL": "C", "TZ": "UTC"},
+                # Capture readiness and kernel drop counts use tcpdump's English output.
+                env={**os.environ, "LC_ALL": "C"},
             )
         process = Process(kind, name, child, log)
         self.processes.append(process)
@@ -427,7 +426,7 @@ class Session:
             )
             log = pcap.with_suffix(".log")
             started[str(end)] = (self.launch("capture", str(end), command, log), pcap)
-        deadline = time.monotonic() + LISTEN_TIMEOUT_S
+        deadline = time.monotonic() + LOCAL_TIMEOUT_S
         waiting = dict(started)
         while waiting:
             for where, (process, pcap) in list(waiting.items()):
@@ -442,7 +441,8 @@ class Session:
                     text = process.log.read_text(errors="replace").strip()
                     msg = f"capture at {where} did not start: {text}"
                     raise LabError(msg)
-            time.sleep(0.05)
+            # Poll twice per ping interval so a ready capture starts measuring promptly.
+            time.sleep(traffic.INTERVAL_NS / (2 * traffic.NS))
         return {where: pcap for where, (_, pcap) in started.items()}
 
     def start_stream(
@@ -551,6 +551,7 @@ class Session:
                 if ("LOWER_UP" in flags[str(end)]) == up:
                     seen.setdefault(str(end), time.monotonic_ns())
             if len(seen) < len(far):
+                # Check carrier several times per 100 ms ping interval.
                 time.sleep(0.03)
         confirmed = len(seen) == len(far)
         observed = self.mark(
@@ -572,7 +573,7 @@ class Session:
         return observed
 
     def stop(self) -> dict[str, Any]:
-        """Set cables up again and stop every process; return early exits and restore errors.
+        """Stop every process and record any cable that could not be set up again.
 
         A second call returns the first result.
         """
@@ -581,21 +582,28 @@ class Session:
         restore_errors = []
         for end in sorted(self.down):
             try:
+                started = self.mark("repair_start", point=str(end))
                 self.set_link(str(end), "up")
-            except LabError as error:
-                restore_errors.append(f"{end}: {error.message}")
+                self.repairs[end] = started["epoch_ns"]
+            except Exception as error:
+                restore_errors.append(f"{end}: {error}")
         early = [p.name for p in self.processes if p.child.poll() is not None]
         for kind in ("stream", "capture"):
             group = [p for p in self.processes if p.kind == kind]
+            if kind == "stream" and group:
+                self.mark("stream_cutoff")
             for process in group:
                 if process.child.poll() is None:
                     process.child.send_signal(signal.SIGINT)
             for process in group:
                 try:
-                    process.child.wait(timeout=STOP_TIMEOUT_S)
+                    process.child.wait(timeout=LOCAL_TIMEOUT_S)
                 except subprocess.TimeoutExpired:
                     process.child.kill()
                     process.child.wait()
+            if kind == "stream" and group:
+                # Capture replies for the final requests through their delivery deadline.
+                time.sleep(traffic.LATE_REPLY_NS / traffic.NS)
         epoch, mono = self.start_clock
         self.stopped = self.mark(
             "stopped",

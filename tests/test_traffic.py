@@ -9,16 +9,18 @@ def test_gap_bounds_window_and_quiet_window():
     # Stream 7 sends seq 0 to 49 every 100 ms. The replies of seq 40 and 41 are lost.
     a = "h1:eth1"
     b = "h2:eth1"
+    payload = b"echo payload"
     sent: traffic.Frames = {}
     received: traffic.Frames = {}
     for seq in range(50):
         stamp = seq * 100 * MS
-        sent[7, 8, seq] = [stamp]
-        received[7, 8, seq] = [stamp + MS]
+        probe = (seq, payload)
+        sent[7, 8, probe] = [stamp]
+        received[7, 8, probe] = [stamp + MS]
         if seq not in (40, 41):
-            received[7, 0, seq] = [stamp + MS]
-            sent[7, 0, seq] = [stamp + 2 * MS]
-    received[7, 8, 10].append(10 * 100 * MS + 3 * MS)
+            received[7, 0, probe] = [stamp + MS]
+            sent[7, 0, probe] = [stamp + 2 * MS]
+    received[7, 8, (10, payload)].append(10 * 100 * MS + 3 * MS)
     windows = [
         traffic.Window("quiet window", 0, 3900 * MS),
         traffic.Window("down", 3900 * MS, 5000 * MS),

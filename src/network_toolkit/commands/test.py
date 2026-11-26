@@ -38,6 +38,21 @@ def _print_result(ctx: CommandContext, result: dict[str, Any]) -> None:
                 statement["statement"], "\n".join([statement["verdict"], *notes])
             )
         ctx.console.print(table)
+    for reboot in result.get("reboots", {}).values():
+        ctx.console.print(
+            f"Reboot of {reboot['switch']}: {reboot['verdict']}", markup=False
+        )
+        if "after_uptime_s" in reboot:
+            ctx.console.print(
+                f"Uptime {reboot['before_uptime_s']:g} s before, {reboot['after_uptime_s']:g} s after "
+                f"{reboot['elapsed_s']:g} s elapsed.",
+                markup=False,
+            )
+        if "healthy_s" in reboot:
+            ctx.console.print(
+                f"Lab state {reboot['state']} at {reboot['healthy_s']:g} s (limit {reboot['limit_s']:g} s).",
+                markup=False,
+            )
     if result["steps"]:
         for step in result["steps"]:
             ctx.console.print(
@@ -72,6 +87,12 @@ def _print_result(ctx: CommandContext, result: dict[str, Any]) -> None:
             f"{rule['verdict']} ({rule['reason']})",
             markup=False,
         )
+    if closing := result.get("closing"):
+        for name, stream in closing["streams"].items():
+            ctx.console.print(
+                f"After the steps, {name}: {stream['summary']}, {stream['duplicates']} duplicates.",
+                markup=False,
+            )
     if result["switch_log"] and result["switch_log"].get("lines") is not None:
         counts = ", ".join(f"{s} {n}" for s, n in result["switch_log"]["lines"].items())
         ctx.console.print(f"Switch log lines: {counts or 'none'}", markup=False)
@@ -149,7 +170,7 @@ def register(app: typer.Typer) -> None:
             Path, typer.Argument(help="Evidence folder written by 'nw test run'")
         ],
     ) -> None:
-        """Compute the result and the timeline again from the saved evidence, without the lab.
+        """Rebuild the report and compare the result bytes from saved lab evidence.
 
         Exit status: 0 pass, 1 fail, 2 error (not verified, unusable evidence,
         or a result that differs from the saved result.json).
