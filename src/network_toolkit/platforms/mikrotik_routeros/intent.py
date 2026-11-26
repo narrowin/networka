@@ -174,11 +174,15 @@ def collect_version(
     return collect(client, device, RESOURCE, **run_options)
 
 
-def ping_command(dest: str, count: int, interface: str | None = None) -> str:
-    """`/ping address=<dest> count=<count> [interface="<interface>"] as-value`."""
+def ping_command(
+    dest: str, count: int, interface: str | None = None, vrf: str | None = None
+) -> str:
+    """`/ping address=<dest> count=<count> [interface=".."] [vrf=".."] as-value`."""
     command = f"/ping address={intent.address(dest)} count={intent.probes(count)}"
     if interface is not None:
         command += f' interface="{intent.name(interface, "interface")}"'
+    if vrf is not None:
+        command += f' vrf="{intent.name(vrf, "vrf")}"'
     return _JSON.format(f"{command} as-value")
 
 
@@ -188,43 +192,41 @@ def collect_ping(
     dest: str,
     count: int,
     interface: str | None = None,
+    vrf: str | None = None,
     **run_options: Any,
 ) -> dict[str, Reply]:
-    """Ping `dest` from the router; one row per probe, the last with the totals."""
-    return collect(client, device, ping_command(dest, count, interface), **run_options)
+    """Ping `dest` from the router; RouterOS returns one row per probe."""
+    command = ping_command(dest, count, interface, vrf)
+    return collect(client, device, command, **run_options)
 
 
 def ping(
-    evidence: Mapping[str, Any], dest: str, count: int, interface: str | None = None
+    evidence: Mapping[str, Any],
+    dest: str,
+    count: int,
+    interface: str | None = None,
+    vrf: str | None = None,
 ) -> dict[str, Any]:
-    """`sent`, `received` and `reachable` from the last row of the ping reply.
+    """`sent`, `received` and `reachable` from the per-probe rows of the reply.
 
-    The last row must name `dest` as its `host` and report `count` sent. A
-    last row without totals whose `status` reports the destination
-    unreachable means none of the `count` probes is answered.
+    RouterOS returns one row per probe and no totals. There must be exactly
+    `count` rows with `seq` 0 to `count - 1`, and every row that names a
+    `host` must name `dest`. A probe is answered when its row has `ttl` and
+    `time` and no `status`; any `status`, such as `timeout` or `no route to
+    host`, is a lost probe.
     """
-    rows = _rows(evidence, ping_command(dest, count, interface), "ping")
-    if not rows:
-        msg = f"the ping of {dest} returned no rows"
+    rows = _rows(evidence, ping_command(dest, count, interface, vrf), "ping")
+    seqs = [row.get("seq") for row in rows]
+    if seqs != list(range(count)):
+        msg = f"the ping of {dest} returned probes {seqs}, not 0 to {count - 1}"
         raise ValueError(msg)
-    last = rows[-1]
-    if last.get("host") != dest:
-        msg = f"the ping reply is not for {dest}: host is {last.get('host')!r}"
+    if any("host" in row and row["host"] != dest for row in rows):
+        msg = f"the ping reply is not for {dest}"
         raise ValueError(msg)
-    status = last.get("status")
-    if (
-        "sent" not in last
-        and "received" not in last
-        and isinstance(status, str)
-        and "unreachable" in status
-    ):
-        return {"sent": count, "received": 0, "reachable": False}
-    sent = _field(last, "sent", int, f"ping {dest}")
-    received = _field(last, "received", int, f"ping {dest}")
-    if sent != count:
-        msg = f"the ping sent {sent} probes, not {count}"
-        raise ValueError(msg)
-    return {"sent": sent, "received": received, "reachable": received == sent}
+    received = sum(
+        "status" not in row and "ttl" in row and "time" in row for row in rows
+    )
+    return {"sent": count, "received": received, "reachable": received == count}
 
 
 def _rows(evidence: Mapping[str, Any], command: str, what: str) -> list[dict]:

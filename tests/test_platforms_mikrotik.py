@@ -518,12 +518,14 @@ def test_version() -> None:
 
 def test_ping() -> None:
     command = ping_command("10.0.0.1", 3)
+    # As RouterOS 7.26beta7 returns them: one row per probe, no totals.
     rows = [
-        {"seq": 0, "host": "10.0.0.1", "sent": 1, "received": 1, "packet-loss": 0},
-        {"seq": 2, "host": "10.0.0.1", "sent": 3, "received": 3, "packet-loss": 0},
+        {"seq": 0, "host": "10.0.0.1", "size": 56, "time": "00:00:00", "ttl": 64},
+        {"seq": 1, "host": "10.0.0.1", "status": "timeout"},
+        {"seq": 2, "status": "no route to host"},
     ]
     evidence = {
         command: {"command": command, "output": json.dumps(rows), "error": None}
     }
-    result = intent.check_ping(evidence, ROS, "10.0.0.1", 3, None, {"reachable": True})
-    assert (result.observed, result.verdict) == ({"reachable": True}, "pass")
+    result = intent.check_ping(evidence, ROS, "10.0.0.1", 3, None, {"received": 1})
+    assert (result.observed, result.verdict) == ({"received": 1}, "pass")

@@ -441,18 +441,22 @@ def check_ping(
     count: int,
     interface: str | None,
     expected: Mapping[str, Any],
+    *,
+    vrf: str | None = None,
 ) -> IntentResult:
     """Compare a ping from the device: `sent`, `received` and `reachable`.
 
     `reachable` means every probe was answered. Only the fields named in
-    `expected` are compared; a loss tolerance is not a field.
+    `expected` are compared; a loss tolerance is not a field. `interface`
+    and `vrf` are optional.
     """
     expect(CHECKS["ping"].expected, expected, "ping")
     wanted = _known(expected, PING)
     normalize = _normalizer(device_type, "ping")
     what = f"ping {dest}"
     return compare(
-        wanted, lambda: _pick(normalize(evidence, dest, count, interface), wanted, what)
+        wanted,
+        lambda: _pick(normalize(evidence, dest, count, interface, vrf), wanted, what),
     )
 
 
@@ -497,6 +501,7 @@ PARAMS: dict[str, Callable[[Any], Any]] = {
     "member": lambda v: name(v, "member"),
     "port": lambda v: name(v, "port"),
     "interface": lambda v: name(v, "interface"),
+    "vrf": lambda v: name(v, "vrf"),
     "dest": address,
     "count": probes,
     "mac": mac,
@@ -671,11 +676,11 @@ CHECKS: dict[str, Check] = {
         ("dest", "count"),
         "collect_ping",
         lambda ev, dt, p, e: check_ping(
-            ev, dt, p["dest"], p["count"], p.get("interface"), e
+            ev, dt, p["dest"], p["count"], p.get("interface"), e, vrf=p.get("vrf")
         ),
         "ping",
         {"reachable": _BOOL, "received": (int,)},
-        ("interface",),
+        ("interface", "vrf"),
     ),
 }
 
@@ -866,15 +871,36 @@ def _resolve(item: IntentItem, device_type: str) -> Check:
         if name_ is not None and not hasattr(module, name_):
             msg = f"{item.where}: {device_type} does not support {item.check} (no {name_})"
             raise IntentError(msg)
+    # A platform may restrict how params combine, for example Linux ping.
+    rule = getattr(module, "PARAM_RULES", {}).get(item.check)
+    if rule is not None:
+        try:
+            rule(item.params)
+        except ValueError as error:
+            msg = f"{item.where}: {device_type}: {error}"
+            raise IntentError(msg) from None
     return check
 
 
 def _reading(check: Check, item: IntentItem) -> dict[str, Any]:
-    """The key of the one reading an item needs: collector and its arguments."""
-    return {
-        "collector": check.collector,
-        "args": [item.params.get(key) for key in (*check.params, *check.optional)],
-    }
+    """The key of the one reading an item needs: collector and its arguments.
+
+    Optional params that are not given are left off the end of `args`, so
+    the collector gets its defaults and adding an optional param keeps
+    existing keys.
+    """
+    args = [item.params.get(key) for key in (*check.params, *check.optional)]
+    return {"collector": check.collector, "args": _trim(args, check)}
+
+
+def _trim(args: Any, check: Check) -> Any:
+    """`args` without trailing `None` optional params; other values unchanged."""
+    if not isinstance(args, list):
+        return args
+    args = list(args)
+    while len(args) > len(check.params) and args[-1] is None:
+        args.pop()
+    return args
 
 
 def _rollup(results: list[IntentResult]) -> Verdict:
@@ -901,7 +927,11 @@ def _evaluate(item: IntentItem, saved: Any) -> IntentResult:
     matching = [
         r
         for r in readings
-        if isinstance(r, dict) and same(key, {k: r.get(k) for k in key})
+        if isinstance(r, dict)
+        and same(
+            key,
+            {"collector": r.get("collector"), "args": _trim(r.get("args"), check)},
+        )
     ]
     if len(matching) == 1 and "error" in matching[0]:
         # A reading whose collection recorded any error decides no item that

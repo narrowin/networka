@@ -209,14 +209,14 @@ Neutral checks compare only the fields named in `expected`.
 | `lacp_partner_system` | `bond`, `member` | LACP system `priority` and `mac` the partner sends | Yes | Yes |
 | `host_entry` | `bridge`, `mac` | Port of the bridge host entry, `null` without one; an entry for the MAC on another bridge is `error` | Yes | No |
 | `interface_up` | `interface` | Carrier | Yes | No |
-| `ping` | `dest`, `count` (1 to 100), optional `interface` | `sent`, `received`, `reachable` (every probe answered) | Yes, not yet read live | Yes |
+| `ping` | `dest`, `count` (1 to 100), optional `interface` and `vrf` (on Linux one of the two) | `sent`, `received`, `reachable` (every probe answered) | Yes | Yes |
 
 `ping` is the production counterpart of the MLAG lab's reachability
 probes. The lab's 100 ms outage probes with per-port captures stay in that
 lab. A reply that says the destination is unreachable, such as Linux
-`ping: connect: Network is unreachable`, "Destination Host Unreachable", or
-a RouterOS last row whose `status` reports it unreachable, counts as no
-probe answered and fails; only an unparseable reply or one for another
+`ping: connect: Network is unreachable` or "Destination Host Unreachable",
+or a RouterOS probe row with a `status` such as `timeout` or
+`no route to host`, counts as a lost probe and fails; only an unparseable reply or one for another
 address is `error`, as in ANTA's VerifyReachability. A tolerance for
 partial loss is out of scope, as there are no
 operators: expect `reachable: true`, or the exact `received` count. On
@@ -261,7 +261,13 @@ in time but not one instant.
 | `collect_stp_mode` | `/interface/bridge/print as-value where name=<bridge>` | Yes, 7.26beta7 |
 | `collect_version` | `/system/resource/print as-value` | Yes, 7.26beta7 |
 | `collect_uptime` | `:tonsec [/system/resource/get uptime]` | Yes, 7.26beta7 |
-| `collect_ping` | `/ping address=<dest> count=<count> [interface="<interface>"] as-value`, totals in the last row | Not yet |
+| `collect_ping` | `/ping address=<dest> count=<count> [interface="<interface>"] [vrf="<vrf>"] as-value` | Yes, 7.26beta7, without `vrf` |
+
+RouterOS returns one row per probe and no totals row: an answered probe
+has `host`, `seq`, `size`, `time` and `ttl`; a lost one has a `status`
+(`timeout` with `host`, `no route to host` without it). The normalizer needs
+exactly `count` rows with `seq` 0 to `count - 1`, any `host` equal to
+`dest`, and counts rows with `ttl` and `time` and no `status` as received.
 | `collect_print` (params `menu`, `where`, `name`) | `<menu>/print detail as-value` | Yes, 7.26beta7 |
 
 All of these, including the quoted names such as `monitor "bridge" once`
@@ -338,7 +344,7 @@ the replies keyed by their command. Read JSON where the platform has it.
 | `collect_bond(bond, member)` | `lacp_member` |
 | `collect_host_entry(bridge, mac)` | `host_entry` |
 | `collect_interface(interface)` | `interface_up` |
-| `collect_ping(dest, count, interface)` | `ping` |
+| `collect_ping(dest, count, interface, vrf)` | `ping` |
 
 ### Normalizers
 
@@ -362,7 +368,7 @@ bridge.
 | `lacp_member(evidence, bond, member)` | `{"actor": {flag: bool}, "partner": {flag: bool}, "partner_system": {"priority": int, "mac": lower-case str}}`, with `partner` and `partner_system` left out when there is no partner |
 | `host_entry(evidence, bridge, mac)` | The port name, or `None` when the bridge has no entry |
 | `interface_up(evidence, interface)` | `bool` |
-| `ping(evidence, dest, count, interface)` | `{"sent": int, "received": int, "reachable": bool}`; the reply must name `dest` and report `count` sent |
+| `ping(evidence, dest, count, interface, vrf)` | `{"sent": int, "received": int, "reachable": bool}`; the reply must name `dest` and account for `count` probes |
 
 For Cumulus:
 
@@ -378,7 +384,7 @@ For Cumulus:
 | `lacp_member`, `lacp_partner_system` | `/proc/net/bonding/<bond>`, the Linux normalizer | Yes |
 | `host_entry` | `bridge -j fdb show br <bridge>`, `ifname` of the MAC | Yes, with an existence read of the bridge |
 | `interface_up` | `nv show interface --output json`, `link.oper-status` | Yes |
-| `ping` | `ping -n -c <count> -W 1 [-I <interface>] <dest>`, the Linux collector | Yes |
+| `ping` | `ping -n -c <count> -W 1 [-I <interface or vrf>] <dest>`, the Linux collector | Yes |
 
 The member and FDB queries above return no rows both for an empty bridge
 and for a bridge that does not exist. A Cumulus collector for `bridge_ports`

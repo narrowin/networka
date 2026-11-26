@@ -146,15 +146,29 @@ def check_bond_member(
     return intent.compare(dict(expected), observe)
 
 
-def ping_command(dest: str, count: int, interface: str | None = None) -> str:
-    """`ping -n -c <count> -W 1 [-I <interface>] <dest>` with validated arguments."""
+def _ping_device(params: Mapping[str, Any]) -> None:
+    """iputils binds to one device: an interface or a VRF, not both."""
+    if params.get("interface") is not None and params.get("vrf") is not None:
+        msg = "ping takes interface or vrf on Linux, not both"
+        raise ValueError(msg)
+
+
+def ping_command(
+    dest: str, count: int, interface: str | None = None, vrf: str | None = None
+) -> str:
+    """`ping -n -c <count> -W 1 [-I <interface or vrf>] <dest>`, validated.
+
+    iputils binds to a VRF through its device, so a VRF is given with `-I`.
+    """
+    _ping_device({"interface": interface, "vrf": vrf})
     parts = ["ping", "-n", "-c", str(intent.probes(count)), "-W", "1"]
-    if interface is not None:
-        interface = intent.name(interface, "interface")
-        if "/" in interface:
-            msg = f"interface must be a name without '/', not {interface!r}"
-            raise ValueError(msg)
-        parts += ["-I", interface]
+    for value, what in ((interface, "interface"), (vrf, "vrf")):
+        if value is not None:
+            device = intent.name(value, what)
+            if "/" in device:
+                msg = f"{what} must be a name without '/', not {device!r}"
+                raise ValueError(msg)
+            parts += ["-I", device]
     return " ".join([*parts, intent.address(dest)])
 
 
@@ -164,26 +178,32 @@ def collect_ping(
     dest: str,
     count: int,
     interface: str | None = None,
+    vrf: str | None = None,
     **run_options: Any,
 ) -> dict[str, Reply]:
     """Ping `dest` from the device. Ping has no JSON output, so this is text."""
-    command = ping_command(dest, count, interface)
+    command = ping_command(dest, count, interface, vrf)
     return {command: intent.read(client, device, command, run_options)}
 
 
 def ping(
-    evidence: Mapping[str, Any], dest: str, count: int, interface: str | None = None
+    evidence: Mapping[str, Any],
+    dest: str,
+    count: int,
+    interface: str | None = None,
+    vrf: str | None = None,
 ) -> dict[str, Any]:
     """`sent`, `received` and `reachable` from the iputils summary line.
 
     The `PING <dest>` header and the `--- <dest> ping statistics ---` line
-    identify the reply, the header names the interface when one was given,
-    and the number sent must be `count`. A reply that is only
+    identify the reply, the header names the interface or VRF device when
+    one was given, and the number sent must be `count`. A reply that is only
     `ping: connect: Network is unreachable` means no route to `dest`: none of
     the `count` probes is answered. A "Destination Host Unreachable" reply
     carries the statistics line and is read from it.
     """
-    text = intent.reply_output(evidence, ping_command(dest, count, interface))
+    text = intent.reply_output(evidence, ping_command(dest, count, interface, vrf))
+    interface = interface if interface is not None else vrf
     if text.strip() == "ping: connect: Network is unreachable":
         return {"sent": count, "received": 0, "reachable": False}
     header = _one(
@@ -211,6 +231,9 @@ def ping(
 
 
 # Linux-only checks an intent file can name.
+# Param combinations Linux cannot run, checked before any device is read.
+PARAM_RULES = {"ping": _ping_device}
+
 CHECKS = {
     "bond_member": Check(
         ("bond", "member"),
