@@ -869,37 +869,40 @@ def load_intent(path: str | Path) -> list[IntentItem]:
     if not isinstance(data, list) or not data:
         msg = f"{path}: the intent file must be a non-empty list of items"
         raise IntentError(msg)
-    items = []
-    for number, raw in enumerate(data, 1):
-        where = f"{path} item {number}"
-        if not isinstance(raw, dict):
-            msg = f"{where}: an item must be a mapping"
-            raise IntentError(msg)
-        if isinstance(raw.get("name"), str):
-            where += f" ({raw['name']})"
-        if unknown := set(raw) - ITEM_KEYS:
-            names = sorted(map(repr, unknown))
-            msg = f"{where}: unknown keys {', '.join(names)}; allowed: {sorted(ITEM_KEYS)}"
-            raise IntentError(msg)
-        if missing := {"device", "check", "expected"} - set(raw):
-            msg = f"{where}: missing keys {sorted(missing)}"
-            raise IntentError(msg)
-        if not isinstance(raw["device"], str) or not isinstance(raw["check"], str):
-            msg = f"{where}: device and check must be strings"
-            raise IntentError(msg)
-        params = raw.get("params", {})
-        item = IntentItem(
-            raw["device"],
-            raw["check"],
-            raw["expected"],
-            params,
-            raw.get("name"),
-            raw.get("source"),
-            where,
-        )
-        items.append(item)
+    items = [parse_item(raw, f"{path} item {n}") for n, raw in enumerate(data, 1)]
     validate_intent(items)
     return items
+
+
+def parse_item(raw: Any, where: str) -> IntentItem:
+    """One intent item from its YAML mapping; `where` names it in errors.
+
+    Only the keys are checked here. `validate_intent` checks the rest.
+    """
+    if not isinstance(raw, dict):
+        msg = f"{where}: an item must be a mapping"
+        raise IntentError(msg)
+    if isinstance(raw.get("name"), str):
+        where += f" ({raw['name']})"
+    if unknown := set(raw) - ITEM_KEYS:
+        names = sorted(map(repr, unknown))
+        msg = f"{where}: unknown keys {', '.join(names)}; allowed: {sorted(ITEM_KEYS)}"
+        raise IntentError(msg)
+    if missing := {"device", "check", "expected"} - set(raw):
+        msg = f"{where}: missing keys {sorted(missing)}"
+        raise IntentError(msg)
+    if not isinstance(raw["device"], str) or not isinstance(raw["check"], str):
+        msg = f"{where}: device and check must be strings"
+        raise IntentError(msg)
+    return IntentItem(
+        raw["device"],
+        raw["check"],
+        raw["expected"],
+        raw.get("params", {}),
+        raw.get("name"),
+        raw.get("source"),
+        where,
+    )
 
 
 def _resolve(item: IntentItem, device_type: str) -> Check:

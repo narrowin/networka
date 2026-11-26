@@ -47,6 +47,7 @@ $ nw [OPTIONS] COMMAND [ARGS]...
 * `sync`: Sync inventory from external sources
 * `platforms`: Inspect Scrapli definitions and registered...
 * `intent`: Check device state against an intent file...
+* `test`: Run lab tests in a containerlab lab and...
 
 ## `nw info`
 
@@ -845,6 +846,71 @@ $ nw intent replay [OPTIONS] {directory}
 **Arguments**:
 
 * `directory <path>`: Directory written by &#x27;nw intent run --save&#x27;  [required]
+
+**Options**:
+
+* `--help`: Show this message and exit.
+
+## `nw test`
+
+Run lab tests in a containerlab lab and replay their saved evidence
+
+**Usage**:
+
+```console
+$ nw test [OPTIONS] COMMAND [ARGS]...
+```
+
+**Options**:
+
+* `--help`: Show this message and exit.
+
+**Commands**:
+
+* `run`: Run each test in the lab, save its...
+* `replay`: Compute the result again from the saved...
+
+### `nw test run`
+
+Run each test in the lab, save its evidence, and print the verdicts.
+
+Needs root on the lab host. Exit status: 0 pass, 1 fail, 2 error (not
+verified, or an unusable file).
+
+**Usage**:
+
+```console
+$ nw test run [OPTIONS] {files}...
+```
+
+**Arguments**:
+
+* `files... <list[Path]>`: Test files (YAML)  [required]
+
+**Options**:
+
+* `--lab <path>`: Lab directory that containerlab wrote (clab-&lt;name&gt;)  [required]
+* `-s, --save <path>`: Directory for one evidence folder per test  [required]
+* `-c, --config <path>`: Configuration directory or file path  [default: /Users/md/Library/Application Support/networka]
+* `-i, --interactive-auth`: Prompt for username and password interactively
+* `--help`: Show this message and exit.
+
+### `nw test replay`
+
+Compute the result again from the saved evidence, without the lab.
+
+Exit status: 0 pass, 1 fail, 2 error (not verified, unusable evidence,
+or a result that differs from the saved result.json).
+
+**Usage**:
+
+```console
+$ nw test replay [OPTIONS] {directory}
+```
+
+**Arguments**:
+
+* `directory <path>`: Evidence folder written by &#x27;nw test run&#x27;  [required]
 
 **Options**:
 

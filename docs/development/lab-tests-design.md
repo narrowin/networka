@@ -1,6 +1,6 @@
 # Lab tests with Networka
 
-This is a design proposal. Nothing in it is built yet, apart from the parts marked as existing.
+This is a design proposal. The prototype in `labtest.py` builds the part described in the user guide [lab tests](../lab-tests.md). The decisions it made are listed under Decisions. The rest is not built yet, apart from the parts marked as existing.
 
 ## Problem
 
@@ -57,37 +57,54 @@ One test file describes one test. This example is the MLAG case "bond member los
 
 ```yaml
 name: MLAG bond member loss and return
-state: [state/small.yaml]
+state:
+  - state/small.yaml
 
 streams:
-  - {id: 101, from: c1:bond0, to: mobile:bond0}
-  - {id: 201, from: mobile:bond0, to: c1:bond0}
-  - {id: 301, from: c1:eth3, to: c2:eth3}
+  - id: 101
+    from: c1:bond0
+    to: mobile:bond0
+  - id: 201
+    from: mobile:bond0
+    to: c1:bond0
+  - id: 301
+    from: c1:eth3
+    to: c2:eth3
 
-captures: all
+captures:
+  - c1:eth1
 
 steps:
   - name: Member down
-    action: {link: c1:eth1, state: down}
+    action:
+      link: c1:eth1
+      state: down
     hold_s: 8
     expect:
-      - {streams: [101, 201], max_outage_s: 3}
-      - {streams: [301], max_outage_s: 0}
-      - {streams: [101], not_seen_at: [c1:eth1]}
+      - streams: [101, 201]
+        max_outage_s: 3
+      - streams: [301]
+        max_outage_s: 0
+      - streams: [101]
+        not_seen_at: [c1:eth1]
   - name: Member back
-    action: {link: c1:eth1, state: up}
+    action:
+      link: c1:eth1
+      state: up
     hold_s: 10
     expect:
-      - {streams: [101, 201], max_outage_s: 3}
-      - {streams: [301], max_outage_s: 0}
+      - streams: [101, 201]
+        max_outage_s: 3
+      - streams: [301]
+        max_outage_s: 0
 ```
 
 | Field | Meaning |
 |---|---|
 | `name` | Title shown in the result. |
-| `state` | Intent files in the existing format. The engine checks them before the first step and after the last step. |
+| `state` | State files. A state file is a list of statements. Each statement is one sentence with an optional source and the intent checks that prove it. The engine checks them before the first step and after the last step. |
 | `streams` | Numbered ping streams. `id` becomes the ICMP identifier. `from` and `to` are capture points written as `node:interface`. The destination is the IPv4 address of `to`, unless `address` is given. One ping is sent every 100 ms. |
-| `captures` | `all` captures at every link endpoint of the topology. A list limits the captures to the named capture points. |
+| `captures` | Extra capture points. The endpoints of every stream are always captured. |
 | `steps` | Ordered list. A step has a `name`, an optional `action`, a hold time `hold_s` and a list of `expect` entries. A step without an action is an observation window. A baseline test is one such step. |
 | `until` | Optional in a step. State checks that must pass before the hold time starts, with a `timeout_s`. A step uses it after a reboot. |
 | `expect` | `max_outage_s` sets the longest allowed outage for the listed streams in this step. `seen_at` and `not_seen_at` name capture points where the listed streams must or must not appear. |
@@ -187,6 +204,10 @@ docs/, results/                write-ups of the findings
 | No action runs unless the state checks pass and the streams run without loss first. | Run the action in any case. | A fault applied to a lab that is already broken gives a result that nobody can interpret. The MLAG suite has this rule. |
 | Missing or invalid evidence gives `error` and never `pass`. | Count it as pass, or skip it. | The state checks follow the same rule. |
 | Every run saves its test file and its evidence, and replay computes the result again. | Keep only the verdict. | A result can be checked later without the lab. The state checks follow the same rule. |
+| A state file is a list of statements, and each statement names the intent checks that prove it. | Plain intent files. | A reader sees the claim and its source next to the checks. The result reports a verdict per statement. |
+| Test files and state files are written in block style YAML with one field per line. | One-line mappings in braces. | Block style is easier to read and to review in a diff. |
+| The endpoints of every stream are always captured, and `captures` only adds points. | `captures: all` for every link endpoint. | The measurement needs both ends of each stream. Extra points cost disk space and are added only where a reader needs them. |
+| A limit of 0 fails on any lost probe. | Treat a lower bound of 0 as within a limit of 0. | A lost probe makes the outage longer than its lower bound. |
 
 ## Left out on purpose
 
