@@ -33,11 +33,11 @@ from pathlib import Path
 from typing import Any, Literal
 
 NS = 1_000_000_000
-# Longest pause between two sends of one stream that still counts as steady.
-SEND_GAP_LIMIT_NS = 450_000_000
+# How far a stream may fall behind its interval between two sends and still count as steady.
+# A stall of the lab host lasts a fixed time, whatever the interval, so the allowance is fixed too.
+SEND_STALL_NS = 350_000_000
 # A reply later than this after its request counts as lost.
 LATE_REPLY_NS = 500_000_000
-BASELINE_MIN_DELIVERED = 30
 REQUEST, REPLY = 8, 0
 CACHE = Path.home() / ".cache" / "networka" / "tshark"
 FIELDS = ("frame.time_epoch", "icmp.ident", "icmp.type", "icmp.seq")
@@ -48,11 +48,12 @@ Frames = dict[tuple[int, int, int], list[int]]
 
 @dataclass(frozen=True, slots=True)
 class Stream:
-    """One numbered ping stream between two capture points."""
+    """One numbered ping stream between two capture points, sent every `interval_s`."""
 
     id: int
     source: str
     destination: str
+    interval_s: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,7 +139,6 @@ def measure(
     captures: Mapping[str, Path],
     streams: Sequence[Stream],
     windows: Sequence[Window],
-    interval_s: float,
 ) -> dict[str, Any]:
     """Decode the captures that the streams use and measure every stream."""
     points = {point for s in streams for point in (s.source, s.destination)}
@@ -150,7 +150,6 @@ def measure(
         {point: decode(captures[point]) for point in sorted(points)},
         streams,
         windows,
-        interval_s,
     )
 
 
@@ -162,7 +161,6 @@ def measure_frames(
     frames: Mapping[str, Frames],
     streams: Sequence[Stream],
     windows: Sequence[Window],
-    interval_s: float,
 ) -> dict[str, Any]:
     """Measure every stream from decoded frames.
 
@@ -171,7 +169,6 @@ def measure_frames(
     """
     start, end = windows[0].start_ns, windows[-1].end_ns
     result: dict[str, Any] = {
-        "interval_s": interval_s,
         "start_ns": start,
         "end_ns": end,
         "streams": {},
@@ -271,6 +268,7 @@ def _stream(
             )
     ordered = [start, *sorted(sends.values()), end]
     max_interval = max(b - a for a, b in itertools.pairwise(ordered))
+    gap_limit = round(stream.interval_s * NS) + SEND_STALL_NS
     by_time = sorted((stamp, seq) for seq, stamp in sends.items())
     bounds: list[tuple[int, int | None]] = [(start, None), *by_time, (end, None)]
     pauses = [
@@ -282,11 +280,12 @@ def _stream(
             "before_seq": after,
         }
         for (a, before), (b, after) in itertools.pairwise(bounds)
-        if b - a > SEND_GAP_LIMIT_NS
+        if b - a > gap_limit
     ]
     flow = {
         "source": stream.source,
         "destination": stream.destination,
+        "interval_s": stream.interval_s,
         "sent": len(sends),
         "delivered": len(good),
         "lost": sorted(bad),
@@ -294,6 +293,7 @@ def _stream(
         "capture_mismatches": mismatches,
         "gaps": gaps,
         "max_send_interval_s": seconds(max_interval),
+        "send_gap_limit_s": seconds(gap_limit),
         "send_pauses": pauses,
         "cadence_ok": not pauses,
     }
@@ -312,17 +312,20 @@ def _outage(gaps: list[dict[str, Any]]) -> dict[str, Any] | None:
     }
 
 
-def baseline(result: dict[str, Any], window: str) -> dict[str, Any]:
-    """Pass when every stream delivered at least 30 probes and lost none.
+def baseline(
+    result: dict[str, Any], window: str, minimum: Mapping[str, int]
+) -> dict[str, Any]:
+    """Pass when every stream delivered at least its `minimum` probes and lost none.
 
     A duplicated reply also fails the baseline.
     """
     streams = {
         ident: {
             "delivered": counts["delivered"],
+            "min_delivered": minimum[ident],
             "lost": counts["lost"],
             "duplicates": counts["duplicates"],
-            "ok": counts["delivered"] >= BASELINE_MIN_DELIVERED
+            "ok": counts["delivered"] >= minimum[ident]
             and not counts["lost"]
             and not counts["duplicates"],
         }

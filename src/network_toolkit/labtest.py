@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: MIT
 """Lab tests: a test file, its fixed flow in a containerlab lab, the verdict and replay.
 
-A test file names state files, numbered ping streams and ordered steps. A step
-can set one link down or up, holds for a time and limits the outage of the
-streams it lists. The flow checks the state, starts captures and streams,
-checks a baseline window, runs the steps, checks the state again and stops.
+A lab file holds what all tests of one lab share: the state statements, the
+numbered ping streams and extra capture points. A test file names its lab file
+and holds ordered steps. A step can set one link down or up, holds for a time
+and limits the outage of the streams it lists. The flow checks the state,
+starts captures and streams, checks a baseline window, runs the steps, checks
+the state again and stops.
 
 The verdict is computed from the saved evidence only. `replay` therefore
 computes the same `result.json` again without the lab.
@@ -34,22 +36,26 @@ if TYPE_CHECKING:
     from network_toolkit.client import NetworkaClient
 
 TEST_FILE = "test.yaml"
-STATE_DIR = "state"
+LAB_FILE = "lab.yaml"
 EVENTS_FILE = "events.jsonl"
 RESULT_FILE = "result.json"
 TIMELINE_FILE = "timeline.tsv"
-INTERVAL_S = 0.1
+DEFAULT_INTERVAL_MS = 100
 # Time for neighbour discovery between the start of the streams and the baseline.
 NEIGHBOUR_S = 2.0
 BASELINE_S = 5.0
+# A stream must deliver this share of the probes its interval allows in the baseline:
+# 30 of 50 at 100 ms.
+BASELINE_SHARE = 0.6
 # Time after the last step for late replies, before the state is checked again.
 SETTLE_S = 2.0
 CLOCK_LIMIT_NS = 50_000_000
 BASELINE = "baseline"
 
-TEST_FIELDS = (("name", "state", "streams", "steps"), ("source", "captures"))
-STREAM_FIELDS = (("id", "from", "to"), ("address",))
-STEP_FIELDS = (("name", "hold_s", "expect"), ("action",))
+TEST_FIELDS = (("name", "purpose", "lab", "steps"), ("source",))
+LAB_FIELDS = (("state", "streams"), ("captures",))
+STREAM_FIELDS = (("id", "from", "to"), ("address", "interval_ms"))
+STEP_FIELDS = (("name", "hold_s", "expect"), ("action", "expected", "source"))
 ACTION_FIELDS = (("link", "state"), ())
 EXPECT_FIELDS = (("streams", "max_outage_s"), ())
 STATEMENT_FIELDS = (("statement", "checks"), ("source",))
@@ -60,7 +66,7 @@ PING_LINE = re.compile(
 
 
 class LabTestError(NetworkToolkitError):
-    """A test file, a state file or saved evidence cannot be used."""
+    """A test file, a lab file or saved evidence cannot be used."""
 
 
 @dataclass(frozen=True)
@@ -69,6 +75,16 @@ class StreamSpec:
     source: str
     destination: str
     address: str | None
+    interval_ms: int
+
+    @property
+    def interval_s(self) -> float:
+        return self.interval_ms / 1000
+
+    @property
+    def baseline_min(self) -> int:
+        """Delivered probes the baseline needs from this stream."""
+        return int(BASELINE_S * 1000 * BASELINE_SHARE) // self.interval_ms
 
 
 @dataclass(frozen=True)
@@ -89,6 +105,8 @@ class Step:
     action: Action | None
     hold_s: float
     expect: tuple[Expect, ...]
+    expected: str | None
+    source: str | None
 
 
 @dataclass(frozen=True)
@@ -100,13 +118,14 @@ class Statement:
 
 @dataclass(frozen=True)
 class LabTest:
-    """A validated test file with its state files."""
+    """A validated test file with its lab file."""
 
     path: Path
     text: str
     name: str
+    purpose: str
     source: str | None
-    state_files: tuple[tuple[str, str], ...]
+    lab_text: str
     statements: tuple[Statement, ...]
     streams: tuple[StreamSpec, ...]
     captures: tuple[str, ...]
@@ -173,21 +192,23 @@ def _read_yaml(path: Path) -> Any:
         raise LabTestError(msg) from None
 
 
-def load_state(path: Path) -> tuple[Statement, ...]:
-    """Read a state file: a list of statements, each with its intent checks."""
-    data = _list(_read_yaml(path), f"{path}")
+def _optional_text(raw: Mapping[str, Any], key: str, where: str) -> str | None:
+    value = raw.get(key)
+    return None if value is None else _text(value, f"{where}: {key}")
+
+
+def _statements(raw: Any, where: str) -> tuple[Statement, ...]:
+    """The state of a lab file: a list of statements, each with its intent checks."""
     statements = []
-    for n, raw in enumerate(data, 1):
-        where = f"{path}: statement {n}"
-        _fields(raw, where, STATEMENT_FIELDS)
-        text = _text(raw["statement"], f"{where}: statement")
-        source = raw.get("source")
-        if source is not None:
-            _text(source, f"{where}: source")
+    for n, entry in enumerate(_list(raw, where), 1):
+        at = f"{where} {n}"
+        _fields(entry, at, STATEMENT_FIELDS)
+        text = _text(entry["statement"], f"{at}: statement")
+        source = _optional_text(entry, "source", at)
         try:
             checks = tuple(
-                intent.parse_item(item, f"{where}: check {m}")
-                for m, item in enumerate(_list(raw["checks"], f"{where}: checks"), 1)
+                intent.parse_item(item, f"{at}: check {m}")
+                for m, item in enumerate(_list(entry["checks"], f"{at}: checks"), 1)
             )
         except intent.IntentError as error:
             raise LabTestError(error.message) from None
@@ -195,58 +216,68 @@ def load_state(path: Path) -> tuple[Statement, ...]:
     return tuple(statements)
 
 
-def load_test(path: str | Path, state_dir: Path | None = None) -> LabTest:
-    """Read and strictly validate a test file and its state files.
-
-    State paths are relative to the test file. With `state_dir`, as in a saved
-    evidence folder, each state file is read from there by its file name.
-    """
-    path = Path(path)
-    raw = _fields(_read_yaml(path), f"{path}", TEST_FIELDS)
-    name = _text(raw["name"], f"{path}: name")
-    source = raw.get("source")
-    if source is not None:
-        _text(source, f"{path}: source")
-    state_files: list[tuple[str, str]] = []
-    statements: list[Statement] = []
-    for n, entry in enumerate(_list(raw["state"], f"{path}: state"), 1):
-        relative = Path(_text(entry, f"{path}: state {n}"))
-        if relative.name in (known for known, _ in state_files):
-            _fail(f"{path}: state {n}", f"a second state file named {relative.name}")
-        file = (state_dir or path.parent / relative.parent) / relative.name
-        statements.extend(load_state(file))
-        state_files.append((relative.name, file.read_text(encoding="utf-8")))
+def _streams(raw: Any, where: str) -> tuple[StreamSpec, ...]:
     streams: list[StreamSpec] = []
-    for n, entry in enumerate(_list(raw["streams"], f"{path}: streams"), 1):
-        where = f"{path}: stream {n}"
-        _fields(entry, where, STREAM_FIELDS)
+    for n, entry in enumerate(_list(raw, where), 1):
+        at = f"{where} {n}"
+        _fields(entry, at, STREAM_FIELDS)
         ident = entry["id"]
         if (
             isinstance(ident, bool)
             or not isinstance(ident, int)
             or not 0 < ident < 65536
         ):
-            _fail(f"{where}: id", "must be a number from 1 to 65535")
+            _fail(f"{at}: id", "must be a number from 1 to 65535")
         if ident in (s.id for s in streams):
-            _fail(f"{where}: id", f"stream {ident} is listed twice")
+            _fail(f"{at}: id", f"stream {ident} is listed twice")
         address = entry.get("address")
         if address is not None:
             try:
-                ipaddress.IPv4Address(_text(address, f"{where}: address"))
+                ipaddress.IPv4Address(_text(address, f"{at}: address"))
             except ValueError:
-                _fail(f"{where}: address", "must be an IPv4 address")
+                _fail(f"{at}: address", "must be an IPv4 address")
+        interval = entry.get("interval_ms", DEFAULT_INTERVAL_MS)
+        if (
+            isinstance(interval, bool)
+            or not isinstance(interval, int)
+            or not 10 <= interval <= 1000
+        ):
+            _fail(f"{at}: interval_ms", "must be a whole number from 10 to 1000")
         streams.append(
             StreamSpec(
                 ident,
-                _point(entry["from"], f"{where}: from"),
-                _point(entry["to"], f"{where}: to"),
+                _point(entry["from"], f"{at}: from"),
+                _point(entry["to"], f"{at}: to"),
                 address,
+                interval,
             )
         )
+    return tuple(streams)
+
+
+def load_test(path: str | Path, lab_file: Path | None = None) -> LabTest:
+    """Read and strictly validate a test file and its lab file.
+
+    The lab path is relative to the test file. With `lab_file`, as in a saved
+    evidence folder, the lab file is read from there instead.
+    """
+    path = Path(path)
+    raw = _fields(_read_yaml(path), f"{path}", TEST_FIELDS)
+    name = _text(raw["name"], f"{path}: name")
+    purpose = _text(raw["purpose"], f"{path}: purpose")
+    source = _optional_text(raw, "source", f"{path}")
+    lab_path = lab_file or path.parent / _text(raw["lab"], f"{path}: lab")
+    if not lab_path.is_file():
+        _fail(f"{path}: lab", f"there is no lab file {lab_path}")
+    lab_raw = _fields(_read_yaml(lab_path), f"{lab_path}", LAB_FIELDS)
+    statements = _statements(lab_raw["state"], f"{lab_path}: state")
+    streams = _streams(lab_raw["streams"], f"{lab_path}: stream")
     extra = []
-    if "captures" in raw:
-        captures = _list(raw["captures"], f"{path}: captures")
-        extra = [_point(p, f"{path}: captures {n}") for n, p in enumerate(captures, 1)]
+    if "captures" in lab_raw:
+        captures = _list(lab_raw["captures"], f"{lab_path}: captures")
+        extra = [
+            _point(p, f"{lab_path}: captures {n}") for n, p in enumerate(captures, 1)
+        ]
     ends = {point for s in streams for point in (s.source, s.destination)}
     steps: list[Step] = []
     for n, entry in enumerate(_list(raw["steps"], f"{path}: steps"), 1):
@@ -269,7 +300,10 @@ def load_test(path: str | Path, state_dir: Path | None = None) -> LabTest:
             ids = _list(item["streams"], f"{at}: streams")
             for ident in ids:
                 if ident not in (s.id for s in streams):
-                    _fail(f"{at}: streams", f"stream {ident!r} is not in streams")
+                    _fail(
+                        f"{at}: streams",
+                        f"stream {ident!r} is not defined in the lab file {lab_path}",
+                    )
                 if ident in listed:
                     _fail(
                         f"{at}: streams",
@@ -279,7 +313,16 @@ def load_test(path: str | Path, state_dir: Path | None = None) -> LabTest:
             limit = _seconds(item["max_outage_s"], f"{at}: max_outage_s")
             expects.append(Expect(tuple(ids), limit))
         hold = _seconds(entry["hold_s"], f"{where}: hold_s")
-        steps.append(Step(step_name, action, hold, tuple(expects)))
+        steps.append(
+            Step(
+                step_name,
+                action,
+                hold,
+                tuple(expects),
+                _optional_text(entry, "expected", where),
+                _optional_text(entry, "source", where),
+            )
+        )
     try:
         intent.validate_intent([item for s in statements for item in s.checks])
     except intent.IntentError as error:
@@ -288,10 +331,11 @@ def load_test(path: str | Path, state_dir: Path | None = None) -> LabTest:
         path,
         path.read_text(encoding="utf-8"),
         name,
+        purpose,
         source,
-        tuple(state_files),
-        tuple(statements),
-        tuple(streams),
+        lab_path.read_text(encoding="utf-8"),
+        statements,
+        streams,
         tuple(sorted(ends | set(extra))),
         tuple(steps),
     )
@@ -326,8 +370,9 @@ def live_baseline(
 ) -> list[str]:
     """What keeps the baseline from being clean, read from the ping logs.
 
-    Each stream needs 30 replies since `start_ns`, no unanswered probe and no
-    duplicate reply. The captures judge the baseline again after the run.
+    Each stream needs its baseline minimum of replies since `start_ns`, no
+    unanswered probe and no duplicate reply. The captures judge the baseline
+    again after the run.
     """
     problems = []
     for stream in streams:
@@ -344,7 +389,7 @@ def live_baseline(
             else:
                 replies.add(int(found[2]))
         lost = sorted(unanswered - replies)
-        if len(replies) < traffic.BASELINE_MIN_DELIVERED or lost or duplicates:
+        if len(replies) < stream.baseline_min or lost or duplicates:
             problems.append(
                 f"stream {stream.id}: {len(replies)} replies, unanswered {lost}, "
                 f"duplicated {sorted(duplicates)}"
@@ -374,10 +419,9 @@ def run_test(
     for step in test.steps:
         if step.action is not None:
             the_lab.peer(lab.point(step.action.link))
-    (folder / STATE_DIR).mkdir(parents=True, exist_ok=True)
+    folder.mkdir(parents=True, exist_ok=True)
     (folder / TEST_FILE).write_text(test.text, encoding="utf-8")
-    for file_name, text in test.state_files:
-        (folder / STATE_DIR / file_name).write_text(text, encoding="utf-8")
+    (folder / LAB_FILE).write_text(test.lab_text, encoding="utf-8")
     items = test.items()
     with lab.Session(the_lab, folder) as session:
         session.mark("test_started", test=test.name, lab=the_lab.name)
@@ -407,7 +451,11 @@ def _flow(
         session.start_capture(where)
     for stream in test.streams:
         session.start_stream(
-            stream.id, stream.source, stream.destination, stream.address, INTERVAL_S
+            stream.id,
+            stream.source,
+            stream.destination,
+            stream.address,
+            stream.interval_s,
         )
     time.sleep(NEIGHBOUR_S)
     start = session.mark("baseline_start")
@@ -481,7 +529,7 @@ def _state(test: LabTest, folder: Path) -> dict[str, Any] | None:
 def evaluate(folder: str | Path) -> dict[str, Any]:
     """Compute result.json from the files of one evidence folder, without the lab."""
     folder = Path(folder)
-    test = load_test(folder / TEST_FILE, folder / STATE_DIR)
+    test = load_test(folder / TEST_FILE, folder / LAB_FILE)
     events = _events(folder / EVENTS_FILE)
     marks: dict[str, dict[str, Any]] = {}
     for event in events:
@@ -490,6 +538,7 @@ def evaluate(folder: str | Path) -> dict[str, Any]:
     reasons: list[str] = []
     result: dict[str, Any] = {
         "name": test.name,
+        "purpose": test.purpose,
         "source": test.source,
         "verdict": "error",
         "reasons": reasons,
@@ -590,29 +639,36 @@ def _traffic(
         abs(stopped.get("clock_delta_ns", CLOCK_LIMIT_NS)) < CLOCK_LIMIT_NS,
         "the wall clock and the monotonic clock of the lab host agree within 50 ms",
     )
-    intervals = {e["interval_s"] for e in events if e["name"] == "stream_started"} or {
-        INTERVAL_S
-    }
-    streams = [traffic.Stream(s.id, s.source, s.destination) for s in test.streams]
+    streams = [
+        traffic.Stream(s.id, s.source, s.destination, s.interval_s)
+        for s in test.streams
+    ]
     try:
-        measured = traffic.measure(pcaps, streams, windows, max(intervals))
+        measured = traffic.measure(pcaps, streams, windows)
     except (ValueError, OSError, subprocess.SubprocessError) as error:
         check(False, f"the captures can be decoded ({error})")
         return
     result["traffic"] = measured
     for ident, flow in measured["streams"].items():
-        check(flow["cadence_ok"], f"stream {ident} sent a probe at least every 450 ms")
+        limit_ms = round(flow["send_gap_limit_s"] * 1000)
+        check(
+            flow["cadence_ok"],
+            f"stream {ident} sent a probe at least every {limit_ms} ms",
+        )
         check(
             not flow["capture_mismatches"],
             f"stream {ident} shows the same replies at both capture points",
         )
-    base = traffic.baseline(measured, BASELINE)
+    minimum = {str(s.id): s.baseline_min for s in test.streams}
+    base = traffic.baseline(measured, BASELINE, minimum)
     result["baseline"] = base
     for ident, counts in base["streams"].items():
         check(
             counts["ok"],
-            f"stream {ident} delivered 30 probes or more in the baseline, none lost or duplicated",
+            f"stream {ident} delivered {counts['min_delivered']} probes or more "
+            "in the baseline, none lost or duplicated",
         )
+    intervals = {str(s.id): s.interval_s for s in test.streams}
     for step in test.steps:
         window = measured["windows"][step.name]
         judged: dict[str, Any] = {}
@@ -627,6 +683,7 @@ def _traffic(
                         f"{counts['duplicates']} duplicated probes",
                     )
                 judged[str(ident)] = {
+                    "interval_s": intervals[str(ident)],
                     "limit_s": expect.max_outage_s,
                     "lower_s": outage["lower_s"] if outage else 0.0,
                     "upper_s": outage["upper_s"] if outage else 0.0,
@@ -641,6 +698,8 @@ def _traffic(
         result["steps"].append(
             {
                 "name": step.name,
+                "expected": step.expected,
+                "source": step.source,
                 "action": None
                 if step.action is None
                 else {"link": step.action.link, "state": step.action.state},

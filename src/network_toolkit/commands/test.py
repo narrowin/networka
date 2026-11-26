@@ -26,6 +26,7 @@ def _bounds(stream: dict[str, Any]) -> str:
 
 def _print_result(ctx: CommandContext, result: dict[str, Any]) -> None:
     ctx.console.print(f"Test: {result['name']}", markup=False)
+    ctx.console.print(f"Purpose: {result['purpose']}", markup=False)
     for when in ("before", "after"):
         state = result["state"].get(when)
         if state is None:
@@ -45,6 +46,12 @@ def _print_result(ctx: CommandContext, result: dict[str, Any]) -> None:
             )
         ctx.console.print(table)
     if result["steps"]:
+        for step in result["steps"]:
+            if step["expected"]:
+                ctx.console.print(
+                    f"Expected in step {step['name']}: {step['expected']}",
+                    markup=False,
+                )
         table = Table(title="Steps", show_header=True, header_style="bold")
         for column in ("Step", "Stream", "Outage", "Limit", "Verdict"):
             table.add_column(column, overflow="fold")

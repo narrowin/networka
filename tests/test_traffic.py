@@ -24,7 +24,7 @@ def test_gap_bounds_window_and_baseline():
         traffic.Window("down", 3900 * MS, 5000 * MS),
     ]
     result = traffic.measure_frames(
-        {a: sent, b: received}, [traffic.Stream(7, a, b)], windows, 0.1
+        {a: sent, b: received}, [traffic.Stream(7, a, b, 0.1)], windows
     )
 
     flow = result["streams"]["7"]
@@ -41,4 +41,4 @@ def test_gap_bounds_window_and_baseline():
     down = result["windows"]["down"]["streams"]["7"]
     assert down["outage"] == {"lower_s": 0.1, "upper_s": 0.3, "lost": 2}
     assert result["windows"]["baseline"]["streams"]["7"]["outage"] is None
-    assert traffic.baseline(result, "baseline")["verdict"] == "fail"
+    assert traffic.baseline(result, "baseline", {"7": 30})["verdict"] == "fail"

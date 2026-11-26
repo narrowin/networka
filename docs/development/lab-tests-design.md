@@ -12,7 +12,7 @@ A new lab, for example a Cumulus lab, has to copy or rewrite such a program befo
 
 A lab repository describes its lab and its tests, and Networka runs them.
 
-The lab repository holds the containerlab topology, the device configs and the test files in YAML. It holds no test logic. Networka holds the engine. The engine reaches the nodes, checks device state, starts streams and captures, applies the fault, measures the outage, judges it against the limits in the test file, saves the evidence and replays it.
+The lab repository holds the containerlab topology, the device configs, one lab file per lab and the test files in YAML. It holds no test logic. Networka holds the engine. The engine reaches the nodes, checks device state, starts streams and captures, applies the fault, measures the outage, judges it against the limits in the test file, saves the evidence and replays it.
 
 The engine works for RouterOS, Cumulus and Linux nodes. The state checks are vendor-neutral, and the traffic measurement does not depend on the vendor.
 
@@ -51,15 +51,21 @@ Networka checks the path in these ways.
 - `traceroute` lists the routed hops, for networks where routing decides the path.
 - In a containerlab lab, a traffic test records at which capture points each numbered packet was seen. The expectations `seen_at` and `not_seen_at` check this. It also works on layer 2.
 
-## The test file
+## The lab file and the test file
 
-One test file describes one test. This example is the MLAG case "bond member loss and return".
+A lab file holds what all tests of one lab share. A test file holds only what is specific to one test and names its lab file. Each fact is written once. This example is the MLAG case "bond member loss and return".
 
 ```yaml
-name: MLAG bond member loss and return
+# tests/small/lab.yaml
 state:
-  - state/small.yaml
-
+  - statement: Both MLAG peers show mlag-state connected.
+    checks:
+      - device: p1
+        check: mlag
+        params:
+          bridge: bridge
+        expected:
+          connected: true
 streams:
   - id: 101
     from: c1:bond0
@@ -67,47 +73,66 @@ streams:
   - id: 201
     from: mobile:bond0
     to: c1:bond0
-  - id: 301
-    from: c1:eth3
-    to: c2:eth3
-
+  - id: 102
+    from: c2:bond0
+    to: mobile:bond0
 captures:
   - c1:eth1
+```
 
+```yaml
+# tests/small/bond-member-loss.yaml
+name: MLAG bond member loss and return
+purpose: >-
+  Client 1's cable to the first MLAG peer goes down and comes back.
+  The test checks that client 1's traffic stops for at most 3 s.
+lab: lab.yaml
 steps:
   - name: Member down
     action:
       link: c1:eth1
       state: down
     hold_s: 8
+    expected: The cable goes down, and the first peer sends client 1's traffic over the peer link.
     expect:
-      - streams: [101, 201]
+      - streams:
+          - 101
+          - 201
         max_outage_s: 3
-      - streams: [301]
+      - streams:
+          - 102
         max_outage_s: 0
-      - streams: [101]
-        not_seen_at: [c1:eth1]
+      - streams:
+          - 101
+        not_seen_at:
+          - c1:eth1
   - name: Member back
     action:
       link: c1:eth1
       state: up
     hold_s: 10
+    expected: The cable comes back, and LACP takes it back into the bond.
     expect:
-      - streams: [101, 201]
+      - streams:
+          - 101
+          - 201
         max_outage_s: 3
-      - streams: [301]
+      - streams:
+          - 102
         max_outage_s: 0
 ```
 
-| Field | Meaning |
-|---|---|
-| `name` | Title shown in the result. |
-| `state` | State files. A state file is a list of statements. Each statement is one sentence with an optional source and the intent checks that prove it. The engine checks them before the first step and after the last step. |
-| `streams` | Numbered ping streams. `id` becomes the ICMP identifier. `from` and `to` are capture points written as `node:interface`. The destination is the IPv4 address of `to`, unless `address` is given. One ping is sent every 100 ms. |
-| `captures` | Extra capture points. The endpoints of every stream are always captured. |
-| `steps` | Ordered list. A step has a `name`, an optional `action`, a hold time `hold_s` and a list of `expect` entries. A step without an action is an observation window. A baseline test is one such step. |
-| `until` | Optional in a step. State checks that must pass before the hold time starts, with a `timeout_s`. A step uses it after a reboot. |
-| `expect` | `max_outage_s` sets the longest allowed outage for the listed streams in this step. `seen_at` and `not_seen_at` name capture points where the listed streams must or must not appear. |
+| Field | File | Meaning |
+|---|---|---|
+| `state` | lab | A list of statements. Each statement is one sentence with an optional source and the intent checks that prove it. The engine checks them before the first step and after the last step of every test. |
+| `streams` | lab | Numbered ping streams. `id` becomes the ICMP identifier. `from` and `to` are capture points written as `node:interface`. The destination is the IPv4 address of `to`, unless `address` is given. `interval_ms` sets the time between two pings, 100 ms by default. Every test of the lab runs all streams. |
+| `captures` | lab | Extra capture points. The endpoints of every stream are always captured. |
+| `name` | test | Title shown in the result. |
+| `purpose` | test | One or two sentences on what the test checks and why. The result shows it first. |
+| `lab` | test | The lab file, relative to the test file. |
+| `steps` | test | Ordered list. A step has a `name`, an optional `action`, a hold time `hold_s`, an optional `expected` text with its `source`, and a list of `expect` entries. A step without an action is an observation window. Every test starts with a baseline window, so a test needs no step for it. |
+| `until` | test | Optional in a step. State checks that must pass before the hold time starts, with a `timeout_s`. A step uses it after a reboot. |
+| `expect` | test | `max_outage_s` sets the longest allowed outage for the listed streams in this step. `seen_at` and `not_seen_at` name capture points where the listed streams must or must not appear. |
 
 A stream with `flood: true` sends to a broadcast address, or to an address that no node owns. Each capture point in its `receivers` list must see every frame once. The sender's own capture points must see no copy coming back.
 
@@ -162,6 +187,7 @@ A test has the verdict `pass`, `fail` or `error`, as the state checks have today
 ```text
 out/01-bond-member-loss/
   test.yaml        the test file as it ran
+  lab.yaml         the lab file as it ran
   state-before/    intent.yaml, evidence.json, results.json
   state-after/
   captures/        one pcap per capture point, with pcap.sha256
@@ -176,14 +202,14 @@ sudo nw test run tests/small/*.yaml --save out/
 nw test replay out/01-bond-member-loss
 ```
 
-`nw test replay` computes `result.json` again from the saved files. It needs no lab.
+`nw test replay` computes `result.json` again from the saved files. It reads only the saved `test.yaml` and `lab.yaml`, and it needs no lab.
 
 ## What a lab repository contains
 
 ```text
 labs/small/small.clab.yml      topology and device configs
-tests/small/state/*.yaml       state checks as intent files
-tests/small/*.yaml             test files
+tests/small/lab.yaml           state, streams and captures that all tests share
+tests/small/*.yaml             one test file per test
 hooks/                         local commands for faults that only this lab needs
 docs/, results/                write-ups of the findings
 ```
@@ -204,8 +230,11 @@ docs/, results/                write-ups of the findings
 | No action runs unless the state checks pass and the streams run without loss first. | Run the action in any case. | A fault applied to a lab that is already broken gives a result that nobody can interpret. The MLAG suite has this rule. |
 | Missing or invalid evidence gives `error` and never `pass`. | Count it as pass, or skip it. | The state checks follow the same rule. |
 | Every run saves its test file and its evidence, and replay computes the result again. | Keep only the verdict. | A result can be checked later without the lab. The state checks follow the same rule. |
-| A state file is a list of statements, and each statement names the intent checks that prove it. | Plain intent files. | A reader sees the claim and its source next to the checks. The result reports a verdict per statement. |
-| Test files and state files are written in block style YAML with one field per line. | One-line mappings in braces. | Block style is easier to read and to review in a diff. |
+| A state is a list of statements, and each statement names the intent checks that prove it. | Plain intent files. | A reader sees the claim and its source next to the checks. The result reports a verdict per statement. |
+| One lab file holds the state, the streams and the captures of a lab, and each test file names it. | A stream list and state files in every test file. | Each fact is written once. A test file then shows only what the test changes and expects. A test of the baseline alone is not needed, because every test starts with one. |
+| A test has a required `purpose`, and a step has an optional `expected` text with its source. The result carries them. | Comments in the YAML. | A reader of the result sees what the test was about without opening the test file. |
+| Each stream has its own interval, 10 to 1000 ms, 100 ms by default. A stream may pause between two sends for its interval plus 350 ms. | A fixed interval, or a pause limit of 4.5 intervals. | A stall of the lab host lasts the same time whatever the interval. A multiple would allow 4.5 s at 1000 ms and only 45 ms at 10 ms. The baseline needs 60 percent of the probes the interval allows, 30 at 100 ms. |
+| Lab files and test files are written in block style YAML with one field per line. | One-line mappings in braces. | Block style is easier to read and to review in a diff. |
 | The endpoints of every stream are always captured, and `captures` only adds points. | `captures: all` for every link endpoint. | The measurement needs both ends of each stream. Extra points cost disk space and are added only where a reader needs them. |
 | A limit of 0 fails on any lost probe. | Treat a lower bound of 0 as within a limit of 0. | A lost probe makes the outage longer than its lower bound. |
 
