@@ -34,10 +34,15 @@ An intent file is a YAML list. Each item has these keys:
 | `params` | No | The check's parameters, for example `{bridge: bridge}`. |
 | `name`, `source` | No | Labels for reports. |
 
-Any other key, an unknown check, params that do not fit the check, a device
-that is not in the inventory, or a check its platform does not support is an
-error that names the file and the item. Nothing is read from a device until
-every item is valid.
+Loading checks every item and names the file and the item on any error: an
+unknown key or check, missing or extra params, a param value that is not a
+plain name (`bridge`, `bond`, `member`, `port`, `interface`), a MAC address,
+a menu path such as `/interface/bridge/port`, or a `where` mapping of
+property names to scalars, and an `expected` of the wrong shape or type
+(`true` is not `1`). A MAC address must be quoted, or YAML may read it as a
+number. Before any device is read, each device is resolved in the inventory
+the same way `nw run` resolves it, and its `device_type` must support the
+check.
 
 ## Run, save and replay
 
@@ -66,13 +71,14 @@ nw intent replay saved
 
 `--save` writes three files:
 
-- `intent.yaml`, a copy of the intent file.
+- `intent.yaml`, the validated items, written before any device is read.
+  Replay uses exactly these items.
 - `evidence.json` with the Networka version and, per device, its
   `device_type`, the collection `started` and `finished` times, and the
   readings. Each reading names its `collector` and `args` and holds the
   replies as `command`, `output` and `error`.
-- `results.json` with the overall verdict and, per item, its name, device,
-  check, expected and observed value, verdict and reason.
+- `results.json` with the overall verdict and, per item, its name, source,
+  device, check, expected and observed value, verdict and reason.
 
 ```json
 {
@@ -85,8 +91,8 @@ nw intent replay saved
           "collector": "collect_bridge",
           "args": ["bridge"],
           "replies": {
-            ":put [:serialize to=json options=json.no-string-conversion [/interface/bridge/monitor bridge once as-value]]": {
-              "command": ":put [:serialize to=json options=json.no-string-conversion [/interface/bridge/monitor bridge once as-value]]",
+            ":put [:serialize to=json options=json.no-string-conversion [/interface/bridge/monitor \"bridge\" once as-value]]": {
+              "command": ":put [:serialize to=json options=json.no-string-conversion [/interface/bridge/monitor \"bridge\" once as-value]]",
               "output": "{\"mlag-state\":\"connected\",\"mlag-active-role\":\"primary\"}",
               "error": null
             }
@@ -116,7 +122,10 @@ Intent verdict: fail
 The intent verdict is `fail` when any item fails, `error` when no item fails
 but at least one could not be verified, and `pass` otherwise. The exit
 status is 0 for pass, 1 for fail and 2 for error, including an unusable
-intent file or evidence.
+intent file or evidence; the command then prints one `error:` line and no
+traceback. Values compare in value and type, also inside mappings and
+lists. Malformed evidence, such as a device without a list of readings, and
+any failure inside a check give that item `error`.
 
 In Python, `run_intent` collects and then evaluates the evidence through
 `replay_intent`, so a replay gives the same results:
@@ -126,7 +135,7 @@ from network_toolkit import NetworkaClient, intent
 
 items = intent.load_intent("intent.yaml")
 with NetworkaClient() as client:
-    report = intent.run_intent(client, items, save_dir="saved", source="intent.yaml")
+    report = intent.run_intent(client, items, save_dir="saved")
 assert intent.replay_directory("saved").results == report.results
 ```
 
@@ -150,17 +159,18 @@ Neutral checks compare only the fields named in `expected`.
 | `mlag` | `bridge` | `connected`, `role` (`primary`, `secondary`), `state` (the platform's own word) | Yes | No |
 | `lacp_member` | `bond`, `member` | LACP flags of actor and partner: `activity`, `timeout`, `aggregation`, `synchronization`, `collecting`, `distributing`, `defaulted`, `expired` | Yes | Yes |
 | `lacp_partner_system` | `bond`, `member` | LACP system `priority` and `mac` the partner sends | Yes | Yes |
-| `host_entry` | `bridge`, `mac` | Port of the bridge host entry, `null` without one | Yes | No |
+| `host_entry` | `bridge`, `mac` | Port of the bridge host entry, `null` without one; an entry for the MAC on another bridge is `error` | Yes | No |
 | `interface_up` | `interface` | Carrier | Yes | No |
 
 `lacp_member` passes when both the actor and the partner side equal
-`expected`. Both MLAG peers present one LACP system ID, so
+`expected`; a member without an LACP partner gives `error` with reason
+"no LACP partner". The partner MAC is compared in lower case. Both MLAG peers present one LACP system ID, so
 `lacp_partner_system` gives the same value for each member of an MLAG bond
 when read on the partner.
 
 | Platform | `check` | `params` | Why it is platform-specific |
 | --- | --- | --- | --- |
-| RouterOS | `property` | `menu` in slash form, `where`, `name` | Compares one property of a menu entry, for example `pvid`, `edge`, `bpdu-guard`, `loop-protect`, `lacp-strict` or `mlag-priority`. These are RouterOS configuration names. |
+| RouterOS | `property` | `menu` in slash form, `where`, `name` | Compares one property of a menu entry; an absent property is `error`, not `null`. For example `pvid`, `edge`, `bpdu-guard`, `loop-protect`, `lacp-strict` or `mlag-priority`. These are RouterOS configuration names. |
 | RouterOS | `version` | none | Compares the version without the channel. The expected value comes from a RouterOS image name. |
 | Linux | `bond_member` | `bond`, `member` | Compares the bonding driver's `carrier` (MII Status) and `eligible`: in the active aggregator, and both port states synchronized, collecting and distributing. Aggregator selection is a Linux bonding concept. |
 
@@ -168,11 +178,16 @@ when read on the partner.
 
 Each command runs inside
 `:put [:serialize to=json options=json.no-string-conversion [<command>]]`.
-A collector joins its few commands with `;` into one read and splits the
-output into one reply per command, because each prints one JSON line. Every
-collector is a separate read. One read of all state and configuration
-commands together exceeded the default 5 s command timeout, so the items of
-a device are close in time but not one instant.
+Names are quoted in the command, and only validated names, MAC addresses and
+menu paths reach it. Each collector makes one read per command:
+`collect_bridge` reads the bridge monitor and the port statistics separately,
+so a failed statistics read leaves MLAG and STP checks usable, and
+`collect_bridge_port` reads the statistics and then the monitor of the
+selected port. `collect` can join several commands with `;` into one read
+and splits the output into one reply per command, because each prints one
+JSON line. One read of all state and configuration commands together
+exceeded the default 5 s command timeout, so the items of a device are close
+in time but not one instant.
 
 | Collector | Command | Checked live |
 | --- | --- | --- |
@@ -185,7 +200,11 @@ a device are close in time but not one instant.
 | `collect_stp_mode` | `/interface/bridge/print as-value where name=<bridge>` | Yes, 7.26beta7 |
 | `collect_version` | `/system/resource/print as-value` | Yes, 7.26beta7 |
 | `collect_uptime` | `:tonsec [/system/resource/get uptime]` | Yes, 7.26beta7 |
-| `collect_print` | `<menu>/print detail as-value` | Not yet; the form without `detail` was read on 7.26beta7 |
+| `collect_print` | `<menu>/print detail as-value` | Yes, 7.26beta7 |
+
+The live checks used unquoted names, for example `monitor bridge once`. The
+quoted form the collectors now send, for example `monitor "bridge" once`,
+has not been read live yet.
 
 What the JSON returns, as seen on 7.26beta7:
 
@@ -195,56 +214,118 @@ What the JSON returns, as seen on 7.26beta7:
   `vlan-ids` an array of strings. A bridge `mtu` of `auto` and a port
   `horizon` of `none` are `0`.
 - `print` without `detail` leaves out properties at their default value,
-  which is why `collect_print` uses `detail`.
+  for example the bridge port's `learn` and `priority`, the bridge VLAN's
+  `tagged` and `untagged`, and the Ethernet `loop-protect`. That is why
+  `collect_print` uses `detail`.
 - Durations lose sub-second parts (`mii-interval` 100ms becomes
   `"00:00:00"`), and the bridge monitor's `max-age`, `hello-time` and
   `forward-delay` are whole seconds. No check reads them.
 - An inactive bridge port's monitor returns only `.id`, `interface` and
   `status: inactive`. It is normalized as not forwarding.
-- A bond member without an LACP partner has no partner fields. Its partner
-  flags are normalized as all cleared, and `lacp_partner_system` gives
-  `error`.
+- A bond member with an LACP partner has `partner: true`. Without one, as
+  seen once while a member came back, the row has no `partner`,
+  `partner-flags`, `partner-key`, `partner-sys-id` or `partner-sys-priority`,
+  for example `{"active": true, "flags": "ATG---FE", "key": 15,
+  "port": "ether3"}`. Checks on the partner side then give `error`.
 - The bonding monitor returns one object for one member and an array for
   several.
 
 ## Add a platform
 
-The steps use Cumulus Linux as the example. No Cumulus module exists yet;
-the sources below are from the NVIDIA guides and
+This section is written for adding Cumulus Linux. No Cumulus module exists
+yet. The sources below come from the NVIDIA guides and
 [draft PR #47](https://github.com/narrowin/networka/pull/47) and have not
 been checked on a switch.
 
-1. Create `src/network_toolkit/platforms/<device_type>/intent.py`.
-2. Add a collector for each concept the platform supports, with the names
-   in `intent.CHECKS`, for example `collect_bridge(client, device, bridge)`.
-   Read JSON where the platform has it and keep each reply through
-   `intent.read`, keyed by its command.
-3. Add the normalizers the neutral checks look up: `bridge_port`,
-   `bridge_ports`, `stp_bridge`, `stp_mode`, `mlag`, `lacp_member`,
-   `host_interface` and `interface_up`. Each returns the neutral fields,
-   leaves out a field the platform does not report, and raises `ValueError`
-   when the evidence cannot decide. For Cumulus:
+### Device type
 
-   | Neutral fields | Cumulus source | Maps |
-   | --- | --- | --- |
-   | `bridge_port` `forwarding` | `bridge -j link show dev <port>`, `state` is `forwarding` | Yes |
-   | `bridge_port` `role`, `edge` | `mstpctl showportdetail <bridge> <port>`, role and oper edge port; a JSON form is still to be confirmed | Yes |
-   | `bridge_ports` | `bridge -j link show`, ports whose `master` is the bridge | Yes |
-   | `stp_bridge` | `mstpctl showbridge <bridge>`: bridge ID, designated root, root port, topology change count | Partly: bridge IDs print as `8.000.mac` and need converting to `0xPPPP.mac` |
-   | `stp_mode` | `nv show bridge domain <bridge> stp --output json`, mode | Partly: `pvrst` has no RouterOS counterpart |
-   | `mlag` `connected`, `role` | `nv show mlag --output json`, peer alive and role | Partly: MLAG is not bridge-scoped on Cumulus, so `bridge` selects nothing |
-   | `mlag` `state` | none | No: the state word is each platform's own |
-   | `lacp_member`, `lacp_partner_system` | `/proc/net/bonding/<bond>`, as the Linux module reads it | Yes |
-   | `host_entry` | `bridge -j fdb show br <bridge>`, `ifname` of the MAC | Yes |
-   | `interface_up` | `nv show interface --output json`, `link.oper-status` | Yes |
+Networka selects platform code by the inventory's `device_type`. Register
+Cumulus in `src/network_toolkit/platforms/registry.py` as `cumulus_linux`,
+the name the Scrapli definitions already use, with its vendor, status and
+description like the other entries. The `linux` intent module stays for
+plain Linux hosts. The Cumulus module imports the Linux bonding normalizers
+(`lacp_member`, and the `bond_member` check if it wants it) because Cumulus
+bonds use the Linux bonding driver:
 
-4. Put the platform's own checks in a `CHECKS` dictionary of `intent.Check`
-   entries, for example a Cumulus check of a CLAG setting with no neutral
-   field. Use an empty dictionary when there are none.
-5. Add the module to `intent.PLATFORMS`. An intent item whose collector or
-   normalizer is missing on that platform is an error naming the item.
-6. Save replies from a lab device and add a test that replays them, as
-   `tests/test_intent.py` does for Linux.
+```python
+from network_toolkit.platforms.linux.intent import collect_bond, lacp_member
+```
+
+### Collectors
+
+A collector reads one concept from one device:
+
+```python
+def collect_bridge(client, device, *collect_args, **run_options) -> dict[str, Reply]
+```
+
+`collect_args` are the params the check lists in `intent.CHECKS`, in that
+order. Validate them with `intent.name` or `intent.mac` before they reach a
+command. Read through `intent.read(client, device, command, run_options)`,
+which records a read failure in the reply instead of raising, and return
+the replies keyed by their command. Read JSON where the platform has it.
+
+| Collector and args | Normalizers it feeds |
+| --- | --- |
+| `collect_bridge(bridge)` | `stp_bridge`, `mlag`, `bridge_ports` |
+| `collect_bridge_port(bridge, port)` | `bridge_port` |
+| `collect_stp_mode(bridge)` | `stp_mode` |
+| `collect_bond(bond)` | `lacp_member` |
+| `collect_host_entry(mac)` | `host_entry` |
+| `collect_interface(interface)` | `interface_up` |
+
+### Normalizers
+
+A normalizer takes the collector's evidence and the params and returns the
+neutral fields. It raises `ValueError` with a short reason when the evidence
+cannot decide, which becomes the item's `error`. It leaves out a field the
+platform does not report, so a check on that field gives `error`, never a
+pass.
+
+| Normalizer | Returns |
+| --- | --- |
+| `bridge_port(evidence, bridge, port)` | `{"forwarding": bool, "role": str, "edge": bool}`, role as `root`, `designated`, `alternate`, `backup` or `disabled` |
+| `bridge_ports(evidence, bridge)` | `["swp1", "swp2"]` |
+| `stp_bridge(evidence, bridge)` | `{"bridge_id": "0x8000.mac", "root_bridge_id": ..., "root_bridge": bool, "root_port": str or None, "topology_changes": int}` |
+| `stp_mode(evidence, bridge)` | `"rstp"`, `"mstp"`, `"none"` |
+| `mlag(evidence, bridge)` | `{"connected": bool, "role": "primary" or "secondary", "state": str}` |
+| `lacp_member(evidence, bond, member)` | `{"actor": {flag: bool}, "partner": {flag: bool}, "partner_system": {"priority": int, "mac": lower-case str}}`, with `partner` and `partner_system` left out when there is no partner |
+| `host_entry(evidence, bridge, mac)` | The port name, or `None` when the bridge has no entry |
+| `interface_up(evidence, interface)` | `bool` |
+
+For Cumulus:
+
+| Neutral fields | Cumulus source | Maps |
+| --- | --- | --- |
+| `bridge_port` `forwarding` | `bridge -j link show dev <port>`, `state` is `forwarding` | Yes |
+| `bridge_port` `role`, `edge` | `mstpctl showportdetail <bridge> <port>`, role and oper edge port; a JSON form is still to be confirmed | Yes |
+| `bridge_ports` | `bridge -j link show`, ports whose `master` is the bridge | Yes |
+| `stp_bridge` | `mstpctl showbridge <bridge>`: bridge ID, designated root, root port, topology change count | Partly: bridge IDs print as `8.000.mac` and need converting to `0xPPPP.mac` |
+| `stp_mode` | `nv show bridge domain <bridge> stp --output json`, mode | Partly: `pvrst` has no RouterOS counterpart |
+| `mlag` `connected`, `role` | `nv show mlag --output json`, peer alive and role | Partly: MLAG is not bridge-scoped on Cumulus, so `bridge` selects nothing |
+| `mlag` `state` | none | No: the state word is each platform's own |
+| `lacp_member`, `lacp_partner_system` | `/proc/net/bonding/<bond>`, the Linux normalizer | Yes |
+| `host_entry` | `bridge -j fdb show br <bridge>`, `ifname` of the MAC | Yes |
+| `interface_up` | `nv show interface --output json`, `link.oper-status` | Yes |
+
+A CLAG setting with no neutral field becomes a Cumulus-only check.
+
+### Checklist
+
+1. Register `cumulus_linux` in `platforms/registry.py`.
+2. Create `src/network_toolkit/platforms/cumulus_linux/intent.py` with the
+   collectors and normalizers above, importing the Linux bonding ones.
+3. Add a `CHECKS` dictionary of `intent.Check` entries for Cumulus-only
+   checks, empty when there are none.
+4. Add `"cumulus_linux": "network_toolkit.platforms.cumulus_linux.intent"`
+   to `intent.PLATFORMS`. An item whose collector or normalizer is missing
+   on the platform is then an error naming the item.
+5. Read each collector's commands once on a lab switch, save the replies,
+   and add a test that feeds them to the checks, as
+   `tests/test_platforms_mikrotik.py` does with RouterOS replies. Include a
+   down port and a bond member without a partner.
+6. Run an intent file against the lab with `nw intent run FILE --save DIR`
+   and check that `nw intent replay DIR` prints the same results.
 
 The development setup needs uv 0.13.10, as pinned in `pyproject.toml`. The
 [intent examples](examples/intent/README.md) replay archived MLAG lab

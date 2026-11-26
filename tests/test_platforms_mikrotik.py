@@ -340,7 +340,10 @@ BOND = [
         "partner-sys-id": "02:00:00:11:00:12",
         "partner-sys-priority": 65535,
         "partner-flags": "ATG---F-",
-    }
+        "partner": True,
+    },
+    # A member whose partner is unknown, as RouterOS 7.26beta7 returned it.
+    {"active": True, "flags": "ATG---FE", "key": 15, "port": "ether3"},
 ]
 HOST = [
     {
@@ -448,6 +451,8 @@ def test_lacp_member_and_partner_system() -> None:
     system = {"priority": 65535, "mac": "02:00:00:11:00:12"}
     partner = intent.check_lacp_partner_system(STATE, ROS, "client2", "ether4", system)
     assert partner.verdict == "pass"
+    alone = intent.check_lacp_member(STATE, ROS, "client2", "ether3", scd)
+    assert (alone.verdict, alone.reason) == ("error", "no LACP partner")
 
 
 def test_host_entry() -> None:

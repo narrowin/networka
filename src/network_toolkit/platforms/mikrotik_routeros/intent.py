@@ -32,28 +32,36 @@ UPTIME = ":put [:serialize to=json [:tonsec [/system/resource/get uptime]]]"
 LACP_LETTERS = "ATGSCDFE"
 
 
+# The command builders accept only plain names, MAC addresses and menu paths
+# and quote names, so a parameter cannot change the command.
+
+
 def bridge_monitor(bridge: str) -> str:
-    return _JSON.format(f"/interface/bridge/monitor {bridge} once as-value")
+    bridge = intent.name(bridge, "bridge")
+    return _JSON.format(f'/interface/bridge/monitor "{bridge}" once as-value')
 
 
 def bond_monitor(bond: str) -> str:
+    bond = intent.name(bond, "bond")
     return _JSON.format(
-        f"/interface/bonding/monitor-slaves bond={bond} once=yes as-value"
+        f'/interface/bonding/monitor-slaves bond="{bond}" once=yes as-value'
     )
 
 
 def ethernet_monitor(interface: str) -> str:
-    return _JSON.format(f"/interface/ethernet/monitor {interface} once as-value")
+    interface = intent.name(interface, "interface")
+    return _JSON.format(f'/interface/ethernet/monitor "{interface}" once as-value')
 
 
 def host_print(mac: str) -> str:
     return _JSON.format(
-        f"/interface/bridge/host/print as-value where mac-address={mac}"
+        f"/interface/bridge/host/print as-value where mac-address={intent.mac(mac)}"
     )
 
 
 def bridge_print(bridge: str) -> str:
-    return _JSON.format(f"/interface/bridge/print as-value where name={bridge}")
+    bridge = intent.name(bridge, "bridge")
+    return _JSON.format(f'/interface/bridge/print as-value where name="{bridge}"')
 
 
 def menu_print(menu: str) -> str:
@@ -61,6 +69,9 @@ def menu_print(menu: str) -> str:
 
     Without `detail`, RouterOS leaves out properties that have their default value.
     """
+    if not isinstance(menu, str) or not intent.MENU.fullmatch(menu):
+        msg = f"menu must be a path such as /interface/bridge/port, not {menu!r}"
+        raise ValueError(msg)
     return _JSON.format(f"{menu}/print detail as-value")
 
 
@@ -93,13 +104,14 @@ def collect(
 def collect_bridge(
     client: NetworkaClient, device: str, bridge: str, **run_options: Any
 ) -> dict[str, Reply]:
-    """Bridge monitor and port statistics: STP bridge, MLAG and bridge ports."""
-    evidence = collect(
-        client, device, bridge_monitor(bridge), PORT_STATS, **run_options
-    )
-    return {
-        "stats" if key == PORT_STATS else key: reply for key, reply in evidence.items()
-    }
+    """Bridge monitor and port statistics: STP bridge, MLAG and bridge ports.
+
+    They are two reads, so a failed statistics command leaves the bridge
+    monitor usable.
+    """
+    evidence = collect(client, device, bridge_monitor(bridge), **run_options)
+    evidence["stats"] = collect(client, device, PORT_STATS, **run_options)[PORT_STATS]
+    return evidence
 
 
 def collect_bond(
@@ -135,7 +147,7 @@ def collect_stp_mode(
 def collect_print(
     client: NetworkaClient, device: str, menu: str, **run_options: Any
 ) -> dict[str, Reply]:
-    """`print as-value` of a menu, for `check_property`."""
+    """`print detail as-value` of a menu, for `check_property`."""
     return collect(client, device, menu_print(menu), **run_options)
 
 
@@ -259,11 +271,14 @@ def bridge_port(evidence: Mapping[str, Any], bridge: str, interface: str) -> dic
 
 def bridge_ports(evidence: Mapping[str, Any], bridge: str) -> list[str]:
     """Interfaces of the bridge in the port statistics."""
-    return [
-        _field(row, "interface", str, "bridge port")
-        for row in _statistics(evidence)
-        if row.get("bridge") == bridge
-    ]
+    ports = []
+    for row in _statistics(evidence):
+        if not isinstance(row.get("bridge"), str):
+            msg = "a bridge-port statistics row has no bridge"
+            raise ValueError(msg)
+        if row["bridge"] == bridge:
+            ports.append(_field(row, "interface", str, "bridge port"))
+    return ports
 
 
 def _bridge(evidence: Mapping[str, Any], bridge: str) -> dict[str, Any]:
@@ -314,17 +329,24 @@ def stp_mode(evidence: Mapping[str, Any], bridge: str) -> str:
 def lacp_member(evidence: Mapping[str, Any], bond: str, member: str) -> dict:
     """Actor and partner LACP flags and the partner system of one bond member.
 
-    A member that has no partner reports no partner fields. Its partner flags
-    are then all cleared and `partner_system` is left out.
+    RouterOS marks a member that has an LACP partner with `partner: true`.
+    Without a partner, `partner` and `partner_system` are left out and only
+    the actor flags are returned. The partner MAC is lower-cased.
     """
     rows = _rows(evidence, bond_monitor(bond), f"{bond} monitor")
     row = _one([r for r in rows if r.get("port") == member], f"{bond} member {member}")
-    partnered = "partner-flags" in row
+    partner = row.get("partner", False)
+    if not isinstance(partner, bool):
+        msg = f"{member} partner is not a JSON Boolean"
+        raise ValueError(msg)
+    sides = (
+        (("actor", "flags"), ("partner", "partner-flags"))
+        if partner
+        else (("actor", "flags"),)
+    )
     state: dict[str, Any] = {}
-    for side, key in (("actor", "flags"), ("partner", "partner-flags")):
-        flags = (
-            _field(row, key, str, member) if side == "actor" or partnered else "-" * 8
-        )
+    for side, key in sides:
+        flags = _field(row, key, str, member)
         if len(flags) != len(LACP_LETTERS) or any(
             flag not in (letter, "-")
             for flag, letter in zip(flags, LACP_LETTERS, strict=True)
@@ -335,7 +357,7 @@ def lacp_member(evidence: Mapping[str, Any], bond: str, member: str) -> dict:
             name: flag != "-"
             for name, flag in zip(intent.LACP_FLAGS, flags, strict=True)
         }
-    if partnered:
+    if partner:
         state["partner_system"] = {
             "priority": _field(row, "partner-sys-priority", int, member),
             "mac": _field(row, "partner-sys-id", str, member).lower(),
@@ -343,15 +365,22 @@ def lacp_member(evidence: Mapping[str, Any], bond: str, member: str) -> dict:
     return state
 
 
-def host_interface(evidence: Mapping[str, Any], bridge: str, mac: str) -> str | None:
-    """`on-interface` of the host entry for `mac` on `bridge`, `None` without one."""
-    rows = _rows(evidence, host_print(mac), "bridge host print")
-    ports = {
-        _field(row, "on-interface", str, mac)
-        for row in rows
-        if str(row.get("mac-address", "")).lower() == mac.lower()
-        and row.get("bridge") == bridge
-    }
+def host_entry(evidence: Mapping[str, Any], bridge: str, mac: str) -> str | None:
+    """`on-interface` of the host entry for `mac` on `bridge`, `None` without one.
+
+    An entry for the MAC on another bridge, or a row without `mac-address`,
+    `bridge` or `on-interface`, cannot decide and raises.
+    """
+    ports = set()
+    for row in _rows(evidence, host_print(mac), "bridge host print"):
+        found = _field(row, "mac-address", str, "host entry")
+        on = _field(row, "bridge", str, f"host entry {found}")
+        if found.lower() != mac.lower():
+            continue
+        if on != bridge:
+            msg = f"the host entry for {mac} is on bridge {on}, not {bridge}"
+            raise ValueError(msg)
+        ports.add(_field(row, "on-interface", str, mac))
     if len(ports) > 1:
         msg = f"host entries for {mac} on {bridge} disagree: {sorted(ports)}"
         raise ValueError(msg)
@@ -388,7 +417,7 @@ def check_property(
     name: str,
     expected: Any,
 ) -> IntentResult:
-    """Compare one property of a menu entry, `None` when it is absent.
+    """Compare one property of a menu entry; an absent property is `error`.
 
     `menu` is the path in slash form, for example `/interface/bridge/port`,
     as read by `collect_print`. `where` selects one entry by its JSON values,
@@ -401,8 +430,16 @@ def check_property(
     def observe() -> Any:
         rows = _rows(evidence, menu_print(menu), f"{menu} print")
         found = " ".join(f"{key}={value}" for key, value in where.items())
-        selected = [r for r in rows if all(r.get(k) == v for k, v in where.items())]
-        return _one(selected, f"entry with {found}").get(name)
+        selected = [
+            r
+            for r in rows
+            if all(k in r and intent.same(v, r[k]) for k, v in where.items())
+        ]
+        row = _one(selected, f"entry with {found}")
+        if name not in row:
+            msg = f"the entry with {found} has no property {name}"
+            raise ValueError(msg)
+        return row[name]
 
     return intent.compare(expected, observe)
 

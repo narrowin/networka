@@ -25,7 +25,8 @@ _IN_USE = 0x38
 
 
 def bonding(bond: str) -> str:
-    return f"cat /proc/net/bonding/{bond}"
+    """The read of one bond; `bond` must be a plain interface name."""
+    return f"cat /proc/net/bonding/{intent.name(bond, 'bond')}"
 
 
 def collect_bond(

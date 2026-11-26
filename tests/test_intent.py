@@ -10,6 +10,7 @@ from typer.testing import CliRunner
 from network_toolkit import intent
 from network_toolkit.api.run import DeviceCommandResult
 from network_toolkit.cli import app
+from network_toolkit.config import DeviceConfig, NetworkConfig
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.platforms.linux.intent import bonding, check_bond_member
 from network_toolkit.platforms.mikrotik_routeros import intent as ros
@@ -100,12 +101,14 @@ def _routeros_client() -> MagicMock:
         ros.PORT_STATS: "[]",
         ros.bond_monitor("client2"): (
             '[{"port":"ether4","flags":"ATGSCD--","partner-sys-id":"02:00:00:11:00:12",'
-            '"partner-sys-priority":65535,"partner-flags":"ATGSCD--"}]'
+            '"partner-sys-priority":65535,"partner-flags":"ATGSCD--","partner":true}]'
         ),
         ros.RESOURCE: '{"version":"7.26beta7 (testing)"}',
     }
     client = MagicMock()
-    client.devices = {"r1": MagicMock(device_type="mikrotik_routeros")}
+    client.config = NetworkConfig(
+        devices={"r1": DeviceConfig(host="192.0.2.1", device_type="mikrotik_routeros")}
+    )
     client.run.side_effect = lambda device, command, **_: MagicMock(
         command_results=[
             DeviceCommandResult(
@@ -122,7 +125,7 @@ def test_run_intent_saves_evidence_that_replays_to_the_same_results(
     source = tmp_path / "intent.yaml"
     source.write_text(INTENT)
     items = intent.load_intent(source)
-    live = intent.run_intent(_routeros_client(), items, tmp_path / "out", source)
+    live = intent.run_intent(_routeros_client(), items, tmp_path / "out")
     replayed = intent.replay_directory(tmp_path / "out")
     assert live.verdict == "pass"
     assert [r for _, r in live.results] == [r for _, r in replayed.results]
@@ -154,9 +157,41 @@ def test_load_intent_names_file_and_item(tmp_path: Path) -> None:
     ):
         intent.load_intent(source)
     source.write_text(
-        "- {device: r1, check: bond_member, params: {bond: b, member: m}, expected: {}}\n"
+        "- {device: r1, check: bond_member, params: {bond: b, member: m}, expected: {carrier: true}}\n"
     )
     with pytest.raises(
         intent.IntentError, match="only for linux, not mikrotik_routeros"
     ):
         intent.run_intent(_routeros_client(), intent.load_intent(source))
+    for line, message in (
+        (
+            "check: host_entry, params: {bridge: bridge, mac: 1}, expected: x",
+            "quote it",
+        ),
+        (
+            "check: mlag, params: {bridge: 'br;x'}, expected: {connected: true}",
+            "bridge must",
+        ),
+        (
+            "check: mlag, params: {bridge: b}, expected: {connected: 1}",
+            "connected must",
+        ),
+    ):
+        source.write_text(f"- {{device: r1, {line}}}\n")
+        with pytest.raises(intent.IntentError, match=message):
+            intent.load_intent(source)
+
+
+def test_replay_of_malformed_evidence_is_error_and_exit_2(tmp_path: Path) -> None:
+    (tmp_path / "intent.yaml").write_text(INTENT)
+    evidence = {
+        "devices": {"r1": {"device_type": "mikrotik_routeros", "readings": None}}
+    }
+    (tmp_path / "evidence.json").write_text(json.dumps(evidence))
+    report = intent.replay_directory(tmp_path)
+    assert report.verdict == "error"
+    assert intent.same(True, True) and not intent.same(True, 1)
+    assert not intent.same({"a": [False]}, {"a": [0]})
+    result = CliRunner().invoke(app, ["intent", "replay", str(tmp_path / "missing")])
+    assert result.exit_code == 2
+    assert "Traceback" not in result.output

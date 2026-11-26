@@ -27,12 +27,14 @@ def _show(value: Any) -> str:
 
 def _print_report(ctx: CommandContext, report: intent.IntentReport) -> None:
     table = Table(show_header=True, header_style="bold")
-    for column in ("Item", "Device", "Check", "Expected", "Observed", "Verdict"):
+    columns = ("Item", "Source", "Device", "Check", "Expected", "Observed", "Verdict")
+    for column in columns:
         table.add_column(column, overflow="fold")
     for number, (item, result) in enumerate(report.results, 1):
         verdict = result.verdict + (f": {result.reason}" if result.reason else "")
         table.add_row(
             item.name or str(number),
+            item.source or "-",
             item.device,
             item.check,
             _show(result.expected),
@@ -41,6 +43,13 @@ def _print_report(ctx: CommandContext, report: intent.IntentReport) -> None:
         )
     ctx.console.print(table)
     ctx.console.print(f"Intent verdict: {report.verdict}", markup=False)
+
+
+def _error(error: Exception) -> typer.Exit:
+    """Print an error without a traceback and return the exit for status 2."""
+    message = error.message if isinstance(error, NetworkToolkitError) else str(error)
+    typer.echo(f"error: {message or type(error).__name__}", err=True)
+    return typer.Exit(2)
 
 
 def register(app: typer.Typer) -> None:
@@ -80,19 +89,18 @@ def register(app: typer.Typer) -> None:
 
         Exit status: 0 pass, 1 fail, 2 error (not verified, or an unusable file).
         """
-        ctx = CommandContext(config_file=config_file)
-        run_options: dict[str, Any] = {}
-        if interactive_auth:
-            run_options["interactive_creds"] = prompt_for_credentials(
-                "Enter username for devices", "Enter password for devices", "admin"
-            )
         try:
+            ctx = CommandContext(config_file=config_file)
             items = intent.load_intent(file)
+            run_options: dict[str, Any] = {}
+            if interactive_auth:
+                run_options["interactive_creds"] = prompt_for_credentials(
+                    "Enter username for devices", "Enter password for devices", "admin"
+                )
             with NetworkaClient(config_file) as client:
-                report = intent.run_intent(client, items, save, file, **run_options)
-        except NetworkToolkitError as error:
-            ctx.print_error(error.message)
-            raise typer.Exit(2) from None
+                report = intent.run_intent(client, items, save, **run_options)
+        except Exception as error:  # no traceback for the operator: exit 2
+            raise _error(error) from None
         _print_report(ctx, report)
         if save is not None:
             ctx.print_info(f"Evidence saved in {save}")
@@ -108,12 +116,11 @@ def register(app: typer.Typer) -> None:
 
         Exit status: 0 pass, 1 fail, 2 error (not verified, or unusable evidence).
         """
-        ctx = CommandContext()
         try:
+            ctx = CommandContext()
             report = intent.replay_directory(directory)
-        except NetworkToolkitError as error:
-            ctx.print_error(error.message)
-            raise typer.Exit(2) from None
+        except Exception as error:  # no traceback for the operator: exit 2
+            raise _error(error) from None
         _print_report(ctx, report)
         raise typer.Exit(EXIT_CODES[report.verdict])
 
