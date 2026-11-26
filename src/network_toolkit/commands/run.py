@@ -450,6 +450,8 @@ def register(app: typer.Typer) -> None:
                 output_mgr.print_blank_line()
 
             if command_result.error:
+                if output_mode != OutputMode.RAW:
+                    ctx.print_error(f"Error: {command_result.error}")
                 raise typer.Exit(1)
 
             _print_command_result(command_result)

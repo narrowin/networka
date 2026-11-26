@@ -224,8 +224,8 @@ operators: expect `reachable: true`, or the exact `received` count. On
 Linux the `count` probes must finish within the device's `command_timeout`.
 
 `lacp_member` passes when both the actor and the partner side equal
-`expected`; a member without an LACP partner gives `error` with reason
-"no LACP partner". The partner MAC is compared in lower case. Both MLAG peers present one LACP system ID, so
+`expected`. A member without an LACP partner, such as a member that is
+down, gives `fail` with the partner side observed as `null`. The partner MAC is compared in lower case. Both MLAG peers present one LACP system ID, so
 `lacp_partner_system` gives the same value for each member of an MLAG bond
 when read on the partner.
 

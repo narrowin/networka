@@ -371,12 +371,14 @@ def check_lacp_member(
     normalize = _normalizer(device_type, "lacp_member")
     what = f"{bond} member {member}"
 
-    def observe() -> dict[str, dict]:
+    def observe() -> dict[str, dict | None]:
         state = normalize(evidence, bond, member)
-        if "partner" not in state:
-            msg = "no LACP partner"
-            raise ValueError(msg)
-        return {side: _pick(state[side], wanted, what) for side in ("actor", "partner")}
+        # A member without an LACP partner, such as one that is down, fails.
+        partner = state.get("partner")
+        return {
+            "actor": _pick(state["actor"], wanted, what),
+            "partner": None if partner is None else _pick(partner, wanted, what),
+        }
 
     return compare({"actor": wanted, "partner": wanted}, observe)
 
