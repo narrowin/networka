@@ -417,4 +417,7 @@ No physical-switch or forwarding acceptance is claimed.
 The upstream fresh-image conversion issue remains outside Networka's code.
 This guide documents the verified disposable-lab preparation; it does not
 install a RouterOS patch or introduce automatic preparation into `nw test`.
-The separate SFTP verification stall requires its own diagnosis or fix.
+The separate SFTP read-back stall was addressed by using sequential SFTP reads;
+see [verify uploaded files](../../file_upload.md#verify-uploaded-files) for the
+change and its disposable-lab verification. The RouterOS conversion issue still
+requires the preparation cycle above.

@@ -1516,8 +1516,8 @@ class DeviceSession:
                 logger.error(f"Remote file not found: {remote_path}")
                 return False
 
-            # Download the file
-            sftp.get(remote_path, str(local_path))
+            # Read sequentially to avoid overwhelming network-device SFTP servers.
+            sftp.get(remote_path, str(local_path), prefetch=False)
 
             logger.info(
                 f"File '{remote_filename}' downloaded successfully to '{local_path}'"

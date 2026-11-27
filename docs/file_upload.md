@@ -2,6 +2,50 @@
 
 Networka uses Paramiko SFTP for file transfers. Use `nw upload` or the Python API when the device supports SFTP and your credentials permit file writes. See [transport selection](transport.md) for connection and host-key settings.
 
+## Verify uploaded files
+
+With `switch1` defined in `devices.yml` and the package in the current directory:
+
+```bash
+uv run --locked nw upload switch1 routeros-7.25.2-arm64.npk \
+  --config devices.yml --verify --checksum-verify
+```
+
+Verification downloads the uploaded file into a temporary file, checks its size
+and SHA-256 against the local original, then removes the temporary file. The
+upload command finishes after that read-back completes. Add `--verbose` to see
+the read-back and checksum details.
+
+The shared download method reads sequentially, with Paramiko's `prefetch=False`.
+This also applies to upload verification and firmware transfers that call it.
+[Paramiko enables read-ahead by default](https://docs.paramiko.org/en/stable/api/sftp.html#paramiko.sftp_client.SFTPClient.get),
+without a concurrent-request limit. Disabling it avoids queuing those reads and
+does not start a background prefetch worker. Sequential reads can be slower on
+links with high round-trip latency.
+
+Free CHR has a [1 Mbit/s outbound limit per interface](https://manual.mikrotik.com/docs/getting-started/routeros-licensing/chr/chr-licensing/).
+Reading a 13,988,453-byte package back therefore needs at least about 112 seconds,
+plus protocol overhead. Allow for this when checking whether a lab transfer has
+stopped progressing.
+
+### Check the verified lab result
+
+On 27 November 2026, the disposable `nw-sftp-verify-20261127` lab used the
+[pinned RouterOS 7.24.5 ARM64 CHR image](vendors/mikrotik/chr-upgrade-lab.md#deploy-the-disposable-switch).
+The uploaded file was the complete 13,988,453-byte RouterOS 7.25.2 package,
+saved remotely as `sftp-check.bin`; no RouterOS upgrade was requested.
+
+- With unlimited read-ahead, verification reached the 240-second guard with
+  12,713,984 bytes read back. The command exited `124`, and a subsequent SSH
+  session failed while waiting for the SSH banner.
+- With sequential reads, the same upload and full size/SHA-256 verification
+  completed with exit `0` in 123 seconds. A subsequent SSH command succeeded,
+  and RouterOS was still 7.24.5 afterward.
+
+The verified SHA-256 was
+`376117314e47159c615397a2087b5eaf596947bc144aeaa98cacbb49494a54dc`.
+These are disposable-lab results; physical-device behavior was not measured.
+
 ## Features
 
 - **Single Device Upload**: Upload files to individual MikroTik devices
