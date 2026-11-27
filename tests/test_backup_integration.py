@@ -27,7 +27,7 @@ class TestBackupResultIntegration:
             success=True,
             text_outputs={"config.txt": "interface gi0/0"},
             files_to_download=[
-                {"source": "flash:/vlan.dat", "destination": "vlan.dat"}
+                {"remote_file": "flash:/vlan.dat", "local_filename": "vlan.dat"}
             ],
             errors=[],
         )
@@ -208,7 +208,7 @@ class TestMikroTikBackupIntegration:
         result = ops.config_backup(["/export file=nw-export"])
 
         # Check that export file is in the download list
-        file_names = [f["destination"] for f in result.files_to_download]
+        file_names = [f["local_filename"] for f in result.files_to_download]
         assert "nw-export.rsc" in file_names
 
     def test_mikrotik_comprehensive_backup_includes_binary(self) -> None:
@@ -224,7 +224,7 @@ class TestMikroTikBackupIntegration:
         )
 
         # Check that both binary and text exports are in download list
-        file_names = [f["destination"] for f in result.files_to_download]
+        file_names = [f["local_filename"] for f in result.files_to_download]
         assert "nw-backup.backup" in file_names
         assert "nw-export.rsc" in file_names
 
@@ -357,7 +357,7 @@ class TestPlatformSpecificBehavior:
 
         # Extract file types
         cisco_files = [f["local_filename"] for f in cisco_result.files_to_download]
-        mkt_files = [f["destination"] for f in mkt_result.files_to_download]
+        mkt_files = [f["local_filename"] for f in mkt_result.files_to_download]
 
         # Verify platform-specific files
         assert "vlan.dat" in cisco_files

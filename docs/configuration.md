@@ -34,7 +34,7 @@ Networka loads all files in these folders. Later files override earlier ones whe
 - Host: IP or DNS name to connect to.
 - `device_type` is the logical network OS used for definition and sequence selection, for example `mikrotik_routeros`.
 - `platform` in inventory is an optional hardware architecture such as `arm` for firmware selection.
-- Groups: explicit member lists and/or tag-based membership.
+- Groups: explicit member lists and/or tag-based membership. A device must have every tag in `match_tags` to match a group; explicitly listed members remain included.
 - Sequences: named sets of commands to run consistently.
 
 For the active definition catalog, run `nw platforms list`.

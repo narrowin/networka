@@ -42,7 +42,7 @@ def mock_platform_ops(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     result.success = True
     result.text_outputs = {"config.rsc": "dummy config"}
     result.files_to_download = [
-        {"source": "backup.backup", "destination": "backup.backup"}
+        {"remote_file": "backup.backup", "local_filename": "backup.backup"}
     ]
     result.errors = []
 

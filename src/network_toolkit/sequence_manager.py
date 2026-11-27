@@ -26,6 +26,7 @@ from network_toolkit.config import (
     VendorSequence,
     load_vendor_sequence_file,
 )
+from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.inventory.catalog import get_inventory_catalog
 
 
@@ -183,6 +184,14 @@ class SequenceManager:
     def exists(self, sequence_name: str) -> bool:
         """Recognize sequence names even when they do not apply to a target."""
         return sequence_name in self.known_names()
+
+    def require(self, sequence_name: str, device_name: str) -> list[str]:
+        """Resolve a nonempty sequence or stop the requested operation."""
+        commands = self.resolve(sequence_name, device_name)
+        if not commands:
+            msg = f"Sequence '{sequence_name}' is not defined for '{device_name}'"
+            raise NetworkToolkitError(msg)
+        return commands
 
     # ---------- Internal loading ----------
     def _load_all(self) -> None:

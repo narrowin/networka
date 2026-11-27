@@ -632,7 +632,7 @@ class NetworkConfig(BaseModel):
             if (
                 group_config.match_tags
                 and device.tags
-                and any(tag in device.tags for tag in group_config.match_tags)
+                and all(tag in device.tags for tag in group_config.match_tags)
             ):
                 device_groups.append(group_name)
 

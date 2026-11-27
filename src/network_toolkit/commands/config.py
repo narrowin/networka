@@ -684,18 +684,16 @@ def _config_init_impl(
     # Check if configuration already exists and handle force flag
     skip_base_config = False
     if target_path.exists() and any(target_path.iterdir()) and not force:
-        if yes:
-            # In --yes mode, we proceed without prompting (same as if user said yes)
-            pass
-        else:
+        overwrite = False
+        if not yes:
             overwrite = typer.confirm(
                 f"Configuration directory {target_path} already exists and is not empty. "
                 "Overwrite?",
                 default=False,
             )
-            if not overwrite:
-                ctx.print_info("Skipping base configuration setup (directory exists).")
-                skip_base_config = True
+        if not overwrite:
+            ctx.print_info("Skipping base configuration setup (directory exists).")
+            skip_base_config = True
 
     if dry_run:
         ctx.print_info(f"DRY RUN: Would create configuration in {target_path}")

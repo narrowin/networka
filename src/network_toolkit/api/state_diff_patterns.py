@@ -36,7 +36,7 @@ UPTIME_PATTERNS = [
     # Colon format: 12:34:56.789
     re.compile(r"\d+:\d{2}:\d{2}(?:\.\d+)?"),
     # "Up for X" style: up for 1 year, 2 weeks
-    re.compile(r"up\s+(?:for\s+)?[\d\w\s,]+"),
+    re.compile(r"\bup\s+(?:for\s+)?<UPTIME>(?:\s*,?\s*<UPTIME>)*"),
     # Tunnel uptime: Tunnel has been up for: 12:34:56
     re.compile(r"Tunnel has been up for:\s+.+"),
 ]

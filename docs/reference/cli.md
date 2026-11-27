@@ -134,7 +134,7 @@ $ nw upload [OPTIONS] {<device|group>} {local_file}
 
 * `-r, --remote-name <str>`: Remote filename (default: same as local)
 * `--verify / --no-verify`: Verify upload by checking file exists  [default: verify]
-* `--checksum-verify / --no-checksum-verify`: Verify file integrity using checksums (uses config default if not specified)  [default: no-checksum-verify]
+* `--checksum-verify / --no-checksum-verify`: Verify file integrity using checksums (uses config default if not specified)
 * `-j, --max-concurrent <int range>`: Maximum concurrent uploads when target is a group  [default: 5; x&gt;=1]
 * `-c, --config <path>`: Configuration file path  [default: /Users/md/Library/Application Support/networka]
 * `-v, --verbose`: Enable verbose output

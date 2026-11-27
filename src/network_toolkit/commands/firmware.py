@@ -19,6 +19,7 @@ from network_toolkit.platforms import (
     get_platform_file_extensions,
     get_platform_operations,
 )
+from network_toolkit.sequence_manager import SequenceManager
 
 MAX_LIST_PREVIEW = 10
 
@@ -264,16 +265,9 @@ def downgrade(
                                 StyleName.INFO,
                             )
                         )
-                        # Run sequence commands
-                        seq_cmds: list[str] = []
-                        dcfg = devices.get(dev)
-                        if (
-                            dcfg
-                            and dcfg.command_sequences
-                            and precheck_sequence in dcfg.command_sequences
-                        ):
-                            seq_cmds = dcfg.command_sequences[precheck_sequence]
-
+                        seq_cmds = SequenceManager(config).require(
+                            precheck_sequence, dev
+                        )
                         for cmd in seq_cmds:
                             session.execute_command(cmd)
 
@@ -456,16 +450,9 @@ def bios(
                                 StyleName.INFO,
                             )
                         )
-                        # Run sequence commands
-                        seq_cmds: list[str] = []
-                        dcfg = devices.get(dev)
-                        if (
-                            dcfg
-                            and dcfg.command_sequences
-                            and precheck_sequence in dcfg.command_sequences
-                        ):
-                            seq_cmds = dcfg.command_sequences[precheck_sequence]
-
+                        seq_cmds = SequenceManager(config).require(
+                            precheck_sequence, dev
+                        )
                         for cmd in seq_cmds:
                             session.execute_command(cmd)
 

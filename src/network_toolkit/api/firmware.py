@@ -15,6 +15,7 @@ from network_toolkit.platforms import (
     get_platform_file_extensions,
     get_platform_operations,
 )
+from network_toolkit.sequence_manager import SequenceManager
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +133,12 @@ def _process_device_upgrade(
                 ),
             )
 
+        seq_cmds = (
+            SequenceManager(options.config).require(options.precheck_sequence, dev)
+            if options.precheck_sequence and not options.skip_precheck
+            else []
+        )
+
         # Connect to device and proceed with operation
         with DeviceSession(dev, options.config) as session:
             platform_ops = get_platform_operations(session)
@@ -142,16 +149,6 @@ def _process_device_upgrade(
                     options.precheck_sequence,
                     dev,
                 )
-                # Run sequence commands
-                seq_cmds: list[str] = []
-                dcfg = devices.get(dev)
-                if (
-                    dcfg
-                    and dcfg.command_sequences
-                    and options.precheck_sequence in dcfg.command_sequences
-                ):
-                    seq_cmds = dcfg.command_sequences[options.precheck_sequence]
-
                 for cmd in seq_cmds:
                     session.execute_command(cmd)
 

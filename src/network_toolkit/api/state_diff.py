@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import difflib
 from dataclasses import dataclass, field
+from itertools import zip_longest
 
 from network_toolkit.api.state_diff_patterns import (
     BGP_NEIGHBOR_IDENTITY_PATTERN,
@@ -276,9 +277,13 @@ class StateDiffer:
             if tag == "replace":
                 # Check if it's just a volatile change that wasn't fully caught
                 # or a real change
-                for k in range(i2 - i1):
-                    old = lines_a[i1 + k]
-                    new = lines_b[j1 + k]
+                for old, new in zip_longest(lines_a[i1:i2], lines_b[j1:j2]):
+                    if old is None:
+                        outcome.high_confidence.append(f"[+] {identity}: {new}")
+                        continue
+                    if new is None:
+                        outcome.high_confidence.append(f"[-] {identity}: {old}")
+                        continue
                     # If lines are very similar, might be low confidence
                     if difflib.SequenceMatcher(None, old, new).ratio() > 0.8:
                         outcome.low_confidence.append(f"~ {identity}: {old} -> {new}")

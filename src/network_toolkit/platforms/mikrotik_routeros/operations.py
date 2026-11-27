@@ -579,8 +579,11 @@ class MikroTikRouterOSOperations(PlatformOperations):
             # Specify files to download
             files_to_download.extend(
                 [
-                    {"source": "nw-backup.backup", "destination": "nw-backup.backup"},
-                    {"source": "nw-export.rsc", "destination": "nw-export.rsc"},
+                    {
+                        "remote_file": "nw-backup.backup",
+                        "local_filename": "nw-backup.backup",
+                    },
+                    {"remote_file": "nw-export.rsc", "local_filename": "nw-export.rsc"},
                 ]
             )
 
@@ -651,7 +654,7 @@ class MikroTikRouterOSOperations(PlatformOperations):
 
             # Specify the exported config file to download
             files_to_download.append(
-                {"source": "nw-export.rsc", "destination": "nw-export.rsc"}
+                {"remote_file": "nw-export.rsc", "local_filename": "nw-export.rsc"}
             )
 
             logger.info(

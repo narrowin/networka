@@ -175,7 +175,7 @@ class TestPlatformRegistry:
         assert info.vendor == "Cisco"
         assert info.status == PlatformStatus.IMPLEMENTED
         assert info.has_operations_class is True
-        assert info.has_builtin_sequences is False
+        assert info.has_builtin_sequences is True
         assert info.capabilities.firmware_upgrade is True
         assert ".bin" in info.firmware_extensions
 

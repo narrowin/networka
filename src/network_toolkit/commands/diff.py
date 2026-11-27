@@ -23,7 +23,6 @@ Exit codes:
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Annotated
 
@@ -190,14 +189,12 @@ def register(app: typer.Typer) -> None:
                 )
                 for structured_item in differences:
                     if ctx.mode == OutputMode.JSON:
-                        typer.echo(
-                            json.dumps(
-                                {
-                                    "device": structured_item.device,
-                                    "command": structured_item.command,
-                                    "changes": structured_item.changes,
-                                }
-                            )
+                        ctx.output_manager.print_json(
+                            {
+                                "device": structured_item.device,
+                                "command": structured_item.command,
+                                "changes": structured_item.changes,
+                            }
                         )
                         continue
                     ctx.console.print(
@@ -225,10 +222,8 @@ def register(app: typer.Typer) -> None:
                     )
                 changed = any(item.changes for item in differences)
                 if ctx.mode == OutputMode.JSON:
-                    typer.echo(
-                        json.dumps(
-                            {"changed": changed, "excluded_paths": exclude_paths or []}
-                        )
+                    ctx.output_manager.print_json(
+                        {"changed": changed, "excluded_paths": exclude_paths or []}
                     )
                 else:
                     ctx.console.print(

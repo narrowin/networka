@@ -16,6 +16,9 @@ from network_toolkit.exceptions import NetworkToolkitError
 @pytest.fixture
 def mock_config():
     config = MagicMock(spec=NetworkConfig)
+    config.vendor_sequences = {}
+    config.vendor_platforms = {}
+    config.global_command_sequences = {}
     config.devices = {
         "dev1": MagicMock(device_type="cisco_ios", command_sequences={}),
         "dev2": MagicMock(device_type="mikrotik_routeros", command_sequences={}),

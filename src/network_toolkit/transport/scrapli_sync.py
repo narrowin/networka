@@ -40,6 +40,7 @@ _NS_PER_SECOND = 1_000_000_000
 _ROUTEROS_ERROR_PREFIXES = (
     "syntax error",
     "bad command name",
+    "bad parameter",
     "expected end of command",
     "input does not match any value",
     "failure:",

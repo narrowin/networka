@@ -1,5 +1,13 @@
 # Built-in Cisco IOS-XE Command Sequences
 sequences:
+  pre_maintenance:
+    description: "Read-only checks before maintenance"
+    category: "maintenance"
+    commands:
+      - "show version"
+      - "show clock"
+      - "show ip interface brief"
+
   system_info:
     description: "Complete system information gathering"
     category: "information"

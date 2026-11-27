@@ -33,6 +33,7 @@ def test_mikrotik_builtin_sequences_common(sm_isolated: SequenceManager) -> None
         "spanning_tree_analysis",
         "security_audit",
         "backup_config",
+        "pre_maintenance",
     }
     assert set(seqs.keys()) == expected_names
 

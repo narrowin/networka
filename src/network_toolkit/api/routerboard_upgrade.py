@@ -10,6 +10,7 @@ from network_toolkit.device import DeviceSession
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.inventory.resolve import resolve_named_targets, select_named_target
 from network_toolkit.platforms import UnsupportedOperationError, get_platform_operations
+from network_toolkit.sequence_manager import SequenceManager
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,11 @@ def _process_device_upgrade(
 ) -> DeviceRouterboardUpgradeResult:
     """Process RouterBOARD upgrade for a single device."""
     try:
+        seq_cmds = (
+            SequenceManager(options.config).require(options.precheck_sequence, dev)
+            if options.precheck_sequence and not options.skip_precheck
+            else []
+        )
         with DeviceSession(dev, options.config) as session:
             # Get platform-specific operations
             try:
@@ -100,15 +106,6 @@ def _process_device_upgrade(
                     options.precheck_sequence,
                     dev,
                 )
-                seq_cmds: list[str] = []
-                dcfg = (options.config.devices or {}).get(dev)
-                if (
-                    dcfg
-                    and dcfg.command_sequences
-                    and options.precheck_sequence in dcfg.command_sequences
-                ):
-                    seq_cmds = dcfg.command_sequences[options.precheck_sequence]
-
                 for cmd in seq_cmds:
                     session.execute_command(cmd)
 

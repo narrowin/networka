@@ -34,7 +34,7 @@ class UploadOptions:
     config: NetworkConfig
     remote_filename: str | None = None
     verify: bool = True
-    checksum_verify: bool = False
+    checksum_verify: bool | None = None
     max_concurrent: int = 5
     verbose: bool = False
     session_pool: SessionPoolProtocol | None = None

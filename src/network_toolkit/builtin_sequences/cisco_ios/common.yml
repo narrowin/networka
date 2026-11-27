@@ -1,0 +1,17 @@
+# Built-in Cisco IOS sequences
+sequences:
+  backup_config:
+    description: "Save configuration and version output"
+    category: "maintenance"
+    commands:
+      - "show running-config"
+      - "show startup-config"
+      - "show version"
+
+  pre_maintenance:
+    description: "Read-only checks before maintenance"
+    category: "maintenance"
+    commands:
+      - "show version"
+      - "show clock"
+      - "show ip interface brief"

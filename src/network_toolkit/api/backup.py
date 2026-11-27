@@ -196,11 +196,12 @@ def _perform_device_backup(
                 output_file.write_text(content, encoding="utf-8")
 
             downloaded_files = []
+            download_errors: list[str] = []
             # Download files if requested
             if options.download and backup_op_result.files_to_download:
                 for file_spec in backup_op_result.files_to_download:
-                    remote_file = file_spec["source"]
-                    local_filename = file_spec["destination"]
+                    remote_file = file_spec["remote_file"]
+                    local_filename = file_spec["local_filename"]
 
                     # Simple placeholder replacement for local path if needed,
                     # but here we just use the backup_dir as per original logic
@@ -215,18 +216,17 @@ def _perform_device_backup(
                         if success:
                             downloaded_files.append(local_filename)
                         else:
-                            logger.debug(
-                                "Failed to download %s from %s",
-                                remote_file,
-                                device_name,
+                            message = (
+                                f"Failed to download {remote_file} from {device_name}"
                             )
+                            download_errors.append(message)
+                            logger.error(message)
                     except Exception as exc:
-                        logger.debug(
-                            "Error downloading %s from %s: %s",
-                            remote_file,
-                            device_name,
-                            exc,
+                        message = (
+                            f"Error downloading {remote_file} from {device_name}: {exc}"
                         )
+                        download_errors.append(message)
+                        logger.error(message)
 
             # Generate manifest
             manifest = {
@@ -236,18 +236,21 @@ def _perform_device_backup(
                 "transport": transport_type,
                 "text_outputs": list(backup_op_result.text_outputs.keys()),
                 "downloaded_files": downloaded_files,
+                "success": not download_errors,
+                "errors": download_errors,
             }
             manifest_file = backup_dir / "manifest.json"
             manifest_file.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
             return DeviceBackupResult(
                 device=device_name,
-                success=True,
+                success=not download_errors,
                 platform=platform_name,
                 transport=transport_type,
                 backup_dir=backup_dir,
                 text_outputs=backup_op_result.text_outputs,
                 downloaded_files=downloaded_files,
+                error="; ".join(download_errors) or None,
             )
 
     except NetworkToolkitError as exc:

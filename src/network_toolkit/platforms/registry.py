@@ -128,7 +128,7 @@ PLATFORM_REGISTRY: dict[str, PlatformInfo] = {
         ),
         firmware_extensions=[".bin", ".tar"],
         has_operations_class=True,
-        has_builtin_sequences=False,
+        has_builtin_sequences=True,
         docs_path="vendors/cisco/index.md",
         operations_class="network_toolkit.platforms.cisco_ios.operations.CiscoIOSOperations",
     ),

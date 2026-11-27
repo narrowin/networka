@@ -1,5 +1,13 @@
 # Built-in MikroTik RouterOS Command Sequences
 sequences:
+  pre_maintenance:
+    description: "Read-only checks before maintenance"
+    category: "maintenance"
+    commands:
+      - "/system/resource/print"
+      - "/system/clock/print"
+      - "/interface/print detail"
+
   system_info:
     description: "Complete system information gathering"
     category: "information"

@@ -49,7 +49,7 @@ def register(app: typer.Typer) -> None:
             ),
         ] = True,
         checksum_verify: Annotated[
-            bool,
+            bool | None,
             typer.Option(
                 "--checksum-verify/--no-checksum-verify",
                 help=(
@@ -57,7 +57,7 @@ def register(app: typer.Typer) -> None:
                     " specified)"
                 ),
             ),
-        ] = False,
+        ] = None,
         max_concurrent: Annotated[
             int,
             typer.Option(
@@ -84,6 +84,11 @@ def register(app: typer.Typer) -> None:
         config = ctx.config
         assert config is not None
         output = ctx.output_manager
+        effective_checksum_verify = (
+            config.general.verify_checksums
+            if checksum_verify is None
+            else checksum_verify
+        )
 
         try:
             if not local_file.exists():
@@ -127,7 +132,7 @@ def register(app: typer.Typer) -> None:
                 ctx.print_info(f"  File size: {file_size:,} bytes")
                 ctx.print_info(f"  Verify upload: {'Yes' if verify else 'No'}")
                 ctx.print_info(
-                    f"  Checksum verify: {'Yes' if checksum_verify else 'No'}"
+                    f"  Checksum verify: {'Yes' if effective_checksum_verify else 'No'}"
                 )
                 output.print_blank_line()
             else:
@@ -147,7 +152,7 @@ def register(app: typer.Typer) -> None:
                 ctx.print_info(f"  Max concurrent: {max_concurrent}")
                 ctx.print_info(f"  Verify upload: {'Yes' if verify else 'No'}")
                 ctx.print_info(
-                    f"  Checksum verify: {'Yes' if checksum_verify else 'No'}"
+                    f"  Checksum verify: {'Yes' if effective_checksum_verify else 'No'}"
                 )
                 output.print_blank_line()
 

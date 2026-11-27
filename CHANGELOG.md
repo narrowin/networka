@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Preserve existing base configuration with `nw config init --yes`; require overwrite confirmation or `--force`.
+- Resolve required firmware and RouterBOARD prechecks through the configured sequence hierarchy and fail when a required sequence is missing.
+- Report backup download failures and use consistent download fields for MikroTik backups.
+- Honor configured upload checksum defaults across the CLI and SDK, and display the effective setting.
+- Require every group-matching tag and retain meaningful changes when comparing unequal text blocks or normalizing uptime.
+- Recognize RouterOS parameter errors, correct maintenance log commands, and report Cisco IOS built-in sequences accurately.
 - Keep distinct IPv6 targets separate, reject incomplete saved sequence collections, report skipped targets in JSONL output, and accept JSON output mode in configuration.
 
 - Separate deliberate host silence and host power loss from failover measurements in lab reports and summaries, retaining every numerical limit and verdict check. Report MAC relearning and power recovery against their existing separate limits.

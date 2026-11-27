@@ -130,7 +130,7 @@ sequences:
       - "/system/clock/print"
       - "/interface/print stats"
       - "/ip/route/print count-only"
-      - "/log/print last=20"
+      - '/log/print where topics~"error|critical|warning"'
 
   post_maintenance:
     description: "Post-maintenance verification"
@@ -141,7 +141,7 @@ sequences:
       - "/interface/print stats"
       - "/ping 8.8.8.8 count=5"
       - "/ip/route/print count-only"
-      - "/log/print last=10"
+      - '/log/print where topics~"error|critical|warning"'
 
   # Troubleshooting Sequences
   connectivity_test:
