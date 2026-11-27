@@ -154,8 +154,8 @@ class Lab:
     def qemu(self, end: Point) -> Qemu | None:
         """The QEMU NIC behind `end`, or None when the node runs no QEMU.
 
-        The container interface and the QEMU TAP must share one bridge in the
-        node's namespace, and the TAP must be the netdev of exactly one QEMU NIC.
+        The interface and TAP must share a bridge or have reciprocal tc
+        redirects. The TAP must be the netdev of exactly one QEMU NIC.
         Anything else raises LabError, so a QEMU monitor action never hits the
         wrong cable.
         """
@@ -171,16 +171,76 @@ class Lab:
                 self.run(end.node, "ip", "-j", "link", "show", "master", master)
             )
             members = [m["ifname"] for m in listed if m["ifname"] in netdevs.values()]
+        else:
+            targets = tc_redirects(
+                json.loads(
+                    self.run(
+                        end.node,
+                        "tc",
+                        "-j",
+                        "filter",
+                        "show",
+                        "dev",
+                        end.interface,
+                        "ingress",
+                    )
+                )
+            )
+            if len(targets) == 1:
+                tap = next(iter(targets))
+                if tap in netdevs.values():
+                    reverse = tc_redirects(
+                        json.loads(
+                            self.run(
+                                end.node,
+                                "tc",
+                                "-j",
+                                "filter",
+                                "show",
+                                "dev",
+                                tap,
+                                "ingress",
+                            )
+                        )
+                    )
+                    if reverse == {end.interface}:
+                        members = [tap]
         nics = [
             devices[i] for i, tap in netdevs.items() if tap in members and i in devices
         ]
         if len(members) != 1 or len(nics) != 1 or qmp is None:
             msg = (
                 f"cannot tell which QEMU NIC is behind {end}: bridge {master!r} "
-                f"holds TAPs {members}, NICs {nics}, QEMU monitor {qmp}"
+                f"or reciprocal tc redirects identify TAPs {members}, "
+                f"NICs {nics}, QEMU monitor {qmp}"
             )
             raise LabError(msg)
         return Qemu(pid, nics[0], members[0], *qmp)
+
+
+def tc_redirects(filters: list[dict[str, Any]]) -> set[str]:
+    """Unconditional ingress redirects; mirrors and conditional filters do not qualify."""
+    targets = set()
+    for entry in filters:
+        options = entry.get("options", {})
+        if (
+            entry.get("kind") not in {"flower", "matchall"}
+            or entry.get("protocol") != "all"
+            or options.get("keys")
+        ):
+            continue
+        actions = options.get("actions", [])
+        if len(actions) != 1:
+            continue
+        action = actions[0]
+        if (
+            action.get("kind") == "mirred"
+            and action.get("mirred_action") == "redirect"
+            and action.get("direction") == "egress"
+            and isinstance(action.get("to_dev"), str)
+        ):
+            targets.add(action["to_dev"])
+    return targets
 
 
 def parse_topology(data: Mapping[str, Any]) -> Lab:
