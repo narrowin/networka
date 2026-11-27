@@ -39,7 +39,9 @@ nav:
   - Troubleshooting: troubleshooting.md
   - Vendors:
     - Overview: vendors/index.md
-    - MikroTik RouterOS: vendors/mikrotik/index.md
+    - MikroTik RouterOS:
+      - Overview: vendors/mikrotik/index.md
+      - Prepare a CHR upgrade lab: vendors/mikrotik/chr-upgrade-lab.md
     - Cisco IOS / IOS-XE: vendors/cisco/index.md
     - Arista EOS: vendors/arista/index.md
     - Juniper JunOS: vendors/juniper/index.md

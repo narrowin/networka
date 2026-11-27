@@ -90,6 +90,11 @@ evidence. Differences do not by themselves judge whether an upgrade succeeded.
 Use intent checks separately for requirements such as a link being up.
 The existing text and heuristic comparison modes keep their behavior.
 
+For the verified RouterOS example, see
+[prepare a CHR upgrade lab](vendors/mikrotik/chr-upgrade-lab.md).
+It includes the fresh-image VRF-loss cause, exact preparation commands and
+native JSON from the completed upgrade.
+
 ## Compare with saved output
 
 Before the change, save the device's command output in a text file. If

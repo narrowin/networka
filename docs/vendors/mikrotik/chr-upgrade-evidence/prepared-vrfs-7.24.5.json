@@ -1,0 +1,1 @@
+[{".id":"*1","comment":"clab-mgmt","disabled":false,"interfaces":["ether1"],"name":"mgmt"},{".id":"*0","builtin":true,"disabled":false,"interfaces":["all"],"name":"main"}]

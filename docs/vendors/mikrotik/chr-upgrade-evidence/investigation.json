@@ -1,0 +1,73 @@
+{
+  "date": "2026-11-27",
+  "scope": "Pinned fresh RouterOS 7.24.5 ARM64 CHR image, disposable containerlab switch",
+  "networka_commit": "https://github.com/narrowin/networka/commit/01343875ab803972dcb9a654f68647618624bdc3",
+  "containerlab_commit": "https://github.com/srl-labs/containerlab/commit/06ac3ca4d442ce4f937b50bd7c04d5f32fb3173b",
+  "conversion_store": "/nova/store/r5/version",
+  "row": 1,
+  "u32_field": 1,
+  "flag_lifecycle": [
+    {
+      "state": "Fresh 7.24.5 after bootstrap",
+      "conversion_store_registered": false,
+      "conversion_value": null,
+      "force_conversion_file_present": false,
+      "version_row_payloads": []
+    },
+    {
+      "state": "Static table configured and ordinary 7.24.5 reboot",
+      "conversion_store_registered": false,
+      "conversion_value": null,
+      "force_conversion_file_present": false,
+      "version_row_payloads": []
+    },
+    {
+      "state": "First package installation, now 7.24.7",
+      "conversion_store_registered": true,
+      "conversion_value": 1,
+      "force_conversion_file_present": false,
+      "version_row_payloads": [
+        "4d320100000901"
+      ]
+    },
+    {
+      "state": "Returned to 7.24.5 before lab configuration",
+      "conversion_store_registered": true,
+      "conversion_value": 1,
+      "force_conversion_file_present": false,
+      "version_row_payloads": [
+        "4d320100000901"
+      ]
+    },
+    {
+      "state": "Prepared-base upgrade complete, now 7.25.2",
+      "conversion_store_registered": true,
+      "conversion_value": 1,
+      "force_conversion_file_present": false,
+      "version_row_payloads": [
+        "4d320100000901"
+      ]
+    }
+  ],
+  "converter_7_25_2_locations": {
+    "read_flag": "0x1a92c..0x1a958",
+    "legacy_branch": "0x1a97c",
+    "clear_stores": "0x1b490..0x1b4b8",
+    "write_flag_1": "0x1b46c..0x1b488"
+  },
+  "first_point_upgrade_comparisons": {
+    "vrfs_exit": 1,
+    "routing_tables_exit": 1
+  },
+  "prepared_upgrade_comparisons": {
+    "vrfs-json": 0,
+    "interfaces-json": 1,
+    "resources-json": 1,
+    "tables-json": 0
+  },
+  "excluded_paths": [],
+  "post_upgrade_management_repair_required": false,
+  "private_flag_edits": false,
+  "physical_hardware_examined": false,
+  "payload_sources": "Complete native output strings extracted from saved nw run envelopes; no fields excluded."
+}
