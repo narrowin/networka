@@ -14,6 +14,15 @@ from network_toolkit.transport.scrapli_sync import (
 )
 
 
+def ip_device_name(address: str) -> str:
+    """Return the inventory name used for an ad-hoc IP target."""
+    if ":" in address:
+        # Escape underscores first so IPv6 punctuation stays unambiguous.
+        address = address.replace("_", "__").replace(":", "_c").replace(".", "_d")
+        return f"ip_{address}"
+    return f"ip_{address.replace('.', '_')}"
+
+
 def is_ip_address(target: str) -> bool:
     """
     Check if a string is a valid IP address.
@@ -170,7 +179,13 @@ def create_ip_based_config(
 
     for ip in ips:
         # Create a device name from the IP
-        device_name = f"ip_{ip.replace('.', '_').replace(':', '_')}"
+        device_name = ip_device_name(ip)
+        existing = ip_devices.get(device_name) or (base_config.devices or {}).get(
+            device_name
+        )
+        if existing is not None and existing.host != ip:
+            msg = f"IP target '{ip}' conflicts with inventory device '{device_name}'"
+            raise ValueError(msg)
         ip_devices[device_name] = create_ip_device_config(
             ip, device_type, hardware_platform, port, transport_type
         )

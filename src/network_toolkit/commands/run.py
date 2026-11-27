@@ -23,7 +23,7 @@ from network_toolkit.common.defaults import (
     SSH_PORT_MAX,
     SSH_PORT_MIN,
 )
-from network_toolkit.common.output import OutputMode
+from network_toolkit.common.output import OutputManager, OutputMode
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.ip_device import is_ip_list
 from network_toolkit.results_enhanced import ResultsManager
@@ -161,6 +161,11 @@ def register(app: typer.Typer) -> None:
         config = ctx.config
         assert config is not None
         output_mgr = ctx.output_manager
+        json_mode = raw == RawFormat.JSON or output_mgr.mode == OutputMode.JSON
+        if json_mode:
+            output_mode = OutputMode.RAW
+            output_mgr = OutputManager(OutputMode.RAW)
+            ctx.output_manager = output_mgr
 
         interactive_creds = None
         if interactive_auth:
@@ -210,16 +215,29 @@ def register(app: typer.Typer) -> None:
             )
 
         def _print_unknown_targets(unknown: list[str]) -> None:
-            if unknown and output_mode != OutputMode.RAW:
-                ctx.print_warning(
-                    f"Warning: ignoring unknown target(s): {', '.join(unknown)}"
+            if not unknown:
+                return
+            message = f"Warning: ignoring unknown target(s): {', '.join(unknown)}"
+            if json_mode:
+                output_mgr.print_json(
+                    {"event": "warning", "message": message, "unknown_targets": unknown}
                 )
+            elif output_mode != OutputMode.RAW:
+                ctx.print_warning(message)
 
         def _print_notices(notices: list[str]) -> None:
             if output_mode == OutputMode.RAW:
                 return
             for message in notices:
                 ctx.print_info(message)
+
+        def _print_error(message: str, device: str | None = None) -> None:
+            if json_mode:
+                output_mgr.print_json(
+                    {"event": "error", "device": device, "error": message}
+                )
+            elif output_mode != OutputMode.RAW:
+                output_mgr.print_error(message, device)
 
         try:
             options = RunOptions(
@@ -236,23 +254,19 @@ def register(app: typer.Typer) -> None:
             )
             run_result = run_commands(options)
         except TargetResolutionError as exc:
+            _print_error(exc.message)
             if output_mode != OutputMode.RAW:
-                ctx.print_error(exc.message)
                 if exc.unknown_targets:
                     ctx.print_info(
                         f"Unresolved target(s): {', '.join(exc.unknown_targets)}"
                     )
             raise typer.Exit(1) from exc
         except NetworkToolkitError as exc:
-            if output_mode != OutputMode.RAW:
-                output_mgr.print_error(f"Error: {exc.message}")
+            _print_error(f"Error: {exc.message}")
             raise typer.Exit(1) from exc
         except Exception as exc:  # pragma: no cover - unexpected
-            if output_mode != OutputMode.RAW:
-                output_mgr.print_error(f"Unexpected error: {exc}")
+            _print_error(f"Unexpected error: {exc}")
             raise typer.Exit(1) from exc
-
-        json_mode = raw == RawFormat.JSON
 
         # Warn about unknown targets but continue when at least one device resolved
         _print_unknown_targets(run_result.resolution.unknown)
@@ -278,6 +292,8 @@ def register(app: typer.Typer) -> None:
 
         def _print_sequence_result(device_result: DeviceSequenceResult) -> None:
             if output_mode == OutputMode.RAW:
+                if device_result.error:
+                    _print_error(device_result.error, device_result.device)
                 if not device_result.outputs:
                     return
                 for cmd, output in device_result.outputs.items():
@@ -317,6 +333,8 @@ def register(app: typer.Typer) -> None:
 
         def _print_command_result(device_result: DeviceCommandResult) -> None:
             if output_mode == OutputMode.RAW:
+                if device_result.error:
+                    _print_error(device_result.error, device_result.device)
                 if device_result.error or device_result.output is None:
                     return
                 if json_mode:
@@ -354,8 +372,7 @@ def register(app: typer.Typer) -> None:
                     output_mgr.print_blank_line()
 
                 if device_result.error:
-                    if output_mode != OutputMode.RAW:
-                        ctx.print_error(f"Error: {device_result.error}")
+                    _print_error(f"Error: {device_result.error}", device_result.device)
                     raise typer.Exit(1)
 
                 _print_sequence_result(device_result)
@@ -450,8 +467,7 @@ def register(app: typer.Typer) -> None:
                 output_mgr.print_blank_line()
 
             if command_result.error:
-                if output_mode != OutputMode.RAW:
-                    ctx.print_error(f"Error: {command_result.error}")
+                _print_error(f"Error: {command_result.error}", command_result.device)
                 raise typer.Exit(1)
 
             _print_command_result(command_result)

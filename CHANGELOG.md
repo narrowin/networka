@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep distinct IPv6 targets separate, reject incomplete saved sequence collections, report skipped targets in JSONL output, and accept JSON output mode in configuration.
+
 - Separate deliberate host silence and host power loss from failover measurements in lab reports and summaries, retaining every numerical limit and verdict check. Report MAC relearning and power recovery against their existing separate limits.
 - Lead site power-loss reports with forwarding and failover on surviving streams, and show restart and rejoin after power returns separately.
 - `nw test summary` highlights outages that exceed their configured limits before longer outages that remain within their limits.

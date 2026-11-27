@@ -2,7 +2,7 @@
 
 Use `--output-mode` on commands that expose it. Set
 `general.output_mode` in `config.yml` to `default`, `light`, `dark`,
-`no-color`, or `raw` for a shared default.
+`no-color`, `raw`, or `json` for a shared default.
 
 | Mode | Output |
 | --- | --- |
@@ -11,7 +11,7 @@ Use `--output-mode` on commands that expose it. Set
 | `dark` | Colors for dark terminals |
 | `no-color` | Readable output without ANSI colors |
 | `raw` | Minimal decoration for scripts |
-| `json` | JSON status records via the CLI option or environment on supported commands |
+| `json` | JSONL status and command output records on supported commands |
 
 Output mode selection follows this order.
 
@@ -28,6 +28,7 @@ nw info router1 --output-mode raw
 nw run router1 system_info --output-mode json
 ```
 
-In a run, JSON status records can appear alongside plain device output.
+In a run, JSON mode emits one JSON object per line for command output, errors,
+summaries, and warnings about skipped targets.
 Set `general.results_format` to choose the format of
 [stored result files](results.md).

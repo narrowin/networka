@@ -40,6 +40,7 @@ def _load(path: Path) -> dict[tuple[str, str], Any]:
     files = sorted(p for p in path.rglob("*") if p.is_file()) if directory else [path]
     replies: dict[tuple[str, str], Any] = {}
     summaries: list[tuple[Path, dict[str, Any]]] = []
+    sequence_replies: dict[tuple[str, str], list[tuple[int, int]]] = {}
     for file in files:
         if directory and file.suffix != ".json":
             raise _error(
@@ -73,6 +74,21 @@ def _load(path: Path) -> dict[tuple[str, str], Any]:
             raise _error(file, "saved result needs a device name and command")
         if not isinstance(output, str):
             raise _error(file, "saved result has no command output")
+        if (
+            directory
+            and {"sequence_name", "command_number", "total_commands"} & data.keys()
+        ):
+            sequence = data.get("sequence_name")
+            number, total = data.get("command_number"), data.get("total_commands")
+            if (
+                not isinstance(sequence, str)
+                or not sequence
+                or type(number) is not int
+                or type(total) is not int
+                or not 1 <= number <= total
+            ):
+                raise _error(file, "invalid sequence command metadata")
+            sequence_replies.setdefault((device, sequence), []).append((number, total))
         try:
             payload = load_json(output)
         except ValueError as error:
@@ -87,10 +103,13 @@ def _load(path: Path) -> dict[tuple[str, str], Any]:
         if "results_summary" in summary:
             commands = summary["results_summary"]
             device = summary.get("device_name")
+            sequence = summary.get("sequence_name")
             if (
                 not isinstance(commands, dict)
                 or not commands
                 or not isinstance(device, str)
+                or not isinstance(sequence, str)
+                or not sequence
             ):
                 raise _error(file, "invalid sequence summary")
             actual = {command for name, command in replies if name == device}
@@ -100,6 +119,14 @@ def _load(path: Path) -> dict[tuple[str, str], Any]:
                 raise _error(
                     file, "sequence summary does not match saved command replies"
                 )
+            positions = sequence_replies.pop((device, sequence), [])
+            if (
+                len(positions) != len(commands)
+                or any(total != len(commands) for _, total in positions)
+                or sorted(number for number, _ in positions)
+                != list(range(1, len(commands) + 1))
+            ):
+                raise _error(file, "incomplete sequence command replies")
         else:
             devices = summary.get("succeeded_device_list")
             if summary["failed_device_list"] or summary.get("failed_devices") != 0:
@@ -116,6 +143,9 @@ def _load(path: Path) -> dict[tuple[str, str], Any]:
                 or summary.get("succeeded_devices") != len(devices)
             ):
                 raise _error(file, "group summary does not match saved device replies")
+    if sequence_replies:
+        device, sequence = next(iter(sequence_replies))
+        raise _error(path, f"missing sequence summary for {device} / {sequence}")
     return replies
 
 

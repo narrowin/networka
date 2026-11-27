@@ -107,6 +107,12 @@ class OutputManager:
     def _print_status(
         self, label: str, style: StyleName, message: str, context: str | None
     ) -> None:
+        if self.mode == OutputMode.JSON:
+            payload: dict[str, Any] = {"type": "success", "message": message}
+            if context:
+                payload["device"] = context
+            self.print_json(payload)
+            return
         status = Text(label, style=self._style_manager.get_style(style) or "")
         if context:
             status.append(" [")
@@ -175,6 +181,21 @@ class OutputManager:
         if self.mode == OutputMode.RAW:
             # Raw mode skips summaries entirely
             return
+        if self.mode == OutputMode.JSON:
+            self.print_json(
+                {
+                    "type": "summary",
+                    "target": target,
+                    "operation_type": operation_type,
+                    "name": name,
+                    "duration": duration,
+                    "status": status,
+                    "is_group": is_group,
+                    "totals": totals,
+                    "results_dir": results_dir,
+                }
+            )
+            return
 
         bold_style = self._style_manager.get_style(self._style_name.BOLD) or ""
         summary_style = self._style_manager.get_style(self._style_name.SUMMARY) or ""
@@ -214,6 +235,9 @@ class OutputManager:
 
     def print_results_directory(self, results_dir: str) -> None:
         """Print the results directory information."""
+        if self.mode == OutputMode.JSON:
+            self.print_info(f"Results directory: {results_dir}")
+            return
         if self.mode == OutputMode.RAW:
             # Raw mode doesn't show results directory info
             return
@@ -223,14 +247,14 @@ class OutputManager:
 
     def print_json(self, data: dict[str, Any]) -> None:
         """Print JSON data."""
-        if self.mode == OutputMode.RAW:
+        if self.mode in {OutputMode.RAW, OutputMode.JSON}:
             sys.stdout.write(f"{json.dumps(data)}\n")
         else:
             self._console.print_json(json.dumps(data))
 
     def print_separator(self) -> None:
         """Print a separator line."""
-        if self.mode == OutputMode.RAW:
+        if self.mode in {OutputMode.RAW, OutputMode.JSON}:
             # Raw mode doesn't use separators
             return
 
@@ -241,7 +265,7 @@ class OutputManager:
 
     def print_blank_line(self) -> None:
         """Print a single blank line (no-op in raw mode)."""
-        if self.mode == OutputMode.RAW:
+        if self.mode in {OutputMode.RAW, OutputMode.JSON}:
             return
         self._console.print()
 
@@ -250,7 +274,9 @@ class OutputManager:
 
         In RAW mode, prints the text as-is to stdout without styling.
         """
-        if self.mode == OutputMode.RAW:
+        if self.mode == OutputMode.JSON:
+            self.print_json({"type": "output", "message": text})
+        elif self.mode == OutputMode.RAW:
             sys.stdout.write(f"{text}\n")
         else:
             self._console.print(
@@ -288,7 +314,9 @@ class OutputManager:
 
         Use this sparingly for help screens or pre-formatted content.
         """
-        if self.mode == OutputMode.RAW:
+        if self.mode == OutputMode.JSON:
+            self.print_json({"type": "text", "message": text})
+        elif self.mode == OutputMode.RAW:
             sys.stdout.write(f"{text}\n")
         else:
             self._console.print(text)

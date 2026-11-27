@@ -158,12 +158,13 @@ class TestCLI:
         )
         assert result.exit_code == 1, result.output
         *events, summary = map(json.loads, result.stdout.splitlines())
-        assert events
+        results = [event for event in events if event["event"] == "result"]
+        assert results
         assert all(
             event["event"] == "result"
             and event["device"] == "test_device1"
             and event["output"] == "Sequence output"
-            for event in events
+            for event in results
         )
         assert summary.pop("duration") >= 0
         assert summary == {

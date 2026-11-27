@@ -254,8 +254,10 @@ class GeneralConfig(ConfigHistoryMixin, BaseModel):
     @classmethod
     def validate_output_mode(cls, v: str) -> str:
         """Validate output mode is supported."""
-        if v.lower() not in ["default", "light", "dark", "no-color", "raw"]:
-            msg = "output_mode must be one of: default, light, dark, no-color, raw"
+        if v.lower() not in ["default", "light", "dark", "no-color", "raw", "json"]:
+            msg = (
+                "output_mode must be one of: default, light, dark, no-color, raw, json"
+            )
             raise ValueError(msg)
         return v.lower()
 
