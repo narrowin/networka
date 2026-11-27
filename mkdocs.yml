@@ -52,6 +52,29 @@ nav:
     - Lab test engine: development/lab-tests-design.md
     - Adding platform support: adding-platforms.md
     - Documentation guidelines: documentation-guidelines.md
+    - Glossary: glossary.md
+  - Decisions:
+    - Overview: adr/index.md
+    - adr/0001-networka-holds-all-test-logic-and-a-lab-is-only-a-description.md
+    - adr/0002-a-test-is-a-yaml-file-of-exact-values-and-running-it-needs-no-ai.md
+    - adr/0003-a-lab-test-pushes-no-configuration-and-state-checks-prove-the-lab-state.md
+    - adr/0004-lab-actions-run-on-containerlab-only.md
+    - adr/0005-outage-is-measured-from-numbered-pings-every-100-ms-captured-at-both-ends.md
+    - adr/0006-replay-judges-saved-evidence-again-and-must-give-a-byte-identical-result.md
+    - adr/0007-the-run-writes-its-report-and-nobody-writes-verdicts-or-numbers-by-hand.md
+    - adr/0008-a-run-keeps-only-the-capture-slices-that-prove-its-verdict.md
+    - adr/0009-switch-logs-come-from-one-collector-and-markers-prove-they-are-complete.md
+    - adr/0010-networka-reaches-every-lab-node-over-ssh-at-the-address-containerlab-assigned.md
+    - adr/0011-a-reboot-is-the-switch-s-own-reboot-and-a-power-loss-pauses-the-guest-and-withdraws-carrier.md
+    - adr/0012-validity-checks-prove-the-measurement.md
+    - adr/0013-device-state-is-read-as-the-device-s-own-json-not-parsed-from-text.md
+    - adr/0014-a-check-has-three-verdicts-and-missing-evidence-never-passes.md
+    - adr/0015-a-test-keeps-one-ssh-session-per-device.md
+    - adr/0016-impairments-use-tc-netem-in-the-node-s-namespace.md
+    - adr/0017-networka-uses-scrapli-2-and-takes-the-platform-from-the-inventory-without-autodetection.md
+    - adr/0018-networka-keeps-its-own-runtime-and-does-not-adopt-nornir.md
+    - adr/0019-the-textual-tui-is-retired.md
+    - adr/0020-networka-requires-the-latest-stable-python-and-uses-uv-for-all-python-work.md
 
 theme:
   name: material
@@ -157,3 +180,4 @@ extra:
 watch:
   - src
   - docs
+  - GLOSSARY.md
