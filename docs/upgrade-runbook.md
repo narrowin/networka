@@ -13,6 +13,7 @@ into its configuration, keeping the existing device and credential entries:
 ```yaml
 general:
   results_format: json
+
 groups:
   lab_switches:
     description: All RouterOS switches in the lab
@@ -48,10 +49,12 @@ before/after comparison.
 
 ## Collect before the upgrade
 
-Run from a Networka checkout with dependencies installed using `uv sync --locked`.
-Set your group and configuration path, and keep this terminal open:
+Run from your Networka checkout. Set your group and configuration path, and
+keep this terminal open:
 
 ```bash
+uv sync --locked
+
 TARGET="lab_switches"
 CONFIG="./devices.yml"
 mkdir -p ./captures
