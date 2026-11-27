@@ -1,10 +1,21 @@
 name: Docs
 
 on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'mkdocs.yml'
+      - 'GLOSSARY.md'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'docs/**'
+      - 'src/**'
+      - '.github/workflows/docs.yml'
   pull_request:
     branches: [ main ]
     paths:
       - 'mkdocs.yml'
+      - 'GLOSSARY.md'
       - 'pyproject.toml'
       - 'uv.lock'
       - 'docs/**'
