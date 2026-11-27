@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `nw test summary` counts a saved run whose starting state check did not pass, instead of exiting 2 because it has no traffic.
+
 ## [0.5.2] - 2026-11-27
 
 ### Added

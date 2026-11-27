@@ -82,8 +82,12 @@ def _node(point: str) -> str:
     return point.split(":", 1)[0]
 
 
-def _test(folder: Path) -> tuple[str, float, Outage | None]:
-    """The verdict, ping interval and longest decided outage of one saved test."""
+def _test(folder: Path) -> tuple[str, float | None, Outage | None]:
+    """The verdict, ping interval and longest decided outage of one saved test.
+
+    A test whose starting state check did not pass sent no traffic and has no
+    ping interval.
+    """
     path = folder / labtest.RESULT_FILE
     try:
         result = json.loads(path.read_text(encoding="utf-8"))
@@ -92,7 +96,8 @@ def _test(folder: Path) -> tuple[str, float, Outage | None]:
     worst: Outage | None = None
     try:
         verdict = result["verdict"]
-        interval = float(result["traffic"]["interval_s"])
+        traffic = result["traffic"]
+        interval = None if traffic is None else float(traffic["interval_s"])
         if verdict == "error":
             return verdict, interval, None
         test = labtest.load_test(folder / labtest.TEST_FILE, folder / labtest.LAB_FILE)
@@ -155,7 +160,8 @@ def _cell(raw: Any, base: Path, where: str) -> Cell | None:
             seen[folder.name] = folder
             verdict, interval, outage = _test(folder)
             counts[verdict] += 1
-            intervals.add(interval)
+            if interval is not None:
+                intervals.add(interval)
             if outage and (worst is None or outage.upper > worst.upper):
                 worst = outage
     verdict = "FAIL" if counts["fail"] else "PASS" if counts["pass"] else "ERROR"
@@ -218,6 +224,7 @@ def _worst_cell(cell: Cell | None) -> str:
 
 
 def _interval(cells: list[Cell]) -> str:
+    """The ping intervals in ms, empty when no test sent traffic."""
     values = sorted({i for c in cells for i in c.intervals})
     return " or ".join(f"{round(v * 1000):g}" for v in values)
 
@@ -236,11 +243,13 @@ def _markdown(
         "FAIL": _rel(base / spec["fail_icon"], here),
     }
     chart = _rel(base / spec["chart"], here)
+    interval = _interval(cells)
+    ping = f", one ping every {interval}{NBSP}ms per stream" if interval else ""
     header = ["Lab", "Topology", *modes, *(f"Worst outage, {m}" for m in modes)]
     lines = [
         f"![{spec['chart_alt']}]({chart})",
         "",
-        f"{spec['caption']}, one ping every {_interval(cells)}{NBSP}ms per stream.",
+        f"{spec['caption']}{ping}.",
         "",
         "| " + " | ".join(header) + " |",
         "|" + " --- |" * len(header),
@@ -286,6 +295,8 @@ def _svg(modes: list[str], rows: list[Row]) -> str:
     row_px = ROW_PAD + MODE_PX * len(modes)
     bottom = TOP + row_px * len(rows)
     height = bottom + 42
+    interval = _interval([c for r in rows for c in r.cells if c])
+    ping = f", one ping every {interval} ms" if interval else ""
 
     def x(seconds: float) -> float:
         return AXIS_X + scale * seconds
@@ -300,8 +311,7 @@ def _svg(modes: list[str], rows: list[Row]) -> str:
         f'  <rect width="{WIDTH}" height="{height}" fill="#ffffff"/>',
         (
             f'  <text x="{AXIS_X}" y="16" font-size="12" fill="{MUTED}">Worst outage '
-            f"in any test, seconds (upper bound, one ping every "
-            f"{_interval([c for r in rows for c in r.cells if c])} ms)</text>"
+            f"in any test, seconds (upper bound{ping})</text>"
         ),
         '  <g stroke="#d0d7de" stroke-width="1">',
     ]
