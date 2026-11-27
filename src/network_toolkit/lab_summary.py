@@ -223,7 +223,12 @@ def _interval(cells: list[Cell]) -> str:
 
 
 def _markdown(
-    spec: dict[str, Any], modes: list[str], rows: list[Row], here: Path, base: Path
+    spec: dict[str, Any],
+    modes: list[str],
+    rows: list[Row],
+    here: Path,
+    base: Path,
+    spec_path: Path,
 ) -> list[str]:
     cells = [c for r in rows for c in r.cells if c is not None]
     icons = {
@@ -253,12 +258,13 @@ def _markdown(
             )
             + " |"
         )
-    names = list(dict.fromkeys(_rel(run, here) for c in cells for run in c.runs))
+    source = _rel(spec_path, here)
     lines += [
         "",
-        "Each value comes from the `nw test` runs "
-        + ", ".join(f"`{n}`" for n in names)
-        + ".",
+        (
+            f"The values are generated with `nw test summary {source}` from the"
+            f" runs that [{source}]({source}) lists."
+        ),
     ]
     return lines
 
@@ -434,7 +440,7 @@ def summarize(spec_path: str | Path) -> tuple[Path, Path]:
         labtest._fail(
             str(markdown), f"needs one {START} line followed by one {END} line"
         )
-    section = _markdown(spec, modes, rows, markdown.parent, base)
+    section = _markdown(spec, modes, rows, markdown.parent, base, spec_path)
     lines[lines.index(START) + 1 : lines.index(END)] = section
     markdown.write_text("\n".join(lines), encoding="utf-8")
     chart.write_text(_svg(modes, rows), encoding="utf-8")
