@@ -70,7 +70,7 @@ A `log` contains `must` or `must_not` lists. Each rule names a `switch` or `ever
 ## What the run measures
 
 1. For a lab with switch logging, Networka records the collector offset and sends each switch a start marker. Switches are identified by marker-capable devices in the lab, the inventory's `switches` group, and individual rule targets. Unrecognised senders or a missing marker invalidate log coverage. The collector may create its file on the first message.
-2. All device preconditions must pass before Networka starts the traffic or takes an action. It captures both ends of every stream, each action cable and the extra points used by the configured proofs. Pings run every 100 ms to resolve stops smaller than a second. Each stream must show a first reply within 5 s.
+2. The starting state check must pass before Networka starts the traffic or takes an action. When it does not pass, Networka runs none of the steps and the test is `error`. It captures both ends of every stream, each action cable and the extra points used by the configured proofs. Pings run every 100 ms to resolve stops smaller than a second. Each stream must show a first reply within 5 s.
 3. The quiet window starts at the last stream's first reply. Networka checks 3 s of clean traffic before the first action, allowing three fast LACP messages for bonds to settle. A clean window has no outage or duplicate and at least `floor(window duration / 110 ms) − 1` delivered pings per stream. The count allows 10% scheduling variation and one boundary ping. An unclean quiet window yields `error` before any action.
 4. Networka changes the cable in its network namespace and, for QEMU endpoints, through the guest's QEMU monitor. It waits up to 1 s for carrier confirmation on an end it did not set directly, because a virtual cable normally changes carrier within milliseconds.
 5. For a reboot, Networka verifies that the target is one `mikrotik_chr` node with a `mikrotik_routeros` inventory entry at its live topology management address. It reads native RouterOS uptime and sends `:execute {/system reboot}` once over pooled SSH. After dispatch it checks for the SSH banner before trying an authenticated uptime read. The 5 s wait between attempts gives RouterOS time to accept returning sessions. The step must prove a lower uptime that fits within the monotonic time since dispatch and pass every lab state check within `wait_healthy_s`. A recovery timeout stops the remaining steps with `error`. On a traffic fault or power restoration, if all steps started, the report still measures them through the sender cutoff. The final state and closing window remain unverified. The stream limits cover dispatch, recovery, and the hold after recovery.
@@ -92,8 +92,8 @@ A send pause longer than 450 ms leaves too much of the 500 ms reply deadline uno
 | Exit | Meaning |
 | --- | --- |
 | `0` | `pass`. The evidence verifies the applicable state, traffic, action and log checks. |
-| `1` | `fail`. A check found an actual violation, such as a failed device precondition, excessive outage, or broken log rule. |
-| `2` | `error`. A run stopped, evidence could not verify a check, the input or lab was unusable, or replay found a result mismatch. |
+| `1` | `fail`. A check found an actual violation, such as an excessive outage or a broken log rule. |
+| `2` | `error`. A run stopped, the starting state check did not pass, evidence could not verify a check, the input or lab was unusable, or replay found a result mismatch. |
 
 A failed check takes precedence over an unverified check in a completed run and when combining verdicts across files. A recorded run error makes that run `error`. Networka saves `error` and re-raises an interrupt received during evidence collection. On Linux the interrupted command can exit `130` for SIGINT, while replay exits `2`.
 

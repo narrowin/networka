@@ -23,7 +23,3 @@ A failed starting state means the fault was never tried, so the test cannot say 
 
 A lab that needs other settings is a lab of its own, and a lab that needs a playbook runs it from its own repository between deploy and `nw test run`.
 A test that leaves the lab broken shows up as ERROR in the starting state check of the next test.
-
-## What is not built
-
-`nw test run` still gives FAIL, exit 1, when the starting state check fails, as the [lab test guide](../lab-tests.md#verdict) says.

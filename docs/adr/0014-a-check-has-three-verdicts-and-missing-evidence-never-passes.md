@@ -19,5 +19,5 @@ Fail-first keeps a confirmed failure from being hidden by an item that could not
 
 ## Consequences
 
-A test whose starting state check fails is not a completed run; it is ERROR (not built, see [ADR 0003](0003-a-lab-test-pushes-no-configuration-and-state-checks-prove-the-lab-state.md)).
+A test whose starting state check fails is not a completed run; it is ERROR, as [ADR 0003](0003-a-lab-test-pushes-no-configuration-and-state-checks-prove-the-lab-state.md) records.
 Exit codes follow the verdict: 0 for PASS, 1 for FAIL and 2 for ERROR.

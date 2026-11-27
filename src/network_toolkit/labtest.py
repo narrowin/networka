@@ -1340,10 +1340,10 @@ def evaluate(folder: str | Path) -> dict[str, Any]:
     result["state"]["before"] = before
     if before is None:
         part("error", "The state before the test was not checked.")
-    else:
+    elif before["verdict"] != "pass":
         part(
-            before["verdict"],
-            f"The state before the test is {before['verdict']}, so no cable was changed.",
+            "error",
+            f"The state before the test is {before['verdict']}, so the steps were not run.",
         )
     log, result["switch_log"] = _read_switch_log(test, folder, events, part)
     if log is not None:
@@ -1408,7 +1408,9 @@ def evaluate(folder: str | Path) -> dict[str, Any]:
             part(after["verdict"], f"The state after the test is {after['verdict']}.")
     elif before is not None and before["verdict"] == "pass" and not reasons:
         part("error", "The steps did not finish.")
-    result["verdict"] = "error" if "run_error" in marks else rollup(parts)
+    # A run error or a starting state that does not pass leaves the test untried.
+    untried = "run_error" in marks or before is None or before["verdict"] != "pass"
+    result["verdict"] = "error" if untried else rollup(parts)
     return result
 
 
