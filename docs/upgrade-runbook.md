@@ -5,6 +5,10 @@ Collect every RouterOS switch in a lab or customer upgrade group with one
 the whole group before and after your upgrade, then compare both saved bundles
 with one `nw diff` invocation.
 
+Perform the customer upgrade using your approved procedure between collections.
+For containerlab verification, deploy the required RouterOS version directly
+and exercise collection and comparison with a controlled configuration change.
+
 ## Define the group once
 
 Use your existing Networka inventory and SSH credentials. Merge these settings

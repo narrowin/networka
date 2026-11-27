@@ -30,8 +30,8 @@ stopped progressing.
 
 ### Check the verified lab result
 
-On 27 November 2026, the disposable `nw-sftp-verify-20261127` lab used the
-[pinned RouterOS 7.24.5 ARM64 CHR image](vendors/mikrotik/chr-upgrade-lab.md#deploy-the-disposable-switch).
+On 27 November 2026, the disposable `nw-sftp-verify-20261127` lab used a
+RouterOS 7.24.5 ARM64 CHR image.
 The uploaded file was the complete 13,988,453-byte RouterOS 7.25.2 package,
 saved remotely as `sftp-check.bin`; no RouterOS upgrade was requested.
 

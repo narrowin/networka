@@ -1,4 +1,11 @@
-# Prepare a CHR lab for an upgrade comparison
+# Historical CHR image upgrade investigation
+
+!!! note "Historical lab investigation"
+
+    This page preserves a separate in-place package-upgrade experiment on a
+    pinned CHR image. The customer workflow is described in the
+    [whole-group collection and comparison runbook](../../upgrade-runbook.md).
+    Containerlab verification deploys the required RouterOS version directly.
 
 Prepare a disposable RouterOS CHR switch, save its native JSON with `nw run`,
 upgrade it, and compare the saved output with `nw diff`.
@@ -414,10 +421,10 @@ No physical-switch or forwarding acceptance is claimed.
   names and exact commands, use `results_format: json`, and compare the
   resource object separately from tables indexed with `--key name`.
 
-The upstream fresh-image conversion issue remains outside Networka's code.
-This guide documents the verified disposable-lab preparation; it does not
-install a RouterOS patch or introduce automatic preparation into `nw test`.
+The observations and preparation above apply to this pinned disposable CHR
+image and its first in-place package installation. Customer hardware was not
+examined. This historical experiment is outside the whole-group collection
+and comparison workflow.
 The separate SFTP read-back stall was addressed by using sequential SFTP reads;
 see [verify uploaded files](../../file_upload.md#verify-uploaded-files) for the
-change and its disposable-lab verification. The RouterOS conversion issue still
-requires the preparation cycle above.
+change and its disposable-lab verification.
