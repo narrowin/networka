@@ -86,3 +86,35 @@ artifact installation procedures.
   completed work after relevant checks and independent review.
 - Run `git diff --check` before handing off changes. For commit and contribution
   conventions, see [CONTRIBUTING.md](../CONTRIBUTING.md).
+
+## Words and decisions
+
+- [GLOSSARY.md](../GLOSSARY.md) gives the one word for each thing in Networka.
+  Read it before writing docs, reports, help text or any other text, use its
+  terms, and never use a word on an _Avoid_ line. If a term is missing or
+  disputed, ask the operator instead of inventing one.
+- [docs/adr/](../docs/adr/) records why Networka is shaped as it is. Read the
+  matching ADR before changing what it covers, and do not reopen a decision
+  without new evidence.
+- _Avoid_ lines govern prose. Existing CLI flags, YAML keys and code names,
+  such as `wait_healthy_s`, `nw diff --baseline` and the YAML `statement`,
+  keep their names until they are renamed.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live as local markdown files under
+`.scratch/<feature>/`. See
+[issue-tracker.md](../docs/agents/issue-tracker.md).
+
+### Triage labels
+
+The five default role names, recorded as a `Status:` line in
+each issue file. See
+[triage-labels.md](../docs/agents/triage-labels.md).
+
+### Domain docs
+
+Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo
+root. See [domain.md](../docs/agents/domain.md).
