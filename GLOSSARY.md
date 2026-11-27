@@ -65,6 +65,16 @@ _Avoid_: snapshot, sample
 The part of a **platform** that turns **replies** into the fields a **check** compares.
 _Avoid_: parser, translator, mapper
 
+### State comparison
+
+**State record**:
+A saved set of **readings** from named **devices**, collected over a known time interval to describe their state before or after a change.
+_Avoid_: baseline (for a state record), snapshot
+
+**State comparison**:
+A comparison of selected device state between two **state records**, accounting for declared expected differences and keeping unexpected changes distinct from **checks** against expected values.
+_Avoid_: diff (for a state comparison with a verdict)
+
 ### Labs
 
 **Lab**:

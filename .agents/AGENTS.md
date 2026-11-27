@@ -105,6 +105,10 @@ artifact installation procedures.
 
 ## Agent skills
 
+Use [networka-review](skills/networka-review/SKILL.md) for a local code review
+against a Git reference: independent Standards, Spec, and Correctness reviews.
+It complements `networka-verify`, which executes checks for changed behavior.
+
 ### Issue tracker
 
 Issues and specs live as local markdown files under
