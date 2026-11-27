@@ -37,7 +37,7 @@ $ nw [OPTIONS] COMMAND [ARGS]...
 * `run`: Execute a single command or a sequence on...
 * `upload`: Upload a file to a device or to all...
 * `download`: Download a file from a device or all...
-* `diff`: Diff config, a command, or a sequence.
+* `diff`: Diff config, a command, a sequence, or two...
 * `cli`: Open tmux with CLI panes for a device or...
 * `list`: List network devices, groups, sequences,...
 * `config`: Configuration management commands
@@ -166,7 +166,7 @@ $ nw download [OPTIONS] {<device|group>} {remote_file} {local_path}
 
 ## `nw diff`
 
-Diff config, a command, or a sequence.
+Diff config, a command, a sequence, or two saved JSON collections.
 
 Examples:
   - nw diff sw-acc1 config -b saved/export_compact.txt
@@ -174,6 +174,7 @@ Examples:
   - nw diff lab_devices system_info -b saved/
   - nw diff sw-acc1,sw-acc2 &quot;/system/resource/print&quot;   # device-to-device
   - nw diff sw-acc1,sw-acc2 config                      # device-to-device
+  - nw diff saved/run-001 saved/run-002 --structured --key name
 
 **Usage**:
 
@@ -183,8 +184,8 @@ $ nw diff [OPTIONS] {target} {subject}
 
 **Arguments**:
 
-* `target <str>`: Device/group name or comma-separated list (e.g. &#x27;sw-1,lab_devices&#x27;)  [required]
-* `subject <str>`: Subject to diff: &#x27;config&#x27; for /export compact, a RouterOS command starting with &#x27;/&#x27;, or the name of a configured sequence.  [required]
+* `target <str>`: Device/group name, comma-separated list, or first saved JSON path with --structured.  [required]
+* `subject <str>`: Subject to diff: &#x27;config&#x27; for /export compact, a RouterOS command starting with &#x27;/&#x27;, a configured sequence, or the second saved JSON path with --structured.  [required]
 
 **Options**:
 
@@ -192,6 +193,9 @@ $ nw diff [OPTIONS] {target} {subject}
 * `--ignore <list[str]>`: Regex to ignore lines; repeat for multiple patterns.
 * `--save-current <path>`: Optional path to save the current fetched state (file or directory).
 * `-H, --heuristic`: Use heuristic operational state diffing (ignores timestamps, counters, etc.).
+* `--structured`: Compare native JSON in saved nw run results
+* `--key <str>`: Unique identity field of a top-level JSON table
+* `--exclude-path <list[str]>`: Payload path excluded from structured comparison; repeatable
 * `-c, --config <path>`: Configuration file path  [default: /Users/md/Library/Application Support/networka]
 * `-o, --output-mode <default|light|dark|no-color|raw|json>`: Output decoration mode: default, light, dark, no-color, raw
 * `-v, --verbose`: Enable verbose logging

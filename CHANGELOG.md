@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Compare native JSON in saved `nw run` results with `nw diff --structured`, using DeepDiff's compact colored display with optional unique row keys and explicit path exclusions. JSON output retains structured changes.
+
 ### Fixed
 
 - Separate deliberate host silence and host power loss from failover measurements in lab reports and summaries, retaining every numerical limit and verdict check. Report MAC relearning and power recovery against their existing separate limits.

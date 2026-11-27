@@ -48,6 +48,7 @@ dependencies = [
     "libtmux>=0.68.0,<0.69",
     "python-dotenv>=1.0.0",
     "platformdirs>=3.6.0,<5",
+    "deepdiff==9.2.1",
 ]
 
 [project.optional-dependencies]
