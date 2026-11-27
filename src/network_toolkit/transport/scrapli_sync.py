@@ -30,6 +30,7 @@ from scrapli.ffi_types import Cancel
 from scrapli.transport import Options
 
 from network_toolkit.exceptions import DeviceExecutionError, OperationUnconfirmedError
+from network_toolkit.transport.cancellation import current_cancel
 from network_toolkit.transport.interfaces import CommandResult
 
 logger = logging.getLogger(__name__)
@@ -164,7 +165,11 @@ class ScrapliSyncTransport:
     def open(self) -> None:
         with self._lock:
             try:
-                self._driver.open()
+                cancel = current_cancel()
+                cancel_options: dict[str, Any] = (
+                    {"cancel": cancel.native} if cancel is not None else {}
+                )
+                self._driver.open(**cancel_options)
                 self._force_close = False
             except Exception:
                 if self._driver.ptr is not None:
@@ -185,8 +190,14 @@ class ScrapliSyncTransport:
     def send_command(self, command: str) -> CommandResult:
         with self._lock:
             try:
+                cancel = current_cancel()
+                cancel_options: dict[str, Any] = (
+                    {"cancel": cancel.native} if cancel is not None else {}
+                )
                 result = self._driver.send_input(
-                    command, operation_timeout_ns=self._command_timeout_ns
+                    command,
+                    operation_timeout_ns=self._command_timeout_ns,
+                    **cancel_options,
                 )
             except (ScrapliException, OSError) as exc:
                 # The session state is unknown, so do not wait for a clean logout.

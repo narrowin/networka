@@ -18,6 +18,8 @@ import ipaddress
 import json
 import re
 from collections.abc import Callable, Mapping
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextvars import copy_context
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -28,6 +30,10 @@ import yaml
 from network_toolkit.__about__ import __version__
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.inventory.resolve import select_named_target
+from network_toolkit.transport.cancellation import (
+    cancellable_operation,
+    current_cancel,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Collection
@@ -1085,13 +1091,17 @@ def run_intent(
     client: NetworkaClient,
     intent: list[IntentItem],
     save_dir: str | Path | None = None,
+    *,
+    parallel: bool = False,
     **run_options: Any,
 ) -> IntentReport:
     """Collect every reading once, then evaluate it exactly as `replay_intent` does.
 
     Every item is resolved against the inventory before any device is read.
     Items that need the same reader with the same arguments on one device
-    share one reading. With `save_dir`, `intent.yaml` is written from the
+    share one reading. With `parallel`, different devices are read concurrently;
+    readers on each device remain serial, and interruption cancels native reads.
+    With `save_dir`, `intent.yaml` is written from the
     validated items before collecting, and `evidence.json` and `results.json`
     after. `run_options` are passed to `NetworkaClient.run`.
     """
@@ -1110,11 +1120,15 @@ def run_intent(
         folder.mkdir(parents=True, exist_ok=True)
         text = yaml.safe_dump([item.to_yaml() for item in intent], sort_keys=False)
         (folder / INTENT_FILE).write_text(text)
-    for device_name, device in plan.items():
+
+    def collect(device_name: str, device: dict[str, Any]) -> None:
         module = platform(device["device_type"])
         device["started"] = _now()
         unreachable = None
         for reading in device["readings"]:
+            cancel = current_cancel()
+            if cancel is not None and cancel.cancelled:
+                break
             if unreachable is not None:
                 # The device did not accept a connection: do not wait for it again.
                 reading["replies"], reading["error"] = {}, unreachable
@@ -1130,6 +1144,29 @@ def run_intent(
                 continue
             unreachable = _connection_failure(device_name, reading["replies"])
         device["finished"] = _now()
+
+    if parallel:
+        # A device's readers remain serial on its session. Different devices
+        # can be read together so the full state does not add their SSH delays.
+        with cancellable_operation() as cancel:
+            executor = ThreadPoolExecutor(max_workers=min(32, len(plan)))
+            try:
+                futures = [
+                    executor.submit(copy_context().run, collect, name, device)
+                    for name, device in plan.items()
+                ]
+                for future in as_completed(futures):
+                    future.result()
+            except BaseException:
+                # In particular, the lab's SIGALRM deadline must interrupt
+                # native SSH reads before waiting for the workers to finish.
+                cancel.cancel()
+                raise
+            finally:
+                executor.shutdown(wait=True, cancel_futures=True)
+    else:
+        for device_name, device in plan.items():
+            collect(device_name, device)
     evidence = {"networka_version": __version__, "devices": plan}
     report = replay_intent(intent, evidence)
     if folder is not None:

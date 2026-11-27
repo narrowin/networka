@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextvars import copy_context
 
 
 def execute_parallel[T, R](
@@ -36,7 +37,8 @@ def execute_parallel[T, R](
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
         future_to_index = {
-            executor.submit(func, item): index for index, item in enumerate(items)
+            executor.submit(copy_context().run, func, item): index
+            for index, item in enumerate(items)
         }
 
         for future in as_completed(future_to_index):

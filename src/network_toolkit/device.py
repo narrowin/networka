@@ -29,6 +29,7 @@ from network_toolkit.platforms.mikrotik_routeros.confirmation_patterns import (
     MIKROTIK_ROUTERBOARD_UPGRADE,
     MIKROTIK_SYSTEM_RESET,
 )
+from network_toolkit.transport.cancellation import current_cancel
 from network_toolkit.transport.factory import get_transport_factory
 
 if TYPE_CHECKING:
@@ -148,6 +149,10 @@ class DeviceSession:
             attempts = max(1, self.config.general.connection_retries)
             transport_factory = get_transport_factory(transport_type)
             for attempt in range(1, attempts + 1):
+                cancel = current_cancel()
+                if cancel is not None and cancel.cancelled:
+                    msg = "Operation cancelled before connecting"
+                    raise DeviceConnectionError(msg)
                 transport = transport_factory.create_transport(
                     self.device_name, self.config, self._connection_params
                 )
@@ -163,7 +168,10 @@ class DeviceSession:
                         self.device_name,
                         self._error_reason(exc),
                     )
-                    time.sleep(self.config.general.retry_delay)
+                    if cancel is None:
+                        time.sleep(self.config.general.retry_delay)
+                    elif cancel.wait(self.config.general.retry_delay):
+                        raise
                 else:
                     self._transport = transport
                     self._connected = True

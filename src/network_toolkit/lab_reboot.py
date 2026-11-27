@@ -174,12 +174,16 @@ def wait_recovered(
     items: list[intent.IntentItem],
     options: Mapping[str, Any],
     operation: str,
+    *,
+    poll_s: float = POLL_S,
 ) -> None:
     try_number = 0
     while True:
         try_number += 1
         directory = session.directory / "recovery" / str(number) / str(try_number)
-        checked = intent.run_intent(client, items, directory, **options)
+        checked = intent.run_intent(
+            client, items, directory, parallel=operation == "fault", **options
+        )
         session.mark(
             f"{operation}_state_checked",
             switch=target,
@@ -189,7 +193,7 @@ def wait_recovered(
         )
         if checked.verdict == "pass":
             return
-        time.sleep(POLL_S)
+        time.sleep(poll_s)
 
 
 def uptime_proof(
@@ -226,13 +230,17 @@ def recovery_proof(
     items: list[intent.IntentItem],
     operation: str,
 ) -> Mapping[str, Any]:
-    checked = [
+    checks = [
         e
         for e in events
         if e["name"] == f"{operation}_state_checked"
         and e.get("number") == number
         and e.get("switch") == target
-    ][-1]
+    ]
+    if not checks:
+        msg = "No full recovery state check completed before the run stopped."
+        raise ValueError(msg)
+    checked = checks[-1]
     try_number = int(checked["try_number"])
     path = folder / "recovery" / str(number) / str(try_number) / intent.EVIDENCE_FILE
     recovered = intent.replay_intent(items, intent.load_json(path.read_text()))

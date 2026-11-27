@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import shlex
 import statistics
@@ -23,6 +24,9 @@ DROP_COUNT = re.compile(r"\(dropped (\d+),")
 NETEM_HANDLE = "982:"
 # The qualified fast-rate LACP partners transmit once per second.
 LACP_POLL_S = 0.2
+# Read the Linux member without querying the guests; avoid spending the
+# remaining recovery budget asleep before the full SSH state check.
+LOCAL_MEMBER_POLL_S = 0.05
 LACP_RECOVERY_S = 30.0
 
 
@@ -342,6 +346,45 @@ class TrafficActions:
             raw=applied,
         )
 
+    def drain_delay(self, point: lab.Point, fault: Impair) -> None:
+        """Stop delaying new frames and let the existing queue empty before deletion."""
+        self.tc(
+            point,
+            "qdisc",
+            "change",
+            "dev",
+            point.interface,
+            "root",
+            "handle",
+            NETEM_HANDLE,
+            "netem",
+            "delay",
+            "0ms",
+            "loss",
+            "0%",
+        )
+        deadline = time.monotonic() + (fault.delay_ms + fault.jitter_ms) / 1000 + 1
+        while True:
+            raw = json.loads(
+                self.tc(point, "-j", "-s", "qdisc", "show", "dev", point.interface)
+            )
+            queues = [
+                q
+                for q in raw
+                if q.get("root")
+                and q.get("kind") == "netem"
+                and q.get("handle") == NETEM_HANDLE
+            ]
+            _require(
+                len(queues) == 1 and type(queues[0].get("qlen")) is int,
+                f"{point} did not report its owned queue length",
+            )
+            if queues[0]["qlen"] == 0:
+                self.session.mark("fault_drained", target=str(point), raw=raw)
+                return
+            _require(time.monotonic() < deadline, f"{point} delay queue did not drain")
+            time.sleep(0.01)
+
     def remove(self, active: Installed) -> dict[str, str]:
         errors = []
         for p in sorted(active.owned):
@@ -350,16 +393,20 @@ class TrafficActions:
                 if isinstance(active.fault, Impair):
                     root = _root(raw)
                     if root[1:3] == ["netem", NETEM_HANDLE]:
-                        self.tc(
-                            p,
-                            "qdisc",
-                            "del",
-                            "dev",
-                            p.interface,
-                            "root",
-                            "handle",
-                            NETEM_HANDLE,
-                        )
+                        try:
+                            if active.fault.delay_ms:
+                                self.drain_delay(p, active.fault)
+                        finally:
+                            self.tc(
+                                p,
+                                "qdisc",
+                                "del",
+                                "dev",
+                                p.interface,
+                                "root",
+                                "handle",
+                                NETEM_HANDLE,
+                            )
                 else:
                     _classifier_remove(self.topology, p, raw)
                 active.owned.discard(p)
@@ -426,8 +473,44 @@ class TrafficActions:
             )
             _require(remaining > 0, f"{name(fault)} exhausted its recovery deadline")
             with lab_reboot._deadline(remaining, "Fault recovery"):
+                if isinstance(fault, Impair):
+                    end = lab.point(fault.point)
+                    if self.topology.node(end.node).kind == "linux":
+                        # Read the affected Linux member before asking the
+                        # guests for full state. Repeated SSH queries must not
+                        # disturb the protocol recovery being measured.
+                        for item in items:
+                            if (
+                                item.device == end.node
+                                and item.check == "bond_member"
+                                and item.params["member"] == end.interface
+                                and item.expected.get("eligible") is True
+                            ):
+                                while True:
+                                    checked = intent.run_intent(
+                                        client, [item], parallel=True, **options
+                                    )
+                                    self.session.mark(
+                                        "fault_member_checked",
+                                        number=number,
+                                        target=fault.point,
+                                        evidence=checked.evidence,
+                                        verdict=checked.verdict,
+                                    )
+                                    if checked.verdict == "pass":
+                                        break
+                                    time.sleep(LOCAL_MEMBER_POLL_S)
                 lab_reboot.wait_recovered(
-                    client, self.session, name(fault), number, items, options, "fault"
+                    client,
+                    self.session,
+                    name(fault),
+                    number,
+                    items,
+                    options,
+                    "fault",
+                    # The switches are already reachable. Do not inherit the
+                    # reboot retry delay and sleep through a short recovery.
+                    poll_s=LACP_POLL_S,
                 )
 
 
