@@ -24,7 +24,7 @@ A lab file holds its stream directions, state checks and optional switch log. A 
 
 | Lab field | Meaning |
 | --- | --- |
-| `streams` | Each entry gives a unique `name`, a `from` point and a `to` point. Pings target the destination interface's IPv4 address. File order assigns the ICMP identifiers. |
+| `streams` | Each entry gives a unique `name`, a `from` point and a `to` point. Pings target the destination interface's IPv4 address. A `to` written as an IPv4 address, such as a VRRP address on a router, is the fixed ping target and has no capture point. File order assigns the ICMP identifiers. |
 | `state` | Each entry gives a `statement`, optional `source` and device `checks`. [Intent check format](intent.md) |
 | `switch_log` | Collector file relative to the deployed lab directory. Each line starts with an RFC 3339 receive timestamp and the switch name, followed by the message. Required for log rules. |
 
@@ -45,13 +45,14 @@ If the final state requires a cable to be up, add an explicit `up` step to measu
 
 ### Typed actions
 
-Use one action per step. Installations and changes that need a return step must be paired within the test.
+Use one action per step. Installations and changes that need a return step must be paired within the test. One power loss can be active at a time, and `power_on` must name the same node, list or group as its `power_off`.
 
 | Keys inside `action` | Effect and evidence |
 | --- | --- |
 | `observe: true` | Measure traffic and any step checks in the current state. |
 | `reboot: switch1` | Request a RouterOS reboot over SSH and verify a fresh boot and full lab health. |
 | `power_off: switch1`, then `power_on: switch1` | Pause the named RouterOS CHR guest and withdraw carrier on its data cables. On return, reset and resume the guest, restore carrier, and verify a fresh boot and full lab health. |
+| `power_off: [switch1, switch2, client1]`, then `power_on` with the same list | Power off several nodes in one step, such as a whole site. The value can also name an inventory group that is not a lab node. Networka pauses every RouterOS CHR guest, sets every data cable of the listed nodes down and withdraws carrier from the guest NICs that face them. A Linux node keeps running with all its data cables down, so its kernel keeps state such as bond and neighbour entries. On return, it resets and resumes every guest, restores all cables, verifies a fresh boot of each guest and then full lab health. |
 | `impair: client1:eth1` with `loss_percent`, `delay_ms`, or both | Apply netem in `direction: out` from the given endpoint by default. Use `in` for egress from the far end or `both` for both ends. Set optional `jitter_ms` with delay. Verify the installed values and read its counters. Repeat `impair` with `clear: true` to restore the default queue. |
 | `cut_ping: stream-name` with `at: client2:eth3` | Drop the named stream’s IPv4 echo requests at the cable ingress. Repeat `cut_ping` with `clear: true`. Replay checks the filter counters and whether the capture brackets the cut as one continuous gap. |
 | `silence_lacp: client1:eth1` with `bond: bond0` | Drop outbound LACP slow-protocol frames at the named Linux bond member. Repeat `silence_lacp` with `clear: true`. Verify drops, loss of member eligibility with carrier still present, and restored eligibility. |
@@ -78,7 +79,7 @@ A `log` contains `must` or `must_not` lists. Each rule names a `switch` or `ever
 
 ## Verdict
 
-The request and reply must appear in captures at both stream endpoints. Networka matches pings by ICMP identifier, sequence, and echoed payload. Linux ping can reuse a sequence after a send error with a fresh timestamp in the payload. A reply must return within 500 ms because a healthy lab path answers within milliseconds. An outage spans consecutive undelivered pings. Its lower bound is the time from the first to the last lost request. Its upper bound is the time between the delivered requests immediately before and after it, when both exist. An outage counts in every step it overlaps. The report shows the total lost pings separately from the longest stop used for the limit.
+The request and reply must appear in captures at both stream endpoints. A stream to a fixed address is measured at its source only: a ping counts as delivered when its reply returns to the source capture in time. Networka matches pings by ICMP identifier, sequence, and echoed payload. Linux ping can reuse a sequence after a send error with a fresh timestamp in the payload. A reply must return within 500 ms because a healthy lab path answers within milliseconds. An outage spans consecutive undelivered pings. Its lower bound is the time from the first to the last lost request. Its upper bound is the time between the delivered requests immediately before and after it, when both exist. An outage counts in every step it overlaps. The report shows the total lost pings separately from the longest stop used for the limit.
 
 | Step verdict | Condition |
 | --- | --- |

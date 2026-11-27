@@ -9,7 +9,9 @@ return. Its destination capture point sees the requests arrive and the replies
 leave.
 
 A ping is delivered when the request and the reply appear at both capture
-points and the reply returns within 0.5 s of the request. A run of pings that
+points and the reply returns within 0.5 s of the request. A stream to a fixed
+address, such as a VRRP address on a router, has no destination capture point.
+Its pings are delivered when the reply returns to the source in time. A run of pings that
 were not delivered is an outage. Its lower bound is the time between the first and
 the last lost request. Its upper bound is the time between the last delivered
 request before the outage and the first delivered request after it. An outage counts
@@ -49,12 +51,16 @@ Frames = dict[tuple[int, int, Probe], list[int]]
 
 @dataclass(frozen=True, slots=True)
 class Stream:
-    """One ping stream between two capture points, told apart by its ICMP identifier."""
+    """One ping stream between two capture points, told apart by its ICMP identifier.
+
+    With `source_only`, the destination is a fixed address without a capture.
+    """
 
     name: str
     ident: int
     source: str
     destination: str
+    source_only: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,7 +147,9 @@ def measure(
     windows: Sequence[Window],
 ) -> dict[str, Any]:
     """Decode the captures that the streams use and measure every stream."""
-    points = {point for s in streams for point in (s.source, s.destination)}
+    points = {s.source for s in streams} | {
+        s.destination for s in streams if not s.source_only
+    }
     missing = sorted(points - captures.keys())
     if missing:
         msg = f"No capture for {', '.join(missing)}"
@@ -180,7 +188,10 @@ def measure_frames(
     }
     for stream in streams:
         flow, sends, good, duplicates = _stream(
-            stream, frames[stream.source], frames[stream.destination], windows
+            stream,
+            frames[stream.source],
+            None if stream.source_only else frames[stream.destination],
+            windows,
         )
         result["streams"][stream.name] = flow
         for w in windows:
@@ -208,9 +219,12 @@ def measure_frames(
 
 
 def _stream(
-    stream: Stream, sent: Frames, received: Frames, windows: Sequence[Window]
+    stream: Stream, sent: Frames, received: Frames | None, windows: Sequence[Window]
 ) -> tuple[dict[str, Any], dict[Probe, int], set[Probe], set[Probe]]:
-    """Match requests and replies of one stream at both ends and find its gaps."""
+    """Match requests and replies of one stream at both ends and find its gaps.
+
+    Without `received`, the stream is judged from the source capture alone.
+    """
     ident = stream.ident
     start, end = windows[0].start_ns, windows[-1].end_ns
     sends = {
@@ -225,13 +239,19 @@ def _stream(
     mismatches = []
     for probe in seen:
         outbound, reply = (ident, REQUEST, probe), (ident, REPLY, probe)
-        if len(sent.get(reply, [])) > 1 or len(received.get(outbound, [])) > 1:
+        if len(sent.get(reply, [])) > 1 or (
+            received is not None and len(received.get(outbound, [])) > 1
+        ):
             duplicates.add(probe)
-        if reply in sent and (outbound not in received or reply not in received):
+        if (
+            received is not None
+            and reply in sent
+            and (outbound not in received or reply not in received)
+        ):
             mismatches.append(probe[0])
-        if outbound not in received:
+        if received is not None and outbound not in received:
             bad[probe] = "request absent at destination"
-        elif reply not in received:
+        elif received is not None and reply not in received:
             bad[probe] = "reply absent at destination"
         elif reply not in sent:
             bad[probe] = "reply absent at source"

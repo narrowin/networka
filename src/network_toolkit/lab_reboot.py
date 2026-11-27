@@ -130,7 +130,7 @@ def run(
         command = routeros.reboot(client, switch, **options)
         session.mark("reboot_command", switch=switch, number=number, reply=command)
         wait_uptime(
-            client, session, switch, number, before_ns, dispatch, options, "reboot"
+            client, session, {switch: before_ns}, number, dispatch, options, "reboot"
         )
         wait_healthy(client, session, switch, number, items, options, "reboot")
 
@@ -138,28 +138,32 @@ def run(
 def wait_uptime(
     client: NetworkaClient,
     session: lab.Session,
-    switch: str,
+    before: Mapping[str, int],
     number: int,
-    before_ns: int,
     dispatch: Mapping[str, Any],
     options: Mapping[str, Any],
     operation: str,
 ) -> None:
-    port = client.devices[switch].port or client.config.general.port
-    while True:
+    """Poll every switch until each shows an uptime lower than `before` since dispatch."""
+    pending = dict(before)
+    while pending:
         time.sleep(POLL_S)
-        if not _ssh_ready(session.lab.node(switch).address, port):
-            continue
-        reading = routeros.collect_uptime(client, switch, **options)
-        observed = session.mark(
-            f"{operation}_uptime", switch=switch, number=number, uptime=reading
-        )
-        try:
-            after_ns = routeros.uptime_ns(reading)
-        except ValueError:
-            continue
-        if _restarted(before_ns, after_ns, observed["mono_ns"] - dispatch["mono_ns"]):
-            return
+        for switch, before_ns in list(pending.items()):
+            port = client.devices[switch].port or client.config.general.port
+            if not _ssh_ready(session.lab.node(switch).address, port):
+                continue
+            reading = routeros.collect_uptime(client, switch, **options)
+            observed = session.mark(
+                f"{operation}_uptime", switch=switch, number=number, uptime=reading
+            )
+            try:
+                after_ns = routeros.uptime_ns(reading)
+            except ValueError:
+                continue
+            if _restarted(
+                before_ns, after_ns, observed["mono_ns"] - dispatch["mono_ns"]
+            ):
+                del pending[switch]
 
 
 def wait_healthy(

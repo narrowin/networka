@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""Abrupt guest power loss and recovery on a containerlab RouterOS switch."""
+"""Abrupt power loss and recovery of containerlab nodes: RouterOS CHR guests and Linux hosts."""
 
 from __future__ import annotations
 
@@ -7,8 +7,10 @@ import ipaddress
 import json
 import re
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -19,18 +21,28 @@ from network_toolkit.traffic import NS
 if TYPE_CHECKING:
     from network_toolkit.client import NetworkaClient
 
+# Replies of every monitor command that the evidence keeps per RouterOS guest.
+GUEST_REPLIES = ("uptime", "status", "stop", "system_reset", "cont")
+
 
 @dataclass(frozen=True)
 class Power:
-    switch: str
+    """Power off or on one node, an inventory group, or the listed `nodes`.
+
+    `target` is the node or group as written, or the listed nodes joined by commas.
+    """
+
+    target: str
     on: bool
+    nodes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
 class Layout:
+    nodes: tuple[str, ...]
     own: tuple[lab.Point, ...]
     far: tuple[lab.Point, ...]
-    guest: lab.Qemu
+    guests: Mapping[str, lab.Qemu]
     peers: Mapping[lab.Point, lab.Qemu]
 
 
@@ -38,25 +50,47 @@ class Layout:
 class Outage:
     layout: Layout
     opening: int
-    before_ns: int
+    before_ns: Mapping[str, int]
     links: set[lab.Point] = field(default_factory=set)
     nics: set[lab.Point] = field(default_factory=set)
-    reset_pending: bool = False
-    resume_pending: bool = False
+    reset_pending: set[str] = field(default_factory=set)
+    resume_pending: set[str] = field(default_factory=set)
 
 
-def ends(topology: lab.Lab, switch: str) -> tuple[tuple[lab.Point, lab.Point], ...]:
-    return tuple(
-        (end, peer)
-        for left, right in topology.links
-        for end, peer in ((left, right), (right, left))
-        if end.node == switch
-    )
+def ends(
+    topology: lab.Lab, nodes: Iterable[str]
+) -> tuple[tuple[lab.Point, ...], tuple[lab.Point, ...]]:
+    """The cable ends on the powered nodes and the ends that face them from other nodes."""
+    powered = set(nodes)
+    own, far = [], []
+    for left, right in topology.links:
+        for end, peer in ((left, right), (right, left)):
+            if end.node in powered:
+                own.append(end)
+                if peer.node not in powered:
+                    far.append(peer)
+    return tuple(own), tuple(far)
 
 
 def _need(ok: object, message: str) -> None:
     if not ok:
         raise lab.LabError(message)
+
+
+def resolve(
+    client: NetworkaClient, topology: lab.Lab, action: Power
+) -> tuple[str, ...]:
+    """The lab nodes of a power action: the listed nodes, a group's members or one node."""
+    if action.nodes:
+        nodes = action.nodes
+    elif action.target in client.groups and action.target not in topology.nodes:
+        nodes = tuple(client.config.get_group_members(action.target))
+        _need(nodes, f"Power group {action.target!r} has no devices")
+    else:
+        nodes = (action.target,)
+    for node in nodes:
+        topology.node(node)
+    return nodes
 
 
 def _nic(topology: lab.Lab, end: lab.Point) -> lab.Qemu:
@@ -73,16 +107,27 @@ def _nic(topology: lab.Lab, end: lab.Point) -> lab.Qemu:
     return qemu
 
 
-def layout(topology: lab.Lab, switch: str) -> Layout:
-    """Discover all data links from the deployed topology and guest NIC layout."""
-    links = ends(topology, switch)
-    _need(links, f"{switch} has no data cables in the lab")
-    own, far = zip(*links, strict=True)
-    nics = [_nic(topology, end) for end in own]
-    _need(
-        len({(nic.pid, nic.qmp_host, nic.qmp_port) for nic in nics}) == 1,
-        f"{switch} does not have one guest behind all its data cables",
-    )
+def layout(topology: lab.Lab, nodes: Sequence[str]) -> Layout:
+    """Discover all data links from the deployed topology and guest NIC layout.
+
+    A RouterOS CHR node has one QEMU guest behind all its cables. A Linux node
+    has no guest; its cables alone lose carrier.
+    """
+    own, far = ends(topology, nodes)
+    guests = {}
+    for node in nodes:
+        cables = [end for end in own if end.node == node]
+        _need(cables, f"{node} has no data cables in the lab")
+        kind = topology.node(node).kind
+        if kind == "mikrotik_chr":
+            nics = [_nic(topology, end) for end in cables]
+            _need(
+                len({(nic.pid, nic.qmp_host, nic.qmp_port) for nic in nics}) == 1,
+                f"{node} does not have one guest behind all its data cables",
+            )
+            guests[node] = nics[0]
+        else:
+            _need(kind == "linux", f"{node} is neither a RouterOS CHR nor a Linux node")
     peers = {}
     for end in far:
         kind = topology.node(end.node).kind
@@ -90,7 +135,7 @@ def layout(topology: lab.Lab, switch: str) -> Layout:
             peers[end] = _nic(topology, end)
         else:
             _need(kind == "linux", f"{end} is not a supported power-loss neighbour")
-    return Layout(own, far, nics[0], peers)
+    return Layout(tuple(nodes), own, far, guests, peers)
 
 
 def _interface(nic: str) -> str:
@@ -138,8 +183,20 @@ def _carrier(
     )
 
 
+def _parallel(calls: Sequence[Callable[[], Any]]) -> list[Any]:
+    """Run local commands at once, so every cable of a site changes together."""
+    if not calls:
+        return []
+    with ThreadPoolExecutor(max_workers=len(calls)) as jobs:
+        futures = [jobs.submit(call) for call in calls]
+        errors = [error for job in futures if (error := job.exception())]
+        if errors:
+            raise lab.LabError("; ".join(str(error) for error in errors))
+        return [job.result() for job in futures]
+
+
 class PowerActions:
-    """Stop and reset a guest, preserving its container, management and links."""
+    """Stop and reset guests and withdraw carrier, preserving containers, management and links."""
 
     def __init__(
         self,
@@ -161,20 +218,51 @@ class PowerActions:
         self, _kind: object, original: BaseException | None, _traceback: object
     ) -> None:
         errors = []
-        for switch, outage in self.active.items():
+        for target, outage in self.active.items():
             try:
                 self.restore(outage)
-                status = lab.qmp_command(outage.layout.guest, "query-status", {})
-                _need(_status(status, running=True), f"{switch} did not resume")
+                status = self._status(outage.layout)
+                for node, reply in status.items():
+                    _need(_status(reply, running=True), f"{node} did not resume")
                 self._observe(outage.layout, up=True)
-                self.session.mark("power_cleanup", switch=switch)
+                self.session.mark(
+                    "power_cleanup", switch=target, nodes=list(outage.layout.nodes)
+                )
             except Exception as error:
-                errors.append(f"{switch} power cleanup: {error}")
+                errors.append(f"{target} power cleanup: {error}")
         self.session.record_restore_errors(errors, original)
 
     def _link(self, end: lab.Point, *, up: bool) -> None:
         state = "up" if up else "down"
         self.session.lab.run(end.node, "ip", "link", "set", "dev", end.interface, state)
+
+    def _links(self, ends: Iterable[lab.Point], *, up: bool) -> None:
+        _parallel([partial(self._link, end, up=up) for end in sorted(ends)])
+
+    def _facing(
+        self, plan: Layout, ends: Iterable[lab.Point], *, up: bool
+    ) -> dict[str, Any]:
+        """Set the guest NICs that face the powered nodes; return the replies in layout order."""
+        wanted = set(ends)
+        chosen = [end for end in plan.peers if end in wanted]
+        replies = _parallel(
+            [
+                partial(
+                    lab.qmp_command,
+                    plan.peers[end],
+                    "set_link",
+                    {"name": plan.peers[end].nic, "up": up},
+                )
+                for end in chosen
+            ]
+        )
+        return {str(end): reply for end, reply in zip(chosen, replies, strict=True)}
+
+    def _status(self, plan: Layout) -> dict[str, Any]:
+        return {
+            node: lab.qmp_command(guest, "query-status", {})
+            for node, guest in plan.guests.items()
+        }
 
     def _read(self, plan: Layout) -> dict[str, Any]:
         return {
@@ -204,46 +292,52 @@ class PowerActions:
             # Poll faster than one ping interval to see carrier settle.
             time.sleep(0.03)
 
-    def off(self, switch: str, number: int) -> None:
-        plan = self.layouts[switch]
-        before = routeros.collect_uptime(self.client, switch, **self.options)
-        before_ns = routeros.uptime_ns(before)
-        _need(
-            before_ns > 0, f"Cannot prove a lower uptime after power loss of {switch}"
-        )
-        status = lab.qmp_command(plan.guest, "query-status", {})
-        _need(_status(status, running=True), f"{switch} is not running")
+    def off(self, target: str, number: int) -> None:
+        plan = self.layouts[target]
+        uptime, before_ns = {}, {}
+        for node in plan.guests:
+            uptime[node] = routeros.collect_uptime(self.client, node, **self.options)
+            before_ns[node] = routeros.uptime_ns(uptime[node])
+            _need(
+                before_ns[node] > 0,
+                f"Cannot prove a lower uptime after power loss of {node}",
+            )
+        status = self._status(plan)
+        for node, reply in status.items():
+            _need(_status(reply, running=True), f"{node} is not running")
         baseline = self._observe(plan, up=True)
         active = Outage(plan, number, before_ns)
-        self.active[switch] = active
+        self.active[target] = active
         self.session.mark(
             "power_off_start",
-            switch=switch,
+            switch=target,
             number=number,
-            uptime=before,
+            nodes=list(plan.nodes),
+            uptime=uptime,
             peers={str(end): nic.nic for end, nic in plan.peers.items()},
             status=status,
             **baseline,
         )
-        active.reset_pending = active.resume_pending = True
-        stop = lab.qmp_command(plan.guest, "stop", {})
-        for end in plan.own:
-            # The command may succeed before an interrupt or a transport error reaches us.
-            active.links.add(end)
-            self._link(end, up=False)
-        facing = {}
-        for end, nic in plan.peers.items():
-            active.nics.add(end)
-            facing[str(end)] = lab.qmp_command(
-                nic, "set_link", {"name": nic.nic, "up": False}
-            )
-        status = lab.qmp_command(plan.guest, "query-status", {})
-        _need(_status(status, running=False), f"{switch} did not pause")
+        # A command may succeed before an interrupt or a transport error reaches us.
+        active.reset_pending.update(plan.guests)
+        active.resume_pending.update(plan.guests)
+        stop = {
+            node: lab.qmp_command(guest, "stop", {})
+            for node, guest in plan.guests.items()
+        }
+        active.links.update(plan.own)
+        self._links(plan.own, up=False)
+        active.nics.update(plan.peers)
+        facing = self._facing(plan, plan.peers, up=False)
+        status = self._status(plan)
+        for node, reply in status.items():
+            _need(_status(reply, running=False), f"{node} did not pause")
         reading = self._observe(plan, up=False)
         self.session.mark(
             "power_off_observed",
-            switch=switch,
+            switch=target,
             number=number,
+            nodes=list(plan.nodes),
             stop=stop,
             status=status,
             facing=facing,
@@ -251,34 +345,25 @@ class PowerActions:
         )
 
     def restore(self, active: Outage) -> dict[str, Any]:
-        """Always attempt guest resume and every link, even after one failure."""
+        """Always attempt every guest reset and resume and every link, even after one failure."""
         plan = active.layout
         errors = []
-        replies: dict[str, Any] = {"facing": {}}
-        for attr, command in (
-            ("reset_pending", "system_reset"),
-            ("resume_pending", "cont"),
+        replies: dict[str, Any] = {"facing": {}, "system_reset": {}, "cont": {}}
+        for pending, command in (
+            (active.reset_pending, "system_reset"),
+            (active.resume_pending, "cont"),
         ):
-            if not getattr(active, attr):
-                continue
+            for node, guest in plan.guests.items():
+                if node not in pending:
+                    continue
+                try:
+                    replies[command][node] = lab.qmp_command(guest, command, {})
+                    pending.discard(node)
+                except lab.LabError as error:
+                    errors.append(str(error))
+        for change in (self._restore_links, self._restore_nics):
             try:
-                replies[command] = lab.qmp_command(plan.guest, command, {})
-                setattr(active, attr, False)
-            except lab.LabError as error:
-                errors.append(str(error))
-        for end in sorted(active.links):
-            try:
-                self._link(end, up=True)
-                active.links.discard(end)
-            except lab.LabError as error:
-                errors.append(str(error))
-        for end in sorted(active.nics):
-            nic = plan.peers[end]
-            try:
-                replies["facing"][str(end)] = lab.qmp_command(
-                    nic, "set_link", {"name": nic.nic, "up": True}
-                )
-                active.nics.discard(end)
+                change(active, replies)
             except lab.LabError as error:
                 errors.append(str(error))
         if errors:
@@ -286,29 +371,41 @@ class PowerActions:
             raise lab.LabError(msg)
         return replies
 
+    def _restore_links(self, active: Outage, _replies: dict[str, Any]) -> None:
+        self._links(active.links, up=True)
+        active.links.clear()
+
+    def _restore_nics(self, active: Outage, replies: dict[str, Any]) -> None:
+        replies["facing"] = self._facing(active.layout, active.nics, up=True)
+        active.nics.clear()
+
     def on(
-        self, switch: str, number: int, wait_s: float, items: list[intent.IntentItem]
+        self, target: str, number: int, wait_s: float, items: list[intent.IntentItem]
     ) -> None:
-        active = self.active[switch]
+        active = self.active[target]
         plan = active.layout
-        status = lab.qmp_command(plan.guest, "query-status", {})
-        _need(_status(status, running=False), f"{switch} did not remain paused")
+        status = self._status(plan)
+        for node, reply in status.items():
+            _need(_status(reply, running=False), f"{node} did not remain paused")
         dispatch = self.session.mark(
             "power_on_start",
-            switch=switch,
+            switch=target,
             number=number,
+            nodes=list(plan.nodes),
             opening=active.opening,
             status=status,
         )
         with lab_reboot._deadline(wait_s, since_ns=dispatch["mono_ns"]):
             replies = self.restore(active)
-            status = lab.qmp_command(plan.guest, "query-status", {})
-            _need(_status(status, running=True), f"{switch} did not resume")
+            status = self._status(plan)
+            for node, reply in status.items():
+                _need(_status(reply, running=True), f"{node} did not resume")
             reading = self._observe(plan, up=True)
             self.session.mark(
                 "power_on_observed",
-                switch=switch,
+                switch=target,
                 number=number,
+                nodes=list(plan.nodes),
                 status=status,
                 **replies,
                 **reading,
@@ -316,17 +413,16 @@ class PowerActions:
             lab_reboot.wait_uptime(
                 self.client,
                 self.session,
-                switch,
-                number,
                 active.before_ns,
+                number,
                 dispatch,
                 self.options,
                 "power",
             )
             lab_reboot.wait_healthy(
-                self.client, self.session, switch, number, items, self.options, "power"
+                self.client, self.session, target, number, items, self.options, "power"
             )
-        del self.active[switch]
+        del self.active[target]
 
 
 def _event(
@@ -347,43 +443,80 @@ def _event(
     return matches[0]
 
 
+def _per_node(event: Mapping[str, Any], node: str) -> Mapping[str, Any]:
+    """An event saved when power took one switch, with its replies keyed by that switch."""
+    return {
+        **event,
+        "nodes": [node],
+        **{key: {node: event[key]} for key in GUEST_REPLIES if key in event},
+    }
+
+
 def proof(
     folder: Path,
     events: Sequence[Mapping[str, Any]],
-    switch: str,
+    action: Power,
     opening: int,
     closing: int,
     hold_s: float,
     wait_s: float,
     items: list[intent.IntentItem],
 ) -> dict[str, Any]:
-    """Prove the guest pause, loss of carrier, reset, new uptime and healthy lab."""
-    result: dict[str, Any] = {"switch": switch, "verdict": "error", "limit_s": wait_s}
+    """Prove the guest pauses, loss of carrier, resets, new uptimes and healthy lab."""
+    target = action.target
+    result: dict[str, Any] = {"switch": target, "verdict": "error", "limit_s": wait_s}
     try:
-        start = _event(events, "power_off_start", switch, opening)
-        stopped = _event(events, "power_off_observed", switch, opening)
-        dispatch = _event(events, "power_on_start", switch, closing)
-        powered = _event(events, "power_on_observed", switch, closing)
+        recorded = [
+            _event(events, "power_off_start", target, opening),
+            _event(events, "power_off_observed", target, opening),
+            _event(events, "power_on_start", target, closing),
+            _event(events, "power_on_observed", target, closing),
+        ]
+        if "nodes" not in recorded[0]:
+            recorded = [_per_node(e, target) for e in recorded]
+        start, stopped, dispatch, powered = recorded
         topology = lab.parse_topology(
             json.loads((folder / lab.TOPOLOGY_DATA).read_text())
         )
-        own, far = zip(*ends(topology, switch), strict=True)
+        nodes = tuple(start["nodes"])
+        own, far = ends(topology, nodes)
+        kinds = {node: topology.node(node).kind for node in nodes}
+        guests = [node for node in nodes if kinds[node] == "mikrotik_chr"]
         peers = {lab.point(p): nic for p, nic in start["peers"].items()}
+        # A group is resolved from the inventory, so replay can only check the nodes it names.
         _need(
-            topology.node(switch).kind == "mikrotik_chr"
-            and set(peers)
+            all(e["nodes"] == list(nodes) for e in recorded)
+            and (
+                nodes == action.nodes
+                if action.nodes
+                else nodes == (target,) or (nodes and target not in topology.nodes)
+            )
+            and len(set(nodes)) == len(nodes)
+            and all(kind in ("mikrotik_chr", "linux") for kind in kinds.values())
+            and all(any(end.node == node for end in own) for node in nodes),
+            "The saved power-loss nodes do not match the test",
+        )
+        _need(
+            set(peers)
             == {end for end in far if topology.node(end.node).kind == "mikrotik_chr"}
             and all(re.fullmatch(r"nic[1-9]\d*", nic) for nic in peers.values()),
             "The saved peer NICs do not cover the RouterOS neighbours",
         )
         _need(
-            _status(start["status"], running=True)
-            and _status(stopped["status"], running=False)
-            and _status(dispatch["status"], running=False)
-            and _status(powered["status"], running=True)
-            and _command(stopped["stop"], "stop", {})
-            and _command(powered["system_reset"], "system_reset", {})
-            and _command(powered["cont"], "cont", {}),
+            all(
+                set(e["status"]) == set(guests)
+                for e in (start, stopped, dispatch, powered)
+            )
+            and all(
+                _status(start["status"][node], running=True)
+                and _status(stopped["status"][node], running=False)
+                and _status(dispatch["status"][node], running=False)
+                and _status(powered["status"][node], running=True)
+                and _command(stopped["stop"][node], "stop", {})
+                and _command(powered["system_reset"][node], "system_reset", {})
+                and _command(powered["cont"][node], "cont", {})
+                for node in guests
+            ),
             "The captured monitor replies do not show a paused guest followed by its reset",
         )
         _need(
@@ -410,29 +543,56 @@ def proof(
             and held >= hold_s,
             "The guest power loss did not hold for the requested interval",
         )
-        before = routeros.uptime_ns(start["uptime"])
-        after, elapsed = lab_reboot.uptime_proof(
-            events, before, dispatch, switch, closing, "power"
-        )
+        boots = {}
+        for node in guests:
+            before = routeros.uptime_ns(start["uptime"][node])
+            after, elapsed = lab_reboot.uptime_proof(
+                events, before, dispatch, node, closing, "power"
+            )
+            boots[node] = before, after, elapsed
         healthy = lab_reboot.health_proof(
-            folder, events, switch, closing, items, "power"
+            folder, events, target, closing, items, "power"
         )
         recovered = (healthy["mono_ns"] - dispatch["mono_ns"]) / NS
         _need(
-            powered["mono_ns"] <= dispatch["mono_ns"] + elapsed <= healthy["mono_ns"]
+            all(
+                powered["mono_ns"]
+                <= dispatch["mono_ns"] + elapsed
+                <= healthy["mono_ns"]
+                for _, _, elapsed in boots.values()
+            )
             and healthy["verdict"] == "pass"
             and recovered <= wait_s,
             "The recorded new boot and lab state did not recover within the deadline",
         )
-        result.update(
-            verdict="pass",
-            ports=[str(end) for end in own],
-            held_s=held,
-            before_uptime_s=before / NS,
-            after_uptime_s=after / NS,
-            elapsed_s=elapsed / NS,
-            healthy_s=recovered,
-        )
+        ports = [str(end) for end in own]
+        if nodes == (target,) and guests == [target]:
+            before, after, elapsed = boots[target]
+            result.update(
+                verdict="pass",
+                ports=ports,
+                held_s=held,
+                before_uptime_s=before / NS,
+                after_uptime_s=after / NS,
+                elapsed_s=elapsed / NS,
+                healthy_s=recovered,
+            )
+        else:
+            result.update(
+                verdict="pass",
+                nodes=list(nodes),
+                ports=ports,
+                held_s=held,
+                boots={
+                    node: {
+                        "before_uptime_s": before / NS,
+                        "after_uptime_s": after / NS,
+                        "elapsed_s": elapsed / NS,
+                    }
+                    for node, (before, after, elapsed) in boots.items()
+                },
+                healthy_s=recovered,
+            )
     except (
         OSError,
         KeyError,

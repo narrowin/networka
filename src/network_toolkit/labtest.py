@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import html
 import importlib
+import ipaddress
 import json
 import math
 import re
@@ -93,10 +94,13 @@ class LabTestError(NetworkToolkitError):
 
 @dataclass(frozen=True)
 class StreamSpec:
+    """A stream to a destination point, or with `address` to that fixed IPv4 address."""
+
     name: str
     ident: int
     source: str
     destination: str
+    address: str | None = None
 
 
 @dataclass(frozen=True)
@@ -177,8 +181,10 @@ class LabTest:
         return [item for s in self.statements for item in s.checks]
 
     def ends(self) -> set[str]:
-        """The capture points at both ends of every stream."""
-        return {p for s in self.streams for p in (s.source, s.destination)}
+        """The capture points of every stream: both ends, or the source for a fixed address."""
+        return {s.source for s in self.streams} | {
+            s.destination for s in self.streams if s.address is None
+        }
 
 
 @dataclass(frozen=True)
@@ -285,14 +291,18 @@ def _streams(raw: Any, where: str) -> tuple[StreamSpec, ...]:
             _fail(f"{at}: name", "must be letters, digits, dots, dashes or underscores")
         if name in (s.name for s in streams):
             _fail(f"{at}: name", f"stream {name} is listed twice")
-        streams.append(
-            StreamSpec(
-                name,
-                n,
-                _point(entry["from"], f"{at}: from"),
-                _point(entry["to"], f"{at}: to"),
-            )
-        )
+        source = _point(entry["from"], f"{at}: from")
+        to = _text(entry["to"], f"{at}: to")
+        if ":" in to:
+            streams.append(StreamSpec(name, n, source, _point(to, f"{at}: to"), None))
+            continue
+        try:
+            address = ipaddress.IPv4Address(to)
+        except ValueError:
+            _fail(f"{at}: to", "must be node:interface or an IPv4 address")
+        if address.is_unspecified or address.is_multicast or address.is_loopback:
+            _fail(f"{at}: to", "must be a unicast IPv4 address of a lab device")
+        streams.append(StreamSpec(name, n, source, str(address), str(address)))
     return tuple(streams)
 
 
@@ -369,7 +379,15 @@ def _action(entry: Mapping[str, Any], where: str, wait: float) -> Action:
             _fail(where, "power_on needs a positive wait_healthy_s")
         if not on and "wait_healthy_s" in entry:
             _fail(where, "wait_healthy_s belongs to power_on")
-        return lab_power.Power(_text(action[kind], f"{at}: {kind}"), on)
+        if not isinstance(action[kind], list):
+            return lab_power.Power(_text(action[kind], f"{at}: {kind}"), on)
+        nodes = tuple(
+            _text(node, f"{at}: {kind} {n}")
+            for n, node in enumerate(_list(action[kind], f"{at}: {kind}"), 1)
+        )
+        if len(set(nodes)) != len(nodes):
+            _fail(f"{at}: {kind}", "lists a node twice")
+        return lab_power.Power(", ".join(nodes), on, nodes)
     if kind == "reboot":
         _fields(action, at, (("reboot",), ()))
         if not wait:
@@ -473,12 +491,13 @@ def _fault_pairs(steps: Sequence[Step]) -> dict[int, int]:
 
 def _power_pairs(steps: Sequence[Step]) -> dict[int, int]:
     pairs: dict[int, int] = {}
-    active: tuple[str, int] | None = None
+    active: tuple[tuple[str, tuple[str, ...]], int] | None = None
     for n, step in enumerate(steps, 1):
         if not isinstance(action := step.action, lab_power.Power):
             continue
+        target = action.target, action.nodes
         if action.on:
-            if active is None or active[0] != action.switch:
+            if active is None or active[0] != target:
                 _fail(step.name, "power_on needs a matching power_off")
             pairs[active[1]] = n
             active = None
@@ -486,11 +505,11 @@ def _power_pairs(steps: Sequence[Step]) -> dict[int, int]:
             if active:
                 _fail(
                     step.name,
-                    "restore the powered-off switch before powering off another",
+                    "restore the powered-off nodes before powering off others",
                 )
             if step.hold_s <= 0:
                 _fail(step.name, "power_off needs a positive hold_s")
-            active = action.switch, n
+            active = target, n
     if active:
         _fail(steps[active[1] - 1].name, "power_off needs a matching power_on")
     return pairs
@@ -850,14 +869,16 @@ def run_test(
         if isinstance(step.action, Reboot):
             lab_reboot.validate_target(client, the_lab, step.action.switch)
         if isinstance(step.action, lab_power.Power) and not step.action.on:
-            switch = step.action.switch
-            lab_reboot.validate_target(client, the_lab, switch, "Power loss")
-            plan = lab_power.layout(the_lab, switch)
+            nodes = lab_power.resolve(client, the_lab, step.action)
+            for node in nodes:
+                if the_lab.node(node).kind != "linux":
+                    lab_reboot.validate_target(client, the_lab, node, "Power loss")
+            plan = lab_power.layout(the_lab, nodes)
             for peer in {end.node for end in plan.peers}:
                 lab_reboot.validate_target(
                     client, the_lab, peer, "Power loss neighbour"
                 )
-            power_layouts[switch] = plan
+            power_layouts[step.action.target] = plan
         if isinstance(step.action, lab_faults.TrafficFault) and not step.action.clear:
             the_lab.peer(lab.point(step.action.point))
     switches = _switches(client, the_lab, test) if test.switch_log else []
@@ -925,7 +946,10 @@ def run_test(
 
 def _streams_of(test: LabTest) -> list[traffic.Stream]:
     return [
-        traffic.Stream(s.name, s.ident, s.source, s.destination) for s in test.streams
+        traffic.Stream(
+            s.name, s.ident, s.source, s.destination, source_only=s.address is not None
+        )
+        for s in test.streams
     ]
 
 
@@ -978,6 +1002,7 @@ def _flow(
             stream.source,
             stream.destination,
             traffic.INTERVAL_NS / NS,
+            address=stream.address,
         )
     if test.flood:
         lab_flood.start(session, test.flood, len(test.streams) + 1)
@@ -1030,9 +1055,9 @@ def _flow(
                 mobile.run(action, number)
             elif isinstance(action, lab_power.Power):
                 if action.on:
-                    power.on(action.switch, number, step.wait_s, items)
+                    power.on(action.target, number, step.wait_s, items)
                 else:
-                    power.off(action.switch, number)
+                    power.off(action.target, number)
             elif isinstance(action, lab_faults.TrafficFault):
                 if action.clear:
                     faults.clear(
@@ -1046,7 +1071,8 @@ def _flow(
                         )
                         addresses = (
                             session.lab.ipv4(lab.point(stream.source)),
-                            session.lab.ipv4(lab.point(stream.destination)),
+                            stream.address
+                            or session.lab.ipv4(lab.point(stream.destination)),
                         )
                     faults.install(action, number, addresses)
             time.sleep(step.hold_s)
@@ -1492,6 +1518,7 @@ def _traffic(
             step_limits.get(label, {}).get(name) for label in labels
         )
 
+    fixed = {s.name for s in test.streams if s.address is not None}
     for name, flow in measured["streams"].items():
         limit_ms = round(flow["send_gap_limit_s"] * 1000)
         pauses = flow["send_pauses"]
@@ -1500,10 +1527,11 @@ def _traffic(
             check(True, f"{name} paused sending only inside steps with a loss limit")
         else:
             check(not unjudged, f"{name} sent a ping at least every {limit_ms} ms")
-        check(
-            not flow["capture_mismatches"],
-            f"{name} shows the same replies at both capture points",
-        )
+        if name not in fixed:
+            check(
+                not flow["capture_mismatches"],
+                f"{name} shows the same replies at both capture points",
+            )
     if test.flood:
         flood = lab_flood.proof(
             test.flood,
@@ -1574,7 +1602,7 @@ def _traffic(
         proof = lab_power.proof(
             folder,
             events,
-            action.switch,
+            action,
             opening,
             restoring,
             initial.hold_s,
@@ -1753,6 +1781,8 @@ def _event_row(event: Mapping[str, Any]) -> tuple[str, str] | None:
         return "capture", f"started at {event['point']}"
     if name == "stream_started" and event["stream"].startswith("_flood-"):
         return "flood probe", f"started from {event['source']} to {event['address']}"
+    if name == "stream_started" and event["destination"] == event["address"]:
+        return event["stream"], f"started from {event['source']} to {event['address']}"
     if name == "stream_started":
         return (
             event["stream"],
@@ -1787,6 +1817,18 @@ def _event_row(event: Mapping[str, Any]) -> tuple[str, str] | None:
             "recovery",
             f"full lab state after reboot of {event['switch']}: {event['verdict']}",
         )
+    if name.startswith("power_") and event.get("nodes", [event["switch"]]) != [
+        event["switch"]
+    ]:
+        nodes = f"{event['switch']} ({', '.join(event['nodes'])})"
+        rows = {
+            "power_off_start": f"withdrawing the data cables of {nodes} and stopping the RouterOS guests",
+            "power_off_observed": f"{nodes} RouterOS guests paused and all data cables down",
+            "power_on_start": f"resetting and resuming the RouterOS guests of {nodes}",
+            "power_on_observed": f"{nodes} RouterOS guests running and all data cables up",
+        }
+        if name in rows:
+            return "power", rows[name]
     if name == "power_off_start":
         return (
             "power",
@@ -2007,13 +2049,27 @@ def _report_traffic(
         power = measured_steps.get(step.name, {}).get("power", {})
         if power.get("state") != "on" or power.get("verdict") != "pass":
             continue
+        if "boots" not in power:
+            output += [
+                "",
+                f"**Power loss of {_cell(power['switch'])}** · {_cell(power['verdict'])}",
+                "",
+                f"- Data cables lost carrier and the guest was paused for {power['held_s']:.3f} s.",
+                f"- The new boot was detected at +{power['elapsed_s']:.3f} s, with all lab checks passing at +{power['healthy_s']:.3f} s.",
+            ]
+            continue
         output += [
             "",
-            f"**Power loss of {_cell(power['switch'])}** · {_cell(power['verdict'])}",
+            f"**Power loss of {_cell(', '.join(power['nodes']))}** · {_cell(power['verdict'])}",
             "",
-            f"- Data cables lost carrier and the guest was paused for {power['held_s']:.3f} s.",
-            f"- The new boot was detected at +{power['elapsed_s']:.3f} s, with all lab checks passing at +{power['healthy_s']:.3f} s.",
+            f"- Every data cable of these nodes lost carrier for {power['held_s']:.3f} s"
+            + (", and their RouterOS guests were paused." if power["boots"] else "."),
         ]
+        output += [
+            f"- {_cell(node)} showed a new boot at +{boot['elapsed_s']:.3f} s."
+            for node, boot in power["boots"].items()
+        ]
+        output.append(f"- All lab checks passed at +{power['healthy_s']:.3f} s.")
     for step in test.steps:
         mobile = measured_steps.get(step.name, {}).get("mobile", {})
         if "gratuitous_arp_s" in mobile:
