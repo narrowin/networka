@@ -1,0 +1,96 @@
+access-switch / :put [:serialize to=json options=json.no-string-conversion [/interface/print detail as-value]]
+  unchanged
+access-switch / :put [:serialize to=json options=json.no-string-conversion [/ip/vrf/print detail as-value]]
+  unchanged
+access-switch / :put [:serialize to=json options=json.no-string-conversion [/routing/table/print detail as-value]]
+  unchanged
+access-switch / :put [:serialize to=json options=json.no-string-conversion [/system/resource/print as-value]]
+{
+  "architecture-name": "arm64",
+  "board-name": "CHR QEMU QEMU Virtual Machine",
+  "build-time": "2026-11-20 11:11:10",
+  "cpu": "ARM64",
+  "cpu-count": 1,
+  "cpu-load": 6 -> 36,
+  "free-hdd-space": 71995392,
+  "free-memory": 63320064 -> 63397888,
+  "platform": "MikroTik",
+  "total-hdd-space": 86183936,
+  "total-memory": 301989888,
+  "uptime": "00:01:38" -> "00:01:41",
+  "version": "7.25.2",
+  "write-sect-since-reboot": 2144 -> 2176,
+  "write-sect-total": 2144 -> 2176
+}
+switch1 / :put [:serialize to=json options=json.no-string-conversion [/interface/print detail as-value]]
+  unchanged
+switch1 / :put [:serialize to=json options=json.no-string-conversion [/ip/vrf/print detail as-value]]
+  unchanged
+switch1 / :put [:serialize to=json options=json.no-string-conversion [/routing/table/print detail as-value]]
+  unchanged
+switch1 / :put [:serialize to=json options=json.no-string-conversion [/system/resource/print as-value]]
+{
+  "architecture-name": "arm64",
+  "board-name": "CHR QEMU QEMU Virtual Machine",
+  "build-time": "2026-11-20 11:11:10",
+  "cpu": "ARM64",
+  "cpu-count": 1,
+  "cpu-load": 5 -> 30,
+  "free-hdd-space": 71995392,
+  "free-memory": 63643648 -> 63623168,
+  "platform": "MikroTik",
+  "total-hdd-space": 86183936,
+  "total-memory": 301989888,
+  "uptime": "00:01:38" -> "00:01:41",
+  "version": "7.25.2",
+  "write-sect-since-reboot": 2184 -> 2216,
+  "write-sect-total": 2184 -> 2216
+}
+switch2 / :put [:serialize to=json options=json.no-string-conversion [/interface/print detail as-value]]
+[
+  {...},
+  {...},
+  {...},
+  {
+    ".id": "*7",
+    "disabled": false -> true,
+    "dynamic": false,
+    "last-link-down-time": "2026-11-27 20:04:22",
+    "last-link-up-time": "2026-11-27 20:03:21",
+    "link-downs": 0 -> 1,
+    "mac-address": "8E:93:B3:13:09:E4",
+    "mtu": 0,
+    "name": "demo-bridge",
+    "running": true -> false,
+    "type": "bridge",
+    "vrf": "main",
+    "actual-mtu": 1500,
+    "l2mtu": 65535
+  },
+  {...},
+  {...},
+  {...}
+]
+switch2 / :put [:serialize to=json options=json.no-string-conversion [/ip/vrf/print detail as-value]]
+  unchanged
+switch2 / :put [:serialize to=json options=json.no-string-conversion [/routing/table/print detail as-value]]
+  unchanged
+switch2 / :put [:serialize to=json options=json.no-string-conversion [/system/resource/print as-value]]
+{
+  "architecture-name": "arm64",
+  "board-name": "CHR QEMU QEMU Virtual Machine",
+  "build-time": "2026-11-20 11:11:10",
+  "cpu": "ARM64",
+  "cpu-count": 1,
+  "cpu-load": 5 -> 26,
+  "free-hdd-space": 71995392,
+  "free-memory": 63426560 -> 62775296,
+  "platform": "MikroTik",
+  "total-hdd-space": 86183936,
+  "total-memory": 301989888,
+  "uptime": "00:01:38" -> "00:01:41",
+  "version": "7.25.2",
+  "write-sect-since-reboot": 2048 -> 2144,
+  "write-sect-total": 2048 -> 2144
+}
+Changes found

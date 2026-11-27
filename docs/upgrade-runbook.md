@@ -124,3 +124,41 @@ saved results. Review the differences before accepting the upgrade.
 Keep both saved bundles with the change record. These four queries cover
 interfaces, VRFs, routing-table definitions and resources; apply the customer's
 traffic and protocol acceptance checks separately.
+
+## Inspect the verified lab result
+
+On 27 November 2026, the published YAML and shell blocks above were exercised
+unchanged in one shell on a connected three-switch containerlab lab. Networka
+was commit [a74942c](https://github.com/narrowin/networka/commit/a74942c2319aa1acf47ef111240d46e56f0b9343),
+and all three switches ran RouterOS 7.25.2 throughout. The controlled change
+between collections disabled only the spare `demo-bridge` on `switch2`.
+
+Both collections returned exit `0` and reported `3 succeeded, 0 failed`.
+Each bundle contained twelve JSON replies, three sequence summaries and one
+group summary. The single `nw diff` compared all twelve device/query pairs
+and returned exit `1`, meaning differences found.
+
+| Device | Interfaces | VRFs | Routing-table definitions | Resources |
+|---|---|---|---|---|
+| switch1 | Unchanged | Unchanged | Unchanged | Changed |
+| switch2 | Spare bridge disabled | Unchanged | Unchanged | Changed |
+| access-switch | Unchanged | Unchanged | Unchanged | Changed |
+
+The changed bridge had `disabled: false -> true`, `running: true -> false`
+and `link-downs: 0 -> 1`. RouterOS added its last-link-down time and stopped
+returning its operational MTU fields. Resource differences were CPU load,
+free memory, uptime and write counts. Management and both data interfaces
+remained running on every switch.
+
+The image below renders the captured ANSI output. Red marks old values or
+removed fields; green marks new values or added fields. The `{...}` entries
+are DeepDiff's compact view of unchanged objects.
+
+![Actual whole-lab nw diff output](assets/upgrade-group-result/diff.png)
+
+Download the [captured ANSI output](assets/upgrade-group-result/diff.ansi),
+[plain text output](assets/upgrade-group-result/diff.txt), or
+[both saved bundles](assets/upgrade-group-result/saved-bundles.zip).
+The plain text omits color; use the image or ANSI output to distinguish added
+and removed fields. The bundle archive contains `before/` and `after/`
+directories accepted by the same structured comparison command after extraction.

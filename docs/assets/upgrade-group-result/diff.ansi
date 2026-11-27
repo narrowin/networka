@@ -1,0 +1,96 @@
+access-switch [35m/[0m :put [1m[[0m:serialize [33mto[0m=[35mjson[0m [33moptions[0m=[35mjson[0m.no-string-conversion [1m[[0m[35m/interface/[0m[95mprint[0m detail as-value[1m][0m[1m][0m
+  unchanged
+access-switch [35m/[0m :put [1m[[0m:serialize [33mto[0m=[35mjson[0m [33moptions[0m=[35mjson[0m.no-string-conversion [1m[[0m[35m/ip/vrf/[0m[95mprint[0m detail as-value[1m][0m[1m][0m
+  unchanged
+access-switch [35m/[0m :put [1m[[0m:serialize [33mto[0m=[35mjson[0m [33moptions[0m=[35mjson[0m.no-string-conversion [1m[[0m[35m/routing/table/[0m[95mprint[0m detail as-value[1m][0m[1m][0m
+  unchanged
+access-switch [35m/[0m :put [1m[[0m:serialize [33mto[0m=[35mjson[0m [33moptions[0m=[35mjson[0m.no-string-conversion [1m[[0m[35m/system/resource/[0m[95mprint[0m as-value[1m][0m[1m][0m
+{
+  "architecture-name": "arm64",
+  "board-name": "CHR QEMU QEMU Virtual Machine",
+  "build-time": "2026-11-20 11:11:10",
+  "cpu": "ARM64",
+  "cpu-count": 1,
+  "cpu-load": [31m6[0m -> [32m36[0m,
+  "free-hdd-space": 71995392,
+  "free-memory": [31m63320064[0m -> [32m63397888[0m,
+  "platform": "MikroTik",
+  "total-hdd-space": 86183936,
+  "total-memory": 301989888,
+  "uptime": [31m"00:01:38"[0m -> [32m"00:01:41"[0m,
+  "version": "7.25.2",
+  "write-sect-since-reboot": [31m2144[0m -> [32m2176[0m,
+  "write-sect-total": [31m2144[0m -> [32m2176[0m
+}
+switch1 [35m/[0m :put [1m[[0m:serialize [33mto[0m=[35mjson[0m [33moptions[0m=[35mjson[0m.no-string-conversion [1m[[0m[35m/interface/[0m[95mprint[0m detail as-value[1m][0m[1m][0m
+  unchanged
+switch1 [35m/[0m :put [1m[[0m:serialize [33mto[0m=[35mjson[0m [33moptions[0m=[35mjson[0m.no-string-conversion [1m[[0m[35m/ip/vrf/[0m[95mprint[0m detail as-value[1m][0m[1m][0m
+  unchanged
+switch1 [35m/[0m :put [1m[[0m:serialize [33mto[0m=[35mjson[0m [33moptions[0m=[35mjson[0m.no-string-conversion [1m[[0m[35m/routing/table/[0m[95mprint[0m detail as-value[1m][0m[1m][0m
+  unchanged
+switch1 [35m/[0m :put [1m[[0m:serialize [33mto[0m=[35mjson[0m [33moptions[0m=[35mjson[0m.no-string-conversion [1m[[0m[35m/system/resource/[0m[95mprint[0m as-value[1m][0m[1m][0m
+{
+  "architecture-name": "arm64",
+  "board-name": "CHR QEMU QEMU Virtual Machine",
+  "build-time": "2026-11-20 11:11:10",
+  "cpu": "ARM64",
+  "cpu-count": 1,
+  "cpu-load": [31m5[0m -> [32m30[0m,
+  "free-hdd-space": 71995392,
+  "free-memory": [31m63643648[0m -> [32m63623168[0m,
+  "platform": "MikroTik",
+  "total-hdd-space": 86183936,
+  "total-memory": 301989888,
+  "uptime": [31m"00:01:38"[0m -> [32m"00:01:41"[0m,
+  "version": "7.25.2",
+  "write-sect-since-reboot": [31m2184[0m -> [32m2216[0m,
+  "write-sect-total": [31m2184[0m -> [32m2216[0m
+}
+switch2 [35m/[0m :put [1m[[0m:serialize [33mto[0m=[35mjson[0m [33moptions[0m=[35mjson[0m.no-string-conversion [1m[[0m[35m/interface/[0m[95mprint[0m detail as-value[1m][0m[1m][0m
+[
+  {...},
+  {...},
+  {...},
+  {
+    ".id": "*7",
+    "disabled": [31mfalse[0m -> [32mtrue[0m,
+    "dynamic": false,
+    [32m"last-link-down-time": [0m[32m"2026-11-27 20:04:22"[0m,
+    "last-link-up-time": "2026-11-27 20:03:21",
+    "link-downs": [31m0[0m -> [32m1[0m,
+    "mac-address": "8E:93:B3:13:09:E4",
+    "mtu": 0,
+    "name": "demo-bridge",
+    "running": [31mtrue[0m -> [32mfalse[0m,
+    "type": "bridge",
+    "vrf": "main",
+    [31m"actual-mtu": [0m[31m1500[0m,
+    [31m"l2mtu": [0m[31m65535[0m
+  },
+  {...},
+  {...},
+  {...}
+]
+switch2 [35m/[0m :put [1m[[0m:serialize [33mto[0m=[35mjson[0m [33moptions[0m=[35mjson[0m.no-string-conversion [1m[[0m[35m/ip/vrf/[0m[95mprint[0m detail as-value[1m][0m[1m][0m
+  unchanged
+switch2 [35m/[0m :put [1m[[0m:serialize [33mto[0m=[35mjson[0m [33moptions[0m=[35mjson[0m.no-string-conversion [1m[[0m[35m/routing/table/[0m[95mprint[0m detail as-value[1m][0m[1m][0m
+  unchanged
+switch2 [35m/[0m :put [1m[[0m:serialize [33mto[0m=[35mjson[0m [33moptions[0m=[35mjson[0m.no-string-conversion [1m[[0m[35m/system/resource/[0m[95mprint[0m as-value[1m][0m[1m][0m
+{
+  "architecture-name": "arm64",
+  "board-name": "CHR QEMU QEMU Virtual Machine",
+  "build-time": "2026-11-20 11:11:10",
+  "cpu": "ARM64",
+  "cpu-count": 1,
+  "cpu-load": [31m5[0m -> [32m26[0m,
+  "free-hdd-space": 71995392,
+  "free-memory": [31m63426560[0m -> [32m62775296[0m,
+  "platform": "MikroTik",
+  "total-hdd-space": 86183936,
+  "total-memory": 301989888,
+  "uptime": [31m"00:01:38"[0m -> [32m"00:01:41"[0m,
+  "version": "7.25.2",
+  "write-sect-since-reboot": [31m2048[0m -> [32m2144[0m,
+  "write-sect-total": [31m2048[0m -> [32m2144[0m
+}
+Changes found
