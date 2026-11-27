@@ -22,6 +22,7 @@ from network_toolkit.ip_device import (
 from network_toolkit.ip_device import (
     extract_ips_from_target,
     get_supported_device_types,
+    ip_device_name,
     is_ip_list,
     validate_platform,
 )
@@ -138,7 +139,7 @@ def _resolve_targets(target_expr: str, config: NetworkConfig) -> TargetResolutio
     if is_ip_list(target_expr):
         ips = extract_ips_from_target(target_expr)
         return TargetResolution(
-            resolved=[f"ip_{ip.replace('.', '_')}" for ip in ips],
+            resolved=[ip_device_name(ip) for ip in ips],
             unknown=[],
             ip_mode=True,
         )

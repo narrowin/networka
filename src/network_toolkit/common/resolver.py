@@ -14,6 +14,7 @@ from network_toolkit.inventory.resolve import resolve_named_targets, select_name
 from network_toolkit.ip_device import (
     create_ip_based_config,
     extract_ips_from_target,
+    ip_device_name,
     is_ip_list,
 )
 
@@ -94,7 +95,7 @@ class DeviceResolver:
                 msg = "Platform must be specified when using IP addresses"
                 raise ValueError(msg)
             ips = extract_ips_from_target(target_expr)
-            ip_device_names = [f"ip_{ip.replace('.', '_')}" for ip in ips]
+            ip_device_names = [ip_device_name(ip) for ip in ips]
             # Ensure the config is enhanced with IP devices
             self._get_ip_enhanced_config(target_expr)
             return ip_device_names, []

@@ -15,7 +15,11 @@ from network_toolkit.config import NetworkConfig
 from network_toolkit.device import DeviceSession
 from network_toolkit.exceptions import NetworkToolkitError
 from network_toolkit.inventory.resolve import resolve_named_targets
-from network_toolkit.ip_device import extract_ips_from_target, is_ip_list
+from network_toolkit.ip_device import (
+    extract_ips_from_target,
+    ip_device_name,
+    is_ip_list,
+)
 from network_toolkit.session_pool import SessionPoolProtocol
 
 logger = logging.getLogger(__name__)
@@ -64,7 +68,7 @@ def _resolve_targets(target_expr: str, config: NetworkConfig) -> TargetResolutio
     if is_ip_list(target_expr):
         ips = extract_ips_from_target(target_expr)
         return TargetResolution(
-            resolved=[f"ip_{ip.replace('.', '_')}" for ip in ips],
+            resolved=[ip_device_name(ip) for ip in ips],
             unknown=[],
             ip_mode=True,
         )
