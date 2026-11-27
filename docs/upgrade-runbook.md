@@ -1,23 +1,39 @@
 # Compare RouterOS state around an upgrade
 
-Save the same device JSON before and after your upgrade, then review what
-changed with `nw diff`. These commands cover interfaces, VRFs, routing-table
-definitions and system resources.
+Define what to collect once as a Networka sequence. One `nw run` invocation
+collects every command in that sequence for the selected device or group.
+Run it before and after your upgrade, then compare the two saved bundles.
 
-## Set the device and save directory
+## Define the collection once
 
-Run from a Networka checkout with dependencies installed using `uv sync --locked`.
-Use your existing inventory, SSH access and credentials. In its configuration,
-set the saved file format:
+Use your existing Networka inventory and SSH credentials. Set
+`general.results_format: json` in its configuration.
+
+Save [upgrade-state.yml](examples/upgrade-state.yml) in a `sequences/` directory
+beside your main configuration file. For example, with `./devices.yml` as the
+configuration, use `./sequences/upgrade-state.yml`:
 
 ```yaml
-general:
-  results_format: json
+sequences:
+  upgrade_state:
+    description: Native RouterOS JSON for an upgrade comparison
+    device_types: [mikrotik_routeros]
+    commands:
+      - ':put [:serialize to=json options=json.no-string-conversion [/interface/print detail as-value]]'
+      - ':put [:serialize to=json options=json.no-string-conversion [/ip/vrf/print detail as-value]]'
+      - ':put [:serialize to=json options=json.no-string-conversion [/routing/table/print detail as-value]]'
+      - ':put [:serialize to=json options=json.no-string-conversion [/system/resource/print as-value]]'
 ```
 
-Change `TARGET` and `CONFIG` below to your inventory name and configuration path.
-`TARGET` can also name a group containing only RouterOS devices. Keep the same
-device names, group membership and terminal variables throughout the procedure.
+Edit this list to choose what the customer needs collected. Every command must
+return native JSON; these four were exercised on RouterOS 7.24.5 and 7.25.2.
+Keep the command list, device names and group membership the same across each
+before/after comparison.
+
+## Collect before the upgrade
+
+Run from a Networka checkout with dependencies installed using `uv sync --locked`.
+Set your target and configuration path, and keep this terminal open:
 
 ```bash
 TARGET="switch1"
@@ -25,85 +41,43 @@ CONFIG="./devices.yml"
 mkdir -p ./captures
 SAVE=$(mktemp -d ./captures/upgrade.XXXXXX)
 printf 'Save directory: %s\n' "$SAVE"
+
+uv run --locked nw run "$TARGET" upgrade_state \
+  --config "$CONFIG" --store-results --results-dir "$SAVE/before"
 ```
 
-The native JSON commands below were exercised on RouterOS 7.24.5 and 7.25.2.
-Confirm support on the customer's release before the maintenance window.
+`TARGET` can be a device or a RouterOS-only group. This invocation saves all
+four replies per device, together with a sequence summary. Confirm exit `0`
+and saved results before proceeding.
 
-## Save JSON before the upgrade
+## Perform your upgrade and collect again
+
+Use your approved upgrade procedure. Once SSH access returns, run the same
+sequence with a new destination:
 
 ```bash
-uv run --locked nw run "$TARGET" \
-  ':put [:serialize to=json options=json.no-string-conversion [/interface/print detail as-value]]' \
-  --config "$CONFIG" --store-results --results-dir "$SAVE/before/interfaces"
-
-uv run --locked nw run "$TARGET" \
-  ':put [:serialize to=json options=json.no-string-conversion [/ip/vrf/print detail as-value]]' \
-  --config "$CONFIG" --store-results --results-dir "$SAVE/before/vrfs"
-
-uv run --locked nw run "$TARGET" \
-  ':put [:serialize to=json options=json.no-string-conversion [/routing/table/print detail as-value]]' \
-  --config "$CONFIG" --store-results --results-dir "$SAVE/before/tables"
-
-uv run --locked nw run "$TARGET" \
-  ':put [:serialize to=json options=json.no-string-conversion [/system/resource/print as-value]]' \
-  --config "$CONFIG" --store-results --results-dir "$SAVE/before/resources"
+uv run --locked nw run "$TARGET" upgrade_state \
+  --config "$CONFIG" --store-results --results-dir "$SAVE/after"
 ```
 
-All four commands must finish successfully with exit `0` and saved results.
-Resolve any failed collection before starting the upgrade. Each query has its
-own directory; Networka creates a timestamped subdirectory inside it.
+Confirm exit `0`. Run each capture once in these directories. If you collect
+again, select the exact timestamped directories printed by Networka for the
+comparison; keep the original capture files.
 
-## Perform your upgrade and save JSON again
-
-Use your approved upgrade procedure. Once the devices answer over SSH again,
-keep the original saved output and run the identical queries:
+## Compare the complete bundles
 
 ```bash
-uv run --locked nw run "$TARGET" \
-  ':put [:serialize to=json options=json.no-string-conversion [/interface/print detail as-value]]' \
-  --config "$CONFIG" --store-results --results-dir "$SAVE/after/interfaces"
-
-uv run --locked nw run "$TARGET" \
-  ':put [:serialize to=json options=json.no-string-conversion [/ip/vrf/print detail as-value]]' \
-  --config "$CONFIG" --store-results --results-dir "$SAVE/after/vrfs"
-
-uv run --locked nw run "$TARGET" \
-  ':put [:serialize to=json options=json.no-string-conversion [/routing/table/print detail as-value]]' \
-  --config "$CONFIG" --store-results --results-dir "$SAVE/after/tables"
-
-uv run --locked nw run "$TARGET" \
-  ':put [:serialize to=json options=json.no-string-conversion [/system/resource/print as-value]]' \
-  --config "$CONFIG" --store-results --results-dir "$SAVE/after/resources"
+uv run --locked nw diff "$SAVE/before" "$SAVE/after" --structured
 ```
 
-Confirm all four commands succeeded. Run each collection once in these
-directories. If you collect again, compare the exact timestamped directories
-printed by Networka; a directory containing multiple collections is ambiguous.
+One comparison covers every device and command in both bundles. Missing,
+failed or incomplete saved collections produce an error. All device fields
+remain included. Objects are compared by their fields; array order is
+preserved, so row reordering also appears as a difference.
 
-## Compare the saved results
-
-```bash
-uv run --locked nw diff "$SAVE/before/interfaces" "$SAVE/after/interfaces" \
-  --structured --key name
-
-uv run --locked nw diff "$SAVE/before/vrfs" "$SAVE/after/vrfs" \
-  --structured --key name
-
-uv run --locked nw diff "$SAVE/before/tables" "$SAVE/after/tables" \
-  --structured --key name
-
-uv run --locked nw diff "$SAVE/before/resources" "$SAVE/after/resources" \
-  --structured
-```
-
-`--key name` matches table rows by name. Resources are an object, so their
-comparison has no key. All device fields remain included. A color terminal
-shows DeepDiff's compact colored view; see [saved structured results](results.md#compare-saved-structured-results).
-
-Exit `0` means no differences, `1` means differences found, and `2` means an
-error or unusable saved results. Review each comparison; exit `1` alone does
-not decide whether the upgrade is acceptable.
+A color terminal shows DeepDiff's compact colored view. Exit `0` means no
+differences, `1` means differences found, and `2` means an error or unusable
+saved results. Review the differences before accepting the upgrade.
 
 ## Review the changes
 
@@ -112,10 +86,10 @@ not decide whether the upgrade is acceptable.
 | Software version and build time | Expected to change; confirm the planned target release. |
 | Uptime, last-link-up times and counters | Can reset or change across the reboot and collection interval. |
 | CPU load, free memory and free storage | Can change; investigate unexpectedly constrained resources. |
-| Interface running/disabled state, MTU and VRF assignment | Expect preservation unless the change was planned. Investigate an in-service interface that becomes down or disabled. |
+| Interface running/disabled state, MTU and VRF assignment | Expect preservation unless planned. Investigate an in-service interface that becomes down or disabled. |
 | MAC addresses | Review changes explicitly; physical-interface MAC addresses should remain the same. |
 | VRFs and routing-table definitions | Expect preservation unless planned; investigate missing or unexpectedly changed entries. |
 
-Keep both collections with the change record. These replies cover the state
-listed above; apply the customer's traffic and protocol acceptance checks
-separately before accepting the upgrade.
+Keep both saved bundles with the change record. These four queries cover
+interfaces, VRFs, routing-table definitions and resources; apply the customer's
+traffic and protocol acceptance checks separately.

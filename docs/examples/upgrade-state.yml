@@ -1,0 +1,9 @@
+sequences:
+  upgrade_state:
+    description: Native RouterOS JSON for an upgrade comparison
+    device_types: [mikrotik_routeros]
+    commands:
+      - ':put [:serialize to=json options=json.no-string-conversion [/interface/print detail as-value]]'
+      - ':put [:serialize to=json options=json.no-string-conversion [/ip/vrf/print detail as-value]]'
+      - ':put [:serialize to=json options=json.no-string-conversion [/routing/table/print detail as-value]]'
+      - ':put [:serialize to=json options=json.no-string-conversion [/system/resource/print as-value]]'
