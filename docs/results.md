@@ -24,6 +24,9 @@ See [output modes](output-modes.md) to control what the CLI prints.
 
 ## Compare saved structured results
 
+For exact collection and comparison commands, use the
+[customer upgrade runbook](upgrade-runbook.md).
+
 Use saved replies to see which device values changed after a software upgrade
 or configuration change. Collect the same native JSON command on the same
 devices twice, then compare the saved results without accessing the devices.

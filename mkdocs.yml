@@ -17,6 +17,7 @@ nav:
     - Environment variables: environment-variables.md
     - Running commands: running-commands.md
     - Results: results.md
+    - Upgrade comparison runbook: upgrade-runbook.md
     - Intent verification: intent.md
     - Lab tests: lab-tests.md
     - Output modes: output-modes.md
