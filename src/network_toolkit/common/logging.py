@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2025-present Network Team <network@company.com>
 #
 # SPDX-License-Identifier: MIT
-"""Shared logging setup for the Network Toolkit."""
+"""Shared logging setup for Networka."""
 
 from __future__ import annotations
 

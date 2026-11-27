@@ -1,2 +1,2 @@
 # SPDX-License-Identifier: MIT
-"""Linux intent collectors and normalizers."""
+"""Linux intent readers and normalizers."""

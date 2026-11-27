@@ -196,7 +196,7 @@ def _parallel(calls: Sequence[Callable[[], Any]]) -> list[Any]:
 
 
 class PowerActions:
-    """Stop and reset guests and withdraw carrier, preserving containers, management and links."""
+    """Stop and reset guests and take carrier down, preserving containers, management and links."""
 
     def __init__(
         self,
@@ -271,7 +271,7 @@ class PowerActions:
                 for end in (*plan.own, *plan.far)
             },
             "carrier": {
-                str(end): routeros.collect_interface(
+                str(end): routeros.read_interface(
                     self.client, end.node, _interface(nic.nic), **self.options
                 )
                 for end, nic in plan.peers.items()
@@ -296,7 +296,7 @@ class PowerActions:
         plan = self.layouts[target]
         uptime, before_ns = {}, {}
         for node in plan.guests:
-            uptime[node] = routeros.collect_uptime(self.client, node, **self.options)
+            uptime[node] = routeros.read_uptime(self.client, node, **self.options)
             before_ns[node] = routeros.uptime_ns(uptime[node])
             _need(
                 before_ns[node] > 0,
@@ -305,7 +305,7 @@ class PowerActions:
         status = self._status(plan)
         for node, reply in status.items():
             _need(_status(reply, running=True), f"{node} is not running")
-        baseline = self._observe(plan, up=True)
+        carrier_before = self._observe(plan, up=True)
         active = Outage(plan, number, before_ns)
         self.active[target] = active
         self.session.mark(
@@ -316,7 +316,7 @@ class PowerActions:
             uptime=uptime,
             peers={str(end): nic.nic for end, nic in plan.peers.items()},
             status=status,
-            **baseline,
+            **carrier_before,
         )
         # A command may succeed before an interrupt or a transport error reaches us.
         active.reset_pending.update(plan.guests)
@@ -345,7 +345,7 @@ class PowerActions:
         )
 
     def restore(self, active: Outage) -> dict[str, Any]:
-        """Always attempt every guest reset and resume and every link, even after one failure."""
+        """Always try every guest reset and resume and every cable, even after one failure."""
         plan = active.layout
         errors = []
         replies: dict[str, Any] = {"facing": {}, "system_reset": {}, "cont": {}}
@@ -380,7 +380,11 @@ class PowerActions:
         active.nics.clear()
 
     def on(
-        self, target: str, number: int, wait_s: float, items: list[intent.IntentItem]
+        self,
+        target: str,
+        number: int,
+        recovery_deadline_s: float,
+        items: list[intent.IntentItem],
     ) -> None:
         active = self.active[target]
         plan = active.layout
@@ -395,7 +399,7 @@ class PowerActions:
             opening=active.opening,
             status=status,
         )
-        with lab_reboot._deadline(wait_s, since_ns=dispatch["mono_ns"]):
+        with lab_reboot._deadline(recovery_deadline_s, since_ns=dispatch["mono_ns"]):
             replies = self.restore(active)
             status = self._status(plan)
             for node, reply in status.items():
@@ -419,7 +423,7 @@ class PowerActions:
                 self.options,
                 "power",
             )
-            lab_reboot.wait_healthy(
+            lab_reboot.wait_recovered(
                 self.client, self.session, target, number, items, self.options, "power"
             )
         del self.active[target]
@@ -459,12 +463,16 @@ def proof(
     opening: int,
     closing: int,
     hold_s: float,
-    wait_s: float,
+    recovery_deadline_s: float,
     items: list[intent.IntentItem],
 ) -> dict[str, Any]:
-    """Prove the guest pauses, loss of carrier, resets, new uptimes and healthy lab."""
+    """Prove the guest pauses, loss of carrier, resets, new uptimes and a passing state check."""
     target = action.target
-    result: dict[str, Any] = {"switch": target, "verdict": "error", "limit_s": wait_s}
+    result: dict[str, Any] = {
+        "switch": target,
+        "verdict": "error",
+        "limit_s": recovery_deadline_s,
+    }
     try:
         recorded = [
             _event(events, "power_off_start", target, opening),
@@ -550,19 +558,19 @@ def proof(
                 events, before, dispatch, node, closing, "power"
             )
             boots[node] = before, after, elapsed
-        healthy = lab_reboot.health_proof(
+        checked = lab_reboot.recovery_proof(
             folder, events, target, closing, items, "power"
         )
-        recovered = (healthy["mono_ns"] - dispatch["mono_ns"]) / NS
+        recovered = (checked["mono_ns"] - dispatch["mono_ns"]) / NS
         _need(
             all(
                 powered["mono_ns"]
                 <= dispatch["mono_ns"] + elapsed
-                <= healthy["mono_ns"]
+                <= checked["mono_ns"]
                 for _, _, elapsed in boots.values()
             )
-            and healthy["verdict"] == "pass"
-            and recovered <= wait_s,
+            and checked["verdict"] == "pass"
+            and recovered <= recovery_deadline_s,
             "The recorded new boot and lab state did not recover within the deadline",
         )
         ports = [str(end) for end in own]
@@ -575,7 +583,7 @@ def proof(
                 before_uptime_s=before / NS,
                 after_uptime_s=after / NS,
                 elapsed_s=elapsed / NS,
-                healthy_s=recovered,
+                recovered_s=recovered,
             )
         else:
             result.update(
@@ -591,7 +599,7 @@ def proof(
                     }
                     for node, (before, after, elapsed) in boots.items()
                 },
-                healthy_s=recovered,
+                recovered_s=recovered,
             )
     except (
         OSError,

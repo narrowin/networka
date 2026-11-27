@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""Collect and normalize Linux bonding evidence for the intent checks.
+"""Read and normalize Linux bonding evidence for the intent checks.
 
 The evidence is the iproute2 JSON of the bond and its members from the
 Linux bonding driver, which Cumulus Linux also uses. `check_bond_member` is
@@ -43,7 +43,7 @@ def bond_slaves(bond: str) -> str:
     return f"ip -j -d link show master {_bond_name(bond)}"
 
 
-def collect_bond(
+def read_bond(
     client: NetworkaClient,
     device: str,
     bond: str,
@@ -220,7 +220,7 @@ def ping_command(
     iputils binds to a VRF through its device, so a VRF is given with `-I`.
     """
     _ping_device({"interface": interface, "vrf": vrf})
-    parts = ["ping", "-n", "-c", str(intent.probes(count)), "-W", "1"]
+    parts = ["ping", "-n", "-c", str(intent.ping_count(count)), "-W", "1"]
     for value, what in ((interface, "interface"), (vrf, "vrf")):
         if value is not None:
             device = intent.name(value, what)
@@ -231,7 +231,7 @@ def ping_command(
     return " ".join([*parts, intent.address(dest)])
 
 
-def collect_ping(
+def read_ping(
     client: NetworkaClient,
     device: str,
     dest: str,
@@ -258,7 +258,7 @@ def ping(
     identify the reply, the header names the interface or VRF device when
     one was given, and the number sent must be `count`. A reply that is only
     `ping: connect: Network is unreachable` means no route to `dest`: none of
-    the `count` probes is answered. A "Destination Host Unreachable" reply
+    the `count` pings is answered. A "Destination Host Unreachable" reply
     carries the statistics line and is read from it.
     """
     text = intent.reply_output(evidence, ping_command(dest, count, interface, vrf))
@@ -280,7 +280,7 @@ def ping(
         "ping summary line",
     )
     if int(sent) != count:
-        msg = f"the ping sent {sent} probes, not {count}"
+        msg = f"the ping sent {sent} pings, not {count}"
         raise ValueError(msg)
     return {
         "sent": int(sent),
@@ -297,7 +297,7 @@ PARAM_RULES = {"ping": _ping_device}
 CHECKS = {
     "bond_member": Check(
         ("bond", "member"),
-        "collect_bond",
+        "read_bond",
         lambda ev, _dt, p, e: check_bond_member(ev, p["bond"], p["member"], e),
         expected={"carrier": (bool,), "eligible": (bool,)},
     ),

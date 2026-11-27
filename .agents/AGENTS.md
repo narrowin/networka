@@ -96,9 +96,12 @@ artifact installation procedures.
 - [docs/adr/](../docs/adr/) records why Networka is shaped as it is. Read the
   matching ADR before changing what it covers, and do not reopen a decision
   without new evidence.
-- _Avoid_ lines govern prose. Existing CLI flags, YAML keys and code names,
-  such as `wait_healthy_s`, `nw diff --baseline` and the YAML `statement`,
-  keep their names until they are renamed.
+- _Avoid_ lines govern prose, CLI flags, help text, YAML keys, `result.json`
+  and evidence fields, report text and code names alike. Name a new flag, key,
+  field or identifier with the glossary term, and keep no alias for an old one.
+  The Python package `network_toolkit`, the `device_type` key, `--vendor` and
+  the inventory `host` address keep their names, as they are not the avoided
+  sense.
 
 ## Agent skills
 

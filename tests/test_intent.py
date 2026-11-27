@@ -162,10 +162,10 @@ def test_run_intent_saves_evidence_that_replays_to_the_same_results(
     ]
     evidence = json.loads((tmp_path / "out" / "evidence.json").read_text())
     readings = evidence["devices"]["r1"]["readings"]
-    assert [r["collector"] for r in readings] == [
-        "collect_bridge",
-        "collect_bond",
-        "collect_version",
+    assert [r["reader"] for r in readings] == [
+        "read_bridge",
+        "read_bond",
+        "read_version",
     ]
     results = json.loads((tmp_path / "out" / "results.json").read_text())
     assert results["verdict"] == "pass"

@@ -20,12 +20,12 @@ from network_toolkit.platforms.mikrotik_routeros.intent import (
     bridge_print,
     check_property,
     check_version,
-    collect,
-    collect_bridge_port,
     ethernet_monitor,
     host_print,
     menu_print,
     ping_command,
+    read_bridge_port,
+    read_replies,
 )
 from network_toolkit.platforms.mikrotik_routeros.operations import (
     MikroTikRouterOSOperations,
@@ -299,7 +299,7 @@ def test_bridge_port_forwarding_collects_and_replays() -> None:
         command_results=[DeviceCommandResult(device, command, replies[command])]
     )
 
-    evidence = collect_bridge_port(client, "r1", "bridge", "ether1")
+    evidence = read_bridge_port(client, "r1", "bridge", "ether1")
 
     def forwarding(port: str, *, expected: bool = True) -> intent.IntentResult:
         return intent.check_bridge_port(
@@ -379,18 +379,18 @@ ROS = "mikrotik_routeros"
 STATE = routeros_evidence(*REPLIES)
 
 
-def test_collect_splits_one_read_into_replies() -> None:
+def test_read_replies_splits_one_read_into_replies() -> None:
     commands = (UPTIME, bridge_monitor("bridge"))
     client = MagicMock()
     output = "\n".join(json.dumps(REPLIES[c]) for c in commands)
     client.run.return_value = MagicMock(
         command_results=[DeviceCommandResult("r1", "x", output)]
     )
-    assert collect(client, "r1", *commands) == routeros_evidence(*commands)
+    assert read_replies(client, "r1", *commands) == routeros_evidence(*commands)
     client.run.return_value = MagicMock(
         command_results=[DeviceCommandResult("r1", "x", "1")]
     )
-    short = collect(client, "r1", *commands)
+    short = read_replies(client, "r1", *commands)
     assert short[UPTIME]["error"] == "the joined read returned 1 lines for 2 commands"
 
 
@@ -518,7 +518,7 @@ def test_version() -> None:
 
 def test_ping() -> None:
     command = ping_command("10.0.0.1", 3)
-    # As RouterOS 7.26beta7 returns them: one row per probe, no totals.
+    # As RouterOS 7.26beta7 returns them: one row per ping, no totals.
     rows = [
         {"seq": 0, "host": "10.0.0.1", "size": 56, "time": "00:00:00", "ttl": 64},
         {"seq": 1, "host": "10.0.0.1", "status": "timeout"},

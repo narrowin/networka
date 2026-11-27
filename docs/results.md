@@ -22,24 +22,24 @@ general:
 
 See [output modes](output-modes.md) to control what the CLI prints.
 
-## Compare a baseline
+## Compare with saved output
 
 Before the change, save the device's command output in a text file. If
-you use a stored Networka result, copy the response without the generated
-headers. After the change, pass that baseline to `nw diff` to fetch and
+you use a stored Networka result, copy the reply without the generated
+headers. After the change, pass that saved output to `nw diff` to fetch and
 compare the same command on the same device.
 
 ```bash
-nw diff router1 "/system/identity/print" --baseline ./baseline/router1-identity.txt
+nw diff router1 "/system/identity/print" --saved-output ./saved/router1-identity.txt
 ```
 
-For a sequence, supply a directory with one response file per command.
+For a sequence, supply a directory with one saved output file per command.
 Name each file `cmd_<normalized-command>.txt`. Replace spaces and path
 separators with underscores and trim the leading and trailing underscores.
 For example, `/system/identity/print` uses `cmd_system_identity_print.txt`.
 Use `--save-current` to keep the newly fetched output.
 
-If you already have both text outputs, compare them offline.
+If you already have both text outputs, compare them without a device.
 
 ```bash
 nw diff before.txt after.txt

@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: MIT
-"""Lab tests: a test file, its fixed flow in a containerlab lab, the verdict and replay.
+"""Lab tests: a test file, its run in a containerlab lab, the verdict and replay.
 
-A lab file holds what all tests of one lab share: the state statements, the
+A lab file holds what all tests of one lab share: the state checks, the
 ping streams and the file the switch logs arrive in. A test file names its lab
 file and holds ordered steps. A step sets one cable down or up, holds for a
-time, limits the outage of every stream and can carry log rules. The flow
+time, limits the outage of every stream and can carry log rules. A run
 checks the state, starts captures and streams, checks a quiet window, runs the
 steps, checks the state again and stops.
 
@@ -81,11 +81,11 @@ LAB_FIELDS = (("state", "streams"), ("switch_log",))
 STREAM_FIELDS = (("name", "from", "to"), ())
 STEP_FIELDS = (
     ("name", "hold_s", "max_outage_s", "expected"),
-    ("cable", "state", "action", "wait_healthy_s", "log", "check_state"),
+    ("cable", "state", "action", "recovery_deadline_s", "log", "check_state"),
 )
 LOG_FIELDS = ((), ("must", "must_not"))
 RULE_FIELDS = (("switch", "text"), ())
-STATEMENT_FIELDS = (("statement", "checks"), ("source",))
+STATE_CHECK_FIELDS = (("name", "checks"), ("source",))
 
 
 class LabTestError(NetworkToolkitError):
@@ -121,7 +121,7 @@ class Cable:
 @dataclass(frozen=True)
 class Reboot:
     switch: str
-    wait_s: float
+    recovery_deadline_s: float
 
 
 @dataclass(frozen=True)
@@ -147,13 +147,13 @@ class Step:
     limits: tuple[tuple[str, float], ...]
     expected: str
     log: tuple[Rule, ...]
-    wait_s: float = 0
-    statements: tuple[Statement, ...] = ()
+    recovery_deadline_s: float = 0
+    state_checks: tuple[StateCheck, ...] = ()
 
 
 @dataclass(frozen=True)
-class Statement:
-    statement: str
+class StateCheck:
+    name: str
     source: str | None
     checks: tuple[IntentItem, ...]
 
@@ -168,7 +168,7 @@ class LabTest:
     purpose: str
     source: str | None
     lab_text: str
-    statements: tuple[Statement, ...]
+    state_checks: tuple[StateCheck, ...]
     streams: tuple[StreamSpec, ...]
     switch_log: str | None
     log: tuple[Rule, ...]
@@ -177,8 +177,8 @@ class LabTest:
     watch: lab_watch.Spec | None = None
 
     def items(self) -> list[IntentItem]:
-        """Every check of every statement, in file order."""
-        return [item for s in self.statements for item in s.checks]
+        """every check of every state check, in file order."""
+        return [item for s in self.state_checks for item in s.checks]
 
     def ends(self) -> set[str]:
         """The capture points of every stream: both ends, or the source for a fixed address."""
@@ -261,13 +261,13 @@ def _optional_text(raw: Mapping[str, Any], key: str, where: str) -> str | None:
     return None if value is None else _text(value, f"{where}: {key}")
 
 
-def _statements(raw: Any, where: str) -> tuple[Statement, ...]:
-    """The state of a lab file: a list of statements, each with its intent checks."""
-    statements = []
+def _state_checks(raw: Any, where: str) -> tuple[StateCheck, ...]:
+    """The state of a lab file: a list of state checks, each with its intent checks."""
+    state_checks = []
     for n, entry in enumerate(_list(raw, where), 1):
         at = f"{where} {n}"
-        _fields(entry, at, STATEMENT_FIELDS)
-        text = _text(entry["statement"], f"{at}: statement")
+        _fields(entry, at, STATE_CHECK_FIELDS)
+        text = _text(entry["name"], f"{at}: name")
         source = _optional_text(entry, "source", at)
         try:
             checks = tuple(
@@ -276,8 +276,8 @@ def _statements(raw: Any, where: str) -> tuple[Statement, ...]:
             )
         except intent.IntentError as error:
             raise LabTestError(error.message) from None
-        statements.append(Statement(text, source, checks))
-    return tuple(statements)
+        state_checks.append(StateCheck(text, source, checks))
+    return tuple(state_checks)
 
 
 def _streams(raw: Any, where: str) -> tuple[StreamSpec, ...]:
@@ -339,9 +339,9 @@ def _switch_log(raw: Mapping[str, Any], where: str) -> str | None:
     return value
 
 
-def _action(entry: Mapping[str, Any], where: str, wait: float) -> Action:
+def _action(entry: Mapping[str, Any], where: str, deadline: float) -> Action:
     if "action" not in entry:
-        if "wait_healthy_s" in entry or entry.get("state") not in ("down", "up"):
+        if "recovery_deadline_s" in entry or entry.get("state") not in ("down", "up"):
             _fail(where, "a cable action needs a state of down or up")
         return Cable(_point(entry.get("cable"), f"{where}: cable"), entry["state"])
     if "cable" in entry or "state" in entry:
@@ -366,8 +366,8 @@ def _action(entry: Mapping[str, Any], where: str, wait: float) -> Action:
         _fail(at, f"choose exactly one of {', '.join(sorted(kinds))}")
     [kind] = keys
     if kind in ("active_member", "silence_host"):
-        if "wait_healthy_s" in entry:
-            _fail(where, "a mobile action takes no wait_healthy_s")
+        if "recovery_deadline_s" in entry:
+            _fail(where, "a mobile action takes no recovery_deadline_s")
         try:
             return lab_mobile.parse(action, at)
         except lab.LabError as error:
@@ -375,10 +375,10 @@ def _action(entry: Mapping[str, Any], where: str, wait: float) -> Action:
     if kind in ("power_off", "power_on"):
         _fields(action, at, ((kind,), ()))
         on = kind == "power_on"
-        if on and not wait:
-            _fail(where, "power_on needs a positive wait_healthy_s")
-        if not on and "wait_healthy_s" in entry:
-            _fail(where, "wait_healthy_s belongs to power_on")
+        if on and not deadline:
+            _fail(where, "power_on needs a positive recovery_deadline_s")
+        if not on and "recovery_deadline_s" in entry:
+            _fail(where, "recovery_deadline_s belongs to power_on")
         if not isinstance(action[kind], list):
             return lab_power.Power(_text(action[kind], f"{at}: {kind}"), on)
         nodes = tuple(
@@ -390,21 +390,21 @@ def _action(entry: Mapping[str, Any], where: str, wait: float) -> Action:
         return lab_power.Power(", ".join(nodes), on, nodes)
     if kind == "reboot":
         _fields(action, at, (("reboot",), ()))
-        if not wait:
-            _fail(where, "a reboot needs a positive wait_healthy_s")
-        return Reboot(_text(action["reboot"], f"{where}: reboot"), wait)
+        if not deadline:
+            _fail(where, "a reboot needs a positive recovery_deadline_s")
+        return Reboot(_text(action["reboot"], f"{where}: reboot"), deadline)
     if kind == "observe":
         _fields(action, at, (("observe",), ()))
-        if action["observe"] is not True or "wait_healthy_s" in entry:
-            _fail(at, "observe must be true and takes no wait_healthy_s")
+        if action["observe"] is not True or "recovery_deadline_s" in entry:
+            _fail(at, "observe must be true and takes no recovery_deadline_s")
         return Observe()
     clear = action.get("clear", False)
     if not isinstance(clear, bool):
         _fail(at, "clear must be true or false")
     if clear:
         _fields(action, at, ((kind, "clear"), ()))
-    elif "wait_healthy_s" in entry:
-        _fail(where, "wait_healthy_s belongs to a restoration step")
+    elif "recovery_deadline_s" in entry:
+        _fail(where, "recovery_deadline_s belongs to a step that ends a fault")
     if kind == "impair":
         if not clear:
             _fields(
@@ -554,7 +554,7 @@ def load_test(path: str | Path, lab_file: Path | None = None) -> LabTest:
     if not lab_path.is_file():
         _fail(f"{path}: lab", f"there is no lab file {lab_path}")
     lab_raw = _fields(_read_yaml(lab_path), f"{lab_path}", LAB_FIELDS)
-    statements = _statements(lab_raw["state"], f"{lab_path}: state")
+    state_checks = _state_checks(lab_raw["state"], f"{lab_path}: state")
     streams = _streams(lab_raw["streams"], f"{lab_path}: stream")
     switch_log = _switch_log(lab_raw, f"{lab_path}")
     names = [s.name for s in streams]
@@ -572,8 +572,10 @@ def load_test(path: str | Path, lab_file: Path | None = None) -> LabTest:
                 f"{where}: max_outage_s",
                 f"must give a limit for each stream of {lab_path}: {', '.join(names)}",
             )
-        wait = _seconds(entry.get("wait_healthy_s", 0), f"{where}: wait_healthy_s")
-        action = _action(entry, where, wait)
+        deadline = _seconds(
+            entry.get("recovery_deadline_s", 0), f"{where}: recovery_deadline_s"
+        )
+        action = _action(entry, where, deadline)
         stream = (
             action.stream
             if isinstance(action, lab_faults.CutPing)
@@ -594,8 +596,8 @@ def load_test(path: str | Path, lab_file: Path | None = None) -> LabTest:
                 ),
                 _text(entry["expected"], f"{where}: expected"),
                 _rules(entry["log"], f"{where}: log") if "log" in entry else (),
-                wait,
-                _statements(entry["check_state"], f"{where}: check_state")
+                deadline,
+                _state_checks(entry["check_state"], f"{where}: check_state")
                 if "check_state" in entry
                 else (),
             )
@@ -609,11 +611,11 @@ def load_test(path: str | Path, lab_file: Path | None = None) -> LabTest:
     if switch_log is None and (test_rules or any(s.log for s in steps)):
         _fail(f"{path}: log", f"log rules need switch_log in {lab_path}")
     try:
-        intent.validate_intent([item for s in statements for item in s.checks])
+        intent.validate_intent([item for s in state_checks for item in s.checks])
         for step in steps:
-            if step.statements:
+            if step.state_checks:
                 intent.validate_intent(
-                    [item for s in step.statements for item in s.checks]
+                    [item for s in step.state_checks for item in s.checks]
                 )
     except intent.IntentError as error:
         raise LabTestError(error.message) from None
@@ -624,7 +626,7 @@ def load_test(path: str | Path, lab_file: Path | None = None) -> LabTest:
         _text(raw["purpose"], f"{path}: purpose"),
         _optional_text(raw, "source", f"{path}"),
         lab_path.read_text(encoding="utf-8"),
-        statements,
+        state_checks,
         streams,
         switch_log,
         test_rules,
@@ -921,7 +923,7 @@ def run_test(
         )
         session.mark("state_checked", when="before", verdict=before.verdict)
         if before.verdict == "pass":
-            _flow(
+            _run_steps(
                 client, test, session, items, sorted(cables), power_layouts, run_options
             )
     if session.stopped is None:
@@ -978,7 +980,7 @@ def _first_replies(pcaps: Mapping[str, Path], streams: Sequence[traffic.Stream])
         time.sleep(traffic.INTERVAL_NS / NS)
 
 
-def _flow(
+def _run_steps(
     client: NetworkaClient,
     test: LabTest,
     session: lab.Session,
@@ -1018,7 +1020,7 @@ def _flow(
     problems = traffic.quiet_problems(traffic.quiet(measured, QUIET))
     if test.flood:
         problems.extend(
-            lab_flood.baseline_problems(
+            lab_flood.quiet_problems(
                 test.flood,
                 pcaps,
                 flood_members,
@@ -1034,7 +1036,7 @@ def _flow(
         lab_faults.TrafficActions(session) as faults,
         lab_power.PowerActions(client, session, power_layouts, run_options) as power,
         mobile,
-        lab_watch.collect(client, session, test.watch, run_options),
+        lab_watch.sample_entries(client, session, test.watch, run_options),
     ):
         for number, step in enumerate(test.steps, 1):
             session.mark("step_start", step=step.name)
@@ -1047,7 +1049,7 @@ def _flow(
                     session,
                     action.switch,
                     number,
-                    action.wait_s,
+                    action.recovery_deadline_s,
                     items,
                     run_options,
                 )
@@ -1055,13 +1057,18 @@ def _flow(
                 mobile.run(action, number)
             elif isinstance(action, lab_power.Power):
                 if action.on:
-                    power.on(action.target, number, step.wait_s, items)
+                    power.on(action.target, number, step.recovery_deadline_s, items)
                 else:
                     power.off(action.target, number)
             elif isinstance(action, lab_faults.TrafficFault):
                 if action.clear:
                     faults.clear(
-                        client, action, number, step.wait_s, items, run_options
+                        client,
+                        action,
+                        number,
+                        step.recovery_deadline_s,
+                        items,
+                        run_options,
                     )
                 else:
                     addresses = ("", "")
@@ -1076,9 +1083,11 @@ def _flow(
                         )
                     faults.install(action, number, addresses)
             time.sleep(step.hold_s)
-            if step.statements:
+            if step.state_checks:
                 checks = [
-                    item for statement in step.statements for item in statement.checks
+                    item
+                    for state_check in step.state_checks
+                    for item in state_check.checks
                 ]
                 evidence = intent.run_intent(
                     client,
@@ -1108,23 +1117,24 @@ def _events(path: Path) -> list[dict[str, Any]]:
         raise LabTestError(msg) from None
 
 
-def _state(statements: Sequence[Statement], folder: Path) -> dict[str, Any] | None:
-    """The statements and their checks, replayed from one saved intent run."""
+def _state(state_checks: Sequence[StateCheck], folder: Path) -> dict[str, Any] | None:
+    """The state checks and their checks, replayed from one saved intent run."""
     if not (folder / intent.EVIDENCE_FILE).is_file():
         return None
     try:
         evidence = intent.load_json((folder / intent.EVIDENCE_FILE).read_text())
         report = intent.replay_intent(
-            [item for statement in statements for item in statement.checks], evidence
+            [item for state_check in state_checks for item in state_check.checks],
+            evidence,
         )
     except (OSError, ValueError, intent.IntentError) as error:
         msg = f"{folder}: cannot replay the state: {error}"
         raise LabTestError(msg) from None
     results = iter(report.results)
     outcomes: list[dict[str, Any]] = []
-    for statement in statements:
+    for state_check in state_checks:
         checks: list[dict[str, Any]] = []
-        for item, outcome in (next(results) for _ in statement.checks):
+        for item, outcome in (next(results) for _ in state_check.checks):
             checks.append(
                 {
                     "name": item.name,
@@ -1139,15 +1149,15 @@ def _state(statements: Sequence[Statement], folder: Path) -> dict[str, Any] | No
             )
         outcomes.append(
             {
-                "statement": statement.statement,
-                "source": statement.source,
+                "name": state_check.name,
+                "source": state_check.source,
                 "verdict": rollup([c["verdict"] for c in checks]),
                 "checks": checks,
             }
         )
     return {
         "verdict": rollup([s["verdict"] for s in outcomes]),
-        "statements": outcomes,
+        "state_checks": outcomes,
     }
 
 
@@ -1245,7 +1255,7 @@ def _read_switch_log(
     if unknown:
         part(
             "error",
-            f"The collector recorded unverified senders: {', '.join(sorted(unknown))}.",
+            f"The collector recorded unknown senders: {', '.join(sorted(unknown))}.",
         )
     switches = sorted(expected | unknown)
     for event in [*starts, *ends]:
@@ -1336,7 +1346,7 @@ def evaluate(folder: str | Path) -> dict[str, Any]:
         if verdict != "pass":
             reasons.append(reason)
 
-    before = _state(test.statements, folder / "state-before")
+    before = _state(test.state_checks, folder / "state-before")
     result["state"]["before"] = before
     if before is None:
         part("error", "The state before the test was not checked.")
@@ -1372,7 +1382,12 @@ def evaluate(folder: str | Path) -> dict[str, Any]:
         ):
             action = step.action
             proof = lab_reboot.proof(
-                folder, events, action.switch, n, action.wait_s, test.items()
+                folder,
+                events,
+                action.switch,
+                n,
+                action.recovery_deadline_s,
+                test.items(),
             )
             reboots[step.name] = proof
             part(
@@ -1383,7 +1398,7 @@ def evaluate(folder: str | Path) -> dict[str, Any]:
         result["reboots"] = reboots
     completed = "steps_end" in marks
     # An action may apply and produce valid traffic evidence before recovery
-    # times out. Only grade the full set of started steps through sender cutoff.
+    # times out. Only judge the full set of started steps through sender cutoff.
     recovery_stopped = (
         "run_error" in marks
         and "stream_cutoff" in marks
@@ -1400,7 +1415,7 @@ def evaluate(folder: str | Path) -> dict[str, Any]:
                 watch["verdict"],
                 f"Bridge host entries: {watch.get('reason', watch['verdict'])}",
             )
-        after = _state(test.statements, folder / "state-after")
+        after = _state(test.state_checks, folder / "state-after")
         result["state"]["after"] = after
         if after is None:
             part("error", "The state after the test was not checked.")
@@ -1493,8 +1508,8 @@ def _traffic(
                     pings = "ping" if lost == 1 else "pings"
                     counts["summary"] = (
                         f"{lost} {pings} lost in total at one ping every "
-                        f"{traffic.INTERVAL_NS // 1_000_000} ms, longest measured stop "
-                        f"{_stop_text(outage['lower_s'], outage['upper_s'])}"
+                        f"{traffic.INTERVAL_NS // 1_000_000} ms, longest measured outage "
+                        f"{_outage_text(outage['lower_s'], outage['upper_s'])}"
                     )
     result["traffic"] = measured
     if not completed:
@@ -1505,12 +1520,12 @@ def _traffic(
         return bool(pause["from_s"] < span["end_s"] and span["start_s"] < pause["to_s"])
 
     def covered(name: str, pause: Mapping[str, Any], label: str) -> bool:
-        """A pause no longer than the step's loss limit cannot hide an outage above it."""
+        """A pause no longer than the step's limit cannot hide an outage above it."""
         limit = step_limits.get(label, {}).get(name)
         return bool(limit) and pause["gap_s"] <= limit
 
     def step_judged(name: str, pause: Mapping[str, Any]) -> bool:
-        """Whether only steps with a loss limit overlap the pause, so they judge it."""
+        """Whether only steps with a non-zero limit overlap the pause, so they judge it."""
         labels = [
             label
             for label, span in measured["windows"].items()
@@ -1521,17 +1536,19 @@ def _traffic(
         )
 
     fixed = {s.name for s in test.streams if s.address is not None}
-    for name, flow in measured["streams"].items():
-        limit_ms = round(flow["send_gap_limit_s"] * 1000)
-        pauses = flow["send_pauses"]
+    for name, measured_stream in measured["streams"].items():
+        limit_ms = round(measured_stream["send_gap_limit_s"] * 1000)
+        pauses = measured_stream["send_pauses"]
         unjudged = [pause for pause in pauses if not step_judged(name, pause)]
         if pauses and not unjudged:
-            check(True, f"{name} paused sending only inside steps with a loss limit")
+            check(
+                True, f"{name} paused sending only inside steps with a non-zero limit"
+            )
         else:
             check(not unjudged, f"{name} sent a ping at least every {limit_ms} ms")
         if name not in fixed:
             check(
-                not flow["capture_mismatches"],
+                not measured_stream["capture_mismatches"],
                 f"{name} shows the same replies at both capture points",
             )
     if test.flood:
@@ -1545,7 +1562,7 @@ def _traffic(
             edges[0],
         )
         result["flood"] = flood
-        part(flood["verdict"], f"Flood probes: {flood.get('reason', flood['verdict'])}")
+        part(flood["verdict"], f"Flood check: {flood.get('reason', flood['verdict'])}")
     quiet = traffic.quiet(measured, QUIET)
     result["quiet"] = quiet
     if cutoff and completed:
@@ -1586,7 +1603,7 @@ def _traffic(
             action,
             opening,
             clearing,
-            test.steps[clearing - 1].wait_s,
+            test.steps[clearing - 1].recovery_deadline_s,
             test.items(),
             measured,
             initial.hold_s,
@@ -1608,7 +1625,7 @@ def _traffic(
             opening,
             restoring,
             initial.hold_s,
-            test.steps[restoring - 1].wait_s,
+            test.steps[restoring - 1].recovery_deadline_s,
             test.items(),
         )
         power_steps[opening] = power_steps[restoring] = proof
@@ -1622,13 +1639,13 @@ def _traffic(
         for name, limit in step.limits:
             counts = window["streams"][name]
             outage = counts["outage"]
-            flow = measured["streams"][name]
+            measured_stream = measured["streams"][name]
             diagnostic_reason = None
             if not counts["sent"]:
                 diagnostic_reason = "No sender pings were captured in this step."
             elif any(
                 overlaps(pause, window) and not covered(name, pause, step.name)
-                for pause in flow["send_pauses"]
+                for pause in measured_stream["send_pauses"]
             ):
                 diagnostic_reason = "Sender cadence was invalid in this step."
             elif not completed and n == len(starts) - 1:
@@ -1646,7 +1663,7 @@ def _traffic(
                 paused = max(
                     (
                         pause["gap_s"]
-                        for pause in flow["send_pauses"]
+                        for pause in measured_stream["send_pauses"]
                         if overlaps(pause, window)
                     ),
                     default=None,
@@ -1727,8 +1744,8 @@ def _traffic(
             proof = fault_steps[n + 1]
             step_detail["fault"] = proof
             verdicts.append(proof["verdict"])
-        if step.statements:
-            observed = _state(step.statements, folder / "step-state" / str(n + 1))
+        if step.state_checks:
+            observed = _state(step.state_checks, folder / "step-state" / str(n + 1))
             step_detail["state_check"] = observed
             verdicts.append(observed["verdict"] if observed else "error")
         verdict = rollup(verdicts)
@@ -1752,10 +1769,9 @@ def _traffic(
         for step_result in result["steps"]:
             for counts in step_result["streams"].values():
                 del counts["interval_s"]
-        for flow in measured["streams"].values():
-            del flow["interval_s"]
-            flow["outages"] = flow.pop("gaps")
-            for outage in flow["outages"]:
+        for measured_stream in measured["streams"].values():
+            del measured_stream["interval_s"]
+            for outage in measured_stream["outages"]:
                 if not_sent := outage.pop("absent_at_source"):
                     outage["not_sent"] = not_sent
 
@@ -1782,7 +1798,7 @@ def _event_row(event: Mapping[str, Any]) -> tuple[str, str] | None:
     if name == "capture_started":
         return "capture", f"started at {event['point']}"
     if name == "stream_started" and event["stream"].startswith("_flood-"):
-        return "flood probe", f"started from {event['source']} to {event['address']}"
+        return "flood check", f"started from {event['source']} to {event['address']}"
     if name == "stream_started" and event["destination"] == event["address"]:
         return event["stream"], f"started from {event['source']} to {event['address']}"
     if name == "stream_started":
@@ -1795,9 +1811,9 @@ def _event_row(event: Mapping[str, Any]) -> tuple[str, str] | None:
         return QUIET, f"not clean: {problems}" if problems else "clean"
     if name == "step_start":
         return "step", event["step"]
-    if name == "link_applied":
+    if name == "cable_applied":
         return "cable", f"{event['point']} set {event['state']}"
-    if name == "link_observed":
+    if name == "cable_observed":
         if not event["confirmed"]:
             return "cable", f"{event['point']} is not {event['state']} at the far end"
         far = ", ".join(event["far"])
@@ -1814,7 +1830,7 @@ def _event_row(event: Mapping[str, Any]) -> tuple[str, str] | None:
             "reboot",
             f"{event['switch']} command returned: {event['reply']['error'] or 'accepted'}",
         )
-    if name == "reboot_health":
+    if name == "reboot_state_checked":
         return (
             "recovery",
             f"full lab state after reboot of {event['switch']}: {event['verdict']}",
@@ -1824,7 +1840,7 @@ def _event_row(event: Mapping[str, Any]) -> tuple[str, str] | None:
     ]:
         nodes = f"{event['switch']} ({', '.join(event['nodes'])})"
         rows = {
-            "power_off_start": f"withdrawing the data cables of {nodes} and stopping the RouterOS guests",
+            "power_off_start": f"taking down the data cables of {nodes} and stopping the RouterOS guests",
             "power_off_observed": f"{nodes} RouterOS guests paused and all data cables down",
             "power_on_start": f"resetting and resuming the RouterOS guests of {nodes}",
             "power_on_observed": f"{nodes} RouterOS guests running and all data cables up",
@@ -1834,7 +1850,7 @@ def _event_row(event: Mapping[str, Any]) -> tuple[str, str] | None:
     if name == "power_off_start":
         return (
             "power",
-            f"withdrawing the data cables of {event['switch']} and stopping its guest",
+            f"taking down the data cables of {event['switch']} and stopping its guest",
         )
     if name == "power_off_observed":
         return "power", f"{event['switch']} guest paused and all data cables down"
@@ -1847,10 +1863,10 @@ def _event_row(event: Mapping[str, Any]) -> tuple[str, str] | None:
             "recovery",
             f"restored power and cables after an interrupted action on {event['switch']}",
         )
-    if name == "power_health":
+    if name == "power_state_checked":
         return (
             "recovery",
-            f"full lab state after power restoration of {event['switch']}: {event['verdict']}",
+            f"full lab state after the power loss of {event['switch']}: {event['verdict']}",
         )
     if name == "fault_installing":
         return (
@@ -1876,10 +1892,10 @@ def _event_row(event: Mapping[str, Any]) -> tuple[str, str] | None:
             f"removed the rule for {event['target']}, {drops} packets dropped",
         )
     if name == "fault_lacp_restored":
-        return "recovery", "the client bond member is eligible again"
+        return "recovery", "the host bond member is eligible again"
     if name == "fault_cleanup":
         return "recovery", f"removed the rule for {event['target']} during cleanup"
-    if name == "fault_health":
+    if name == "fault_state_checked":
         return (
             "recovery",
             f"full lab state after clearing the rule is {event['verdict']}",
@@ -1905,7 +1921,7 @@ def _event_row(event: Mapping[str, Any]) -> tuple[str, str] | None:
     return None
 
 
-def _stop_text(lower: float, upper: float | None) -> str:
+def _outage_text(lower: float, upper: float | None) -> str:
     if upper is None:
         return f"at least {lower:g} s"
     if lower == upper:
@@ -1946,7 +1962,7 @@ def report(folder: Path, result: Mapping[str, Any]) -> str:
             "",
             (
                 "Traffic is shown through the sender cutoff after the run stopped. "
-                "The final lab state and closing window are unverified."
+                "The final lab state and closing window are error."
             ),
         ]
     measured_steps = {s["name"]: s for s in result["steps"]}
@@ -1960,14 +1976,14 @@ def report(folder: Path, result: Mapping[str, Any]) -> str:
                 f"longest interval {details['max_sample_interval_s']:g} s."
             )
     if flood := result.get("flood"):
-        output += ["", "## Flood probes", "", f"**{_cell(flood['verdict'])}**"]
-        for probe in flood["probes"]:
+        output += ["", "## Flood check", "", f"**{_cell(flood['verdict'])}**"]
+        for sent in flood["frames"]:
             output.append(
-                f"- {_cell(flood['source'])} → {_cell(probe['destination'])} · "
-                f"{probe['sent']} probes at one every {traffic.INTERVAL_NS // 1_000_000} ms, "
-                f"{len(probe['sender_returns'])} returned to the sender, "
-                f"{probe['baseline_sent'] - len(probe['baseline_exceptions'])} reached "
-                f"the baseline witness {_cell(flood['receiver'])} once."
+                f"- {_cell(flood['source'])} → {_cell(sent['destination'])} · "
+                f"{sent['sent']} frames at one every {traffic.INTERVAL_NS // 1_000_000} ms, "
+                f"{len(sent['sender_returns'])} returned to the sender, "
+                f"{sent['quiet_sent'] - len(sent['quiet_exceptions'])} reached "
+                f"the witness {_cell(flood['receiver'])} once."
             )
     output += _report_rules(test, result, measured_steps, log_lines, zero)
     output += _report_events(result, events, log_lines, zero)
@@ -1981,7 +1997,7 @@ def _report_traffic(
         "",
         "## Traffic",
         "",
-        "| Step | Stream | Limit | Total lost pings | Longest measured stop | Verdict |",
+        "| Step | Stream | Limit | Total lost pings | Longest measured outage | Verdict |",
         "| --- | --- | --- | --- | --- | --- |",
     ]
     points = {s.name: f"{s.source} → {s.destination}" for s in test.streams}
@@ -1997,22 +2013,22 @@ def _report_traffic(
                         f"{limit:g} s",
                         "unmeasured",
                         "unmeasured",
-                        "unverified",
+                        "error",
                     )
                 )
                 continue
             lower, upper = counts["lower_s"], counts["upper_s"]
-            stop = "unverified" if lower is None else _stop_text(lower, upper)
+            outage = "error" if lower is None else _outage_text(lower, upper)
             if counts.get("diagnostic_only"):
                 loss = counts["summary"]
                 if lower is not None:
-                    stop += " (diagnostic)"
-                verdict = f"unverified. {counts['reason']}"
+                    outage += " (diagnostic)"
+                verdict = f"error. {counts['reason']}"
             else:
                 loss = f"{counts['lost']} at one ping every {traffic.INTERVAL_NS // 1_000_000} ms"
                 verdict = counts["verdict"]
             output.append(
-                _row(step.name, points[name], f"{limit:g} s", loss, stop, verdict)
+                _row(step.name, points[name], f"{limit:g} s", loss, outage, verdict)
             )
     for step in test.steps:
         measured = measured_steps.get(step.name, {})
@@ -2020,13 +2036,13 @@ def _report_traffic(
             state = measured["state_check"] or {}
             output += [
                 "",
-                f"**{_cell(step.name)} state** · {_cell(state.get('verdict', 'unverified'))}",
+                f"**{_cell(step.name)} state** · {_cell(state.get('verdict', 'error'))}",
             ]
-            for statement in state.get("statements", []):
+            for state_check in state.get("state_checks", []):
                 output.append(
-                    f"- {_cell(statement['statement'])} · {_cell(statement['verdict'])}"
+                    f"- {_cell(state_check['name'])} · {_cell(state_check['verdict'])}"
                 )
-                for check in statement["checks"]:
+                for check in state_check["checks"]:
                     if check["verdict"] != "pass":
                         output.append(
                             f"  - {_cell(check['device'])} {_cell(check['check'])} · "
@@ -2043,8 +2059,8 @@ def _report_traffic(
                 f"**{_cell(step.name)}** · {_cell(proof['verdict'])}",
                 "",
                 (
-                    f"- {_cell(delay['stream'])} median ping round trip was {delay['baseline_ms']:g} ms before "
-                    f"the delay, {delay['impaired_ms']:g} ms during it, and {delay['restored_ms']:g} ms after removal."
+                    f"- {_cell(delay['stream'])} median ping round trip was {delay['before_ms']:g} ms before "
+                    f"the delay, {delay['impaired_ms']:g} ms during it, and {delay['after_ms']:g} ms after removal."
                 ),
             ]
     for step in test.steps:
@@ -2057,7 +2073,7 @@ def _report_traffic(
                 f"**Power loss of {_cell(power['switch'])}** · {_cell(power['verdict'])}",
                 "",
                 f"- Data cables lost carrier and the guest was paused for {power['held_s']:.3f} s.",
-                f"- The new boot was detected at +{power['elapsed_s']:.3f} s, with all lab checks passing at +{power['healthy_s']:.3f} s.",
+                f"- The new boot was detected at +{power['elapsed_s']:.3f} s, with all lab checks passing at +{power['recovered_s']:.3f} s.",
             ]
             continue
         output += [
@@ -2071,7 +2087,7 @@ def _report_traffic(
             f"- {_cell(node)} showed a new boot at +{boot['elapsed_s']:.3f} s."
             for node, boot in power["boots"].items()
         ]
-        output.append(f"- All lab checks passed at +{power['healthy_s']:.3f} s.")
+        output.append(f"- All lab checks passed at +{power['recovered_s']:.3f} s.")
     for step in test.steps:
         mobile = measured_steps.get(step.name, {}).get("mobile", {})
         if "gratuitous_arp_s" in mobile:
@@ -2080,9 +2096,9 @@ def _report_traffic(
                 f"**{_cell(step.name)}** · {_cell(mobile['verdict'])}",
                 "",
                 (
-                    f"- The gratuitous ARP reached {_cell(mobile['new_tap'])} at "
+                    f"- The gratuitous ARP reached {_cell(mobile['new_point'])} at "
                     f"{mobile['gratuitous_arp_s']:.3f} s from the start of the quiet window. "
-                    f"{_cell(mobile['old_tap'])} saw {mobile['old_port_unicast_after_garp']} "
+                    f"{_cell(mobile['old_point'])} saw {mobile['old_port_unicast_after_garp']} "
                     "further unicast frames addressed to the host."
                 ),
             ]
@@ -2143,9 +2159,9 @@ def _report_traffic(
             output.append(
                 f"- Uptime before dispatch was {reboot['before_uptime_s']:g} s. The switch reported {reboot['after_uptime_s']:g} s at +{reboot['elapsed_s']:g} s."
             )
-        if "healthy_s" in reboot:
+        if "recovered_s" in reboot:
             output.append(
-                f"- Full lab state was {_cell(reboot['state'])} at +{reboot['healthy_s']:g} s, against a {reboot['limit_s']:g} s limit."
+                f"- Full lab state was {_cell(reboot['state'])} at +{reboot['recovered_s']:g} s, against a {reboot['limit_s']:g} s limit."
             )
         if "reason" in reboot:
             output.append(f"- {_cell(reboot['reason'])}")
@@ -2201,13 +2217,13 @@ def _report_rules(
                 for hit in item.get("lines", [])
             ]
             if not matches or item["verdict"] != "pass":
-                matches.insert(0, item.get("reason", "unverified"))
+                matches.insert(0, item.get("reason", "error"))
             output.append(
                 _row(
                     scope,
                     ", ".join(spans) or rule.switch,
                     f"{rule.kind} {rule.text}",
-                    item.get("verdict", "unverified"),
+                    item.get("verdict", "error"),
                     "\n".join(matches),
                 )
             )
@@ -2235,12 +2251,12 @@ def _report_events(
             rows.append((event["epoch_ns"] - zero, *row))
         if event["name"] == "state_checked":
             state = result["state"].get(event["when"]) or {}
-            for statement in state.get("statements", []):
+            for state_check in state.get("state_checks", []):
                 rows.append(
                     (
                         event["epoch_ns"] - zero,
                         "state",
-                        f"{statement['statement']} {statement['verdict']}",
+                        f"{state_check['name']} {state_check['verdict']}",
                     )
                 )
     if not any(e["name"] == "stream_cutoff" for e in events):
@@ -2263,22 +2279,24 @@ def _report_events(
                 "starts at the first reply of every stream",
             )
         )
-    for name, flow in ((result.get("traffic") or {}).get("streams") or {}).items():
+    for name, measured_stream in (
+        (result.get("traffic") or {}).get("streams") or {}
+    ).items():
         diagnostic_steps = {
             step["name"]
             for step in result["steps"]
             if step["streams"][name].get("diagnostic_only")
         }
-        for gap in flow.get("outages", flow.get("gaps", ())):
-            where = ", ".join(gap["where"]) or "not sent"
-            summary = gap["summary"]
-            if diagnostic_steps.intersection(gap["windows"]):
+        for outage in measured_stream.get("outages", ()):
+            where = ", ".join(outage["where"]) or "not sent"
+            summary = outage["summary"]
+            if diagnostic_steps.intersection(outage["windows"]):
                 summary = (
-                    f"Diagnostic only: {gap['lost']} pings recorded lost "
+                    f"Diagnostic only: {outage['lost']} pings recorded lost "
                     f"(configured interval {traffic.INTERVAL_NS // 1_000_000} ms), "
-                    f"observed stop bounds {_stop_text(gap['lower_s'], gap['upper_s'])}"
+                    f"observed outage bounds {_outage_text(outage['lower_s'], outage['upper_s'])}"
                 )
-            rows.append((round(gap["begins_s"] * NS), name, f"{summary}, {where}"))
+            rows.append((round(outage["begins_s"] * NS), name, f"{summary}, {where}"))
     for line in log_lines:
         rows.append((line.epoch_ns - zero, f"{line.switch} log", line.text))
     output.extend(

@@ -25,17 +25,17 @@ def _print_result(ctx: CommandContext, result: dict[str, Any]) -> None:
         if state is None:
             continue
         table = Table(title=f"State {when}", show_header=True, header_style="bold")
-        table.add_column("Statement", overflow="fold")
+        table.add_column("State check", overflow="fold")
         table.add_column("Verdict", overflow="fold")
-        for statement in state["statements"]:
+        for state_check in state["state_checks"]:
             notes = [
                 f"{c['device']} {c['check']}: {c['verdict']}"
                 + (f" ({c['reason']})" if c["reason"] else "")
-                for c in statement["checks"]
+                for c in state_check["checks"]
                 if c["verdict"] != "pass"
             ]
             table.add_row(
-                statement["statement"], "\n".join([statement["verdict"], *notes])
+                state_check["name"], "\n".join([state_check["verdict"], *notes])
             )
         ctx.console.print(table)
     for reboot in result.get("reboots", {}).values():
@@ -48,9 +48,9 @@ def _print_result(ctx: CommandContext, result: dict[str, Any]) -> None:
                 f"{reboot['elapsed_s']:g} s elapsed.",
                 markup=False,
             )
-        if "healthy_s" in reboot:
+        if "recovered_s" in reboot:
             ctx.console.print(
-                f"Lab state {reboot['state']} at {reboot['healthy_s']:g} s (limit {reboot['limit_s']:g} s).",
+                f"Lab state {reboot['state']} at {reboot['recovered_s']:g} s (limit {reboot['limit_s']:g} s).",
                 markup=False,
             )
     if result["steps"]:
@@ -195,7 +195,7 @@ def register(app: typer.Typer) -> None:
             Path, typer.Argument(help="Summary file (YAML) naming the saved runs")
         ],
     ) -> None:
-        """Write the results table and worst-stop chart from saved test runs.
+        """Write the results table and worst-outage chart from saved test runs.
 
         Rewrites the lines between the results markers in the Markdown file
         and writes the SVG chart that the summary file names. Exit status: 0

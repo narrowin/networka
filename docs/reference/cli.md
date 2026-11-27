@@ -169,9 +169,9 @@ $ nw download [OPTIONS] {<device|group>} {remote_file} {local_path}
 Diff config, a command, or a sequence.
 
 Examples:
-  - nw diff sw-acc1 config -b baseline/export_compact.txt
-  - nw diff sw-acc1 &quot;/system/resource/print&quot; -b baseline/resource.txt
-  - nw diff lab_devices system_info -b baseline_dir/
+  - nw diff sw-acc1 config -b saved/export_compact.txt
+  - nw diff sw-acc1 &quot;/system/resource/print&quot; -b saved/resource.txt
+  - nw diff lab_devices system_info -b saved/
   - nw diff sw-acc1,sw-acc2 &quot;/system/resource/print&quot;   # device-to-device
   - nw diff sw-acc1,sw-acc2 config                      # device-to-device
 
@@ -188,7 +188,7 @@ $ nw diff [OPTIONS] {target} {subject}
 
 **Options**:
 
-* `-b, --baseline <path>`: Baseline file (for config/command) or directory (for sequence).
+* `-b, --saved-output <path>`: Saved output file (for config/command) or directory (for sequence).
 * `--ignore <list[str]>`: Regex to ignore lines; repeat for multiple patterns.
 * `--save-current <path>`: Optional path to save the current fetched state (file or directory).
 * `-H, --heuristic`: Use heuristic operational state diffing (ignores timestamps, counters, etc.).
@@ -335,14 +335,14 @@ $ nw config [OPTIONS] COMMAND [ARGS]...
 
 **Commands**:
 
-* `init`: Initialize a network toolkit configuration...
+* `init`: Initialize a Networka configuration in...
 * `validate`: Validate the configuration file and show...
 * `supported-types`: Show supported device types and platform...
 * `update`: Update framework-provided configuration...
 
 ### `nw config init`
 
-Initialize a network toolkit configuration in OS-appropriate location.
+Initialize a Networka configuration in OS-appropriate location.
 
 Creates a complete starter configuration with:
 - .env file with credential templates
@@ -661,7 +661,7 @@ Display JSON schema status.
 
 Shows the status of JSON schema files used for YAML validation in editors
 like VS Code. These schemas provide auto-completion and error checking
-for network toolkit configuration files.
+for Networka configuration files.
 
 **Usage**:
 
@@ -869,7 +869,7 @@ $ nw test [OPTIONS] COMMAND [ARGS]...
 
 * `run`: Run each test in the lab, save its...
 * `replay`: Rebuild the report and compare the result...
-* `summary`: Write the results table and worst-stop...
+* `summary`: Write the results table and worst-outage...
 
 ### `nw test run`
 
@@ -919,7 +919,7 @@ $ nw test replay [OPTIONS] {directory}
 
 ### `nw test summary`
 
-Write the results table and worst-stop chart from saved test runs.
+Write the results table and worst-outage chart from saved test runs.
 
 Rewrites the lines between the results markers in the Markdown file
 and writes the SVG chart that the summary file names. Exit status: 0

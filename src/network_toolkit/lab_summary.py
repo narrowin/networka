@@ -4,7 +4,7 @@
 A summary file in the lab repository lists the labs as rows and the modes as
 columns. Each cell names the run directories written by `nw test run --save`.
 Every test folder in them counts for the cell. The summary rewrites the lines
-between two markers in a Markdown file and writes the chart of the worst stop.
+between two markers in a Markdown file and writes the chart of the worst outage.
 """
 
 from __future__ import annotations
@@ -57,7 +57,7 @@ FAINT = "#8c959f"
 
 
 @dataclass(frozen=True)
-class Stop:
+class Outage:
     lower: float
     upper: float
     limit: float
@@ -72,7 +72,7 @@ class Cell:
     passed: int
     total: int
     errors: int
-    worst: Stop | None
+    worst: Outage | None
     intervals: frozenset[float]
     runs: tuple[Path, ...]
     link: Path | None
@@ -82,14 +82,14 @@ def _node(point: str) -> str:
     return point.split(":", 1)[0]
 
 
-def _test(folder: Path) -> tuple[str, float, Stop | None]:
-    """The verdict, ping interval and longest decided stop of one saved test."""
+def _test(folder: Path) -> tuple[str, float, Outage | None]:
+    """The verdict, ping interval and longest decided outage of one saved test."""
     path = folder / labtest.RESULT_FILE
     try:
         result = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
         labtest._fail(str(path), f"cannot read the result: {error}")
-    worst: Stop | None = None
+    worst: Outage | None = None
     try:
         verdict = result["verdict"]
         interval = float(result["traffic"]["interval_s"])
@@ -99,7 +99,7 @@ def _test(folder: Path) -> tuple[str, float, Stop | None]:
         ends = {s.name: (s.source, s.destination) for s in test.streams}
         for step in result["steps"]:
             for name, stream in step["streams"].items():
-                # The report marks these stops unverified.
+                # The report gives these outages ERROR.
                 if (
                     stream["verdict"] == "error"
                     or stream.get("diagnostic_only")
@@ -108,7 +108,7 @@ def _test(folder: Path) -> tuple[str, float, Stop | None]:
                     continue
                 if worst is None or stream["upper_s"] > worst.upper:
                     source, destination = ends[name]
-                    worst = Stop(
+                    worst = Outage(
                         stream["lower_s"],
                         stream["upper_s"],
                         stream["limit_s"],
@@ -132,7 +132,7 @@ def _cell(raw: Any, base: Path, where: str) -> Cell | None:
     link = labtest._optional_text(raw, "link", where)
     link_path = None if link is None else base / link
     counts: Counter[str] = Counter()
-    worst: Stop | None = None
+    worst: Outage | None = None
     intervals = set()
     seen: dict[str, Path] = {}
     for run in runs:
@@ -153,11 +153,11 @@ def _cell(raw: Any, base: Path, where: str) -> Cell | None:
                     f"test {folder.name} is in both {seen[folder.name]} and {folder}",
                 )
             seen[folder.name] = folder
-            verdict, interval, stop = _test(folder)
+            verdict, interval, outage = _test(folder)
             counts[verdict] += 1
             intervals.add(interval)
-            if stop and (worst is None or stop.upper > worst.upper):
-                worst = stop
+            if outage and (worst is None or outage.upper > worst.upper):
+                worst = outage
     verdict = "FAIL" if counts["fail"] else "PASS" if counts["pass"] else "ERROR"
     return Cell(
         verdict,
@@ -236,7 +236,7 @@ def _markdown(
         "FAIL": _rel(base / spec["fail_icon"], here),
     }
     chart = _rel(base / spec["chart"], here)
-    header = ["Lab", "Topology", *modes, *(f"Worst stop, {m}" for m in modes)]
+    header = ["Lab", "Topology", *modes, *(f"Worst outage, {m}" for m in modes)]
     lines = [
         f"![{spec['chart_alt']}]({chart})",
         "",
@@ -274,14 +274,14 @@ def _num(value: float) -> str:
 
 
 def _svg(modes: list[str], rows: list[Row]) -> str:
-    stops = [c.worst for r in rows for c in r.cells if c is not None and c.worst]
-    longest = max((s.upper for s in stops), default=0.0)
+    outages = [c.worst for r in rows for c in r.cells if c is not None and c.worst]
+    longest = max((s.upper for s in outages), default=0.0)
     # Keep the 20 s axis while the longest mark still fits beside it.
     axis_s = float(MIN_AXIS_S)
     if AXIS_X + AXIS_PX / MIN_AXIS_S * longest > RIGHT_EDGE - 6:
         axis_s = -(-longest // TICK_S) * TICK_S
     scale = AXIS_PX / axis_s
-    limits = Counter(s.limit for s in stops)
+    limits = Counter(s.limit for s in outages)
     limit = min(limits, key=lambda v: (-limits[v], v)) if limits else 5.0
     row_px = ROW_PAD + MODE_PX * len(modes)
     bottom = TOP + row_px * len(rows)
@@ -299,7 +299,7 @@ def _svg(modes: list[str], rows: list[Row]) -> str:
         ),
         f'  <rect width="{WIDTH}" height="{height}" fill="#ffffff"/>',
         (
-            f'  <text x="{AXIS_X}" y="16" font-size="12" fill="{MUTED}">Worst traffic stop '
+            f'  <text x="{AXIS_X}" y="16" font-size="12" fill="{MUTED}">Worst outage '
             f"in any test, seconds (upper bound, one ping every "
             f"{_interval([c for r in rows for c in r.cells if c])} ms)</text>"
         ),
@@ -349,14 +349,14 @@ def _svg(modes: list[str], rows: list[Row]) -> str:
                 or cell.worst is None
                 or cell.verdict not in ("PASS", "FAIL")
             ):
-                text = "not run" if cell is None else "no measured stop"
+                text = "not run" if cell is None else "no measured outage"
                 blanks.append(
                     f'  <text x="{AXIS_X + 6}" y="{y + 4}" fill="{FAINT}" '
                     f'font-style="italic">{text}</text>'
                 )
                 continue
-            stop = cell.worst
-            cx = x(stop.upper)
+            outage = cell.worst
+            cx = x(outage.upper)
             if cell.verdict == "PASS":
                 marks.append(
                     f'  <circle cx="{_num(cx)}" cy="{y}" r="6" fill="{GREEN}" stroke="none"/>'
@@ -366,9 +366,9 @@ def _svg(modes: list[str], rows: list[Row]) -> str:
                     f'  <rect x="{_num(cx - 6)}" y="{y - 6}" width="12" height="12" '
                     f'fill="{RED}" stroke="none"/>'
                 )
-            text = f"{_seconds(stop.upper)} s"
-            if stop.limit != limit:
-                text += f" · limit {stop.limit:g} s"
+            text = f"{_seconds(outage.upper)} s"
+            if outage.limit != limit:
+                text += f" · limit {outage.limit:g} s"
             if cx + 12 + CHAR_PX * len(text) > RIGHT_EDGE:
                 marks.append(
                     f'  <text x="{_num(cx - 12)}" y="{y + 4}" text-anchor="end">{text}</text>'

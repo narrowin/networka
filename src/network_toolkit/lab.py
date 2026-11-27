@@ -46,7 +46,7 @@ class LabError(NetworkToolkitError):
 
 
 class Point(NamedTuple):
-    """A capture point or link endpoint: a node and an interface in its namespace."""
+    """A capture point or cable end: a node and an interface in its namespace."""
 
     node: str
     interface: str
@@ -116,13 +116,13 @@ class Lab:
         return self.nodes[name]
 
     def peer(self, end: Point) -> Point:
-        """The other end of the link that has `end` as one endpoint."""
+        """The other end of the cable that has `end` as one end."""
         for a, z in self.links:
             if end == a:
                 return z
             if end == z:
                 return a
-        msg = f"{end} is not a link endpoint in lab {self.name}"
+        msg = f"{end} is not a cable end in lab {self.name}"
         raise LabError(msg)
 
     def ns(self, node: str, *command: str) -> list[str]:
@@ -421,7 +421,7 @@ class Session:
                 stdout=output,
                 stderr=subprocess.STDOUT,
                 start_new_session=True,
-                # Capture readiness and kernel drop counts use tcpdump's English output.
+                # Capture start and kernel drop counts use tcpdump's English output.
                 env={**os.environ, "LC_ALL": "C"},
             )
         process = Process(kind, name, child, log)
@@ -516,13 +516,13 @@ class Session:
         return log
 
     def set_link(self, where: str, state: str) -> dict[str, Any]:
-        """Set the cable with endpoint `where` down or up.
+        """Set the cable with end `where` down or up.
 
         An end on a node that runs in QEMU gets the change on its container
         interface and on its QEMU NIC through the QEMU monitor, because the guest
         sees a carrier change only that way. When no end runs in QEMU, both
         container interfaces change. The carrier is then confirmed at each end
-        the engine did not set itself, the far end. Returns the `link_observed`
+        the engine did not set itself, the far end. Returns the `cable_observed`
         event.
         """
         if state not in ("down", "up"):
@@ -537,7 +537,7 @@ class Session:
         if not up:
             self.down.add(first)
         self.mark(
-            "link_start", point=str(first), state=state, ends=[str(e) for e in ends]
+            "cable_start", point=str(first), state=state, ends=[str(e) for e in ends]
         )
         with ThreadPoolExecutor(max_workers=len(changed) + len(qemu)) as jobs:
             linux = [
@@ -567,7 +567,7 @@ class Session:
                 if not job.exception()
             }
         applied = self.mark(
-            "link_applied",
+            "cable_applied",
             point=str(first),
             state=state,
             ip_link=[str(e) for e in changed],
@@ -589,7 +589,7 @@ class Session:
                 time.sleep(0.03)
         confirmed = len(seen) == len(far)
         observed = self.mark(
-            "link_observed",
+            "cable_observed",
             point=str(first),
             state=state,
             far=[str(e) for e in far],

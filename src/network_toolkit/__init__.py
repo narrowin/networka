@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2025-present Network Team <network@company.com>
 #
 # SPDX-License-Identifier: MIT
-"""Network Toolkit - Network automation made simple for MikroTik (and beyond)."""
+"""Networka - Network automation made simple for MikroTik (and beyond)."""
 
 import logging
 

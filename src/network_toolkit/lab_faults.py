@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 DROP_COUNT = re.compile(r"\(dropped (\d+),")
 NETEM_HANDLE = "982:"
-# The qualified fast-rate LACP endpoints transmit once per second.
+# The qualified fast-rate LACP partners transmit once per second.
 LACP_POLL_S = 0.2
 LACP_RECOVERY_S = 30.0
 
@@ -220,7 +220,7 @@ class Installed:
     points: tuple[lab.Point, ...]
     addresses: tuple[str, str]
     owned: set[lab.Point]
-    baseline: dict[str, str]
+    qdisc_before: dict[str, str]
     opening: int
 
 
@@ -292,14 +292,14 @@ class TrafficActions:
                 and _member(fault, bond, eligible=True),
                 f"{fault.point} must start eligible in its Linux LACP bond",
             )
-        baseline = {str(p): _qdisc(self.topology, p) for p in points}
-        for point, raw in baseline.items():
+        qdisc_before = {str(p): _qdisc(self.topology, p) for p in points}
+        for point, raw in qdisc_before.items():
             if isinstance(fault, Impair):
                 # Preserve any pre-existing shaper. Containerlab veths use noqueue.
                 _require(_root(raw)[1] == "noqueue", f"{point} has a non-default qdisc")
             else:
                 _require(not _has_classifier(raw), f"{point} already has a classifier")
-        active = Installed(fault, points, addresses, set(), baseline, number)
+        active = Installed(fault, points, addresses, set(), qdisc_before, number)
         self.installed[key(fault)] = active
         self.session.mark(
             "fault_installing",
@@ -309,7 +309,7 @@ class TrafficActions:
             points=[str(p) for p in points],
             peer=str(peer),
             addresses=addresses,
-            baseline=baseline,
+            qdisc_before=qdisc_before,
             bond=bond,
         )
         for p in points:
@@ -376,7 +376,7 @@ class TrafficActions:
         client: NetworkaClient,
         fault: TrafficFault,
         number: int,
-        wait_s: float,
+        recovery_deadline_s: float,
         items: list[intent.IntentItem],
         options: Mapping[str, Any],
     ) -> None:
@@ -400,11 +400,13 @@ class TrafficActions:
             _restored(active, restored), f"{name(fault)} did not restore its qdisc"
         )
         if isinstance(active.fault, SilenceLacp):
-            failed = f"{active.fault.point} did not withdraw from LACP while carrier stayed up"
+            failed = f"{active.fault.point} did not leave LACP while carrier stayed up"
             _require(
                 bond is not None and _member(active.fault, bond, eligible=False), failed
             )
-            deadline = started["mono_ns"] / traffic.NS + (wait_s or LACP_RECOVERY_S)
+            deadline = started["mono_ns"] / traffic.NS + (
+                recovery_deadline_s or LACP_RECOVERY_S
+            )
             while True:
                 reading = self.bond(active.fault)
                 if _member(active.fault, reading, eligible=True):
@@ -417,11 +419,14 @@ class TrafficActions:
                     f"{active.fault.point} did not rejoin LACP",
                 )
                 time.sleep(LACP_POLL_S)
-        if wait_s:
-            remaining = wait_s - (time.monotonic_ns() - started["mono_ns"]) / traffic.NS
+        if recovery_deadline_s:
+            remaining = (
+                recovery_deadline_s
+                - (time.monotonic_ns() - started["mono_ns"]) / traffic.NS
+            )
             _require(remaining > 0, f"{name(fault)} exhausted its recovery deadline")
             with lab_reboot._deadline(remaining, "Fault recovery"):
-                lab_reboot.wait_healthy(
+                lab_reboot.wait_recovered(
                     client, self.session, name(fault), number, items, options, "fault"
                 )
 
@@ -455,12 +460,12 @@ def _matches(active: Installed, readings: Mapping[str, str]) -> bool:
 def _restored(active: Installed, readings: Mapping[str, str]) -> bool:
     return (
         isinstance(readings, Mapping)
-        and set(readings) == set(active.baseline)
+        and set(readings) == set(active.qdisc_before)
         and all(
             isinstance(reading, str)
-            and isinstance(active.baseline[point], str)
-            and _has_classifier(reading) == _has_classifier(active.baseline[point])
-            and _root(reading)[1:3] == _root(active.baseline[point])[1:3]
+            and isinstance(active.qdisc_before[point], str)
+            and _has_classifier(reading) == _has_classifier(active.qdisc_before[point])
+            and _root(reading)[1:3] == _root(active.qdisc_before[point])[1:3]
             for point, reading in readings.items()
         )
     )
@@ -485,10 +490,10 @@ def _rtt(
     """Median request to reply durations from source capture, in milliseconds."""
     frames = traffic.decode(capture)
     samples: list[list[int]] = [[] for _ in windows]
-    for (stream, kind, probe), stamps in frames.items():
+    for (stream, kind, ping), stamps in frames.items():
         if stream != ident or kind != traffic.REQUEST:
             continue
-        replies = frames.get((ident, traffic.REPLY, probe), [])
+        replies = frames.get((ident, traffic.REPLY, ping), [])
         if len(stamps) != 1 or len(replies) != 1:
             continue
         delay = replies[0] - stamps[0]
@@ -498,10 +503,10 @@ def _rtt(
             if start <= stamps[0] and replies[0] < end:
                 current.append(delay)
     counts = [len(current) for current in samples]
-    # A median needs at least three complete samples in each phase.
+    # A median needs at least three complete samples in each period.
     _require(
         min(counts) >= 3,
-        f"Too few ping replies to measure delay in each phase: {counts}",
+        f"Too few ping replies to measure delay in each period: {counts}",
     )
     return [
         statistics.median(current) * 1000 / traffic.NS for current in samples
@@ -535,7 +540,7 @@ def _delay_proof(
     earlier = {
         event["number"] for event in neighboring if event["number"] < before["number"]
     }
-    baseline_start = max(
+    before_start = max(
         (
             event["epoch_ns"]
             for event in events
@@ -545,7 +550,7 @@ def _delay_proof(
         ),
         default=measured["start_ns"],
     )
-    restored_end = min(
+    after_end = min(
         (
             event["epoch_ns"]
             for event in neighboring
@@ -557,18 +562,18 @@ def _delay_proof(
         pcaps[stream["source"]],
         stream["ident"],
         [
-            (baseline_start, before["epoch_ns"]),
+            (before_start, before["epoch_ns"]),
             (applied["epoch_ns"], clearing["epoch_ns"]),
-            (cleared["epoch_ns"], restored_end),
+            (cleared["epoch_ns"], after_end),
         ],
     )
-    baseline, impaired, restored = medians
-    increase = impaired - baseline
+    median_before, impaired, median_after = medians
+    increase = impaired - median_before
     result["delay"] = {
         "stream": fault.delay_stream,
-        "baseline_ms": round(baseline, 3),
+        "before_ms": round(median_before, 3),
         "impaired_ms": round(impaired, 3),
-        "restored_ms": round(restored, 3),
+        "after_ms": round(median_after, 3),
         "increase_ms": round(increase, 3),
         "samples": samples,
     }
@@ -579,9 +584,9 @@ def _delay_proof(
         max(fault.delay_ms / 2, fault.delay_ms - margin)
         <= increase
         <= count * (fault.delay_ms + margin)
-        and abs(restored - baseline) <= tolerance,
+        and abs(median_after - median_before) <= tolerance,
         f"{fault.delay_stream} did not show the requested delay and recovery "
-        f"({baseline:.3f}, {impaired:.3f}, {restored:.3f} ms median RTT)",
+        f"({median_before:.3f}, {impaired:.3f}, {median_after:.3f} ms median RTT)",
     )
 
 
@@ -591,7 +596,7 @@ def proofs(
     fault: TrafficFault,
     opening: int,
     closing: int,
-    wait_s: float,
+    recovery_deadline_s: float,
     items: list[intent.IntentItem],
     measured: Mapping[str, Any],
     hold_s: float,
@@ -610,7 +615,7 @@ def proofs(
             points,
             tuple(before["addresses"]),
             set(),
-            before["baseline"],
+            before["qdisc_before"],
             opening,
         )
         first = lab.point(fault.point)
@@ -628,19 +633,19 @@ def proofs(
             and all(
                 e["target"] == name(fault) for e in (before, applied, clearing, cleared)
             )
-            and set(active.baseline) == {str(point) for point in points}
+            and set(active.qdisc_before) == {str(point) for point in points}
             and before["mono_ns"]
             <= applied["mono_ns"]
             <= clearing["mono_ns"]
             <= cleared["mono_ns"]
-            and set(active.baseline) == set(cleared["raw"]),
+            and set(active.qdisc_before) == set(cleared["raw"]),
             "Fault events do not identify the requested rule and matching removal",
         )
         _require(
             _matches(active, applied["raw"])
             and _matches(active, cleared["counters"])
             and _restored(active, cleared["raw"]),
-            "The saved tc reads do not prove installation and restoration",
+            "The saved tc reads do not prove installation and removal",
         )
         result["points"] = before["points"]
         result["held_s"] = (clearing["mono_ns"] - applied["mono_ns"]) / traffic.NS
@@ -664,21 +669,21 @@ def proofs(
                 and cleared["mono_ns"]
                 <= restored["mono_ns"]
                 <= clearing["mono_ns"]
-                + round((wait_s or LACP_RECOVERY_S) * traffic.NS),
-                "The captured Linux bond state did not prove withdrawal with carrier and recovery",
+                + round((recovery_deadline_s or LACP_RECOVERY_S) * traffic.NS),
+                "The captured Linux bond state did not prove the member left with carrier up and came back",
             )
-        if wait_s:
-            recovered = lab_reboot.health_proof(
+        if recovery_deadline_s:
+            recovered = lab_reboot.recovery_proof(
                 folder, events, name(fault), closing, items, "fault"
             )
             _require(
                 recovered["verdict"] == "pass"
                 and cleared["mono_ns"]
                 <= recovered["mono_ns"]
-                <= clearing["mono_ns"] + wait_s * traffic.NS,
+                <= clearing["mono_ns"] + recovery_deadline_s * traffic.NS,
                 "The lab did not recover within the deadline",
             )
-            result["healthy_s"] = (
+            result["recovered_s"] = (
                 recovered["mono_ns"] - clearing["mono_ns"]
             ) / traffic.NS
         if isinstance(fault, Impair) and fault.delay_stream:
@@ -699,26 +704,27 @@ def proofs(
             start = measured["start_ns"]
             low = (before["epoch_ns"] - start) / traffic.NS
             high = (cleared["epoch_ns"] - start) / traffic.NS
-            gaps = [
-                gap
-                for gap in stream["gaps"]
-                if gap["begins_s"] <= high and gap["ends_s"] >= low
+            outages = [
+                outage
+                for outage in stream["outages"]
+                if outage["begins_s"] <= high and outage["ends_s"] >= low
             ]
-            # The first and last missed probes bound the minimum gap. The
-            # surrounding successful probes bound its maximum length.
+            # The first and last lost pings bound the minimum outage. The
+            # surrounding delivered pings bound its maximum length.
             _require(
-                len(gaps) == 1,
-                f"Expected one contiguous cut of {fault.stream}, found {len(gaps)}",
+                len(outages) == 1,
+                f"Expected one contiguous cut of {fault.stream}, found {len(outages)}",
             )
-            [gap] = gaps
+            [outage] = outages
             unbracketed = (
-                "The captured one-way ping gap does not bracket the applied cut"
+                "The captured one-way ping outage does not bracket the applied cut"
             )
             _require(
-                not gap["absent_at_source"] and gap["upper_s"] is not None, unbracketed
+                not outage["absent_at_source"] and outage["upper_s"] is not None,
+                unbracketed,
             )
-            # Probes leave at the sender's own pace, so the tc markers bound
-            # each send instead of a nominal interval. Lost probes leave
+            # Pings leave at the sender's own pace, so the tc markers bound
+            # each send instead of a nominal interval. Lost pings leave
             # between installing and cleared, and delivered ones outside
             # installed to clearing.
             sends = sorted(
@@ -731,16 +737,16 @@ def proofs(
                 and start <= stamps[0] < measured["end_ns"]
             )
             offsets = [traffic.seconds(send - start) for send in sends]
-            begins = offsets.index(gap["begins_s"])
-            ends = offsets.index(gap["ends_s"])
+            begins = offsets.index(outage["begins_s"])
+            ends = offsets.index(outage["ends_s"])
             _require(
                 begins > 0 and ends + 1 < len(sends),
                 "The cut has no delivered ping before or after it in the capture",
             )
             upper_hold = (cleared["mono_ns"] - before["mono_ns"]) / traffic.NS
             _require(
-                gap["lower_s"] <= upper_hold
-                and result["held_s"] <= gap["upper_s"]
+                outage["lower_s"] <= upper_hold
+                and result["held_s"] <= outage["upper_s"]
                 and sends[begins - 1] <= applied["epoch_ns"]
                 and sends[begins] >= before["epoch_ns"]
                 and sends[ends] <= cleared["epoch_ns"]

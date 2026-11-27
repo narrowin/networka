@@ -263,9 +263,7 @@ class TestSupportedPlatformsTableProvider:
         verbose_info = provider.get_verbose_info()
 
         assert verbose_info is not None
-        assert (
-            "Platforms supported by the network toolkit transport layer" in verbose_info
-        )
+        assert "Platforms supported by the Networka transport layer" in verbose_info
 
 
 class TestTransportTypesTableProvider:

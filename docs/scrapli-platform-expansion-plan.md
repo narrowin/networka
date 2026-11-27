@@ -471,7 +471,7 @@ uv add scrapli-community
 
 ### Q7: Platform Detection
 
-**Question**: Can we auto-detect platform from device responses?
+**Question**: Can we auto-detect platform from device replies?
 
 **Benefit**: User doesn't need to specify platform
 

@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2025-present Network Team <network@company.com>
 #
 # SPDX-License-Identifier: MIT
-"""Command-line interface for the network toolkit (modularized)."""
+"""Command-line interface for Networka (modularized)."""
 
 from __future__ import annotations
 
@@ -111,7 +111,7 @@ def main(
         ),
     ] = None,
 ) -> None:
-    """Configure global settings for the network toolkit."""
+    """Configure global settings for Networka."""
     # The package silences library logging; the CLI keeps printing warnings to
     # stderr until a command configures logging.
     root_logger = logging.getLogger()

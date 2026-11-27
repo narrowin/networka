@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2025-present Network Team <network@company.com>
 #
 # SPDX-License-Identifier: MIT
-"""Configuration management for network toolkit."""
+"""Configuration management for Networka."""
 
 from __future__ import annotations
 
@@ -412,7 +412,7 @@ class FileOperationConfig(BaseModel):
 
 
 class NetworkConfig(BaseModel):
-    """Complete network toolkit configuration."""
+    """Complete Networka configuration."""
 
     general: GeneralConfig = GeneralConfig()
     devices: dict[str, DeviceConfig] | None = None

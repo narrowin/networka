@@ -13,9 +13,9 @@ from mlag_lab.root_evidence import summarize_router
 
 from network_toolkit import intent
 
-POWER_CASE = Path("results/2026-11-24-power-loss/small-stp-off/01-primary-power-loss")
-BOND_CASE = Path("results/2026-11-24-small-search/mstp-default-l2/01-bond-member-loss")
-PROBE_CASES = Path("results/2026-11-24-forwarding-checks/small-mstp-reboots")
+POWER_RUN = Path("results/2026-11-24-power-loss/small-stp-off/01-primary-power-loss")
+BOND_RUN = Path("results/2026-11-24-small-search/mstp-default-l2/01-bond-member-loss")
+FORWARDING_RUNS = Path("results/2026-11-24-forwarding-checks/small-mstp-reboots")
 ROUTEROS_LINK = "/interface ethernet monitor ether2 once"
 ROUTEROS_MLAG = "/interface bridge monitor bridge once"
 CUMULUS_INTERFACES = "nv show interface --output json"
@@ -44,8 +44,8 @@ JUNOS_LINK_STATES = {"up": "up", "down": "down"}
 IntentValue = str | bool
 
 
-def archived_router(case: Path, peer: str, line: int, heading: str) -> str | None:
-    path = case / f"state-{peer}.jsonl"
+def archived_router(run: Path, peer: str, line: int, heading: str) -> str | None:
+    path = run / f"state-{peer}.jsonl"
     with path.open(encoding="utf-8") as archive:
         record = json.loads(next(islice(archive, line - 1, line)))
     source = f"{path}:{line} (started_ns={record['started_ns']})"
@@ -80,7 +80,7 @@ def junos_physical_row(raw: str, name: str):
 
 def show_intent(path: str, expected: IntentValue, actual: IntentValue | None) -> None:
     if actual is None:
-        verdict = "unavailable"
+        verdict = "error"
     else:
         verdict = "match" if actual == expected else "mismatch"
     print(f"  {path:24} expected={expected!r} actual={actual!r} → {verdict}")
@@ -92,19 +92,19 @@ def show_link(
     show_intent("native", native_expected, native_actual)
     translated = link_states.get(native_actual) if native_actual is not None else None
     if native_actual is not None and translated is None:
-        print(f"  translation unavailable for native value {native_actual!r}")
+        print(f"  no translation for native value {native_actual!r}")
     show_intent("translated", "up", translated)
 
 
-def show_baseline(path: str, before: str | None, after: str | None) -> None:
+def show_change(path: str, before: str | None, after: str | None) -> None:
     if before is None or after is None:
-        verdict = "unavailable"
+        verdict = "error"
     else:
         verdict = "unchanged" if before == after else "changed"
     print(f"  {path:24} before={before!r} after={after!r} → {verdict}")
 
 
-def compare_mlag(case: Path) -> None:
+def compare_mlag(run: Path) -> None:
     power_samples = (
         ("before", "p2", 3),
         ("during", "p2", 17),
@@ -115,7 +115,7 @@ def compare_mlag(case: Path) -> None:
     )
     selected = {}
     for label, peer, line in power_samples:
-        raw = archived_router(case, peer, line, f"RouterOS {peer}/ether2 {label}")
+        raw = archived_router(run, peer, line, f"RouterOS {peer}/ether2 {label}")
         state = summarize_router(raw) if raw is not None else {}
         print(f"  command: {ROUTEROS_LINK}")
         link = state.get("carrier", {}).get("ether2")
@@ -143,13 +143,15 @@ def compare_mlag(case: Path) -> None:
         before, before_state, before_role = selected[peer, "before"]
         before_link = ROUTEROS_LINK_STATES.get(before) if before is not None else None
         for label in ("during", "recovered"):
-            print(f"Selected baseline change, RouterOS {peer} {label} (sources above)")
+            print(
+                f"Selected change from the state before the fault, RouterOS {peer} {label} (sources above)"
+            )
             after, after_state, after_role = selected[peer, label]
-            show_baseline("ether2 native", before, after)
+            show_change("ether2 native", before, after)
             after_link = ROUTEROS_LINK_STATES.get(after) if after is not None else None
-            show_baseline("ether2 translated", before_link, after_link)
-            show_baseline("MLAG state", before_state, after_state)
-            show_baseline("MLAG active role", before_role, after_role)
+            show_change("ether2 translated", before_link, after_link)
+            show_change("MLAG state", before_state, after_state)
+            show_change("MLAG active role", before_role, after_role)
             print()
 
 
@@ -248,18 +250,18 @@ def mstp_port_columns_complete(raw: str) -> bool:
     )
 
 
-def check_bonds_and_tree(case: Path) -> None:
-    baseline_members = []
+def check_bonds_and_tree(run: Path) -> None:
+    members_before = []
     for label, peer, line in (
         ("before", "p1", 1),
         ("before", "p2", 1),
         ("during", "p1", 20),
     ):
         raw = archived_router(
-            case, peer, line, f"RouterOS MSTP bond-member-loss {peer} {label}"
+            run, peer, line, f"RouterOS MSTP bond-member-loss {peer} {label}"
         )
         state = summarize_router(raw) if raw is not None else {}
-        print(f"  member bindings: {case / f'config-{peer}.txt'}:54-66")
+        print(f"  member bindings: {run / f'config-{peer}.txt'}:54-66")
         for bond, member in (("client1", "ether3"), ("client2", "ether4")):
             flags = state.get("lacp", {}).get(member, {})
             actor = flags.get("actor", "")
@@ -273,7 +275,7 @@ def check_bonds_and_tree(case: Path) -> None:
             print(f"  {member} actor={actor or None!r} partner={partner or None!r}")
             show_intent(f"{bond}/{member}", "eligible", eligibility)
             if label == "before":
-                baseline_members.append(eligibility)
+                members_before.append(eligibility)
         if peer == "p1":
             print("  command: /interface/ethernet/monitor ether3 once")
             show_intent(
@@ -302,43 +304,43 @@ def check_bonds_and_tree(case: Path) -> None:
         "All four configured client-bond members, before loss (p1 and p2 sources above)"
     )
     actual = None
-    if "ineligible" in baseline_members:
+    if "ineligible" in members_before:
         actual = "a member was ineligible"
-    elif all(member == "eligible" for member in baseline_members):
+    elif all(member == "eligible" for member in members_before):
         actual = "all eligible"
     show_intent("baseline LACP", "all eligible", actual)
     print()
 
 
-def probe_result(flow, description: str, *, baseline: bool) -> tuple[str | None, str]:
+def ping_result(flow, description: str, *, baseline: bool) -> tuple[str | None, str]:
     if not isinstance(flow, dict) or flow.get("description") != description:
         return None, "required flow row is missing or has a different direction"
     sent = flow.get("sent")
     missed = flow.get("baseline_missed" if baseline else "missed")
     mismatches = flow.get("capture_mismatches")
     if not isinstance(mismatches, list) or mismatches:
-        return None, "endpoint capture agreement is unavailable"
+        return None, "the capture points do not show agreement"
     if not all(type(value) is int and value >= 0 for value in (sent, missed)):
-        return None, "probe score fields are incomplete or invalid"
+        return None, "ping score fields are incomplete or invalid"
     if sent == 0 or missed > sent:
-        return None, "no probes sent or misses exceed sends"
+        return None, "no pings sent or misses exceed sends"
     if baseline:
         good = flow.get("baseline_good")
         if type(good) is not int or good < 0 or good + missed != sent:
             return None, "baseline scores do not account for the sends"
     if missed:
-        return "probes missed", "the selected window records missed probes"
-    return "all probes delivered", "no misses recorded and endpoint captures agree"
+        return "pings missed", "the selected window records missed pings"
+    return "all pings delivered", "no misses recorded and capture points agree"
 
 
-def read_probe_report(path: Path, case: str) -> dict:
+def read_ping_report(path: Path, name: str) -> dict:
     try:
         report = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
         print(f"  report error: {error}")
         return {}
-    if not isinstance(report, dict) or report.get("case") != case:
-        print(f"  expected report for case {case!r}")
+    if not isinstance(report, dict) or report.get("case") != name:
+        print(f"  expected report for test {name!r}")
         return {}
     return report
 
@@ -347,7 +349,7 @@ def check_reachability(path: Path) -> None:
     print(
         f"Reachability between the bonded client endpoints on VLAN 110\n  source: {path}"
     )
-    report = read_probe_report(path, "direct-baseline")
+    report = read_ping_report(path, "direct-baseline")
     flows = {}
     if (
         report.get("fault_executed") is False
@@ -356,19 +358,19 @@ def check_reachability(path: Path) -> None:
     ):
         flows = report["flows"]
     else:
-        print("  valid direct-baseline report unavailable")
+        print("  no valid direct-baseline report")
     for flow_id in (101, 201):
         source, destination, address, direction = DIRECT_FLOWS[flow_id]
-        actual, detail = probe_result(flows.get(str(flow_id)), direction, baseline=True)
+        actual, detail = ping_result(flows.get(str(flow_id)), direction, baseline=True)
         print(f"  flows[{flow_id}] {direction} ({source} → {destination}, {address})")
         print(f"  {detail}")
-        show_intent("baseline ICMP", "all probes delivered", actual)
+        show_intent("baseline ICMP", "all pings delivered", actual)
     print()
 
 
 def show_interrupted_reachability(path: Path) -> None:
     print(f"Continuity during the interrupted secondary reboot\n  source: {path}")
-    report = read_probe_report(path, "direct-reboot-secondary")
+    report = read_ping_report(path, "direct-reboot-secondary")
     status = report.get("status")
     print(f"  report status: {status!r}")
     for check in report.get("checks", []):
@@ -389,13 +391,13 @@ def show_interrupted_reachability(path: Path) -> None:
     for flow_id in (101, 201):
         flow = report.get("flows", {}).get(str(flow_id), {})
         direction = DIRECT_FLOWS[flow_id][3]
-        actual, detail = probe_result(flow, direction, baseline=False)
+        actual, detail = ping_result(flow, direction, baseline=False)
         print(f"  flows[{flow_id}] {direction}: {detail}")
         if not complete:
-            print("  the complete reboot window is unavailable")
+            print("  the complete reboot window is missing")
         show_intent(
             f"reboot ICMP {flow_id}",
-            "all probes delivered",
+            "all pings delivered",
             actual if complete else None,
         )
     print()
@@ -408,7 +410,7 @@ def main() -> None:
         "--routeros-stp-port",
         nargs=3,
         metavar=("BRIDGE", "INTERFACE", "EVIDENCE_JSON"),
-        help="also check bridge-port forwarding from evidence saved by collect_bridge_port",
+        help="also check bridge-port forwarding from evidence saved by read_bridge_port",
     )
     parser.add_argument(
         "--cumulus-interface",
@@ -426,12 +428,12 @@ def main() -> None:
     )
     args = parser.parse_args()
     root = args.mlag_checkout
-    compare_mlag(root / POWER_CASE)
+    compare_mlag(root / POWER_RUN)
     compare_published_link()
-    check_bonds_and_tree(root / BOND_CASE)
-    check_reachability(root / PROBE_CASES / "01-baseline" / "result.json")
+    check_bonds_and_tree(root / BOND_RUN)
+    check_reachability(root / FORWARDING_RUNS / "01-baseline" / "result.json")
     show_interrupted_reachability(
-        root / PROBE_CASES / "01-secondary-reboot" / "result.json"
+        root / FORWARDING_RUNS / "01-secondary-reboot" / "result.json"
     )
     if args.routeros_stp_port:
         bridge, interface, evidence = args.routeros_stp_port

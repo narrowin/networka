@@ -97,7 +97,7 @@ def _sample(
         while not stop.is_set():
             tick = time.monotonic()
             started = time.time_ns()
-            raw = routeros.collect(client, device, *commands, **options)
+            raw = routeros.read_replies(client, device, *commands, **options)
             sample = {"started_ns": started, "done_ns": time.time_ns(), "raw": raw}
             target.write(json.dumps(sample) + "\n")
             samples += 1
@@ -106,7 +106,7 @@ def _sample(
 
 
 @contextmanager
-def collect(
+def sample_entries(
     client: NetworkaClient,
     session: lab.Session,
     spec: Spec | None,
@@ -162,7 +162,7 @@ def proof(
     folder: Path, events: Sequence[Mapping[str, Any]], spec: Spec
 ) -> dict[str, Any]:
     """Require a decisive sample on both peers in each step and each target MAC to remain present."""
-    findings: list[str] = []
+    problems: list[str] = []
     details: dict[str, Any] = {}
     result = {"verdict": "error", "interval_s": spec.interval_s, "devices": details}
     try:
@@ -204,7 +204,7 @@ def proof(
                     (
                         event["epoch_ns"]
                         for event in events
-                        if event["name"] == "link_observed"
+                        if event["name"] == "cable_observed"
                         and lower <= event["epoch_ns"] < upper
                     ),
                     lower,
@@ -235,13 +235,13 @@ def proof(
                     default=0,
                 ),
             }
-            findings.extend(
+            problems.extend(
                 f"{device} lost {mac} from its bridge host table"
                 for mac, times in missing.items()
                 if times
             )
     except (OSError, KeyError, TypeError, ValueError) as error:
         return {**result, "reason": str(error)}
-    if findings:
-        return {**result, "verdict": "fail", "reason": ". ".join(findings)}
+    if problems:
+        return {**result, "verdict": "fail", "reason": ". ".join(problems)}
     return {**result, "verdict": "pass"}

@@ -1,7 +1,7 @@
 """Platform Registry - Single source of truth for all platform/vendor information.
 
 This module provides a unified registry that contains metadata for all platforms
-supported by the network toolkit. It eliminates scattered hardcoded platform lists
+supported by Networka. It eliminates scattered hardcoded platform lists
 and ensures code and documentation stay in sync.
 
 The registry is the single source of truth for:

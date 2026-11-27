@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2025-present Network Team <network@company.com>
 #
 # SPDX-License-Identifier: MIT
-"""Default values and constants for the network toolkit."""
+"""Default values and constants for Networka."""
 
 from __future__ import annotations
 

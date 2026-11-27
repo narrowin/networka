@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""Centralized styling and theming system for Network Toolkit."""
+"""Centralized styling and theming system for Networka."""
 
 from __future__ import annotations
 

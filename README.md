@@ -7,10 +7,10 @@
 
 Networka is a lightweight CLI for network engineers and integrators. Run ad hoc
 commands or reusable sequences across network devices from multiple vendors,
-then save the output and compare it with a baseline.
+then save the output and later compare a device with that saved output.
 
 Use Networka for on-demand troubleshooting and before-and-after checks. Pair it
-with continuous monitoring for alerting, telemetry, and ongoing health checks.
+with continuous monitoring for alerting, telemetry, and ongoing checks.
 
 [![Python 3.15+](https://img.shields.io/badge/python-3.15%2B-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20arm64-lightgrey.svg)](https://github.com/narrowin/networka)
@@ -29,7 +29,7 @@ with continuous monitoring for alerting, telemetry, and ongoing health checks.
 
 See how to [run a reusable sequence](https://narrowin.github.io/networka/running-commands/),
 [save the output](https://narrowin.github.io/networka/results/), and
-[compare it with a baseline](https://narrowin.github.io/networka/reference/cli/#nw-diff).
+[compare it with saved output](https://narrowin.github.io/networka/reference/cli/#nw-diff).
 
 <div align="center">
   <img src="https://narrowin.github.io/networka/assets/gifs/networka-setup.gif" alt="Networka Setup Demo" width="800"/>
@@ -64,7 +64,7 @@ Networka is built for network engineers who want to run commands now. Ansible ex
 - **Device backup**: Automated configuration and comprehensive backups with vendor-specific implementations
 - **Firmware management**: Upgrade, downgrade, and BIOS operations with platform validation
 - **CLI session management**: Direct CLI access with tmux integration for interactive sessions
-- [**Lab tests and state checks**](https://github.com/narrowin/networka/blob/main/docs/lab-tests.md) check that devices are in the planned state and measure traffic while the network changes. `nw intent` checks device state on any device whose platform has checks, today MikroTik RouterOS and Linux. `nw test` adds ping measurement and actions such as cable changes, reboots and injected faults, and it runs against containerlab labs. Both save their evidence and replay it offline. The [Small MLAG lab](https://github.com/narrowin/mikrotik-mlag-testsuite/blob/main/tests/small/README.md) has runnable examples.
+- [**Lab tests and state checks**](https://github.com/narrowin/networka/blob/main/docs/lab-tests.md) check that devices are in the planned state and measure traffic while the network changes. `nw intent` checks device state on any device whose platform has checks, today MikroTik RouterOS and Linux. `nw test` adds ping measurement and actions such as cable changes, reboots and injected faults, and it runs against containerlab labs. Both save their evidence and can replay it without the lab or the devices. The [Small MLAG lab](https://github.com/narrowin/mikrotik-mlag-testsuite/blob/main/tests/small/README.md) has runnable examples.
 
 ### **Advanced Features**
 

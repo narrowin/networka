@@ -40,10 +40,10 @@ def test_diff_device_to_device_config(mock_session_cls, mock_config, tmp_path):
 
 
 @patch("network_toolkit.api.diff.DeviceSession")
-def test_diff_baseline_config(mock_session_cls, mock_config, tmp_path):
-    # Setup baseline file
-    baseline_file = tmp_path / "dev1.rsc"
-    baseline_file.write_text("config A", encoding="utf-8")
+def test_diff_saved_output_config(mock_session_cls, mock_config, tmp_path):
+    # Set up saved output file
+    saved_file = tmp_path / "dev1.rsc"
+    saved_file.write_text("config A", encoding="utf-8")
 
     # Setup mocks
     session_mock = MagicMock()
@@ -51,7 +51,7 @@ def test_diff_baseline_config(mock_session_cls, mock_config, tmp_path):
     session_mock.execute_command.return_value = "config B"
 
     options = DiffOptions(
-        targets="dev1", subject="config", config=mock_config, baseline=tmp_path
+        targets="dev1", subject="config", config=mock_config, saved_output=tmp_path
     )
 
     result = diff_targets(options)
@@ -63,10 +63,10 @@ def test_diff_baseline_config(mock_session_cls, mock_config, tmp_path):
 
 
 @patch("network_toolkit.api.diff.DeviceSession")
-def test_diff_baseline_no_change(mock_session_cls, mock_config, tmp_path):
-    # Setup baseline file
-    baseline_file = tmp_path / "dev1.rsc"
-    baseline_file.write_text("config A", encoding="utf-8")
+def test_diff_saved_output_no_change(mock_session_cls, mock_config, tmp_path):
+    # Set up saved output file
+    saved_file = tmp_path / "dev1.rsc"
+    saved_file.write_text("config A", encoding="utf-8")
 
     # Setup mocks
     session_mock = MagicMock()
@@ -74,7 +74,7 @@ def test_diff_baseline_no_change(mock_session_cls, mock_config, tmp_path):
     session_mock.execute_command.return_value = "config A"
 
     options = DiffOptions(
-        targets="dev1", subject="config", config=mock_config, baseline=tmp_path
+        targets="dev1", subject="config", config=mock_config, saved_output=tmp_path
     )
 
     result = diff_targets(options)

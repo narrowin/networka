@@ -1,4 +1,4 @@
-"""Unified config commands for the network toolkit CLI."""
+"""Unified config commands for Networka CLI."""
 
 from __future__ import annotations
 
@@ -130,7 +130,7 @@ def _discover_config_metadata(original: Path) -> dict[str, object]:
 
 def create_env_file(target_dir: Path) -> None:
     """Create a minimal .env file with credential templates."""
-    env_content = """# Network Toolkit Environment Variables
+    env_content = """# Networka Environment Variables
 # =================================
 
 # Default credentials (used when device-specific ones aren't found)
@@ -151,7 +151,7 @@ NW_PASSWORD_DEFAULT=your_password_here
 
 def create_config_yml(config_dir: Path) -> None:
     """Create the main config.yml file."""
-    config_content = """# Network Toolkit Configuration
+    config_content = """# Networka Configuration
 # =============================
 
 general:
@@ -1239,7 +1239,7 @@ def register(app: typer.Typer) -> None:
             bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
         ] = False,
     ) -> None:
-        """Initialize a network toolkit configuration in OS-appropriate location.
+        """Initialize a Networka configuration in OS-appropriate location.
 
         Creates a complete starter configuration with:
         - .env file with credential templates

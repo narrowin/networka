@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2025-present Network Team <network@company.com>
 #
 # SPDX-License-Identifier: MIT
-"""Output formatting and theming abstraction for the Network Toolkit."""
+"""Output formatting and theming abstraction for Networka."""
 
 from __future__ import annotations
 

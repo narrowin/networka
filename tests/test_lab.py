@@ -74,9 +74,9 @@ def test_parse_topology_reads_nodes_and_links() -> None:
     assert str(parsed.peer(parsed.peer(end))) == "dc1-traffic-host1:eth1"
 
 
-def test_peer_of_a_point_outside_the_links_fails() -> None:
+def test_peer_of_a_point_outside_the_cables_fails() -> None:
     parsed = lab.parse_topology(TOPOLOGY)
-    with pytest.raises(lab.LabError, match="not a link endpoint"):
+    with pytest.raises(lab.LabError, match="not a cable end"):
         parsed.peer(lab.point("dc1-traffic-host1:bond0"))
 
 

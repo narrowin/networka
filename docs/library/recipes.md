@@ -69,7 +69,7 @@ print(f"\nCompleted: {success}/{len(devices)} successful")
 
 ## Check collected output
 
-Collect several read-only responses with one session and distinguish a device
+Collect several read-only replies with one session and distinguish a device
 error from a command that returns empty text.
 
 ```python
@@ -171,7 +171,7 @@ finally:
 
 ## Configuration Diff
 
-Compare current config against a baseline:
+Compare current config against saved output:
 
 ```python
 from pathlib import Path
@@ -182,7 +182,7 @@ with NetworkaClient() as client:
     result = client.diff(
         targets="router1",
         subject="/export",
-        baseline=Path("./baselines/router1-baseline.rsc"),
+        saved_output=Path("./saved/router1.rsc"),
     )
 
 for item in result.results:

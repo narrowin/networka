@@ -109,6 +109,6 @@ summary to identify which devices failed.
 ## Next steps
 
 - [CLI reference](reference/cli.md)
-- [Save output and compare a baseline](results.md)
+- [Save output and compare with saved output](results.md)
 - [Choose an output mode](output-modes.md)
 - [Back up device configuration](backups.md)

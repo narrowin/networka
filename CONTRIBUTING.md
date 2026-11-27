@@ -1,6 +1,6 @@
-# Contributing to Network Toolkit
+# Contributing to Networka
 
-Thank you for your interest in contributing to the Network Toolkit!
+Thank you for your interest in contributing to Networka!
 
 For information about project governance, decision-making, and stability commitments, see [GOVERNANCE.md](GOVERNANCE.md).
 

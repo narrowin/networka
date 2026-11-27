@@ -20,7 +20,7 @@ nw run 192.0.2.10 system_info --platform mikrotik_routeros --interactive-auth
 ```
 
 See how to [run a reusable sequence](running-commands.md),
-[save the output](results.md), [compare it with a baseline](reference/cli.md#nw-diff),
+[save the output](results.md), [compare it with saved output](reference/cli.md#nw-diff),
 and [check intended operating state](intent.md).
 
 <div align="center">
@@ -33,7 +33,7 @@ and [check intended operating state](intent.md).
 - Multi-vendor automation (MikroTik, Cisco, Arista, Juniper, …)
 - Flexible configuration (YAML/CSV), tags and groups
 - Containerlab-friendly: consume generated `nornir-simple-inventory.yml` directly
-- [Lab tests and state checks](lab-tests.md) check device state and measure traffic through cable changes, reboots and faults, in containerlab labs, with offline replay.
+- [Lab tests and state checks](lab-tests.md) check device state and measure traffic through cable changes, reboots and faults, in containerlab labs, with replay of the saved evidence.
 - Vendor-aware sequences and backups
 - Rich CLI output with selectable output modes
 - Type-safe internals (mypy), clean CLI (Typer + Rich)

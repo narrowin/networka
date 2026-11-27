@@ -320,7 +320,7 @@ class SupportedPlatformsTableProvider(BaseModel, BaseTableProvider):
 
     def get_verbose_info(self) -> list[str] | None:
         """Get additional verbose information."""
-        return ["Platforms supported by the network toolkit transport layer"]
+        return ["Platforms supported by the Networka transport layer"]
 
 
 class SequenceInfoTableProvider(BaseModel, BaseTableProvider):

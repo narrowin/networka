@@ -94,7 +94,7 @@ def validate(actions: Sequence[Action]) -> None:
 
 @dataclass(frozen=True)
 class Layout:
-    taps: dict[str, str]
+    member_points: dict[str, str]
     witnesses: dict[str, list[str]]
     address: str
 
@@ -137,7 +137,7 @@ class Actions:
                 self.select(lab.point(bond), member)
                 self.session.mark("mobile_move_restored", bond=bond, member=member)
             except Exception as error:
-                errors.append(f"{bond} member restoration: {error}")
+                errors.append(f"{bond} member return: {error}")
         for bond in list(self.silences):
             try:
                 self._remove(bond)
@@ -174,7 +174,7 @@ class Actions:
                 ),
                 f"{bond} needs two connected members",
             )
-            taps: dict[str, str] = {}
+            member_points: dict[str, str] = {}
             switches: set[str] = set()
             for row in members:
                 member = row["ifname"]
@@ -185,14 +185,14 @@ class Actions:
                 )
                 assert nic is not None
                 switches.add(far.node)
-                taps[member] = str(lab.Point(far.node, nic.tap))
+                member_points[member] = str(lab.Point(far.node, nic.tap))
             _require(
                 len(switches) == 2, f"{bond} needs its members on different switches"
             )
             for action in actions:
                 if action.bond == target and isinstance(action, ActiveMember):
                     _require(
-                        action.member in taps,
+                        action.member in member_points,
                         f"{action.member} is not a member of {bond}",
                     )
             witnesses: dict[str, list[str]] = {}
@@ -201,16 +201,20 @@ class Actions:
                 for action in actions
             ):
                 for ends in self.topology.links:
-                    for client, switch in (ends, ends[::-1]):
+                    for host_end, switch in (ends, ends[::-1]):
                         if (
                             switch.node in switches
-                            and client.node != bond.node
-                            and self.topology.node(client.node).kind == "linux"
+                            and host_end.node != bond.node
+                            and self.topology.node(host_end.node).kind == "linux"
                         ):
-                            witnesses.setdefault(client.node, []).append(str(client))
+                            witnesses.setdefault(host_end.node, []).append(
+                                str(host_end)
+                            )
                 points.update(p for ports in witnesses.values() for p in ports)
-            self.layouts[target] = Layout(taps, witnesses, self.topology.ipv4(bond))
-            points.update(taps.values())
+            self.layouts[target] = Layout(
+                member_points, witnesses, self.topology.ipv4(bond)
+            )
+            points.update(member_points.values())
         return points
 
     def select(self, bond: lab.Point, member: str) -> None:
@@ -246,7 +250,9 @@ class Actions:
         layout = self.layouts[action.bond]
         before = self.topology.link_state(bond)
         member, mac = _bond_state(before, bond)
-        _require(member in layout.taps, f"{bond} selected an unexpected member")
+        _require(
+            member in layout.member_points, f"{bond} selected an unexpected member"
+        )
         if isinstance(action, ActiveMember):
             self._move(action, number, bond, before, member, mac, layout)
         elif action.clear:
@@ -297,10 +303,10 @@ class Actions:
         before: dict,
         layout: Layout,
     ) -> None:
-        ends = [lab.Point(bond.node, member) for member in layout.taps]
-        baseline = {str(end): lab_faults._qdisc(self.topology, end) for end in ends}
+        ends = [lab.Point(bond.node, member) for member in layout.member_points]
+        qdisc_before = {str(end): lab_faults._qdisc(self.topology, end) for end in ends}
         _require(
-            all(not lab_faults._has_classifier(raw) for raw in baseline.values()),
+            all(not lab_faults._has_classifier(raw) for raw in qdisc_before.values()),
             f"{bond} already has a classifier on one of its members",
         )
         self.session.mark(
@@ -309,12 +315,12 @@ class Actions:
             bond=action.bond,
             layout=asdict(layout),
             before=before,
-            baseline=baseline,
+            qdisc_before=qdisc_before,
         )
         owned: set[lab.Point] = set()
         self.silences[action.bond] = owned
         for end in ends:
-            # The command can apply the classifier before an interrupt reaches the runner.
+            # The command can apply the classifier before an interrupt reaches Networka.
             owned.add(end)
             lab_faults._classifier_add(
                 self.topology,
@@ -335,7 +341,7 @@ class Actions:
     def _resume(
         self, action: SilenceHost, number: int, bond: lab.Point, layout: Layout
     ) -> None:
-        ends = [lab.Point(bond.node, member) for member in layout.taps]
+        ends = [lab.Point(bond.node, member) for member in layout.member_points]
         self.session.mark("mobile_resume_start", number=number, bond=action.bond)
         counters = {
             str(end): lab_faults._filter_stats(self.topology, end, "egress")
@@ -422,7 +428,7 @@ def _move_proof(
         and previous != action.member
         and _bond_state(moved["after"], bond) == (action.member, mac)
         and start["mono_ns"] <= moved["mono_ns"]
-        and set(layout.taps) == {previous, action.member},
+        and set(layout.member_points) == {previous, action.member},
         f"{bond} saved state did not prove the requested move",
     )
     same_bond = [
@@ -449,7 +455,7 @@ def _move_proof(
         measured["end_ns"],
     )
     new, old = (
-        _pcap(folder, events, layout.taps[member])
+        _pcap(folder, events, layout.member_points[member])
         for member in (action.member, previous)
     )
     address = layout.address
@@ -465,7 +471,7 @@ def _move_proof(
     arrival = next((stamp for stamp in arps if start["epoch_ns"] <= stamp < end), None)
     _require(
         arrival is not None,
-        f"The gratuitous ARP was not captured at {layout.taps[action.member]}",
+        f"The gratuitous ARP was not captured at {layout.member_points[action.member]}",
     )
     assert arrival is not None
     leaked = sum(arrival <= stamp < end for stamp in _stamps(old, f"eth.dst == {mac}"))
@@ -474,8 +480,8 @@ def _move_proof(
         "bond": action.bond,
         "from": previous,
         "to": action.member,
-        "old_tap": layout.taps[previous],
-        "new_tap": layout.taps[action.member],
+        "old_point": layout.member_points[previous],
+        "new_point": layout.member_points[action.member],
         "gratuitous_arp_s": traffic.seconds(arrival - measured["start_ns"]),
         "old_port_unicast_after_garp": leaked,
     }
@@ -501,25 +507,25 @@ def _affected(
     details: dict[str, Any] = {}
     failures = []
     zero = measured["start_ns"]
-    for name, flow in measured["streams"].items():
-        if bond not in (flow["source"], flow["destination"]):
+    for name, measured_stream in measured["streams"].items():
+        if bond not in (measured_stream["source"], measured_stream["destination"]):
             continue
-        gaps = [
-            gap
-            for gap in flow["gaps"]
-            if gap["begins_s"] <= traffic.seconds(cleared - zero)
-            and gap["ends_s"] >= traffic.seconds(applied - zero)
+        outages = [
+            outage
+            for outage in measured_stream["outages"]
+            if outage["begins_s"] <= traffic.seconds(cleared - zero)
+            and outage["ends_s"] >= traffic.seconds(applied - zero)
         ]
         _require(
-            gaps and all(not gap["absent_at_source"] for gap in gaps),
+            outages and all(not outage["absent_at_source"] for outage in outages),
             f"{name} did not show a delivery outage with requests still sent during silence",
         )
-        pcap = _pcap(folder, events, flow["source"])
+        pcap = _pcap(folder, events, measured_stream["source"])
         reply = next(
             (
                 stamp
                 for stamp in _stamps(
-                    pcap, f"icmp.ident == {flow['ident']} && icmp.type == 0"
+                    pcap, f"icmp.ident == {measured_stream['ident']} && icmp.type == 0"
                 )
                 if first <= stamp < end
             ),
@@ -533,9 +539,9 @@ def _affected(
             )
         elif any(
             traffic.seconds(reply - zero)
-            <= gap["begins_s"]
+            <= outage["begins_s"]
             < traffic.seconds(end - zero)
-            for gap in flow["gaps"]
+            for outage in measured_stream["outages"]
         ):
             failures.append(f"{name} lost another ping after delivery resumed")
     _require(details, f"No measured stream uses {bond}")
@@ -555,22 +561,22 @@ def _flooding(
     window: tuple[int, int],
     limit: float,
 ) -> tuple[dict[str, Any], list[str]]:
-    """Count mobile-bound requests received at the other clients' switch-facing ports."""
+    """Count mobile-bound requests received at the other hosts' switch-facing ports."""
     details: dict[str, Any] = {}
     failures = []
     begin, end = window
-    for name, flow in measured["streams"].items():
-        if flow["destination"] != bond:
+    for name, measured_stream in measured["streams"].items():
+        if measured_stream["destination"] != bond:
             continue
-        sender = lab.point(flow["source"]).node
+        sender = lab.point(measured_stream["source"]).node
         witnesses = [
             point
             for node, points in layout.witnesses.items()
             if node != sender
             for point in points
         ]
-        _require(witnesses, f"{name} has no client ports witnessing possible flooding")
-        display = f"eth.dst == {mac} && icmp.ident == {flow['ident']} && icmp.type == 8"
+        _require(witnesses, f"{name} has no host ports witnessing possible flooding")
+        display = f"eth.dst == {mac} && icmp.ident == {measured_stream['ident']} && icmp.type == 8"
         seen = [
             stamp
             for point in witnesses
@@ -619,14 +625,14 @@ def _silence_proof(
     layout = Layout(**start["layout"])
     bond = lab.point(action.bond)
     member, mac = _bond_state(start["before"], bond)
-    points = {str(lab.Point(bond.node, member)) for member in layout.taps}
+    points = {str(lab.Point(bond.node, member)) for member in layout.member_points}
     _require(
         all(e["bond"] == action.bond for e in (start, silent, clear, resumed))
         and start["mono_ns"]
         <= silent["mono_ns"]
         < clear["mono_ns"]
         <= resumed["mono_ns"]
-        and set(start["baseline"])
+        and set(start["qdisc_before"])
         == set(silent["raw"])
         == set(resumed["raw"])
         == set(resumed["counters"])
@@ -636,7 +642,7 @@ def _silence_proof(
         and all(_drop_filter(raw) for raw in resumed["counters"].values())
         and all(
             not lab_faults._has_classifier(raw)
-            for raw in (*start["baseline"].values(), *resumed["raw"].values())
+            for raw in (*start["qdisc_before"].values(), *resumed["raw"].values())
         )
         and _bond_state(resumed["after"], bond) == (member, mac),
         f"{bond} saved state did not prove both egress filters and their removal",
@@ -651,8 +657,8 @@ def _silence_proof(
     )
     frames = sorted(
         stamp
-        for tap in layout.taps.values()
-        for stamp in _stamps(_pcap(folder, events, tap), f"eth.src == {mac}")
+        for member_point in layout.member_points.values()
+        for stamp in _stamps(_pcap(folder, events, member_point), f"eth.src == {mac}")
     )
     applied, cleared = silent["epoch_ns"], clear["epoch_ns"]
     previous_resume = max(
@@ -715,7 +721,7 @@ def _silence_proof(
         "verdict": "fail" if problems else "pass",
         "bond": action.bond,
         "dropped": drops,
-        "taps": layout.taps,
+        "points": layout.member_points,
         "held_s": traffic.seconds(clear["mono_ns"] - silent["mono_ns"]),
         "first_host_frame_s": traffic.seconds(first - measured["start_ns"]),
         "delivery": delivery,

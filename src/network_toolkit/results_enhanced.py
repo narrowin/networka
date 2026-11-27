@@ -1,4 +1,4 @@
-"""Enhanced results storage utilities for network toolkit."""
+"""Enhanced results storage utilities for Networka."""
 
 from __future__ import annotations
 
@@ -299,7 +299,7 @@ class ResultsManager:
 
         else:  # txt format (default)
             with filepath.open("w", encoding="utf-8") as f:
-                f.write("# Network Toolkit Results\n")
+                f.write("# Networka Results\n")
                 f.write(f"# Generated: {data['timestamp']}\n")
                 if data.get("device_name"):
                     f.write(f"# Device: {data['device_name']}\n")

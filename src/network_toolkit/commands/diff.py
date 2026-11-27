@@ -1,9 +1,9 @@
 """`nw diff` command implementation.
 
 Provides smart diffing of device configuration and operational state:
- - Config diff: compares current RouterOS export (compact) with a baseline file
- - Command diff: compares a single command output with a baseline file
- - Sequence diff: compares a sequence's per-command outputs with files in a baseline directory
+ - Config diff: compares current RouterOS export (compact) with a saved output file
+ - Command diff: compares a single command output with a saved output file
+ - Sequence diff: compares a sequence's per-command outputs with files in a saved output directory
 
 Subject-based UX:
     nw diff <targets> <subject>
@@ -12,12 +12,12 @@ Where subject is one of:
     - "/..." (a RouterOS command)
     - a sequence name (resolved per-device)
 
-Device-to-device: if exactly two devices are provided and no --baseline is supplied,
+Device-to-device: if exactly two devices are provided and no --saved-output is supplied,
 the command compares outputs directly between the devices.
 
 Exit codes:
  - 0: No differences
- - 1: Differences found or baseline missing/mismatched
+ - 1: Differences found or saved output missing/mismatched
  - 2: Usage / configuration error (bad inputs)
 """
 
@@ -66,13 +66,13 @@ def register(app: typer.Typer) -> None:
             ),
         ],
         *,
-        baseline: Annotated[
+        saved_output: Annotated[
             Path | None,
             typer.Option(
-                "--baseline",
+                "--saved-output",
                 "-b",
                 help=(
-                    "Baseline file (for config/command) or directory (for sequence)."
+                    "Saved output file (for config/command) or directory (for sequence)."
                 ),
             ),
         ] = None,
@@ -132,9 +132,9 @@ def register(app: typer.Typer) -> None:
         """Diff config, a command, or a sequence.
 
         Examples:
-          - nw diff sw-acc1 config -b baseline/export_compact.txt
-          - nw diff sw-acc1 "/system/resource/print" -b baseline/resource.txt
-          - nw diff lab_devices system_info -b baseline_dir/
+          - nw diff sw-acc1 config -b saved/export_compact.txt
+          - nw diff sw-acc1 "/system/resource/print" -b saved/resource.txt
+          - nw diff lab_devices system_info -b saved/
           - nw diff sw-acc1,sw-acc2 "/system/resource/print"   # device-to-device
           - nw diff sw-acc1,sw-acc2 config                      # device-to-device
         """
@@ -174,7 +174,7 @@ def register(app: typer.Typer) -> None:
             targets=target,
             subject=subject,
             config=config,
-            baseline=baseline,
+            saved_output=saved_output,
             ignore_patterns=ignore,
             save_current=save_current,
             store_results=store_results,
@@ -187,7 +187,7 @@ def register(app: typer.Typer) -> None:
             result = diff_targets(options)
         except NetworkToolkitError as e:
             # Map specific errors to exit code 2 for backward compatibility
-            if "Baseline path is required" in str(e) or "Target(s) not found" in str(e):
+            if "Saved output is required" in str(e) or "Target(s) not found" in str(e):
                 ctx.print_error(f"Error: {e}")
                 raise typer.Exit(2) from None
             ctx.print_error(f"Error: {e}")
@@ -246,7 +246,7 @@ def register(app: typer.Typer) -> None:
             if result.total_changed > 0:
                 msg.append(f"{result.total_changed} differences found")
             if result.total_missing > 0:
-                msg.append(f"{result.total_missing} baselines missing")
+                msg.append(f"{result.total_missing} saved outputs missing")
             if has_errors:
                 msg.append("errors occurred")
 

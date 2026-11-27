@@ -95,7 +95,7 @@ export NW_PASSWORD_CRITICAL_INFRASTRUCTURE=critical_systems_password
 
 ### Option 1: Environment File (.env) - Recommended
 
-The Network Toolkit automatically loads environment variables from `.env` files, making credential management simple and secure.
+Networka automatically loads environment variables from `.env` files, making credential management simple and secure.
 
 1. Copy the example environment file:
 
@@ -116,7 +116,7 @@ The Network Toolkit automatically loads environment variables from `.env` files,
 
 #### .env File Locations
 
-The toolkit automatically looks for `.env` files in the following order (highest to lowest precedence):
+Networka automatically looks for `.env` files in the following order (highest to lowest precedence):
 
 1. **Environment Variables** (Highest priority) - Variables already set in your shell
 2. **Config Directory** - `.env` file in the same directory as your config files
@@ -133,7 +133,7 @@ This allows for flexible credential management:
 Add to your `~/.bashrc` or `~/.zshrc`:
 
 ```bash
-# Network Toolkit Credentials
+# Networka credentials
 export NW_USER_DEFAULT=admin
 export NW_PASSWORD_DEFAULT=your_secure_password
 
@@ -173,7 +173,7 @@ password. See [transport selection](transport.md).
 
 ## Credential Resolution Order
 
-The toolkit resolves credentials in this priority order:
+Networka resolves credentials in this priority order:
 
 1. **Interactive credentials** (Highest) - When `--interactive-auth` is used
 2. **Device configuration** - Explicitly set credentials in device YAML files (supported but discouraged)

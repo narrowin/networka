@@ -61,7 +61,7 @@ def register(app: typer.Typer) -> None:
 
         Shows the status of JSON schema files used for YAML validation in editors
         like VS Code. These schemas provide auto-completion and error checking
-        for network toolkit configuration files.
+        for Networka configuration files.
         """
         setup_logging("DEBUG" if verbose else "WARNING")
 

@@ -38,7 +38,7 @@ class TestConfigInitCore:
         content = env_file.read_text()
         assert "NW_USER_DEFAULT=admin" in content
         assert "NW_PASSWORD_DEFAULT=your_password_here" in content
-        assert "Network Toolkit Environment Variables" in content
+        assert "Networka Environment Variables" in content
 
     def test_create_config_yml(self, tmp_path: Path) -> None:
         """Test config.yml creation."""

@@ -1,13 +1,13 @@
 # SPDX-FileCopyrightText: 2025-present Network Team <network@company.com>
 #
 # SPDX-License-Identifier: MIT
-"""Custom exceptions for the network toolkit."""
+"""Custom exceptions for Networka."""
 
 from typing import Any
 
 
 class NetworkToolkitError(Exception):
-    """Base exception for all network toolkit errors."""
+    """Base exception for all Networka errors."""
 
     def __init__(self, message: str, details: dict[str, Any] | None = None) -> None:
         super().__init__(message)

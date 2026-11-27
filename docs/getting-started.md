@@ -67,6 +67,6 @@ and [environment variables](environment-variables.md) for setting credentials.
 ## Next steps
 
 - [Run commands and sequences](running-commands.md)
-- [Save results and compare a baseline](results.md)
+- [Save results and compare with saved output](results.md)
 - [Open interactive SSH panes with tmux](tmux-ssh.md)
 - [Troubleshoot installation or connections](troubleshooting.md)

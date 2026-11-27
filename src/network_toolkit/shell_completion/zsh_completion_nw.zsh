@@ -98,7 +98,7 @@ _nw_complete() {
 					fi ;;
 				config)
 					if (( CURRENT == 3 )); then
-						values=("init:Initialize a network toolkit configuration" "validate:Validate the configuration file" "supported-types:Show supported device types" "update:Update configuration files")
+						values=("init:Initialize a Networka configuration" "validate:Validate the configuration file" "supported-types:Show supported device types" "update:Update configuration files")
 						_describe -t subcommands 'config subcommands' values && return
 					fi ;;
 				schema)

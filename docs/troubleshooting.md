@@ -40,7 +40,7 @@ for command execution. See [transport selection](transport.md).
 ## Windows notes
 
 The current native driver wheels cover Linux and Apple Silicon macOS.
-WSL2 remains unverified. See [platform compatibility](platform-compatibility.md).
+WSL2 remains untested. See [platform compatibility](platform-compatibility.md).
 
 ## Configuration loading
 

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""Broadcast and unknown-unicast probes that must not return to their sender."""
+"""The flood check: broadcast and unknown-unicast frames must not return to their sender."""
 
 from __future__ import annotations
 
@@ -104,7 +104,7 @@ def preflight(session: lab.Session, spec: Flood) -> tuple[lab.Point, ...]:
     _require(
         source.node != receiver.node
         and all(topology.node(p.node).kind == "linux" for p in (source, receiver)),
-        "Flood probes need distinct Linux lab nodes for sender and receiver",
+        "A flood check needs distinct Linux lab nodes for sender and receiver",
     )
     readings = {
         "bond": topology.run(
@@ -139,7 +139,7 @@ def preflight(session: lab.Session, spec: Flood) -> tuple[lab.Point, ...]:
     return members
 
 
-def _probes(spec: Flood, first_ident: int) -> tuple[tuple[str, int, str], ...]:
+def _flood_streams(spec: Flood, first_ident: int) -> tuple[tuple[str, int, str], ...]:
     return (
         ("_flood-broadcast", first_ident, spec.broadcast),
         ("_flood-unknown-unicast", first_ident + 1, spec.unicast),
@@ -147,7 +147,7 @@ def _probes(spec: Flood, first_ident: int) -> tuple[tuple[str, int, str], ...]:
 
 
 def start(session: lab.Session, spec: Flood, first_ident: int) -> None:
-    for name, ident, destination in _probes(spec, first_ident):
+    for name, ident, destination in _flood_streams(spec, first_ident):
         session.start_stream(
             ident,
             name,
@@ -159,14 +159,14 @@ def start(session: lab.Session, spec: Flood, first_ident: int) -> None:
         )
 
 
-def _flow(
+def _count_frames(
     frames: Mapping[str, traffic.Frames],
     spec: Flood,
     members: tuple[lab.Point, ...],
     ident: int,
     start: int,
     end: int,
-    baseline_end: int,
+    quiet_end: int,
 ) -> dict[str, Any]:
     source = frames[spec.source]
     receiver = frames[spec.receiver]
@@ -177,29 +177,33 @@ def _flow(
     }
     stamps = [start, *sorted(sent.values()), end]
     pause = max(b - a for a, b in itertools.pairwise(stamps))
-    verified = [probe for probe, stamp in sent.items() if stamp < baseline_end]
+    verified = [sent_frame for sent_frame, stamp in sent.items() if stamp < quiet_end]
     appearances = {
-        probe: sum(len(frames[str(member)].get(probe, ())) for member in members)
-        for probe in sent
+        sent_frame: sum(
+            len(frames[str(member)].get(sent_frame, ())) for member in members
+        )
+        for sent_frame in sent
     }
-    returns = [probe[2][0] for probe, count in appearances.items() if count > 1]
-    baseline_other = [
-        probe[2][0]
-        for probe in verified
-        if appearances[probe] != 1 or len(receiver.get(probe, ())) != 1
+    returns = [
+        sent_frame[2][0] for sent_frame, count in appearances.items() if count > 1
     ]
-    # Measure at least one second of clean flooded probes before the first action.
+    quiet_other = [
+        sent_frame[2][0]
+        for sent_frame in verified
+        if appearances[sent_frame] != 1 or len(receiver.get(sent_frame, ())) != 1
+    ]
+    # Measure at least one second of clean flooded frames before the first action.
     if len(verified) < 10 or pause > traffic.SEND_GAP_LIMIT_NS:
-        verdict, reason = "error", "Too few regularly numbered flood probes were sent."
+        verdict, reason = "error", "Too few regularly numbered flood frames were sent."
     elif returns:
         verdict, reason = (
             "fail",
-            "A probe was seen more than once across the sender's bond members.",
+            "A frame was seen more than once across the sender's bond members.",
         )
-    elif baseline_other:
+    elif quiet_other:
         verdict, reason = (
             "fail",
-            "A baseline probe did not appear once at the sender and receiver.",
+            "A frame of the quiet window did not appear once at the sender and receiver.",
         )
     else:
         verdict, reason = "pass", None
@@ -207,14 +211,14 @@ def _flow(
         "verdict": verdict,
         "reason": reason,
         "sent": len(sent),
-        "baseline_sent": len(verified),
-        "baseline_exceptions": baseline_other,
+        "quiet_sent": len(verified),
+        "quiet_exceptions": quiet_other,
         "max_send_interval_s": traffic.seconds(pause),
         "sender_returns": returns,
     }
 
 
-def baseline_problems(
+def quiet_problems(
     spec: Flood,
     captures: Mapping[str, Path],
     members: tuple[lab.Point, ...],
@@ -222,16 +226,16 @@ def baseline_problems(
     start_ns: int,
     end_ns: int,
 ) -> list[str]:
-    """Require working flood probes and a clean witness before mutating the lab."""
+    """Require a working flood check and a clean witness before mutating the lab."""
     frames = {
         point: traffic.decode(captures[point])
         for point in (spec.source, spec.receiver, *(str(member) for member in members))
     }
     failures = []
-    for _, ident, destination in _probes(spec, first_ident):
-        result = _flow(frames, spec, members, ident, start_ns, end_ns, end_ns)
+    for _, ident, destination in _flood_streams(spec, first_ident):
+        result = _count_frames(frames, spec, members, ident, start_ns, end_ns, end_ns)
         if result["verdict"] != "pass":
-            failures.append(f"flood probe to {destination}: {result['reason']}")
+            failures.append(f"flood check to {destination}: {result['reason']}")
     return failures
 
 
@@ -242,14 +246,14 @@ def proof(
     first_ident: int,
     start_ns: int,
     end_ns: int,
-    baseline_end: int,
+    quiet_end: int,
 ) -> dict[str, Any]:
-    """Verify capture health and replay membership, baseline witnesses and returns."""
+    """Verify sound captures and replay membership, quiet window witnesses and returns."""
     result: dict[str, Any] = {
         "source": spec.source,
         "receiver": spec.receiver,
         "verdict": "error",
-        "probes": [],
+        "frames": [],
     }
     try:
         [ready] = [e for e in events if e["name"] == "flood_ready"]
@@ -270,7 +274,7 @@ def proof(
                 f"The flood capture at {point} is incomplete or dropped packets",
             )
         frames = {point: traffic.decode(capture) for point, capture in captures.items()}
-        for name, ident, destination in _probes(spec, first_ident):
+        for name, ident, destination in _flood_streams(spec, first_ident):
             [began] = [
                 e
                 for e in events
@@ -282,14 +286,14 @@ def proof(
                 and began["address"] == destination
                 and name not in stopped["early_exits"]
                 and not points.intersection(stopped["early_exits"]),
-                f"Flood probe to {destination} or one of its captures did not run throughout the test",
+                f"Flood check to {destination} or one of its captures did not run throughout the test",
             )
-            result["probes"].append(
+            result["frames"].append(
                 {
                     "destination": destination,
                     "ident": ident,
-                    **_flow(
-                        frames, spec, members, ident, start_ns, end_ns, baseline_end
+                    **_count_frames(
+                        frames, spec, members, ident, start_ns, end_ns, quiet_end
                     ),
                 }
             )
@@ -304,10 +308,14 @@ def proof(
     ) as error:
         result["reason"] = str(error)
         return result
-    bad = [probe for probe in result["probes"] if probe["verdict"] != "pass"]
+    bad = [
+        sent_frame for sent_frame in result["frames"] if sent_frame["verdict"] != "pass"
+    ]
     if bad:
         result["verdict"] = (
-            "fail" if any(probe["verdict"] == "fail" for probe in bad) else "error"
+            "fail"
+            if any(sent_frame["verdict"] == "fail" for sent_frame in bad)
+            else "error"
         )
         result["reason"] = "; ".join(f"{p['destination']} {p['reason']}" for p in bad)
     else:

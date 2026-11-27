@@ -38,7 +38,7 @@ class TestDiffCLI:
     ) -> None:
         runner = CliRunner()
 
-        baseline = _write(tmp_path / "baseline.txt", "hello\n")
+        saved = _write(tmp_path / "saved.txt", "hello\n")
 
         with patch("network_toolkit.api.diff.DeviceSession") as mock_session_cls:
             sess = MagicMock()
@@ -53,8 +53,8 @@ class TestDiffCLI:
                     "diff",
                     "test_device1",
                     "/system/resource/print",
-                    "--baseline",
-                    str(baseline),
+                    "--saved-output",
+                    str(saved),
                     "--config",
                     str(config_file),
                 ],
@@ -71,7 +71,7 @@ class TestDiffCLI:
     ) -> None:
         runner = CliRunner()
 
-        baseline = _write(tmp_path / "baseline.txt", "hello\n")
+        saved = _write(tmp_path / "saved.txt", "hello\n")
 
         with patch("network_toolkit.api.diff.DeviceSession") as mock_session_cls:
             sess = MagicMock()
@@ -86,8 +86,8 @@ class TestDiffCLI:
                     "diff",
                     "test_device1",
                     "/system/resource/print",
-                    "--baseline",
-                    str(baseline),
+                    "--saved-output",
+                    str(saved),
                     "--config",
                     str(config_file),
                 ],
@@ -98,7 +98,7 @@ class TestDiffCLI:
         # expect unified diff markers
         assert "---" in result.output and "+++" in result.output
 
-    def test_diff_config_requires_baseline(self, config_file: Path) -> None:
+    def test_diff_config_requires_saved_output(self, config_file: Path) -> None:
         runner = CliRunner()
         result = runner.invoke(
             app, ["diff", "test_device1", "config", "--config", str(config_file)]
@@ -107,7 +107,7 @@ class TestDiffCLI:
         assert result.exit_code == 2
 
     @patch("network_toolkit.api.diff.SequenceManager")
-    def test_diff_sequence_with_missing_baseline_files(
+    def test_diff_sequence_with_missing_saved_output_files(
         self, mock_sm: MagicMock, config_file: Path, tmp_path: Path
     ) -> None:
         runner = CliRunner()
@@ -119,9 +119,9 @@ class TestDiffCLI:
             "/system/resource/print",
         ]
 
-        # Create baseline dir with only first command
-        baseline_dir = tmp_path / "baseline_seq"
-        cmd1_file = baseline_dir / "cmd__system_identity_print.txt"
+        # Create saved output dir with only first command
+        saved_dir = tmp_path / "saved_seq"
+        cmd1_file = saved_dir / "cmd__system_identity_print.txt"
         _write(cmd1_file, "id: router\n")
 
         with patch("network_toolkit.api.diff.DeviceSession") as mock_session_cls:
@@ -138,16 +138,16 @@ class TestDiffCLI:
                     "diff",
                     "test_device1",
                     "system_info",
-                    "--baseline",
-                    str(baseline_dir),
+                    "--saved-output",
+                    str(saved_dir),
                     "--config",
                     str(config_file),
                 ],
             )
 
-        # One missing baseline file -> exit 1
+        # One missing saved output file -> exit 1
         assert result.exit_code == 1
-        assert "Baseline file missing" in result.output
+        assert "Saved output missing" in result.output
         sm_inst.resolve.assert_called_once_with(
             sequence_name="system_info", device_name="test_device1"
         )
@@ -157,7 +157,7 @@ class TestDiffAdvancedScenarios:
     """Test advanced diff scenarios and edge cases."""
 
     def test_diff_device_to_device_comparison(self, config_file: Path) -> None:
-        """Test device-to-device comparison without baseline."""
+        """Test device-to-device comparison without saved output."""
         runner = CliRunner()
 
         with patch("network_toolkit.api.diff.DeviceSession") as mock_session_cls:
@@ -188,13 +188,13 @@ class TestDiffAdvancedScenarios:
         assert "device1 output" in result.output
         assert "device2 output" in result.output
 
-    def test_diff_config_export_with_baseline(
+    def test_diff_config_export_with_saved_output(
         self, config_file: Path, tmp_path: Path
     ) -> None:
-        """Test config export diff with baseline."""
+        """Test config export diff with saved output."""
         runner = CliRunner()
-        baseline = _write(
-            tmp_path / "config_baseline.rsc",
+        saved = _write(
+            tmp_path / "config_saved.rsc",
             "# RouterOS script\n/system identity set name=old-router\n",
         )
 
@@ -213,8 +213,8 @@ class TestDiffAdvancedScenarios:
                     "diff",
                     "test_device1",
                     "config",
-                    "--baseline",
-                    str(baseline),
+                    "--saved-output",
+                    str(saved),
                     "--config",
                     str(config_file),
                 ],
@@ -231,7 +231,7 @@ class TestDiffAdvancedScenarios:
     def test_diff_sequence_all_files_match(
         self, config_file: Path, tmp_path: Path
     ) -> None:
-        """Test sequence diff where all baseline files match."""
+        """Test sequence diff where all saved output files match."""
         runner = CliRunner()
 
         with patch("network_toolkit.api.diff.SequenceManager") as mock_sm:
@@ -241,9 +241,9 @@ class TestDiffAdvancedScenarios:
                 "/system/resource/print",
             ]
 
-            baseline_dir = tmp_path / "baseline_seq"
-            _write(baseline_dir / "cmd__system_identity_print.txt", "id: router\n")
-            _write(baseline_dir / "cmd__system_resource_print.txt", "cpu: 10%\n")
+            saved_dir = tmp_path / "saved_seq"
+            _write(saved_dir / "cmd__system_identity_print.txt", "id: router\n")
+            _write(saved_dir / "cmd__system_resource_print.txt", "cpu: 10%\n")
 
             with patch("network_toolkit.api.diff.DeviceSession") as mock_session_cls:
                 sess = MagicMock()
@@ -258,8 +258,8 @@ class TestDiffAdvancedScenarios:
                         "diff",
                         "test_device1",
                         "system_info",
-                        "--baseline",
-                        str(baseline_dir),
+                        "--saved-output",
+                        str(saved_dir),
                         "--config",
                         str(config_file),
                     ],
@@ -273,21 +273,21 @@ class TestDiffAdvancedScenarios:
             or "no differences found" in result.output.lower()
             or "difference" in result.output.lower()
             or "error" in result.output.lower()
-            or "missing baseline" in result.output.lower()
-            or "no baseline" in result.output.lower()
+            or "missing saved output" in result.output.lower()
+            or "no saved output" in result.output.lower()
         )
 
     def test_diff_invalid_arguments(self, config_file: Path) -> None:
         """Test diff with invalid arguments."""
         runner = CliRunner()
 
-        # Test missing baseline for config
+        # Test missing saved output for config
         result = runner.invoke(
             app, ["diff", "test_device1", "config", "--config", str(config_file)]
         )
         assert result.exit_code == 2
 
-        # Test too many devices without baseline
+        # Test too many devices without saved output
         result = runner.invoke(
             app,
             [
@@ -307,7 +307,7 @@ class TestDiffAdvancedScenarios:
     ) -> None:
         """Test diff command error handling."""
         runner = CliRunner()
-        baseline = _write(tmp_path / "baseline.txt", "hello\n")
+        saved = _write(tmp_path / "saved.txt", "hello\n")
 
         with patch("network_toolkit.api.diff.DeviceSession") as mock_session_cls:
             mock_session_cls.side_effect = Exception("Connection failed")
@@ -318,8 +318,8 @@ class TestDiffAdvancedScenarios:
                     "diff",
                     "test_device1",
                     "/system/resource/print",
-                    "--baseline",
-                    str(baseline),
+                    "--saved-output",
+                    str(saved),
                     "--config",
                     str(config_file),
                 ],
@@ -327,8 +327,8 @@ class TestDiffAdvancedScenarios:
 
         assert result.exit_code == 1
 
-    def test_diff_missing_baseline_file(self, config_file: Path) -> None:
-        """Test diff with missing baseline file."""
+    def test_diff_missing_saved_output_file(self, config_file: Path) -> None:
+        """Test diff with missing saved output file."""
         runner = CliRunner()
 
         with patch("network_toolkit.api.diff.DeviceSession") as mock_session_cls:
@@ -344,8 +344,8 @@ class TestDiffAdvancedScenarios:
                     "diff",
                     "test_device1",
                     "/system/resource/print",
-                    "--baseline",
-                    "/nonexistent/baseline.txt",
+                    "--saved-output",
+                    "/nonexistent/saved.txt",
                     "--config",
                     str(config_file),
                 ],
@@ -363,8 +363,8 @@ class TestDiffAdvancedScenarios:
         sm_inst = mock_sm.return_value
         sm_inst.resolve.side_effect = Exception("Sequence resolution failed")
 
-        baseline_dir = tmp_path / "baseline_seq"
-        baseline_dir.mkdir()
+        saved_dir = tmp_path / "saved_seq"
+        saved_dir.mkdir()
 
         result = runner.invoke(
             app,
@@ -372,8 +372,8 @@ class TestDiffAdvancedScenarios:
                 "diff",
                 "test_device1",
                 "invalid_sequence",
-                "--baseline",
-                str(baseline_dir),
+                "--saved-output",
+                str(saved_dir),
                 "--config",
                 str(config_file),
             ],
@@ -384,7 +384,7 @@ class TestDiffAdvancedScenarios:
     def test_diff_verbose_output(self, config_file: Path, tmp_path: Path) -> None:
         """Test diff with verbose logging."""
         runner = CliRunner()
-        baseline = _write(tmp_path / "baseline.txt", "hello\n")
+        saved = _write(tmp_path / "saved.txt", "hello\n")
 
         with patch("network_toolkit.api.diff.DeviceSession") as mock_session_cls:
             sess = MagicMock()
@@ -399,8 +399,8 @@ class TestDiffAdvancedScenarios:
                     "diff",
                     "test_device1",
                     "/system/resource/print",
-                    "--baseline",
-                    str(baseline),
+                    "--saved-output",
+                    str(saved),
                     "--config",
                     str(config_file),
                     "--verbose",

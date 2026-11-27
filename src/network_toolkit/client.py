@@ -166,7 +166,7 @@ class NetworkaClient:
         targets: str,
         subject: str,
         *,
-        baseline: Path | None = None,
+        saved_output: Path | None = None,
         ignore_patterns: list[str] | None = None,
         save_current: Path | None = None,
         store_results: bool = False,
@@ -174,12 +174,12 @@ class NetworkaClient:
         verbose: bool = False,
     ) -> DiffResult:
         """
-        Compare current device state against a baseline.
+        Compare current device state against saved output.
 
         Args:
             targets: Device name, group name, or IP address.
             subject: Command or sequence to run and compare.
-            baseline: Path to baseline file or directory.
+            saved_output: Path to saved output file or directory.
             ignore_patterns: Regex patterns to ignore in diff.
             save_current: Path to save the current output.
             store_results: Whether to save diff results.
@@ -195,7 +195,7 @@ class NetworkaClient:
             targets=targets,
             subject=subject,
             config=self.config,
-            baseline=baseline,
+            saved_output=saved_output,
             ignore_patterns=ignore_patterns,
             save_current=save_current,
             store_results=store_results,

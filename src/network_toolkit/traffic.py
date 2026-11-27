@@ -4,7 +4,7 @@
 A capture point is written as `node:interface` and has one pcap. A stream is a
 steady series of pings from one capture point to another, and its ICMP
 identifier tells streams apart. A ping's sequence and echoed payload identify
-each attempt. Its source capture point sees the requests leave and the replies
+each ping. Its source capture point sees the requests leave and the replies
 return. Its destination capture point sees the requests arrive and the replies
 leave.
 
@@ -33,7 +33,7 @@ from typing import Any
 NS = 1_000_000_000
 # One ping every 100 ms resolves an outage to 0.1 s, ten times finer than a 1 s limit.
 INTERVAL_NS = 100_000_000
-# A healthy lab path answers within milliseconds, so a reply after 500 ms counts as lost.
+# A working lab path answers within milliseconds, so a reply after 500 ms counts as lost.
 LATE_REPLY_NS = 500_000_000
 # Leave half a ping interval below the late-reply deadline so a sender pause cannot hide it.
 SEND_GAP_LIMIT_NS = LATE_REPLY_NS - INTERVAL_NS // 2
@@ -44,9 +44,9 @@ FIELDS = ("frame.time_epoch", "icmp.ident", "icmp.type", "icmp.seq", "@icmp")
 ICMP_HEADER_LENGTH = 8
 ICMP_SEQUENCE_MODULUS = 1 << 16
 
-# (ICMP identifier, ICMP type, probe) to the epoch time in ns of each sighting.
-Probe = tuple[int, bytes]  # Sequence and payload, which includes the send timestamp.
-Frames = dict[tuple[int, int, Probe], list[int]]
+# (ICMP identifier, ICMP type, ping) to the epoch time in ns of each sighting.
+Ping = tuple[int, bytes]  # Sequence and payload, which includes the send timestamp.
+Frames = dict[tuple[int, int, Ping], list[int]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -187,21 +187,21 @@ def measure_frames(
         },
     }
     for stream in streams:
-        flow, sends, good, duplicates = _stream(
+        measured, sends, good, duplicates = _stream(
             stream,
             frames[stream.source],
             None if stream.source_only else frames[stream.destination],
             windows,
         )
-        result["streams"][stream.name] = flow
+        result["streams"][stream.name] = measured
         for w in windows:
             inside = {
-                probe
-                for probe, stamp in sends.items()
-                if w.start_ns <= stamp < w.end_ns
+                ping for ping, stamp in sends.items() if w.start_ns <= stamp < w.end_ns
             }
-            own = [gap for gap in flow["gaps"] if w.name in gap["windows"]]
-            outage = _outage(own)
+            own = [
+                outage for outage in measured["outages"] if w.name in outage["windows"]
+            ]
+            outage = _longest(own)
             lost = outage["lost"] if outage else 0
             result["windows"][w.name]["streams"][stream.name] = {
                 "sent": len(inside),
@@ -220,48 +220,48 @@ def measure_frames(
 
 def _stream(
     stream: Stream, sent: Frames, received: Frames | None, windows: Sequence[Window]
-) -> tuple[dict[str, Any], dict[Probe, int], set[Probe], set[Probe]]:
-    """Match requests and replies of one stream at both ends and find its gaps.
+) -> tuple[dict[str, Any], dict[Ping, int], set[Ping], set[Ping]]:
+    """Match requests and replies of one stream at both ends and find its outages.
 
     Without `received`, the stream is judged from the source capture alone.
     """
     ident = stream.ident
     start, end = windows[0].start_ns, windows[-1].end_ns
     sends = {
-        probe: stamps[0]
-        for (i, kind, probe), stamps in sent.items()
+        ping: stamps[0]
+        for (i, kind, ping), stamps in sent.items()
         if i == ident and kind == REQUEST and start <= stamps[0] < end
     }
     seen = sorted(sends, key=sends.__getitem__)
-    bad: dict[Probe, str] = {}
-    good: set[Probe] = set()
-    duplicates: set[Probe] = set()
+    bad: dict[Ping, str] = {}
+    good: set[Ping] = set()
+    duplicates: set[Ping] = set()
     mismatches = []
-    for probe in seen:
-        outbound, reply = (ident, REQUEST, probe), (ident, REPLY, probe)
+    for ping in seen:
+        outbound, reply = (ident, REQUEST, ping), (ident, REPLY, ping)
         if len(sent.get(reply, [])) > 1 or (
             received is not None and len(received.get(outbound, [])) > 1
         ):
-            duplicates.add(probe)
+            duplicates.add(ping)
         if (
             received is not None
             and reply in sent
             and (outbound not in received or reply not in received)
         ):
-            mismatches.append(probe[0])
+            mismatches.append(ping[0])
         if received is not None and outbound not in received:
-            bad[probe] = "request absent at destination"
+            bad[ping] = "request absent at destination"
         elif received is not None and reply not in received:
-            bad[probe] = "reply absent at destination"
+            bad[ping] = "reply absent at destination"
         elif reply not in sent:
-            bad[probe] = "reply absent at source"
-        elif sent[reply][0] - sends[probe] > LATE_REPLY_NS:
-            bad[probe] = "late reply"
+            bad[ping] = "reply absent at source"
+        elif sent[reply][0] - sends[ping] > LATE_REPLY_NS:
+            bad[ping] = "late reply"
         else:
-            good.add(probe)
-    gaps = _gaps(seen, sends, bad, windows)
+            good.add(ping)
+    outages = _outages(seen, sends, bad, windows)
     gap_limit = SEND_GAP_LIMIT_NS
-    by_time = [(sends[probe], probe[0]) for probe in seen]
+    by_time = [(sends[ping], ping[0]) for ping in seen]
     bounds: list[tuple[int, int | None]] = [(start, None), *by_time, (end, None)]
     max_interval = max(b - a for (a, _), (b, _) in itertools.pairwise(bounds))
     pauses = [
@@ -275,43 +275,43 @@ def _stream(
         for (a, before), (b, after) in itertools.pairwise(bounds)
         if b - a > gap_limit
     ]
-    flow = {
+    measured = {
         "ident": ident,
         "source": stream.source,
         "destination": stream.destination,
         "interval_s": seconds(INTERVAL_NS),
         "sent": len(sends),
         "delivered": len(good),
-        "lost_seqs": sorted(probe[0] for probe in bad),
-        "duplicates": sorted(probe[0] for probe in duplicates),
+        "lost_seqs": sorted(ping[0] for ping in bad),
+        "duplicates": sorted(ping[0] for ping in duplicates),
         "capture_mismatches": mismatches,
-        "gaps": gaps,
+        "outages": outages,
         "max_send_interval_s": seconds(max_interval),
         "send_gap_limit_s": seconds(gap_limit),
         "send_pauses": pauses,
         "cadence_ok": not pauses,
     }
-    return flow, sends, good, duplicates
+    return measured, sends, good, duplicates
 
 
-def _gaps(
-    seen: Sequence[Probe],
-    sends: Mapping[Probe, int],
-    bad: Mapping[Probe, str],
+def _outages(
+    seen: Sequence[Ping],
+    sends: Mapping[Ping, int],
+    bad: Mapping[Ping, str],
     windows: Sequence[Window],
 ) -> list[dict[str, Any]]:
-    """Locate stops between delivered attempts, leaving slots for unseen sequences."""
+    """Locate outages between delivered pings, leaving slots for unseen sequences."""
     start = windows[0].start_ns
-    indexed: dict[int, Probe] = {}
+    indexed: dict[int, Ping] = {}
     position = 0
     previous_seq = seen[0][0] if seen else 0
-    for probe in seen:
-        seq = probe[0]
+    for ping in seen:
+        seq = ping[0]
         position += max(1, (seq - previous_seq) % ICMP_SEQUENCE_MODULUS)
-        indexed[position] = probe
+        indexed[position] = ping
         previous_seq = seq
-    delivered = [slot for slot, probe in indexed.items() if probe not in bad]
-    gaps = []
+    delivered = [slot for slot, ping in indexed.items() if ping not in bad]
+    outages = []
     for previous, next_delivered in itertools.pairwise([0, *delivered, position + 1]):
         first, last = previous + 1, next_delivered - 1
         if first > last:
@@ -331,7 +331,7 @@ def _gaps(
         last_seq = (
             indexed[last][0] if last in indexed else indexed[next_delivered][0] - 1
         )
-        gaps.append(
+        outages.append(
             {
                 "first_seq": first_seq % ICMP_SEQUENCE_MODULUS,
                 "last_seq": last_seq % ICMP_SEQUENCE_MODULUS,
@@ -345,21 +345,21 @@ def _gaps(
                 "windows": [
                     w.name for w in windows if begins < w.end_ns and ends >= w.start_ns
                 ],
-                "where": sorted({bad[probe] for probe in lost}),
+                "where": sorted({bad[ping] for ping in lost}),
             }
         )
-    return gaps
+    return outages
 
 
-def _outage(gaps: list[dict[str, Any]]) -> dict[str, Any] | None:
-    """The longest outage of the gaps and the pings they lost."""
-    if not gaps:
+def _longest(outages: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """The longest outage of the outages and the pings they lost."""
+    if not outages:
         return None
-    uppers = [gap["upper_s"] for gap in gaps]
+    uppers = [outage["upper_s"] for outage in outages]
     return {
-        "lower_s": max(gap["lower_s"] for gap in gaps),
+        "lower_s": max(outage["lower_s"] for outage in outages),
         "upper_s": None if None in uppers else max(uppers),
-        "lost": sum(gap["lost"] for gap in gaps),
+        "lost": sum(outage["lost"] for outage in outages),
     }
 
 

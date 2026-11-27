@@ -1,11 +1,11 @@
-"""Tests for the gap and bound math of the traffic measurement."""
+"""Tests for the outage and bound math of the traffic measurement."""
 
 from network_toolkit import traffic
 
 MS = 1_000_000
 
 
-def test_gap_bounds_window_and_quiet_window():
+def test_outage_bounds_window_and_quiet_window():
     # Stream 7 sends seq 0 to 49 every 100 ms. The replies of seq 40 and 41 are lost.
     a = "h1:eth1"
     b = "h2:eth1"
@@ -14,12 +14,12 @@ def test_gap_bounds_window_and_quiet_window():
     received: traffic.Frames = {}
     for seq in range(50):
         stamp = seq * 100 * MS
-        probe = (seq, payload)
-        sent[7, 8, probe] = [stamp]
-        received[7, 8, probe] = [stamp + MS]
+        ping = (seq, payload)
+        sent[7, 8, ping] = [stamp]
+        received[7, 8, ping] = [stamp + MS]
         if seq not in (40, 41):
-            received[7, 0, probe] = [stamp + MS]
-            sent[7, 0, probe] = [stamp + 2 * MS]
+            received[7, 0, ping] = [stamp + MS]
+            sent[7, 0, ping] = [stamp + 2 * MS]
     received[7, 8, (10, payload)].append(10 * 100 * MS + 3 * MS)
     windows = [
         traffic.Window("quiet window", 0, 3900 * MS),
@@ -29,17 +29,17 @@ def test_gap_bounds_window_and_quiet_window():
         {a: sent, b: received}, [traffic.Stream("h1-to-h2", 7, a, b)], windows
     )
 
-    flow = result["streams"]["h1-to-h2"]
-    assert flow["lost_seqs"] == [40, 41]
-    assert flow["duplicates"] == [10]
-    assert flow["cadence_ok"] is True
-    [gap] = flow["gaps"]
-    assert gap["first_seq"] == 40
-    assert gap["last_seq"] == 41
-    assert gap["lost"] == 2
-    assert gap["lower_s"] == 0.1
-    assert gap["upper_s"] == 0.3
-    assert gap["windows"] == ["down"]
+    measured = result["streams"]["h1-to-h2"]
+    assert measured["lost_seqs"] == [40, 41]
+    assert measured["duplicates"] == [10]
+    assert measured["cadence_ok"] is True
+    [outage] = measured["outages"]
+    assert outage["first_seq"] == 40
+    assert outage["last_seq"] == 41
+    assert outage["lost"] == 2
+    assert outage["lower_s"] == 0.1
+    assert outage["upper_s"] == 0.3
+    assert outage["windows"] == ["down"]
     down = result["windows"]["down"]["streams"]["h1-to-h2"]
     assert down["outage"] == {"lower_s": 0.1, "upper_s": 0.3, "lost": 2}
     assert down["summary"] == (

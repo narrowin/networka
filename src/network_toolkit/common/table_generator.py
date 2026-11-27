@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""Centralized table generation system for Network Toolkit."""
+"""Centralized table generation system for Networka."""
 
 from __future__ import annotations
 

@@ -32,7 +32,7 @@ class DiffOptions:
     targets: str
     subject: str
     config: NetworkConfig
-    baseline: Path | None = None
+    saved_output: Path | None = None
     ignore_patterns: list[str] | None = None
     save_current: Path | None = None
     store_results: bool = False
@@ -142,9 +142,9 @@ def _get_session(
 
 def _diff_texts(
     *,
-    baseline_text: str,
+    saved_text: str,
     current_text: str,
-    baseline_label: str,
+    saved_label: str,
     current_label: str,
     ignore_patterns: list[str],
     heuristic: bool = False,
@@ -158,25 +158,25 @@ def _diff_texts(
         # but StateDiffer design currently relies on hardcoded patterns.
         # We will apply user ignore patterns as a pre-filter if provided.
         if ignore_patterns:
-            baseline_text = "\n".join(_filter_lines(baseline_text, ignore_patterns))
+            saved_text = "\n".join(_filter_lines(saved_text, ignore_patterns))
             current_text = "\n".join(_filter_lines(current_text, ignore_patterns))
 
-        result = differ.diff(baseline_text, current_text)
+        result = differ.diff(saved_text, current_text)
         out = result.to_string()
         return DiffOutcome(
             changed=bool(out.strip() and "No significant" not in out), output=out
         )
 
-    a = _filter_lines(baseline_text, ignore_patterns)
+    a = _filter_lines(saved_text, ignore_patterns)
     b = _filter_lines(current_text, ignore_patterns)
-    out = _make_unified_diff(a, b, baseline_label, current_label)
+    out = _make_unified_diff(a, b, saved_label, current_label)
     return DiffOutcome(changed=bool(out.strip()), output=out)
 
 
-def _find_baseline_file_for_command(base_dir: Path, command: str) -> Path | None:
+def _find_saved_output_for_command(saved_dir: Path, command: str) -> Path | None:
     stem = f"cmd_{_sanitize_filename(command)}"
     for ext in (".txt", ".log", ".out"):
-        candidate = base_dir / f"{stem}{ext}"
+        candidate = saved_dir / f"{stem}{ext}"
         if candidate.exists():
             return candidate
     return None
@@ -206,13 +206,13 @@ def _perform_device_diff(
     is_config: bool,
     is_command: bool,
 ) -> list[DiffItemResult]:
-    if options.baseline is None:
+    if options.saved_output is None:
         return [
             DiffItemResult(
                 device=device,
                 subject=options.subject,
                 outcome=None,
-                error="Baseline is required for single-device diff.",
+                error="Saved output is required for single-device diff.",
             )
         ]
 
@@ -222,40 +222,40 @@ def _perform_device_diff(
     try:
         if is_config:
             # Diff config vs file
-            if options.baseline.is_dir():
+            if options.saved_output.is_dir():
                 # Try to find file in dir
-                cand = options.baseline / f"{device}.rsc"
+                cand = options.saved_output / f"{device}.rsc"
                 if not cand.exists():
-                    cand = options.baseline / f"{device}.txt"
+                    cand = options.saved_output / f"{device}.txt"
                 if not cand.exists():
                     # Try finding any file with device name
-                    matches = list(options.baseline.glob(f"*{device}*"))
+                    matches = list(options.saved_output.glob(f"*{device}*"))
                     if matches:
                         cand = matches[0]
-                base_file = cand
+                saved_file = cand
             else:
-                base_file = options.baseline
+                saved_file = options.saved_output
 
-            if not base_file.exists():
+            if not saved_file.exists():
                 return [
                     DiffItemResult(
                         device=device,
                         subject="config",
                         outcome=None,
-                        error=f"Baseline file not found: {base_file}",
+                        error=f"Saved output not found: {saved_file}",
                     )
                 ]
 
-            base_text = _read_text(base_file)
+            saved_text = _read_text(saved_file)
             with _get_session(device, options.config, options.session_pool) as s:
                 curr_text = s.execute_command("/export compact")
 
             _save_artifact(device, "export_compact", curr_text, options.save_current)
 
             outcome = _diff_texts(
-                baseline_text=base_text,
+                saved_text=saved_text,
                 current_text=curr_text,
-                baseline_label=str(base_file),
+                saved_label=str(saved_file),
                 current_label=f"{device}:/export compact",
                 ignore_patterns=options.ignore_patterns or [],
                 heuristic=options.heuristic,
@@ -266,32 +266,34 @@ def _perform_device_diff(
 
         elif is_command:
             # Diff command vs file
-            cmd_base_file: Path | None
-            if options.baseline.is_dir():
-                cmd_base_file = _find_baseline_file_for_command(options.baseline, subj)
+            cmd_saved_file: Path | None
+            if options.saved_output.is_dir():
+                cmd_saved_file = _find_saved_output_for_command(
+                    options.saved_output, subj
+                )
             else:
-                cmd_base_file = options.baseline
+                cmd_saved_file = options.saved_output
 
-            if not cmd_base_file or not cmd_base_file.exists():
+            if not cmd_saved_file or not cmd_saved_file.exists():
                 return [
                     DiffItemResult(
                         device=device,
                         subject=subj,
                         outcome=None,
-                        error=f"Baseline file not found for command: {subj}",
+                        error=f"Saved output not found for command: {subj}",
                     )
                 ]
 
-            base_text = _read_text(cmd_base_file)
+            saved_text = _read_text(cmd_saved_file)
             with _get_session(device, options.config, options.session_pool) as s:
                 curr_text = s.execute_command(subj)
 
             _save_artifact(device, subj, curr_text, options.save_current)
 
             outcome = _diff_texts(
-                baseline_text=base_text,
+                saved_text=saved_text,
                 current_text=curr_text,
-                baseline_label=str(cmd_base_file),
+                saved_label=str(cmd_saved_file),
                 current_label=f"{device}:{subj}",
                 ignore_patterns=options.ignore_patterns or [],
                 heuristic=options.heuristic,
@@ -300,8 +302,8 @@ def _perform_device_diff(
 
         else:
             # Sequence diff
-            if not options.baseline.is_dir():
-                msg = "For sequence diff, baseline must be a directory."
+            if not options.saved_output.is_dir():
+                msg = "For sequence diff, saved output must be a directory."
                 raise NetworkToolkitError(msg)
 
             seq_cmds = sequence_manager.resolve(sequence_name=subj, device_name=device)
@@ -317,28 +319,28 @@ def _perform_device_diff(
 
             with _get_session(device, options.config, options.session_pool) as s:
                 for cmd in seq_cmds:
-                    seq_base_file: Path | None = _find_baseline_file_for_command(
-                        options.baseline, cmd
+                    seq_saved_file: Path | None = _find_saved_output_for_command(
+                        options.saved_output, cmd
                     )
-                    if not seq_base_file:
+                    if not seq_saved_file:
                         results.append(
                             DiffItemResult(
                                 device=device,
                                 subject=cmd,
                                 outcome=None,
-                                error="Baseline file missing",
+                                error="Saved output missing",
                             )
                         )
                         continue
 
-                    base_text = _read_text(seq_base_file)
+                    saved_text = _read_text(seq_saved_file)
                     curr_text = s.execute_command(cmd)
                     _save_artifact(device, cmd, curr_text, options.save_current)
 
                     outcome = _diff_texts(
-                        baseline_text=base_text,
+                        saved_text=saved_text,
                         current_text=curr_text,
-                        baseline_label=str(seq_base_file),
+                        saved_label=str(seq_saved_file),
                         current_label=f"{device}:{cmd}",
                         ignore_patterns=options.ignore_patterns or [],
                         heuristic=options.heuristic,
@@ -365,9 +367,9 @@ def diff_files(
     text_b = _read_text(file_b)
 
     return _diff_texts(
-        baseline_text=text_a,
+        saved_text=text_a,
         current_text=text_b,
-        baseline_label=str(file_a),
+        saved_label=str(file_a),
         current_label=str(file_b),
         ignore_patterns=ignore_patterns or [],
         heuristic=heuristic,
@@ -403,8 +405,8 @@ def diff_targets(options: DiffOptions) -> DiffResult:
     total_changed = 0
     total_missing = 0
 
-    # Device-to-device mode: exactly two devices and no baseline
-    if options.baseline is None and len(devices) == 2:
+    # Device-to-device mode: exactly two devices and no saved output
+    if options.saved_output is None and len(devices) == 2:
         dev_a, dev_b = devices[0], devices[1]
 
         try:
@@ -440,9 +442,9 @@ def diff_targets(options: DiffOptions) -> DiffResult:
             )
 
             outcome = _diff_texts(
-                baseline_text=curr_a,
+                saved_text=curr_a,
                 current_text=curr_b,
-                baseline_label=f"{dev_a}:{subj}",
+                saved_label=f"{dev_a}:{subj}",
                 current_label=f"{dev_b}:{subj}",
                 ignore_patterns=options.ignore_patterns or [],
             )
@@ -477,13 +479,13 @@ def diff_targets(options: DiffOptions) -> DiffResult:
                 device_pair_diff=True,
             )
 
-    # Standard mode: diff against baseline
-    if not options.baseline:
-        msg = "Baseline path is required (unless comparing exactly two devices)."
+    # Standard mode: diff against saved output
+    if not options.saved_output:
+        msg = "Saved output is required (unless comparing exactly two devices)."
         raise NetworkToolkitError(msg)
 
-    if not options.baseline.exists():
-        msg = f"Baseline path not found: {options.baseline}"
+    if not options.saved_output.exists():
+        msg = f"Saved output not found: {options.saved_output}"
         raise NetworkToolkitError(msg)
 
     # Parallel execution
@@ -508,12 +510,12 @@ def diff_targets(options: DiffOptions) -> DiffResult:
 
     # Calculate totals
     for res in flat_results:
-        if res.error and "Baseline file missing" in res.error:
+        if res.error and "Saved output missing" in res.error:
             total_missing += 1
         elif res.outcome and res.outcome.changed:
             total_changed += 1
-        elif res.error and "Baseline file not found" in res.error:
-            # This covers the case where the whole device failed due to missing baseline
+        elif res.error and "Saved output not found" in res.error:
+            # This covers the case where the whole device failed due to missing saved output
             total_missing += 1
 
     return DiffResult(

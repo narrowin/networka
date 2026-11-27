@@ -92,7 +92,7 @@ class IntentError(NetworkToolkitError):
 
 
 def platform(device_type: str) -> ModuleType:
-    """Return the collectors and normalizers for a Networka device type."""
+    """Return the readers and normalizers for a Networka device type."""
     if device_type not in PLATFORMS:
         supported = ", ".join(sorted(PLATFORMS))
         msg = f"no intent checks for platform {device_type!r}; supported: {supported}"
@@ -120,7 +120,7 @@ def reply_output(
 ) -> str:
     """The output of the reply saved under `key`, which must be for `command`.
 
-    `command` defaults to `key`, as collectors key replies by their command.
+    `command` defaults to `key`, as readers key replies by their command.
     """
     reply = evidence.get(key)
     if not isinstance(reply, dict):
@@ -233,8 +233,8 @@ def address(value: Any) -> str:
     return str(value)
 
 
-def probes(value: Any) -> int:
-    """`value` if it is a whole number of ping probes from 1 to 100."""
+def ping_count(value: Any) -> int:
+    """`value` if it is a whole number of pings from 1 to 100."""
     if type(value) is not int or not 1 <= value <= 100:
         msg = f"count must be a whole number from 1 to 100, not {value!r}"
         raise ValueError(msg)
@@ -474,7 +474,7 @@ def check_ping(
 ) -> IntentResult:
     """Compare a ping from the device: `sent`, `received` and `reachable`.
 
-    `reachable` means every probe was answered. Only the fields named in
+    `reachable` means every ping was answered. Only the fields named in
     `expected` are compared; a loss tolerance is not a field. `interface`
     and `vrf` are optional.
     """
@@ -531,7 +531,7 @@ PARAMS: dict[str, Callable[[Any], Any]] = {
     "interface": lambda v: name(v, "interface"),
     "vrf": lambda v: name(v, "vrf"),
     "dest": address,
-    "count": probes,
+    "count": ping_count,
     "mac": mac,
     "menu": _menu,
     "where": _where,
@@ -608,17 +608,17 @@ def expect(spec: Any, value: Any, check: str) -> None:
 
 @dataclass(frozen=True, slots=True)
 class Check:
-    """How to collect and evaluate one named check.
+    """How to read and evaluate one named check.
 
-    `collector` names a function of the platform module, called with the
+    `reader` names a function of the platform module, called with the
     client, the device and every param in `params` order. `normalizer` names the
     platform normalizer a neutral check needs, `None` for a platform check.
     `expected` is the shape `expected` must have, as `_expected` reads it.
-    `optional` params may be left out and reach the collector as `None`.
+    `optional` params may be left out and reach the reader as `None`.
     """
 
     params: tuple[str, ...]
-    collector: str
+    reader: str
     evaluate: Callable[[Mapping[str, Any], str, Mapping[str, Any], Any], IntentResult]
     normalizer: str | None = None
     expected: Any = None
@@ -631,21 +631,21 @@ _STR = (str,)
 CHECKS: dict[str, Check] = {
     "bridge_port": Check(
         ("bridge", "port"),
-        "collect_bridge_port",
+        "read_bridge_port",
         lambda ev, dt, p, e: check_bridge_port(ev, dt, p["bridge"], p["port"], e),
         "bridge_port",
         {"forwarding": _BOOL, "role": _STR, "edge": _BOOL},
     ),
     "bridge_ports": Check(
         ("bridge",),
-        "collect_bridge",
+        "read_bridge",
         lambda ev, dt, p, e: check_bridge_ports(ev, dt, p["bridge"], e),
         "bridge_ports",
         [_STR],
     ),
     "stp_bridge": Check(
         ("bridge",),
-        "collect_bridge",
+        "read_bridge",
         lambda ev, dt, p, e: check_stp_bridge(ev, dt, p["bridge"], e),
         "stp_bridge",
         {
@@ -658,35 +658,35 @@ CHECKS: dict[str, Check] = {
     ),
     "stp_mode": Check(
         ("bridge",),
-        "collect_stp_mode",
+        "read_stp_mode",
         lambda ev, dt, p, e: check_stp_mode(ev, dt, p["bridge"], e),
         "stp_mode",
         _STR,
     ),
     "mlag": Check(
         ("bridge",),
-        "collect_bridge",
+        "read_bridge",
         lambda ev, dt, p, e: check_mlag(ev, dt, p["bridge"], e),
         "mlag",
         {"connected": _BOOL, "role": _STR, "state": _STR},
     ),
     "lacp_member": Check(
         ("bond", "member"),
-        "collect_bond",
+        "read_bond",
         lambda ev, dt, p, e: check_lacp_member(ev, dt, p["bond"], p["member"], e),
         "lacp_member",
         dict.fromkeys(LACP_FLAGS, _BOOL),
     ),
     "lacp_actor": Check(
         ("bond", "member"),
-        "collect_bond",
+        "read_bond",
         lambda ev, dt, p, e: check_lacp_actor(ev, dt, p["bond"], p["member"], e),
         "lacp_member",
         dict.fromkeys(LACP_FLAGS, _BOOL),
     ),
     "lacp_partner_system": Check(
         ("bond", "member"),
-        "collect_bond",
+        "read_bond",
         lambda ev, dt, p, e: check_lacp_partner_system(
             ev, dt, p["bond"], p["member"], e
         ),
@@ -695,28 +695,28 @@ CHECKS: dict[str, Check] = {
     ),
     "bond_members": Check(
         ("bond",),
-        "collect_bond",
+        "read_bond",
         lambda ev, dt, p, e: check_bond_members(ev, dt, p["bond"], e),
         "bond_members",
         [_STR],
     ),
     "host_entry": Check(
         ("bridge", "mac"),
-        "collect_host_entry",
+        "read_host_entry",
         lambda ev, dt, p, e: check_host_entry(ev, dt, p["bridge"], p["mac"], e),
         "host_entry",
         (str, type(None)),
     ),
     "interface_up": Check(
         ("interface",),
-        "collect_interface",
+        "read_interface",
         lambda ev, dt, p, e: check_interface_up(ev, dt, p["interface"], expected=e),
         "interface_up",
         _BOOL,
     ),
     "ping": Check(
         ("dest", "count"),
-        "collect_ping",
+        "read_ping",
         lambda ev, dt, p, e: check_ping(
             ev, dt, p["dest"], p["count"], p.get("interface"), e, vrf=p.get("vrf")
         ),
@@ -941,7 +941,7 @@ def _resolve(item: IntentItem, device_type: str) -> Check:
         owners = [n for n, checks in _platform_checks().items() if item.check in checks]
         msg = f"{item.where}: check {item.check!r} is only for {', '.join(owners)}, not {device_type}"
         raise IntentError(msg)
-    for name_ in (check.collector, check.normalizer):
+    for name_ in (check.reader, check.normalizer):
         if name_ is not None and not hasattr(module, name_):
             msg = f"{item.where}: {device_type} does not support {item.check} (no {name_})"
             raise IntentError(msg)
@@ -957,14 +957,14 @@ def _resolve(item: IntentItem, device_type: str) -> Check:
 
 
 def _reading(check: Check, item: IntentItem) -> dict[str, Any]:
-    """The key of the one reading an item needs: collector and its arguments.
+    """The key of the one reading an item needs: reader and its arguments.
 
     Optional params that are not given are left off the end of `args`, so
-    the collector gets its defaults and adding an optional param keeps
+    the reader gets its defaults and adding an optional param keeps
     existing keys.
     """
     args = [item.params.get(key) for key in (*check.params, *check.optional)]
-    return {"collector": check.collector, "args": _trim(args, check)}
+    return {"reader": check.reader, "args": _trim(args, check)}
 
 
 def _trim(args: Any, check: Check) -> Any:
@@ -1004,7 +1004,7 @@ def _evaluate(item: IntentItem, saved: Any) -> IntentResult:
         if isinstance(r, dict)
         and same(
             key,
-            {"collector": r.get("collector"), "args": _trim(r.get("args"), check)},
+            {"reader": r.get("reader"), "args": _trim(r.get("args"), check)},
         )
     ]
     if len(matching) == 1 and "error" in matching[0]:
@@ -1019,7 +1019,7 @@ def _evaluate(item: IntentItem, saved: Any) -> IntentResult:
     found = [r.get("replies") for r in matching]
     if len(found) != 1 or not isinstance(found[0], dict):
         return error(
-            f"expected one {key['collector']} reading of {item.device}, found {len(found)}"
+            f"expected one {key['reader']} reading of {item.device}, found {len(found)}"
         )
     try:
         return check.evaluate(
@@ -1090,7 +1090,7 @@ def run_intent(
     """Collect every reading once, then evaluate it exactly as `replay_intent` does.
 
     Every item is resolved against the inventory before any device is read.
-    Items that need the same collector with the same arguments on one device
+    Items that need the same reader with the same arguments on one device
     share one reading. With `save_dir`, `intent.yaml` is written from the
     validated items before collecting, and `evidence.json` and `results.json`
     after. `run_options` are passed to `NetworkaClient.run`.
@@ -1119,12 +1119,12 @@ def run_intent(
                 # The device did not accept a connection: do not wait for it again.
                 reading["replies"], reading["error"] = {}, unreachable
                 continue
-            collect = getattr(module, reading["collector"])
+            read_with = getattr(module, reading["reader"])
             try:
-                reading["replies"] = collect(
+                reading["replies"] = read_with(
                     client, device_name, *reading["args"], **run_options
                 )
-            except Exception as failure:  # any collector failure is kept as evidence
+            except Exception as failure:  # any reader failure is kept as evidence
                 reading["replies"] = {}
                 reading["error"] = f"{type(failure).__name__}: {failure}"
                 continue

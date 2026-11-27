@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: MIT
-"""Collect and normalize RouterOS evidence for the intent checks.
+"""Read and normalize RouterOS evidence for the intent checks.
 
 Every command is read as native JSON: `:serialize to=json` of the command's
 `as-value` result, with `json.no-string-conversion` so that `yes` and `no`
-arrive as Booleans and numbers as numbers. The collectors keep each command
+arrive as Booleans and numbers as numbers. The readers keep each command
 with its output or error. The normalizers turn that evidence into the
 neutral fields of `network_toolkit.intent`, or raise `ValueError` when it
 cannot decide. `check_property` and `check_version` are RouterOS-only checks.
@@ -83,7 +83,7 @@ def menu_print(menu: str) -> str:
     return _JSON.format(f"{menu}/print detail as-value")
 
 
-def collect(
+def read_replies(
     client: NetworkaClient, device: str, *commands: str, **run_options: Any
 ) -> dict[str, Reply]:
     """Run the commands joined with `;` as one read and keep one reply per command.
@@ -129,7 +129,7 @@ def reboot(client: NetworkaClient, device: str, **run_options: Any) -> Reply:
     return intent.read(client, device, REBOOT, run_options)
 
 
-def collect_bridge(
+def read_bridge(
     client: NetworkaClient, device: str, bridge: str, **run_options: Any
 ) -> dict[str, Reply]:
     """Bridge print, bridge monitor and port statistics.
@@ -138,14 +138,16 @@ def collect_bridge(
     must carry. The statistics are a second read, so a failed statistics
     command leaves the bridge monitor usable.
     """
-    evidence = collect(
+    evidence = read_replies(
         client, device, bridge_print(bridge), bridge_monitor(bridge), **run_options
     )
-    evidence["stats"] = collect(client, device, PORT_STATS, **run_options)[PORT_STATS]
+    evidence["stats"] = read_replies(client, device, PORT_STATS, **run_options)[
+        PORT_STATS
+    ]
     return evidence
 
 
-def collect_bond(
+def read_bond(
     client: NetworkaClient,
     device: str,
     bond: str,
@@ -153,35 +155,37 @@ def collect_bond(
     **run_options: Any,
 ) -> dict[str, Reply]:
     """The bonding monitor of `bond`; it lists every member, so `member` is not needed."""
-    return collect(client, device, bond_monitor(bond), **run_options)
+    return read_replies(client, device, bond_monitor(bond), **run_options)
 
 
-def collect_host_entry(
+def read_host_entry(
     client: NetworkaClient, device: str, bridge: str, mac: str, **run_options: Any
 ) -> dict[str, Reply]:
     """The host entries of `mac` and the bridge print that proves `bridge` exists."""
-    return collect(client, device, host_print(mac), bridge_print(bridge), **run_options)
+    return read_replies(
+        client, device, host_print(mac), bridge_print(bridge), **run_options
+    )
 
 
-def collect_interface(
+def read_interface(
     client: NetworkaClient, device: str, interface: str, **run_options: Any
 ) -> dict[str, Reply]:
-    return collect(client, device, ethernet_monitor(interface), **run_options)
+    return read_replies(client, device, ethernet_monitor(interface), **run_options)
 
 
-def collect_uptime(
+def read_uptime(
     client: NetworkaClient, device: str, **run_options: Any
 ) -> dict[str, Reply]:
-    return collect(client, device, UPTIME, **run_options)
+    return read_replies(client, device, UPTIME, **run_options)
 
 
-def collect_stp_mode(
+def read_stp_mode(
     client: NetworkaClient, device: str, bridge: str, **run_options: Any
 ) -> dict[str, Reply]:
-    return collect(client, device, bridge_print(bridge), **run_options)
+    return read_replies(client, device, bridge_print(bridge), **run_options)
 
 
-def collect_print(
+def read_print(
     client: NetworkaClient,
     device: str,
     menu: str,
@@ -190,20 +194,20 @@ def collect_print(
     **run_options: Any,
 ) -> dict[str, Reply]:
     """`print detail as-value` of a menu, for `check_property`."""
-    return collect(client, device, menu_print(menu), **run_options)
+    return read_replies(client, device, menu_print(menu), **run_options)
 
 
-def collect_version(
+def read_version(
     client: NetworkaClient, device: str, **run_options: Any
 ) -> dict[str, Reply]:
-    return collect(client, device, RESOURCE, **run_options)
+    return read_replies(client, device, RESOURCE, **run_options)
 
 
 def ping_command(
     dest: str, count: int, interface: str | None = None, vrf: str | None = None
 ) -> str:
     """`/ping address=<dest> count=<count> [interface=".."] [vrf=".."] as-value`."""
-    command = f"/ping address={intent.address(dest)} count={intent.probes(count)}"
+    command = f"/ping address={intent.address(dest)} count={intent.ping_count(count)}"
     if interface is not None:
         command += f' interface="{intent.name(interface, "interface")}"'
     if vrf is not None:
@@ -211,7 +215,7 @@ def ping_command(
     return _JSON.format(f"{command} as-value")
 
 
-def collect_ping(
+def read_ping(
     client: NetworkaClient,
     device: str,
     dest: str,
@@ -220,9 +224,9 @@ def collect_ping(
     vrf: str | None = None,
     **run_options: Any,
 ) -> dict[str, Reply]:
-    """Ping `dest` from the router; RouterOS returns one row per probe."""
+    """Ping `dest` from the router; RouterOS returns one row per ping."""
     command = ping_command(dest, count, interface, vrf)
-    return collect(client, device, command, **run_options)
+    return read_replies(client, device, command, **run_options)
 
 
 def ping(
@@ -232,18 +236,18 @@ def ping(
     interface: str | None = None,
     vrf: str | None = None,
 ) -> dict[str, Any]:
-    """`sent`, `received` and `reachable` from the per-probe rows of the reply.
+    """`sent`, `received` and `reachable` from the per-ping rows of the reply.
 
-    RouterOS returns one row per probe and no totals. There must be exactly
+    RouterOS returns one row per ping and no totals. There must be exactly
     `count` rows with `seq` 0 to `count - 1`, and every row that names a
-    `host` must name `dest`. A probe is answered when its row has `ttl` and
+    `host` must name `dest`. A ping is answered when its row has `ttl` and
     `time` and no `status`; any `status`, such as `timeout` or `no route to
-    host`, is a lost probe.
+    host`, is a lost ping.
     """
     rows = _rows(evidence, ping_command(dest, count, interface, vrf), "ping")
     seqs = [row.get("seq") for row in rows]
     if seqs != list(range(count)):
-        msg = f"the ping of {dest} returned probes {seqs}, not 0 to {count - 1}"
+        msg = f"the ping of {dest} returned pings {seqs}, not 0 to {count - 1}"
         raise ValueError(msg)
     if any("host" in row and row["host"] != dest for row in rows):
         msg = f"the ping reply is not for {dest}"
@@ -318,7 +322,7 @@ def _port_id(rows: list[dict[str, Any]], bridge: str, interface: str) -> str:
     return port_id
 
 
-def collect_bridge_port(
+def read_bridge_port(
     client: NetworkaClient,
     device: str,
     bridge: str,
@@ -342,7 +346,7 @@ def collect_bridge_port(
 
 
 def bridge_port(evidence: Mapping[str, Any], bridge: str, interface: str) -> dict:
-    """`forwarding`, `role` and `edge` from the evidence of `collect_bridge_port`.
+    """`forwarding`, `role` and `edge` from the evidence of `read_bridge_port`.
 
     The port is selected by bridge and interface name in the statistics, and
     the monitor reply must carry the same `.id`.
@@ -573,7 +577,7 @@ def check_property(
     """Compare one property of a menu entry; an absent property is `error`.
 
     `menu` is the path in slash form, for example `/interface/bridge/port`,
-    as read by `collect_print`. `where` selects one entry by its JSON values,
+    as read by `read_print`. `where` selects one entry by its JSON values,
     for example `{"interface": "ether4"}`. Values compare
     exactly as RouterOS returns them: for example `edge` is the string
     `"yes"` or `"auto"`, `bpdu-guard` a Boolean, `pvid` a number, and
@@ -617,13 +621,13 @@ def check_version(evidence: Mapping[str, Any], expected: str) -> IntentResult:
 CHECKS = {
     "property": Check(
         ("menu", "where", "name"),
-        "collect_print",
+        "read_print",
         lambda ev, _dt, p, e: check_property(ev, p["menu"], p["where"], p["name"], e),
         expected=(str, int, bool, type(None), list),
     ),
     "version": Check(
         (),
-        "collect_version",
+        "read_version",
         lambda ev, _dt, _p, e: check_version(ev, e),
         expected=(str,),
     ),

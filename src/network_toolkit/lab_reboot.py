@@ -115,24 +115,24 @@ def run(
     session: lab.Session,
     switch: str,
     number: int,
-    wait_s: float,
+    recovery_deadline_s: float,
     items: list[intent.IntentItem],
     options: Mapping[str, Any],
 ) -> None:
     validate_target(client, session.lab, switch)
-    before = routeros.collect_uptime(client, switch, **options)
+    before = routeros.read_uptime(client, switch, **options)
     before_ns = routeros.uptime_ns(before)
     if before_ns <= 0:
         msg = f"Cannot prove a lower uptime after reboot of {switch}."
         raise lab.LabError(msg)
     dispatch = session.mark("reboot_start", switch=switch, number=number, uptime=before)
-    with _deadline(wait_s, since_ns=dispatch["mono_ns"]):
+    with _deadline(recovery_deadline_s, since_ns=dispatch["mono_ns"]):
         command = routeros.reboot(client, switch, **options)
         session.mark("reboot_command", switch=switch, number=number, reply=command)
         wait_uptime(
             client, session, {switch: before_ns}, number, dispatch, options, "reboot"
         )
-        wait_healthy(client, session, switch, number, items, options, "reboot")
+        wait_recovered(client, session, switch, number, items, options, "reboot")
 
 
 def wait_uptime(
@@ -152,7 +152,7 @@ def wait_uptime(
             port = client.devices[switch].port or client.config.general.port
             if not _ssh_ready(session.lab.node(switch).address, port):
                 continue
-            reading = routeros.collect_uptime(client, switch, **options)
+            reading = routeros.read_uptime(client, switch, **options)
             observed = session.mark(
                 f"{operation}_uptime", switch=switch, number=number, uptime=reading
             )
@@ -166,7 +166,7 @@ def wait_uptime(
                 del pending[switch]
 
 
-def wait_healthy(
+def wait_recovered(
     client: NetworkaClient,
     session: lab.Session,
     target: str,
@@ -175,19 +175,19 @@ def wait_healthy(
     options: Mapping[str, Any],
     operation: str,
 ) -> None:
-    attempt = 0
+    try_number = 0
     while True:
-        attempt += 1
-        directory = session.directory / "recovery" / str(number) / str(attempt)
-        health = intent.run_intent(client, items, directory, **options)
+        try_number += 1
+        directory = session.directory / "recovery" / str(number) / str(try_number)
+        checked = intent.run_intent(client, items, directory, **options)
         session.mark(
-            f"{operation}_health",
+            f"{operation}_state_checked",
             switch=target,
             number=number,
-            attempt=attempt,
-            verdict=health.verdict,
+            try_number=try_number,
+            verdict=checked.verdict,
         )
-        if health.verdict == "pass":
+        if checked.verdict == "pass":
             return
         time.sleep(POLL_S)
 
@@ -200,25 +200,25 @@ def uptime_proof(
     number: int,
     operation: str,
 ) -> tuple[int, int]:
-    for probe in events:
+    for event in events:
         if (
-            probe["name"] != f"{operation}_uptime"
-            or probe.get("number") != number
-            or probe.get("switch") != switch
+            event["name"] != f"{operation}_uptime"
+            or event.get("number") != number
+            or event.get("switch") != switch
         ):
             continue
         try:
-            after = routeros.uptime_ns(probe["uptime"])
+            after = routeros.uptime_ns(event["uptime"])
         except ValueError:
             continue
-        elapsed = probe["mono_ns"] - start["mono_ns"]
+        elapsed = event["mono_ns"] - start["mono_ns"]
         if _restarted(before, after, elapsed):
             return after, elapsed
     msg = "The recorded uptime does not prove a new boot."
     raise ValueError(msg)
 
 
-def health_proof(
+def recovery_proof(
     folder: Path,
     events: Sequence[Mapping[str, Any]],
     target: str,
@@ -226,17 +226,17 @@ def health_proof(
     items: list[intent.IntentItem],
     operation: str,
 ) -> Mapping[str, Any]:
-    health = [
+    checked = [
         e
         for e in events
-        if e["name"] == f"{operation}_health"
+        if e["name"] == f"{operation}_state_checked"
         and e.get("number") == number
         and e.get("switch") == target
     ][-1]
-    attempt = int(health["attempt"])
-    path = folder / "recovery" / str(number) / str(attempt) / intent.EVIDENCE_FILE
+    try_number = int(checked["try_number"])
+    path = folder / "recovery" / str(number) / str(try_number) / intent.EVIDENCE_FILE
     recovered = intent.replay_intent(items, intent.load_json(path.read_text()))
-    return {**health, "verdict": recovered.verdict}
+    return {**checked, "verdict": recovered.verdict}
 
 
 def proof(
@@ -244,11 +244,15 @@ def proof(
     events: Sequence[Mapping[str, Any]],
     switch: str,
     number: int,
-    wait_s: float,
+    recovery_deadline_s: float,
     items: list[intent.IntentItem],
 ) -> dict[str, Any]:
     """Recheck the raw switch readings and complete lab state against the deadline."""
-    result: dict[str, Any] = {"switch": switch, "verdict": "error", "limit_s": wait_s}
+    result: dict[str, Any] = {
+        "switch": switch,
+        "verdict": "error",
+        "limit_s": recovery_deadline_s,
+    }
     own = [e for e in events if e.get("number") == number and e.get("switch") == switch]
     try:
         [start] = [e for e in own if e["name"] == "reboot_start"]
@@ -260,10 +264,13 @@ def proof(
         result["before_uptime_s"] = before / NS
         after, elapsed_ns = uptime_proof(own, before, start, switch, number, "reboot")
         result.update(after_uptime_s=after / NS, elapsed_s=elapsed_ns / NS)
-        health = health_proof(folder, own, switch, number, items, "reboot")
-        elapsed = (health["mono_ns"] - start["mono_ns"]) / NS
-        result.update(healthy_s=elapsed, state=health["verdict"])
-        if not result["elapsed_s"] <= elapsed <= wait_s or health["verdict"] != "pass":
+        checked = recovery_proof(folder, own, switch, number, items, "reboot")
+        elapsed = (checked["mono_ns"] - start["mono_ns"]) / NS
+        result.update(recovered_s=elapsed, state=checked["verdict"])
+        if (
+            not result["elapsed_s"] <= elapsed <= recovery_deadline_s
+            or checked["verdict"] != "pass"
+        ):
             msg = "The full lab state did not recover within the deadline."
             raise ValueError(msg)
         if command["reply"].get("error"):
