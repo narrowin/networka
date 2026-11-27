@@ -5,6 +5,7 @@ A summary file in the lab repository lists the labs as rows and the modes as
 columns. Each cell names the run directories written by `nw test run --save`.
 Every test folder in them counts for the cell. The summary rewrites the lines
 between two markers in a Markdown file and writes the chart of the worst outage.
+Outages that exceed their limits take precedence over longer outages within limits.
 """
 
 from __future__ import annotations
@@ -64,6 +65,13 @@ class Outage:
     step: str
     source: str
     destination: str
+    exceeds_limit: bool
+    intentional: str | None = None
+
+    @property
+    def rank(self) -> tuple[bool, float]:
+        """Prefer a confirmed limit breach, then the longest upper bound."""
+        return self.exceeds_limit, self.upper
 
 
 @dataclass(frozen=True)
@@ -83,7 +91,7 @@ def _node(point: str) -> str:
 
 
 def _test(folder: Path) -> tuple[str, float | None, Outage | None]:
-    """The verdict, ping interval and longest decided outage of one saved test.
+    """The verdict, ping interval and highest-ranked outage of one saved test.
 
     A test whose starting state check did not pass sent no traffic and has no
     ping interval.
@@ -102,6 +110,9 @@ def _test(folder: Path) -> tuple[str, float | None, Outage | None]:
             return verdict, interval, None
         test = labtest.load_test(folder / labtest.TEST_FILE, folder / labtest.LAB_FILE)
         ends = {s.name: (s.source, s.destination) for s in test.streams}
+        intentional = labtest.intentional_outages(
+            test, {s["name"]: s for s in result["steps"]}
+        )
         for step in result["steps"]:
             for name, stream in step["streams"].items():
                 # The report gives these outages ERROR.
@@ -111,16 +122,27 @@ def _test(folder: Path) -> tuple[str, float | None, Outage | None]:
                     or stream["upper_s"] is None
                 ):
                     continue
-                if worst is None or stream["upper_s"] > worst.upper:
-                    source, destination = ends[name]
-                    worst = Outage(
-                        stream["lower_s"],
-                        stream["upper_s"],
+                source, destination = ends[name]
+                outage = Outage(
+                    stream["lower_s"],
+                    stream["upper_s"],
+                    stream["limit_s"],
+                    step["name"],
+                    _node(source),
+                    _node(destination),
+                    labtest.judge(
+                        stream if stream["lost"] or stream["upper_s"] else None,
                         stream["limit_s"],
-                        step["name"],
-                        _node(source),
-                        _node(destination),
-                    )
+                    )[0]
+                    == "fail",
+                    intentional.get((step["name"], name)),
+                )
+                # Keep breaches visible, but do not rank deliberate downtime
+                # within its allowance against failover on surviving paths.
+                if outage.intentional and not outage.exceeds_limit:
+                    continue
+                if worst is None or outage.rank > worst.rank:
+                    worst = outage
     except (KeyError, TypeError, ValueError, AttributeError) as error:
         labtest._fail(str(path), f"not a result of nw test run: {error!r}")
     return verdict, interval, worst
@@ -162,7 +184,7 @@ def _cell(raw: Any, base: Path, where: str) -> Cell | None:
             counts[verdict] += 1
             if interval is not None:
                 intervals.add(interval)
-            if outage and (worst is None or outage.upper > worst.upper):
+            if outage and (worst is None or outage.rank > worst.rank):
                 worst = outage
     verdict = "FAIL" if counts["fail"] else "PASS" if counts["pass"] else "ERROR"
     return Cell(
@@ -220,6 +242,7 @@ def _worst_cell(cell: Cell | None) -> str:
         f"{_seconds(w.lower)}{EN_DASH}{_seconds(w.upper)}{NBSP}s of{NBSP}{w.limit:g}{NBSP}s, "
         f"{labtest._cell(w.step)}, "
         f"{labtest._cell(w.source)}{NBSP}→{NBSP}{labtest._cell(w.destination)}"
+        + (f", includes {w.intentional.lower()}" if w.intentional else "")
     )
 
 
@@ -273,6 +296,12 @@ def _markdown(
         (
             f"The values are generated with `nw test summary {source}` from the"
             f" runs that [{source}]({source}) lists."
+            " Outages exceeding their limits are highlighted first; among those,"
+            " the longest upper bound is shown. With no limit breach, the longest"
+            " valid outage is shown."
+            " Intentional host interruptions within their combined limits are"
+            " shown separately in each run report and excluded from this comparison;"
+            " breaches remain eligible and are labelled."
         ),
     ]
     return lines
@@ -310,8 +339,8 @@ def _svg(modes: list[str], rows: list[Row]) -> str:
         ),
         f'  <rect width="{WIDTH}" height="{height}" fill="#ffffff"/>',
         (
-            f'  <text x="{AXIS_X}" y="16" font-size="12" fill="{MUTED}">Worst outage '
-            f"in any test, seconds (upper bound{ping})</text>"
+            f'  <text x="{AXIS_X}" y="16" font-size="12" fill="{MUTED}">Outages over '
+            f"their limits first, seconds (upper bound{ping})</text>"
         ),
         '  <g stroke="#d0d7de" stroke-width="1">',
     ]

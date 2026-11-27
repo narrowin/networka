@@ -1990,46 +1990,161 @@ def report(folder: Path, result: Mapping[str, Any]) -> str:
     return "\n".join(output) + "\n"
 
 
+def intentional_outages(
+    test: LabTest, measured_steps: Mapping[str, Any]
+) -> dict[tuple[str, str], str]:
+    """Identify deliberate host interruptions for reporting, without changing judgement."""
+    interruptions = {}
+    for step in test.steps:
+        action = step.action
+        if isinstance(action, lab_mobile.SilenceHost):
+            affected = {action.bond}
+            cause = "Host silence"
+        elif isinstance(action, lab_power.Power):
+            power = measured_steps.get(step.name, {}).get("power", {})
+            nodes = set(action.nodes or power.get("nodes", [action.target]))
+            affected = {
+                point
+                for stream in test.streams
+                for point in (stream.source, stream.destination)
+                if point.split(":", 1)[0] in nodes
+            }
+            cause = "Host power loss"
+        else:
+            continue
+        for stream in test.streams:
+            if affected.intersection((stream.source, stream.destination)):
+                interruptions[step.name, stream.name] = cause
+    return interruptions
+
+
+def _report_power_survivors(
+    test: LabTest, measured_steps: Mapping[str, Any]
+) -> list[str]:
+    """Lead a host power-loss report with traffic that should survive the fault."""
+    intentional = intentional_outages(test, measured_steps)
+    output: list[str] = []
+    for step in test.steps:
+        if (
+            not isinstance(step.action, lab_power.Power)
+            or step.action.on
+            or not any(
+                (step.name, stream.name) in intentional for stream in test.streams
+            )
+        ):
+            continue
+        survivors = [
+            stream
+            for stream in test.streams
+            if (step.name, stream.name) not in intentional
+        ]
+        if not survivors:
+            continue
+        if not output:
+            output += ["", "## Forwarding and failover during power loss"]
+        output += [
+            "",
+            f"**{_cell(step.name)}**",
+            "",
+            f"Expected: {_cell(step.expected)}",
+            "",
+            "| Stream | Measured outage | Limit | Lost pings | Verdict |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+        measured = measured_steps.get(step.name, {})
+        limits = dict(step.limits)
+        for stream in survivors:
+            counts = measured.get("streams", {}).get(stream.name)
+            if counts is None:
+                outage = lost = "unmeasured"
+                verdict = "error"
+            else:
+                lower, upper = counts["lower_s"], counts["upper_s"]
+                outage = "error" if lower is None else _outage_text(lower, upper)
+                lost = str(counts["lost"])
+                verdict = counts["verdict"]
+                if counts.get("diagnostic_only"):
+                    outage += " (diagnostic)"
+                    verdict = f"error. {counts['reason']}"
+            output.append(
+                _row(
+                    stream.name,
+                    outage,
+                    f"{limits[stream.name]:g} s",
+                    lost,
+                    verdict,
+                )
+            )
+    return output
+
+
 def _report_traffic(
     test: LabTest, result: Mapping[str, Any], measured_steps: dict[str, Any]
 ) -> list[str]:
+    surviving_traffic = _report_power_survivors(test, measured_steps)
     output = [
+        *surviving_traffic,
         "",
-        "## Traffic",
+        "## Traffic details" if surviving_traffic else "## Traffic",
         "",
         "| Step | Stream | Limit | Total lost pings | Longest measured outage | Verdict |",
         "| --- | --- | --- | --- | --- | --- |",
     ]
     points = {s.name: f"{s.source} → {s.destination}" for s in test.streams}
+    intentional = intentional_outages(test, measured_steps)
+    intentional_rows = []
     for step in test.steps:
         measured = measured_steps.get(step.name, {})
         for name, limit in step.limits:
             counts = measured.get("streams", {}).get(name)
             if counts is None:
-                output.append(
+                loss = outage = "unmeasured"
+                verdict = "error"
+            else:
+                lower, upper = counts["lower_s"], counts["upper_s"]
+                outage = "error" if lower is None else _outage_text(lower, upper)
+                if counts.get("diagnostic_only"):
+                    loss = counts["summary"]
+                    if lower is not None:
+                        outage += " (diagnostic)"
+                    verdict = f"error. {counts['reason']}"
+                else:
+                    loss = f"{counts['lost']} at one ping every {traffic.INTERVAL_NS // 1_000_000} ms"
+                    verdict = counts["verdict"]
+            if cause := intentional.get((step.name, name)):
+                intentional_rows.append(
                     _row(
                         step.name,
                         points[name],
+                        cause,
                         f"{limit:g} s",
-                        "unmeasured",
-                        "unmeasured",
-                        "error",
+                        loss,
+                        outage,
+                        verdict,
                     )
                 )
-                continue
-            lower, upper = counts["lower_s"], counts["upper_s"]
-            outage = "error" if lower is None else _outage_text(lower, upper)
-            if counts.get("diagnostic_only"):
-                loss = counts["summary"]
-                if lower is not None:
-                    outage += " (diagnostic)"
-                verdict = f"error. {counts['reason']}"
             else:
-                loss = f"{counts['lost']} at one ping every {traffic.INTERVAL_NS // 1_000_000} ms"
-                verdict = counts["verdict"]
-            output.append(
-                _row(step.name, points[name], f"{limit:g} s", loss, outage, verdict)
-            )
+                output.append(
+                    _row(step.name, points[name], f"{limit:g} s", loss, outage, verdict)
+                )
+    if intentional_rows:
+        output += [
+            "",
+            "## Intentional interruptions",
+            "",
+            (
+                "These measured interruptions include deliberate host silence or power loss "
+                "at a host. The combined interruption limits remain in force; they are "
+                "not failover limits for a path that should stay available. "
+                "Recovery is checked separately below."
+            ),
+            "",
+            "| Step | Stream | Cause | Combined limit | Total lost pings | Longest measured interruption | Verdict |",
+            "| --- | --- | --- | --- | --- | --- | --- |",
+            *intentional_rows,
+            "",
+            "## State checks" if surviving_traffic else "## Recovery and state checks",
+        ]
     for step in test.steps:
         measured = measured_steps.get(step.name, {})
         if "state_check" in measured:
@@ -2063,6 +2178,13 @@ def _report_traffic(
                     f"the delay, {delay['impaired_ms']:g} ms during it, and {delay['after_ms']:g} ms after removal."
                 ),
             ]
+    if surviving_traffic:
+        output += [
+            "",
+            "## Restart and rejoin after power returns",
+            "",
+            "Boot and rejoin times start at power-on dispatch.",
+        ]
     for step in test.steps:
         power = measured_steps.get(step.name, {}).get("power", {})
         if power.get("state") != "on" or power.get("verdict") != "pass":
@@ -2073,7 +2195,7 @@ def _report_traffic(
                 f"**Power loss of {_cell(power['switch'])}** · {_cell(power['verdict'])}",
                 "",
                 f"- Data cables lost carrier and the guest was paused for {power['held_s']:.3f} s.",
-                f"- The new boot was detected at +{power['elapsed_s']:.3f} s, with all lab checks passing at +{power['recovered_s']:.3f} s.",
+                f"- The new boot was detected at +{power['elapsed_s']:.3f} s, with all lab checks passing at +{power['recovered_s']:.3f} s after power-on dispatch, against a {power['limit_s']:g} s recovery deadline.",
             ]
             continue
         output += [
@@ -2087,8 +2209,14 @@ def _report_traffic(
             f"- {_cell(node)} showed a new boot at +{boot['elapsed_s']:.3f} s."
             for node, boot in power["boots"].items()
         ]
-        output.append(f"- All lab checks passed at +{power['recovered_s']:.3f} s.")
+        output.append(
+            f"- All lab checks passed at +{power['recovered_s']:.3f} s after power-on dispatch, "
+            f"against a {power['limit_s']:g} s recovery deadline."
+        )
+    relearn_limits: dict[str, float] = {}
     for step in test.steps:
+        if isinstance(step.action, lab_mobile.SilenceHost) and not step.action.clear:
+            relearn_limits[step.action.bond] = step.action.relearn_s
         mobile = measured_steps.get(step.name, {}).get("mobile", {})
         if "gratuitous_arp_s" in mobile:
             output += [
@@ -2112,9 +2240,14 @@ def _report_traffic(
                 f"**{_cell(step.name)}** · {_cell(mobile['verdict'])}",
                 "",
                 (
-                    f"- The hold was {mobile['held_s']:.3f} s. The first host frame "
+                    f"- The deliberate silence lasted {mobile['held_s']:.3f} s. The first host frame "
                     f"reached a switch TAP at {mobile['first_host_frame_s']:.3f} s "
                     "from the start of the quiet window."
+                ),
+                (
+                    f"- The relearning limit is {relearn_limits[step.action.bond]:g} s "
+                    "from that first returning host frame, for delivery and the end "
+                    "of unknown-unicast flooding."
                 ),
             ]
             for stream, reading in mobile["delivery"].items():
