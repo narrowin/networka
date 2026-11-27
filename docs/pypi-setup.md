@@ -1,117 +1,45 @@
-# PyPI Publishing Setup
+# PyPI publishing setup
 
-This document describes how to configure PyPI publishing for the networka project.
+Stable releases use a PyPI API token scoped to the `networka` project, stored as `PYPI_API_TOKEN` in the GitHub `pypi` environment. Prereleases use Trusted Publishing to TestPyPI.
 
-## GitHub Repository Configuration
+## Set up stable publishing
 
-### 1. Set up PyPI Trusted Publishing
+1. Sign in to [PyPI token creation](https://pypi.org/manage/account/token/).
+2. Set the token name to `networka-github-actions` and its scope to **Project: networka**. Create it and copy the token.
+3. Run this command in your terminal and paste the token at its hidden prompt:
 
-In the existing [Networka project on PyPI](https://pypi.org/manage/project/networka/settings/publishing/), add or verify a GitHub Trusted Publisher with these values:
-
-| Setting | Value |
-| --- | --- |
-| Owner | `narrowin` |
-| Repository | `networka` |
-| Workflow file | `release.yml` |
-| Environment | `pypi` |
-
-### 2. Set up TestPyPI Trusted Publishing
-
-1. Go to [TestPyPI](https://test.pypi.org) and create an account
-2. Create a new project called `networka`
-3. Go to "Publishing" → "Add a new pending publisher"
-4. Fill in:
-   - **PyPI Project Name**: `networka`
-   - **Owner**: `narrowin`
-   - **Repository name**: `networka`
-   - **Workflow name**: `release.yml`
-   - **Environment name**: `testpypi`
-
-### 3. Configure GitHub Environments
-
-1. Go to GitHub repository Settings → Environments
-2. Create environment `pypi`:
-   - No deployment protection rules needed (trusted publishing handles authentication)
-3. Create environment `testpypi`:
-   - No deployment protection rules needed
-
-## Local Publishing Setup (Optional)
-
-For manual publishing using `task publish:test` or `task publish:pypi`:
-
-### 1. Configure PyPI credentials
-
-```bash
-# Create pypirc file
-mkdir -p ~/.pypirc
-
-# Edit ~/.pypirc
-[distutils]
-index-servers =
-    pypi
-    testpypi
-
-[pypi]
-username = __token__
-password = <your-pypi-token>
-
-[testpypi]
-repository = https://test.pypi.org/legacy/
-username = __token__
-password = <your-testpypi-token>
-```
-
-### 2. Generate API tokens
-
-1. PyPI: Go to Account Settings → API tokens → "Add API token"
-2. TestPyPI: Go to Account Settings → API tokens → "Add API token"
-3. Use project-scoped tokens when available
-
-## Publishing Process
-
-### Automated (Recommended)
-
-1. Create a release using the release script:
-
-   ```bash
-   ./scripts/release.sh --version 1.0.0
+   ```sh
+   gh secret set PYPI_API_TOKEN --repo narrowin/networka --env pypi
    ```
 
-2. GitHub Actions will automatically:
-   - Build the package
-   - Test installation on multiple platforms
-   - Publish to PyPI (stable) or TestPyPI (prerelease)
-   - Create the GitHub release after publication
+4. Confirm that the secret name appears. This command displays names, never values:
 
-### Manual (Local)
+   ```sh
+   gh secret list --repo narrowin/networka --env pypi
+   ```
 
-```bash
-# Test on TestPyPI first
-task publish:test
+The token belongs only in the GitHub environment secret. It is not needed in this checkout or in chat. Revoke it in PyPI when replacing it.
 
-# If successful, publish to PyPI
-task publish:pypi
+## Release
+
+Follow the pre-release checks in [Project development](development.md#building-and-releasing). The release helper updates metadata and pushes the branch and tag. GitHub Actions builds the distribution files, installs each independently on Ubuntu and macOS, then publishes them. The GitHub release is created only after publication succeeds.
+
+To build and publish an existing release tag using the current workflow:
+
+```sh
+gh workflow run release.yml --repo narrowin/networka --ref main -f tag=v0.5.2
+gh run list --repo narrowin/networka --workflow release.yml --limit 3
+gh run watch RUN_ID --repo narrowin/networka --exit-status
 ```
 
-## Release Types
+The tag must exist remotely and contain matching package metadata. Run a new release only once: PyPI does not permit replacing published files. Retrying a release whose files were already uploaded requires checking which files are present first.
 
-- **Stable releases** (e.g., `1.0.0`): Published to PyPI
-- **Pre-releases** (e.g., `1.0.0rc1`, `1.0.0a1`): Published to TestPyPI
+## Why stable publishing uses an API token
 
-## Troubleshooting
+The latest checked release run, [0.4.1](https://github.com/narrowin/networka/actions/runs/45694239016), passed its build and both installation jobs. PyPI then returned HTTP 403: the Trusted Publishing token was not allowed to upload to `networka`. Earlier investigation confirmed token issuance but could not establish the server-side permission condition. Manual uploads using a project-scoped API token succeeded; the stable workflow uses that authentication method as a workaround.
 
-### Common Issues
+The workflow stops with an explicit error if `PYPI_API_TOKEN` is missing. Token-based uploads do not generate Trusted Publishing attestations. Restoring Trusted Publishing remains separate work; the workaround does not claim to fix PyPI's authorization problem. See the [qualification record](development/networka-release-qualification.md#published-020-and-hosted-checks) and [the action's authentication documentation](https://github.com/pypa/gh-action-pypi-publish#specifying-a-different-username).
 
-1. **Version already exists**: PyPI doesn't allow overwriting. Bump version and try again.
-2. **Authentication failed**: Check API tokens and trusted publishing configuration.
-3. **Package validation failed**: Run `uv run twine check dist/*` to identify issues.
+## TestPyPI
 
-### Testing Installation
-
-```bash
-# Test from TestPyPI
-pip install --index-url https://test.pypi.org/simple/ networka
-
-# Test from PyPI
-pip install networka
-```
+For prereleases, configure a GitHub Trusted Publisher on TestPyPI for owner `narrowin`, repository `networka`, workflow `release.yml`, environment `testpypi`. The GitHub environment must have that exact name. This path remains independent of the stable PyPI token.

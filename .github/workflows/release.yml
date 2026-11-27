@@ -74,7 +74,12 @@ jobs:
       run: |
         TAG_VERSION="${RELEASE_TAG#v}"
         # Extract version from built wheel filename
-        WHEEL_FILE=$(ls dist/*.whl | head -1)
+        WHEELS=(dist/*.whl)
+        if [ "${#WHEELS[@]}" -ne 1 ] || [ ! -f "${WHEELS[0]}" ]; then
+          echo "ERROR: Expected exactly one built wheel in dist/"
+          exit 1
+        fi
+        WHEEL_FILE="${WHEELS[0]}"
         WHEEL_VERSION=$(basename "$WHEEL_FILE" | cut -d'-' -f2)
         echo "Built wheel version: $WHEEL_VERSION"
         if [ "$TAG_VERSION" != "$WHEEL_VERSION" ]; then
@@ -202,8 +207,27 @@ jobs:
         with:
           name: dist
           path: dist/
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Check stable publishing credential
+        if: needs.build.outputs.prerelease == 'false'
+        env:
+          PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          if [ -z "$PYPI_API_TOKEN" ]; then
+            echo "::error::Set PYPI_API_TOKEN in the pypi environment. See docs/pypi-setup.md."
+            exit 1
+          fi
+      - name: Publish stable release to PyPI
+        if: needs.build.outputs.prerelease == 'false'
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          repository-url: ${{ needs.build.outputs.prerelease == 'true' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          attestations: false
+          print-hash: true
+          verify-metadata: true
+      - name: Publish prerelease to TestPyPI
+        if: needs.build.outputs.prerelease == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
           print-hash: true
           verify-metadata: true
