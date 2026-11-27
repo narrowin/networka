@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-11-27
+
+### Added
+
+- Power off several lab nodes together and measure streams to a fixed IP address, including VRRP addresses.
+- Generate a lab results section with `nw test summary` from saved run evidence.
+
+### Fixed
+
+- Measure recovery deadlines from action dispatch and judge ping send pauses against each step's limit.
+- Bound one-way cable cuts by their action markers and require delivered pings around the cut.
+- Measure host silence and relearning from the filter action marker.
+
 ## [0.5.1] - 2026-11-26
 
 ### Added
