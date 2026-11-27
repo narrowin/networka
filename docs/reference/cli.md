@@ -869,6 +869,7 @@ $ nw test [OPTIONS] COMMAND [ARGS]...
 
 * `run`: Run each test in the lab, save its...
 * `replay`: Rebuild the report and compare the result...
+* `summary`: Write the results table and worst-stop...
 
 ### `nw test run`
 
@@ -911,6 +912,28 @@ $ nw test replay [OPTIONS] {directory}
 **Arguments**:
 
 * `directory <path>`: Evidence folder written by &#x27;nw test run&#x27;  [required]
+
+**Options**:
+
+* `--help`: Show this message and exit.
+
+### `nw test summary`
+
+Write the results table and worst-stop chart from saved test runs.
+
+Rewrites the lines between the results markers in the Markdown file
+and writes the SVG chart that the summary file names. Exit status: 0
+written, 2 unusable summary file or a missing run or result.
+
+**Usage**:
+
+```console
+$ nw test summary [OPTIONS] {spec}
+```
+
+**Arguments**:
+
+* `spec <path>`: Summary file (YAML) naming the saved runs  [required]
 
 **Options**:
 

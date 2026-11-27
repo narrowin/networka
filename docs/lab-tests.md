@@ -98,6 +98,36 @@ A failed check takes precedence over an unverified check in a completed run and 
 
 A preflight error can exit before creating a case directory. For example, a stopped collector container fails preflight. A running collector that receives no markers leaves a saved run with unverified switch logs.
 
+## Results summary
+
+`nw test summary <file>` writes a lab repository's results table and chart from runs saved by `nw test run --save`. It rewrites the lines between a `<!-- results:start -->` line and a `<!-- results:end -->` line in a Markdown file and writes an SVG chart of the worst stop per lab and mode. The same runs give byte-identical output. A missing run directory, test folder or `result.json` exits 2 and names the path.
+
+```yaml
+markdown: README.md
+chart: docs/diagrams/results-worst-stop.svg
+chart_alt: Worst traffic stop per lab with RSTP off and on, against its limit
+pass_icon: docs/diagrams/result-pass.svg
+fail_icon: docs/diagrams/result-fail.svg
+caption: RSTP on has the MLAG pair as root. `nw test` live runs of 27 November 2026
+modes: [RSTP off, RSTP on]
+rows:
+  - lab: Small
+    topology: One MLAG pair
+    link: tests/small/README.md
+    cells:
+      RSTP on:
+        runs: [test-results/small-rstp.20261127T061300Z]
+        link: tests/small-rstp/README.md
+  - lab: Medium two-pair-strict
+    topology: Two MLAG pairs + `lacp-strict`
+    label: Two MLAG pairs, lacp-strict
+    link: tests/medium-two-pair-strict/README.md
+```
+
+Paths are relative to the summary file. Links written into the Markdown are relative to the Markdown file. `modes` orders the table columns and the chart sub-rows. A row gives the `lab` name, Markdown `topology` text and `link` to the lab README. The chart shows `label`, or by default the topology without backticks. A mode missing from `cells` shows as not run. A cell lists its `runs` and may `link` its passed count. Each run path is a `--save` directory, whose test folders all count, or a single test folder. A test name listed twice in one cell exits 2. The closing sentence names the run paths. The caption is followed by the ping interval from the results.
+
+The cell shows the number of `pass` tests out of all tests and the number of `error` tests. Its verdict is FAIL when a test failed, PASS when none failed and at least one passed, and ERROR otherwise. The worst stop is the stream stop with the largest upper bound among tests that are not `error`, skipping stops the report marks unverified. It shows the bounds, the stream limit, the step name and the stream's source and destination nodes from the run's own `lab.yaml` copy. The chart marks a PASS cell with a green circle and a FAIL cell with a red square. A dashed line marks the most common limit, and a mark with another limit names it.
+
 ## Saved evidence
 
 | Entry | Content |

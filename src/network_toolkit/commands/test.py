@@ -9,7 +9,7 @@ from typing import Annotated, Any
 import typer
 from rich.table import Table
 
-from network_toolkit import labtest
+from network_toolkit import lab_summary, labtest
 from network_toolkit.client import NetworkaClient
 from network_toolkit.commands.intent import EXIT_CODES, _error
 from network_toolkit.common.command_helpers import CommandContext
@@ -188,6 +188,25 @@ def register(app: typer.Typer) -> None:
             )
             raise typer.Exit(2)
         raise typer.Exit(EXIT_CODES[result["verdict"]])
+
+    @test_app.command("summary")
+    def summary_cmd(
+        spec: Annotated[
+            Path, typer.Argument(help="Summary file (YAML) naming the saved runs")
+        ],
+    ) -> None:
+        """Write the results table and worst-stop chart from saved test runs.
+
+        Rewrites the lines between the results markers in the Markdown file
+        and writes the SVG chart that the summary file names. Exit status: 0
+        written, 2 unusable summary file or a missing run or result.
+        """
+        try:
+            ctx = CommandContext()
+            for path in lab_summary.summarize(spec):
+                ctx.print_info(f"Wrote {path}")
+        except Exception as error:  # no traceback for the operator: exit 2
+            raise _error(error) from None
 
     app.add_typer(test_app, rich_help_panel="Remote Operations")
 

@@ -33,7 +33,10 @@ and command usage.
 - `traffic.py` matches each ping across both captures by identifier, sequence
   and echoed payload. The send timestamp in the payload distinguishes retries
   that reuse a sequence. Observed send times bound each stop.
-- `commands/test.py` exposes [run and replay](../reference/cli.md#nw-test).
+- `lab_summary.py` reads saved results and their `lab.yaml` stream
+  directions and renders the results table and worst-stop chart for a lab
+  repository README.
+- `commands/test.py` exposes [run, replay and summary](../reference/cli.md#nw-test).
   Both call the same evidence evaluator and report renderer. The evaluator
   reads the copied YAML, events, captures, and device and log observations from
   the run directory.
