@@ -1,13 +1,29 @@
 # Compare RouterOS state around an upgrade
 
-Define what to collect once as a Networka sequence. One `nw run` invocation
-collects every command in that sequence for the selected device or group.
-Run it before and after your upgrade, then compare the two saved bundles.
+Collect every RouterOS switch in a lab or customer upgrade group with one
+`nw run` invocation. Define the queries once as a Networka sequence, collect
+the whole group before and after your upgrade, then compare both saved bundles
+with one `nw diff` invocation.
+
+## Define the group once
+
+Use your existing Networka inventory and SSH credentials. Merge these settings
+into its configuration, keeping the existing device and credential entries:
+
+```yaml
+general:
+  results_format: json
+groups:
+  lab_switches:
+    description: All RouterOS switches in the lab
+    members: [switch1, switch2, access-switch]
+```
+
+Replace the member names with every RouterOS device in your upgrade scope, or
+use an existing group that covers them. Confirm every member is present in the
+inventory. This example includes all three switches of a lab.
 
 ## Define the collection once
-
-Use your existing Networka inventory and SSH credentials. Set
-`general.results_format: json` in its configuration.
 
 Save [upgrade-state.yml](examples/upgrade-state.yml) in a `sequences/` directory
 beside your main configuration file. For example, with `./devices.yml` as the
@@ -33,10 +49,10 @@ before/after comparison.
 ## Collect before the upgrade
 
 Run from a Networka checkout with dependencies installed using `uv sync --locked`.
-Set your target and configuration path, and keep this terminal open:
+Set your group and configuration path, and keep this terminal open:
 
 ```bash
-TARGET="switch1"
+TARGET="lab_switches"
 CONFIG="./devices.yml"
 mkdir -p ./captures
 SAVE=$(mktemp -d ./captures/upgrade.XXXXXX)
@@ -46,23 +62,34 @@ uv run --locked nw run "$TARGET" upgrade_state \
   --config "$CONFIG" --store-results --results-dir "$SAVE/before"
 ```
 
-`TARGET` can be a device or a RouterOS-only group. This invocation saves all
-four replies per device, together with a sequence summary. Confirm exit `0`
-and saved results before proceeding.
+This single invocation collects all four queries on every group member.
+Confirm exit `0` and a summary showing every expected device succeeded, with
+zero failures. For this three-switch group:
+
+```text
+Devices: 3 total | 3 succeeded, 0 failed
+```
+
+Networka creates a timestamped directory under `$SAVE/before`, containing a
+directory for each device and a group summary. This example saves twelve JSON
+replies, three sequence summaries and one group summary. Each reply keeps the
+device, exact command, collection time and native JSON output.
 
 ## Perform your upgrade and collect again
 
-Use your approved upgrade procedure. Once SSH access returns, run the same
-sequence with a new destination:
+Use your approved upgrade procedure. Once SSH access returns on every group
+member, collect the same sequence for the whole group with a new destination:
 
 ```bash
 uv run --locked nw run "$TARGET" upgrade_state \
   --config "$CONFIG" --store-results --results-dir "$SAVE/after"
 ```
 
-Confirm exit `0`. Run each capture once in these directories. If you collect
-again, select the exact timestamped directories printed by Networka for the
-comparison; keep the original capture files.
+Confirm exit `0`, the same expected device count and zero failures. The
+timestamped directory under `$SAVE/after` has the same per-device layout.
+Run each capture once in these directories. If you collect again, select the
+exact timestamped directories printed by Networka for the comparison; keep
+the original capture files.
 
 ## Compare the complete bundles
 
@@ -70,10 +97,11 @@ comparison; keep the original capture files.
 uv run --locked nw diff "$SAVE/before" "$SAVE/after" --structured
 ```
 
-One comparison covers every device and command in both bundles. Missing,
-failed or incomplete saved collections produce an error. All device fields
-remain included. Objects are compared by their fields; array order is
-preserved, so row reordering also appears as a difference.
+One comparison covers every device and command in both bundles: twelve
+device/query pairs for this three-switch group. Its output labels each device
+and exact command. Missing, failed or incomplete saved collections produce an
+error. All device fields remain included. Objects are compared by their fields;
+array order is preserved, so row reordering also appears as a difference.
 
 A color terminal shows DeepDiff's compact colored view. Exit `0` means no
 differences, `1` means differences found, and `2` means an error or unusable
